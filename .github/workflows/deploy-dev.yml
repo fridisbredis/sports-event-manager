@@ -27,12 +27,15 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image 
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64
           push: true
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.DEV_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.DEV_SUPABASE_ANON_KEY }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
