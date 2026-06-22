@@ -34,7 +34,7 @@ jobs:
           platforms: linux/amd64
           push: true
           build-args: |
-            NEXT_PUBLIC_SUPABASE_URL=https://lhflutwvwvzawzbcuwup.supabase.co
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.DEV_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.DEV_SUPABASE_ANON_KEY }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           # cache-from: type=gha
@@ -53,7 +53,7 @@ jobs:
             --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             --set-env-vars \
               "NODE_ENV=production" \
-              "NEXT_PUBLIC_SUPABASE_URL=https://lhflutwvwvzawzbcuwup.supabase.co" \
+              "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.DEV_SUPABASE_URL }}" \
               "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.DEV_SUPABASE_ANON_KEY }}" \
               "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.DEV_SUPABASE_SERVICE_ROLE_KEY }}" \
               "TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}" \
