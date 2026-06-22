@@ -109,9 +109,9 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 
 ### Phase 4: GitHub Actions CI/CD
 
-- [ ] GitHub repo created (named `sports-event-manager`)
-- [ ] All secrets added (ACR credentials, Supabase keys, Twilio keys, etc.)
-- [ ] `deploy-dev.yml` workflow runs on push to `main`
+- [x] GitHub repo created (named `sports-event-manager`)
+- [x] All secrets added (ACR credentials, Supabase keys, Twilio keys, etc.)
+- [x] `deploy-dev.yml` workflow runs on push to `main`
 - [ ] `deploy-prod.yml` workflow runs on version tag push
 
 ### Phase 5: Production environment
