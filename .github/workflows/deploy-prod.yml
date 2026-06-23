@@ -53,6 +53,8 @@ jobs:
             --name sports-event-manager-prod \
             --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
             --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            --min-replicas 1 \
+            --max-replicas 3 \
             --set-env-vars \
               "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.PROD_SUPABASE_URL }}" \
               "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.PROD_SUPABASE_ANON_KEY }}" \
