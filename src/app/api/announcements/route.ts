@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { requireTenantAdmin } from '@/lib/auth/tenant'
 import twilio from 'twilio'
 import { z } from 'zod'
 
@@ -10,12 +11,7 @@ const publishSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  // Validate body
+  // Validate body first so we have tenantId for the auth check
   const json = await request.json()
   const parsed = publishSchema.safeParse(json)
   if (!parsed.success) {
@@ -24,9 +20,11 @@ export async function POST(request: NextRequest) {
 
   const { tenantId, channel, body } = parsed.data
 
-  // TODO: verify user is tenant admin for this tenantId
+  // Auth + tenant authorization in one call
+  const auth = await requireTenantAdmin(tenantId)
+  if ('error' in auth) return auth.error
 
-  // Fetch phone numbers for the target channel
+  // ...rest of the handler unchanged (fetch recipients, insert announcement, send SMS)
   const service = await createSupabaseServiceClient()
   const table = channel === 'officials' ? 'officials' : 'participants'
   const { data: recipients, error } = await service
@@ -38,7 +36,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch recipients' }, { status: 500 })
   }
 
-  // Save announcement record
   await service.from('announcements').insert({
     tenant_id: tenantId,
     channel,
@@ -47,11 +44,7 @@ export async function POST(request: NextRequest) {
     published_at: new Date().toISOString(),
   })
 
-  // Send SMS via Twilio
-  const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  )
+  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
 
   const results = await Promise.allSettled(
     (recipients ?? []).map(({ phone }) =>
@@ -63,10 +56,7 @@ export async function POST(request: NextRequest) {
     )
   )
 
-  const failed = results.filter(r => r.status === 'rejected').length
-
-  // Mark SMS as sent
-  // TODO: update the announcement record with sms_sent: true
+  const failed = results.filter((r) => r.status === 'rejected').length
 
   return NextResponse.json({
     sent: results.length - failed,

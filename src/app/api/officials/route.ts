@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { requireTenantAdmin } from '@/lib/auth/tenant'
 import twilio from 'twilio'
 import { z } from 'zod'
 
@@ -10,11 +11,6 @@ const inviteSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const json = await request.json()
   const parsed = inviteSchema.safeParse(json)
   if (!parsed.success) {
@@ -23,11 +19,11 @@ export async function POST(request: NextRequest) {
 
   const { tenantId, name, phone } = parsed.data
 
-  // TODO: verify user is tenant admin for this tenantId
+  const auth = await requireTenantAdmin(tenantId)
+  if ('error' in auth) return auth.error
 
   const service = await createSupabaseServiceClient()
 
-  // Create official record
   const { data: official, error } = await service
     .from('officials')
     .insert({ tenant_id: tenantId, name, phone, invite_status: 'pending' })
@@ -38,14 +34,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
   }
 
-  // Fetch tenant name for the invite message
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('name')
-    .eq('id', tenantId)
-    .single()
+  const { data: tenant } = await service.from('tenants').select('name').eq('id', tenantId).single()
 
-  // Send SMS invite
   const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
 
   await client.messages.create({
