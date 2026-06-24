@@ -4,6 +4,52 @@ import type { User } from '@supabase/supabase-js'
 
 export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 
+export type UserRoleWithTenant = {
+  role: TenantRole
+  tenant_id: string
+  tenantSlug: string
+}
+
+const ROLE_PRIORITY: Record<TenantRole, number> = {
+  system_admin: 1,
+  tenant_admin: 2,
+  official: 3,
+  participant: 4,
+}
+
+export async function getUserRoles(userId: string): Promise<UserRoleWithTenant[]> {
+  const service = await createSupabaseServiceClient()
+  const { data, error } = await service
+    .from('user_roles')
+    .select('role, tenant_id, tenants(slug)')
+    .eq('user_id', userId)
+
+  if (error || !data) return []
+
+  return data.map((row) => ({
+    role: row.role as TenantRole,
+    tenant_id: row.tenant_id,
+    tenantSlug: (row.tenants as { slug: string } | null)?.slug ?? '',
+  }))
+}
+
+export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | null {
+  if (roles.length === 0) return null
+
+  const primary = [...roles].sort((a, b) => ROLE_PRIORITY[a.role] - ROLE_PRIORITY[b.role])[0]
+
+  switch (primary.role) {
+    case 'system_admin':
+      return '/admin'
+    case 'tenant_admin':
+      return `/${primary.tenantSlug}/dashboard`
+    case 'official':
+      return `/${primary.tenantSlug}/assignments`
+    case 'participant':
+      return `/${primary.tenantSlug}/participant`
+  }
+}
+
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
