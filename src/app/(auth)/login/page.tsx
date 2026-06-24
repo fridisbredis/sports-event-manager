@@ -68,9 +68,7 @@ export default function LoginPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Code sent to {phone}
-          </p>
+          <p className="text-sm text-gray-600">Code sent to {phone}</p>
           <label className="block">
             <span className="text-sm text-gray-600">6-digit code</span>
             <input
@@ -89,18 +87,13 @@ export default function LoginPage() {
           >
             {loading ? 'Verifying…' : 'Verify'}
           </button>
-          <button
-            onClick={() => setStep('phone')}
-            className="text-sm text-gray-600 underline"
-          >
+          <button onClick={() => setStep('phone')} className="text-sm text-gray-600 underline">
             Use a different number
           </button>
         </div>
       )}
 
-      {error && (
-        <p className="mt-4 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
     </main>
   )
 }

@@ -7,7 +7,7 @@ interface Props {
 
 export default async function DashboardPage({ params }: Props) {
   const supabase = await createSupabaseServerClient()
-  
+
   const { data: tenant } = await supabase
     .from('tenants')
     .select('*')

@@ -3,7 +3,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function RootPage() {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
@@ -19,8 +21,8 @@ export default async function RootPage() {
       <div>
         <h1 className="text-2xl font-semibold">You're signed in 🎉</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Phase 1 of the setup is working: Next.js + Supabase Auth + Twilio
-          delivered an SMS and verified the OTP.
+          Phase 1 of the setup is working: Next.js + Supabase Auth + Twilio delivered an SMS and
+          verified the OTP.
         </p>
       </div>
 
@@ -40,17 +42,14 @@ export default async function RootPage() {
       </div>
 
       <form action={signOut}>
-        <button
-          type="submit"
-          className="w-full bg-black text-white rounded py-2 hover:bg-gray-800"
-        >
+        <button type="submit" className="w-full bg-black text-white rounded py-2 hover:bg-gray-800">
           Sign out
         </button>
       </form>
 
       <p className="text-xs text-gray-500">
-        TODO: post-login routing based on user role (system_admin → /admin,
-        tenant_admin → /[tenantSlug]/dashboard, etc.)
+        TODO: post-login routing based on user role (system_admin → /admin, tenant_admin →
+        /[tenantSlug]/dashboard, etc.)
       </p>
     </main>
   )
