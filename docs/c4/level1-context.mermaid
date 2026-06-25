@@ -1,0 +1,26 @@
+C4Context
+    title System Context — Viadal Event Planner (Viadal as design driver)
+
+    Person(systemadmin, "System admin", "Manages tenants across the platform: activation, deactivation, feature toggling per tenant.")
+    Person(tenantadmin, "Tenant admin (Event admin)", "Manages one tenant/event. Configures event, manages officials, publishes announcements.")
+    Person(official, "Official (funktionär)", "Invited via SMS. Views workstations, to-do lists and timeslots.")
+    Person(participant, "Participant (deltagare)", "Views event info plus a personal view (bib/category and results link).")
+
+    System(platform, "Viadal Event Planner", "Multi-tenant web app for planning and executing sport events. i18n-ready, per-tenant feature toggling.")
+
+    System_Ext(raceresults, "Race Results", "External timing and results service. Surfaced via embedded links.")
+    System_Ext(sms, "SMS provider", "Delivers official invites and announcement notifications. No email fallback in v1.")
+
+    Rel(systemadmin, platform, "Manages tenants, toggles features")
+    Rel(tenantadmin, platform, "Configures event, manages officials, publishes announcements")
+    Rel(official, platform, "Views workstations, to-do lists, timeslots")
+    Rel(participant, platform, "Views event info and personal view")
+
+    Rel(platform, raceresults, "Embeds links to timing and results pages")
+    Rel(participant, raceresults, "Views results", "via embedded links")
+
+    Rel(platform, sms, "Sends invites and notifications")
+    Rel(sms, official, "Delivers invites and notifications", "SMS")
+    Rel(sms, participant, "Delivers notifications", "SMS")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

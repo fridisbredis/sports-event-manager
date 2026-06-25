@@ -1,0 +1,70 @@
+%% Viadal Event Planner - Screen Map / Information Architecture
+%% v0.1 - 2026-06-24
+%% Participant screens are placeholders (flows to be written). Dashed = placeholder.
+flowchart TD
+    SignIn["Sign in (phone/OTP)"]
+    Invite["Invite confirmation\n(verify number + confirm availability)"]
+
+    SignIn --> SAdmin
+    SignIn --> EAdmin
+    SignIn --> OHome
+    SignIn --> PHome
+
+    subgraph SYS["System admin"]
+        SAdmin["Tenant management (list)"]
+        STenant["Tenant detail\n(activate/deactivate, feature toggles)"]
+        SAdmin --> STenant
+    end
+
+    subgraph ADM["Event admin (tenant admin)"]
+        EAdmin["Event dashboard"]
+        ECfg["Event configuration\n(facts, stages, facilities, publish)"]
+        EWsList["Workstations (list)"]
+        EWsCfg["Workstation configuration\n(windows, capacity, checklists)"]
+        ERoster["Officials roster\n(add/remove, invite)"]
+        ESched["Scheduling\n(by person / by workstation)"]
+        EComm["Communication\n(participant + officials channels)"]
+        EAcct["Personal account"]
+        EAdmin --> ECfg
+        EAdmin --> EWsList
+        EWsList --> EWsCfg
+        EAdmin --> ERoster
+        EAdmin --> ESched
+        EAdmin --> EComm
+        EAdmin --> EAcct
+    end
+
+    subgraph OFF["Official"]
+        OHome["Official home"]
+        OInfo["Event info\n(facts, facilities, programme, results links)"]
+        OSched["My schedule\n(time view + workstation view)"]
+        OAnn["Announcements (officials channel)"]
+        OAcct["Personal account"]
+        OHome --> OInfo
+        OHome --> OSched
+        OHome --> OAnn
+        OHome --> OAcct
+    end
+
+    subgraph PAR["Participant (placeholders)"]
+        PHome["Participant home"]
+        PInfo["Event info (shared)"]
+        PView["Personal view\n(bib/category, results link)"]
+        PAnn["Announcements (participant channel)"]
+        PAcct["Personal account"]
+        PHome --> PInfo
+        PHome --> PView
+        PHome --> PAnn
+        PHome --> PAcct
+    end
+
+    RR["Race Results (external)"]
+
+    ERoster -. SMS invite .-> Invite
+    Invite --> OHome
+    OInfo --> RR
+    PInfo --> RR
+    PView --> RR
+
+    class PHome,PInfo,PView,PAnn,PAcct placeholder
+    classDef placeholder stroke-dasharray: 5 5

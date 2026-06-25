@@ -1,0 +1,41 @@
+C4Container
+    title Container Diagram — Viadal Event Planner (v0.5 · 2026-06-24 · UI delivery decision added · hosting pending Frida confirm)
+
+    Person(systemadmin, "System admin", "Manages tenants, activation/deactivation, per-tenant feature toggling.")
+    Person(tenantadmin, "Tenant admin (Event admin)", "Configures one event, manages officials, publishes announcements.")
+    Person(official, "Official (funktionär)", "Views workstations, to-do lists, timeslots.")
+    Person(participant, "Participant (deltagare)", "Views event info plus personal view (bib/category, results link).")
+
+    System_Boundary(platform, "Viadal Event Planner") {
+        Container_Boundary(deploy, "Azure Container Apps · Docker") {
+            Container(nextjs, "Next.js app", "Next.js 14 App Router · TypeScript · i18next", "Single responsive app for all roles, one codebase (no separate apps). UI delivery (decided 2026-06-24): admin screens web-first (reachable but non-optimized on mobile), official/participant screens mobile-first, role-based navigation; the scheduling matrix is edit-on-desktop and view-only on mobile. Server Components handle rendering; Route Handlers handle server-side actions (publish announcements, send official invites, send notification SMS). All data access goes through the server using the authenticated user's token per request, so Row Level Security applies; the Supabase service role is never used for user-scoped tenant data. No hardcoded UI strings (i18n-ready, English-only in v1). Reads per-tenant feature flags to show/hide features. Holds Twilio credentials server-side.")
+        }
+        Container_Boundary(supa, "Supabase (managed · EU region)") {
+            Container(auth, "Authentication", "Supabase Auth · phone/OTP · @supabase/ssr", "Logs users in by SMS one-time code. Issues the session token that carries the tenant context used by Row Level Security. Session managed via cookies in Next.js middleware. Delivers OTP codes via Twilio.")
+            ContainerDb(db, "Database", "Supabase Postgres · Row Level Security", "All tenants share one database; every row carries tenant_id and Row Level Security enforces tenant isolation at the database layer. Holds events, officials, assignments (workstations, to-do lists, timeslots), participants, announcements, and the tenants table with per-tenant tier and feature flags.")
+            Container(storage, "File storage", "Supabase Storage", "Stores tenant assets such as event logos.")
+        }
+    }
+
+    System_Ext(twilio, "Twilio", "SMS provider. Delivers OTP login codes, official invites, and announcement notifications.")
+    System_Ext(raceresults, "Race Results", "External timing and results service, surfaced via embedded links. No timing computed in-house.")
+
+    Rel(systemadmin, nextjs, "Manages tenants, toggles features", "HTTPS")
+    Rel(tenantadmin, nextjs, "Configures event, manages officials, publishes announcements", "HTTPS")
+    Rel(official, nextjs, "Views schedule and assignments", "HTTPS")
+    Rel(participant, nextjs, "Views event info and personal view", "HTTPS")
+
+    Rel(nextjs, auth, "Authenticates users via SMS one-time code")
+    Rel(nextjs, db, "Reads/writes tenant data", "under Row Level Security")
+    Rel(nextjs, storage, "Uploads/serves logos and assets", "HTTPS")
+    Rel(nextjs, twilio, "Sends official invites and announcement SMS", "API")
+    Rel(nextjs, raceresults, "Embeds links to timing/results pages")
+
+    Rel(auth, twilio, "Sends OTP login codes", "API")
+
+    Rel(twilio, official, "Delivers codes, invites, notifications", "SMS")
+    Rel(twilio, participant, "Delivers codes and notifications", "SMS")
+
+    Rel(participant, raceresults, "Views results", "via embedded links")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
