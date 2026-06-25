@@ -1,6 +1,6 @@
 # Pre-Production Checklist
 
-Living document. Tick items as they're completed. Last updated: 2026-06-22.
+Living document. Tick items as they're completed. Last updated: 2026-06-25.
 
 ---
 
@@ -8,32 +8,30 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 
 ### Security
 
-- [ ] Build `tenant_id` validation into `src/app/api/announcements/route.ts` — verify the authenticated user is a tenant admin for the supplied `tenantId` before using `createSupabaseServiceClient()`
-- [ ] Build `tenant_id` validation into `src/app/api/officials/route.ts` — same as above
-- [ ] Audit any other route that uses the service role client — service role bypasses RLS, so application-layer checks are the only safety net
+- [x] Build `tenant_id` validation into `src/app/api/announcements/route.ts` — verify the authenticated user is a tenant admin for the supplied `tenantId` before using `createSupabaseServiceClient()` (done via `requireTenantAdmin` helper)
+- [x] Build `tenant_id` validation into `src/app/api/officials/route.ts` — same as above
+- [x] Audit any other route that uses the service role client — currently only the two above; future routes use the same `requireTenantAdmin` helper
 - [ ] Rotate ACR passwords (and any other secret) if it's been shared, screenshotted, or pasted anywhere outside 1Password
 - [ ] Verify Twilio EU data residency setting (Console → Account → General Settings → Region) for strict GDPR compliance
 
 ### Missing features
 
-- [ ] Post-login routing in `src/app/page.tsx` based on user role:
-  - `system_admin` → `/admin`
-  - `tenant_admin` → `/[tenantSlug]/dashboard`
-  - `official` → `/[tenantSlug]/dashboard`
-  - `participant` → `/[tenantSlug]/my`
-- [ ] System admin view: create/deactivate tenants, toggle feature flags per tenant
-- [ ] Tenant admin flows: event configuration, officials management, announcements
-- [ ] Official view: assignments (workstation, timeslot, todo)
-- [ ] Participant view: event info, schedule, Race Results link, personal view with bib/category
-- [ ] Personal account settings for all roles: phone, name, notification opt-out toggle
-- [ ] Announcement publishing UI with two channels (officials, participants)
+- [x] Post-login routing in `src/app/page.tsx` based on user role
+- [ ] System admin view: create/deactivate tenants, toggle feature flags per tenant (SYS-01, SYS-02)
+- [ ] Tenant admin flows: event configuration, officials management, announcements (EVT-01/02, WS-01/02, OFF-01, SCHED-01, COMM-01)
+- [ ] Official view: assignments (HOME-01, INFO-01, MYSCH-01, ANN-01)
+- [ ] Participant view: event info, schedule, Race Results link, personal view with bib/category (flows not yet written)
+- [ ] Personal account settings for all roles: phone, name, notification opt-out toggle (ACCT-01)
+- [ ] Announcement publishing UI with two channels (officials, participants) (COMM-01)
 - [ ] Replace all hardcoded UI strings with `i18next` translation keys (English-only in v1, but no hardcoded strings — non-negotiable architectural requirement)
 
 ### Naming and documentation
 
-- [ ] Peter renames Mermaid files and scope PDF from "Viadal Event Planner" to "Sports Event Manager"
-- [ ] Peter's corrected Level 2 diagram (Supabase outside the app boundary) added to `docs/c4/`
-- [ ] Create `DEVELOPMENT.md` (gitignored) with Azure resource details, URLs, and deployment procedures — mirror the Kanban setup
+- [ ] Decide product name — repo is `sports-event-manager`, Peter's docs say "Viadal Event Planner (working title)". Align both, or pick a third for v1 launch.
+- [x] Peter's specification docs added to `docs/` (scope, flows, IA, screens, design prompts, C4 diagrams)
+- [x] Wireframes from Claude Design generated (three key screens saved as visual reference)
+- [x] CLAUDE.md created as project onboarding for Claude sessions
+- [ ] DEVELOPMENT.md (gitignored) with Azure resource details, URLs, and deployment procedures
 
 ### Domain and URLs
 
@@ -50,6 +48,7 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 - [ ] Decide whether to register an alphanumeric sender ID ("Viadal" or "SportEvtMgr") — approval takes days, start early
 - [ ] Budget for SMS costs (~$0.07 per OTP + announcement volume per event)
 - [ ] Document SMS spend tracking — Twilio Console → Monitor → Usage, filtered by subaccount
+- [ ] Buy a separate prod phone number (currently sharing dev number via Supabase test phone numbers — must be replaced before real users)
 
 ---
 
@@ -72,8 +71,8 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 
 ### Secrets management
 
-- [ ] Migrate env vars from Container Apps env to Azure Key Vault references
-- [ ] Use 1Password CLI to inject secrets into local dev (no more plaintext `.env.local`)
+- [x] Migrate env vars from Container Apps env to Azure Key Vault references
+- [x] Use 1Password CLI to inject secrets into local dev (no more plaintext `.env.local`)
 - [ ] Set up GitHub Actions OIDC federation with Azure (replace ACR username/password with managed identity)
 
 ### Testing
@@ -87,6 +86,7 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 - [ ] Design behaviour when a user has roles in multiple tenants (tenant switcher UI?)
 - [ ] Decide: can a user be both `official` and `participant` in the same tenant?
 - [ ] Soft delete vs hard delete for tenants and events — historical data preservation strategy
+- [ ] Decide how `system_admin` is represented in `user_roles` (currently `tenant_id` is NOT NULL — needs either a row per tenant or a designated "system tenant")
 
 ### Backup and disaster recovery
 
@@ -98,7 +98,7 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 
 ## 📋 Phase tracking
 
-### Phase 3: Azure dev environment (in progress)
+### Phase 3: Azure dev environment
 
 - [x] Resource group `sports-event-manager-dev-rg` created
 - [x] ACR `sportsevtmgrdev` created and passwords rotated + saved in 1Password
@@ -112,18 +112,35 @@ Living document. Tick items as they're completed. Last updated: 2026-06-22.
 - [x] GitHub repo created (named `sports-event-manager`)
 - [x] All secrets added (ACR credentials, Supabase keys, Twilio keys, etc.)
 - [x] `deploy-dev.yml` workflow runs on push to `main`
-- [ ] `deploy-prod.yml` workflow runs on version tag push
+- [x] `deploy-prod.yml` workflow runs on version tag push
 
 ### Phase 5: Production environment
 
-- [ ] Prod Supabase project created in Stockholm region
-- [ ] Migrations + RLS policies applied to prod
-- [ ] Prod ACR or prod tag strategy in place
-- [ ] Prod Container App created
-- [ ] Prod environment variables configured (separate from dev)
-- [ ] Domain + SSL + custom domain on Container App
-- [ ] First production deployment verified
+- [x] Prod Supabase project created in Stockholm region
+- [x] Migrations + RLS policies applied to prod
+- [x] Prod ACR or prod tag strategy in place
+- [x] Prod Container App created
+- [x] Prod environment variables configured (separate from dev)
+- [ ] Domain + SSL + custom domain on Container App (deferred — Peter to decide)
+- [x] First production deployment verified
 - [ ] Quota request to Azure for dedicated prod Container Apps Environment (optional)
+
+### Phase 6: Application features (in progress)
+
+- [x] `requireTenantAdmin` helper in `src/lib/auth/tenant.ts` (defense-in-depth)
+- [x] Tenant validation applied to `/api/officials` and `/api/announcements`
+- [x] Middleware returns 401 JSON for `/api/*` (instead of HTML redirect)
+- [x] Post-login routing based on user role
+- [x] DB migration 0003 — workstations, operating windows, todos, event stages, scheduling granularity, draft/published status, assignment statuses
+- [x] DB migration 0003 applied to dev and prod
+- [x] TypeScript types regenerated from new schema + human-friendly aliases
+- [x] Wireframes generated from Claude Design (key screens)
+- [x] Prettier configuration and full-codebase formatting
+- [ ] Build admin screens (EVT-01, EVT-02, WS-01, WS-02, OFF-01, SCHED-01, COMM-01, ACCT-01)
+- [ ] Build official screens (HOME-01, INFO-01, MYSCH-01, ANN-01, AUTH-02)
+- [ ] Build system admin screens (SYS-01, SYS-02)
+- [ ] i18next applied to UI strings
+- [ ] Race Results integration
 
 ---
 
