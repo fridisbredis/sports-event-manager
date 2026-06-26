@@ -7,6 +7,8 @@ export type Tenant = DbTables['tenants']['Row']
 export type UserRole = DbTables['user_roles']['Row']
 export type Event = DbTables['events']['Row']
 export type EventStage = DbTables['event_stages']['Row']
+export type EventDistance = DbTables['event_distances']['Row']
+export type EventFacility = DbTables['event_facilities']['Row']
 export type Workstation = DbTables['workstations']['Row']
 export type WorkstationOperatingWindow = DbTables['workstation_operating_windows']['Row']
 export type WorkstationTodo = DbTables['workstation_todos']['Row']
@@ -29,6 +31,8 @@ export type AnnouncementInsert = DbTables['announcements']['Insert']
 
 // Update types (for partial updates)
 export type EventUpdate = DbTables['events']['Update']
+export type EventDistanceInsert = DbTables['event_distances']['Insert']
+export type EventFacilityInsert = DbTables['event_facilities']['Insert']
 export type WorkstationUpdate = DbTables['workstations']['Update']
 // ...add more as you need them
 

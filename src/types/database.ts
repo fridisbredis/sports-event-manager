@@ -117,6 +117,90 @@ export type Database = {
           },
         ]
       }
+      event_distances: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          label: string
+          position: number
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          label: string
+          position?: number
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          label?: string
+          position?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_distances_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_distances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_facilities: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          label: string
+          position: number
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          label: string
+          position?: number
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          label?: string
+          position?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_facilities_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_facilities_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_stages: {
         Row: {
           created_at: string
@@ -475,6 +559,10 @@ export type Database = {
     Functions: {
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       is_system_admin: { Args: never; Returns: boolean }
+      sync_event_stages: {
+        Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

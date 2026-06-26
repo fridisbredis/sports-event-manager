@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { publishEvent } from '@/lib/actions/publish-event'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -77,34 +77,7 @@ export default async function DashboardPage({ params }: Props) {
 
   async function handlePublish() {
     'use server'
-
-    const supabase = await createSupabaseServerClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) redirect('/login')
-
-    // Re-fetch event and re-verify publish requirements at action time
-    const { data: ev } = await supabase
-      .from('events')
-      .select('id, status, name, start_date, end_date')
-      .eq('tenant_id', tenantId)
-      .maybeSingle()
-
-    if (!ev || ev.status === 'published') return
-
-    const { count: stages } = await supabase
-      .from('event_stages')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_id', ev.id)
-
-    // RLS enforces tenant_admin write access; re-check requirements before update
-    if (!ev.name || !ev.start_date || !ev.end_date || !stages) return
-
-    await supabase.from('events').update({ status: 'published' }).eq('id', ev.id)
-
-    revalidatePath(`/${tenantSlug}/dashboard`)
+    await publishEvent({ tenantSlug, tenantId, eventId: event!.id })
   }
 
   const formatDate = (d: string) =>
