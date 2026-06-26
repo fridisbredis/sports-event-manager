@@ -1,6 +1,6 @@
 # Pre-Production Checklist
 
-Living document. Tick items as they're completed. Last updated: 2026-06-25.
+Living document. Tick items as they're completed. Last updated: 2026-06-26.
 
 ---
 
@@ -133,12 +133,23 @@ Living document. Tick items as they're completed. Last updated: 2026-06-25.
 - [x] Post-login routing based on user role
 - [x] DB migration 0003 — workstations, operating windows, todos, event stages, scheduling granularity, draft/published status, assignment statuses
 - [x] DB migration 0003 applied to dev and prod
-- [x] TypeScript types regenerated from new schema + human-friendly aliases
+- [x] DB migration 0004 — consolidate RLS policies (system_admin handling, unified style across all tenant-scoped tables)
+- [x] DB migration 0005 — event_distances, event_facilities, sync_event_stages RPC
+- [x] TypeScript types regenerated; src/types/app.ts updated with new aliases
 - [x] Wireframes generated from Claude Design (key screens)
 - [x] Prettier configuration and full-codebase formatting
-- [ ] Build admin screens (EVT-01, EVT-02, WS-01, WS-02, OFF-01, SCHED-01, COMM-01, ACCT-01)
-- [ ] Build official screens (HOME-01, INFO-01, MYSCH-01, ANN-01, AUTH-02)
-- [ ] Build system admin screens (SYS-01, SYS-02)
+- [x] EVT-01 (Event dashboard) — draft/published status, required-to-publish checklist, officials/scheduling summaries, navigation to admin areas
+- [x] EVT-02 (Event configuration) — identity, dates, stages, scheduling granularity, save flow
+- [x] Shared publish-event server action used by EVT-01 (and ready for EVT-02)
+- [ ] Publish button on EVT-02 (final step of EVT-02)
+- [ ] Distances and facilities UI in EVT-02 (TODO in code, schema is ready)
+- [ ] WS-01 + WS-02 (Workstations + configuration)
+- [ ] OFF-01 (Officials roster)
+- [ ] SCHED-01 (Scheduling) — pending Peter's input on stage modelling for Viadal
+- [ ] COMM-01 (Communication)
+- [ ] ACCT-01 (Personal account, shared)
+- [ ] HOME-01, INFO-01, MYSCH-01, ANN-01, AUTH-02 (official mobile screens)
+- [ ] SYS-01, SYS-02 (system admin screens)
 - [ ] i18next applied to UI strings
 - [ ] Race Results integration
 
