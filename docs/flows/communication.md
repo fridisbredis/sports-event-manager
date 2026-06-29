@@ -25,7 +25,7 @@
 
 These were discussed and deliberately deferred:
 
-- **Per-workstation channels:** one channel per workstation, with membership following schedule allocation.
+- **Per-work-area channels:** one channel per work area, with membership following schedule allocation.
 - **Two-way / interactive messaging for officials:** officials can post in the channels they belong to.
 - **Admin "important" checkbox:** chat posts are in-app only by default; an admin can flag a post as important to trigger SMS to the channel.
 

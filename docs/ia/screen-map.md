@@ -1,7 +1,9 @@
 # Screen Map / Information Architecture
 
 **Scope:** all screens for v1, grouped by role. Race-admin and official screens are specified from their flows. Participant screens are included as **placeholders** (marked ☐) because their flows are not written yet. System admin screens cover the tenant-management layer.
-**Version:** v0.1 · **Date:** 2026-06-24 · **Owner:** Peter Thorn
+**Version:** v0.2 · **Date:** 2026-06-29 · **Owner:** Peter Thorn
+
+> v0.2 changes (Stage model): EVT-02 gains a stages section (list + type-aware modal + read-only expander); "Workstations" relabelled **Work areas** (screen IDs WS-01/WS-02 kept stable), each work area belongs to one stage; SCHED-01 gains a stage selector and schedules per stage; participant Event info shows only Race stages.
 
 Cross-cutting for every screen: all UI strings are i18n (English only in v1, no hardcoded strings); all tenant data is tenant-scoped; the personal-account, event-info, and communication screens are **shared infrastructure** rendered with role-specific content, not duplicated per role. Feature-gated capabilities sit behind the per-tenant toggle layer.
 
@@ -29,11 +31,11 @@ After sign-in, the user's role determines their landing screen:
 ## 2. Event admin (tenant admin)
 
 - **Event dashboard** — home for the tenant's single event; entry to all admin areas; shows draft/published state. *(Source: event-creation-config)*
-- **Event configuration** — identity (name, type, logo, description), dates/duration, stages/days, venues, distances, facilities, scheduling granularity, and **publish** (draft → published). *(Source: event-creation-config)*
-- **Workstations (list)** — all workstations for the event. *(Source: workstation-checklist-config)*
-- **Workstation configuration** — identity, one or more operating windows, capacity ("up to X"), and checklists/to-dos with instruction text. *(Source: workstation-checklist-config)*
+- **Event configuration** — identity (name, type, logo, description), dates/duration, **stages** (list + type-aware add/edit modal + read-only expander; each stage is Race or Non-race, with start/end time, optional venue, and, for Race stages, distance(s)), facilities, scheduling granularity, and **publish** (draft → published; requires at least one Race stage). *(Source: event-creation-config)*
+- **Work areas (list)** (ID WS-01) — all work areas for the event, each shown with its stage. *(Source: workstation-checklist-config)*
+- **Work area configuration** (ID WS-02) — stage, identity, one or more operating windows (within the stage's allocable range), capacity ("up to X"), and checklists/to-dos with instruction text. *(Source: workstation-checklist-config)*
 - **Officials roster** — add/remove officials, send/re-send SMS invite, see Invited/Confirmed state. *(Source: officials-management-registration)*
-- **Scheduling** — single assignment model in two editable views via a persistent toggle: **By person** and **By workstation**. Cells show assigned-vs-ceiling; out-of-window cells disabled; only Confirmed officials listed; over-capacity warns. *(Source: officials-scheduling v0.2)*
+- **Scheduling** — **stage selector** plus a single assignment model in two editable views via a persistent toggle: **By person** and **By work area**. The grid's time range follows the selected stage. Cells show assigned-vs-ceiling; out-of-window cells disabled; only Confirmed officials listed; over-capacity warns. *(Source: officials-scheduling v0.4)*
 - **Communication** — publish-only announcements to two separate channels: **participant channel** and **officials channel**. *(Source: communication v0.2)*
 - **Personal account** — the admin's own account (shared screen). *(Source: scope item 7)*
 
@@ -41,7 +43,7 @@ After sign-in, the user's role determines their landing screen:
 
 - **Official home** — entry to the screens below. *(Landing)*
 - **Event info** — shared read-only "about the event": identity, dates, location/venues, facilities, event programme, and Race Results links (officials can follow competition status). *(Source: event-info-view)*
-- **My schedule** — the official's own assignments in **two views**: time view (chronological) and workstation view (grouped per station with that station's checklist). Read-only. *(Source: officials-scheduling v0.2)*
+- **My schedule** — the official's own assignments in **two views**: time view (chronological) and work area view (grouped per work area with that work area's checklist). Read-only, across all stages. *(Source: officials-scheduling v0.4)*
 - **Announcements (officials channel)** — read-only officials announcement channel. *(Source: communication v0.2)*
 - **Personal account** — name, mobile number (read-only in v1), SMS notification opt-out, link to My schedule. *(Source: official-personal-account)*
 
@@ -50,7 +52,7 @@ After sign-in, the user's role determines their landing screen:
 Included so the map is complete; flows to be written next.
 
 - **Participant home** ☐ — entry to the screens below.
-- **Event info** ☐ — same shared event-info screen as officials (identity, facilities, location, programme, Race Results links).
+- **Event info** ☐ — same shared event-info screen as officials, but **showing only Race stages** (identity, facilities, location, programme, Race Results links).
 - **Personal view** ☐ — the participant's own bib/category and a link to their Race Results page.
 - **Announcements (participant channel)** ☐ — read-only participant announcement channel.
 - **Personal account** ☐ — name, mobile number, bib/category, Race Results link, SMS notification opt-out.

@@ -1,5 +1,5 @@
 %% Viadal Event Planner - Screen Map / Information Architecture
-%% v0.1 - 2026-06-24
+%% v0.2 - 2026-06-29 (Stage model: Work areas; per-stage scheduling)
 %% Participant screens are placeholders (flows to be written). Dashed = placeholder.
 flowchart TD
     SignIn["Sign in (phone/OTP)"]
@@ -19,10 +19,10 @@ flowchart TD
     subgraph ADM["Event admin (tenant admin)"]
         EAdmin["Event dashboard"]
         ECfg["Event configuration\n(facts, stages, facilities, publish)"]
-        EWsList["Workstations (list)"]
-        EWsCfg["Workstation configuration\n(windows, capacity, checklists)"]
+        EWsList["Work areas (list)"]
+        EWsCfg["Work area configuration\n(stage, windows, capacity, checklists)"]
         ERoster["Officials roster\n(add/remove, invite)"]
-        ESched["Scheduling\n(by person / by workstation)"]
+        ESched["Scheduling\n(stage selector; by person / by work area)"]
         EComm["Communication\n(participant + officials channels)"]
         EAcct["Personal account"]
         EAdmin --> ECfg
@@ -37,7 +37,7 @@ flowchart TD
     subgraph OFF["Official"]
         OHome["Official home"]
         OInfo["Event info\n(facts, facilities, programme, results links)"]
-        OSched["My schedule\n(time view + workstation view)"]
+        OSched["My schedule\n(time view + work area view)"]
         OAnn["Announcements (officials channel)"]
         OAcct["Personal account"]
         OHome --> OInfo

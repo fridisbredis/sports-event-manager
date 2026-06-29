@@ -1,9 +1,9 @@
 C4Container
-    title Container Diagram — Viadal Event Planner (v0.5 · 2026-06-24 · UI delivery decision added · hosting pending Frida confirm)
+    title Container Diagram — Viadal Event Planner (v0.6 · 2026-06-29 · Stage model added · hosting pending Frida confirm)
 
     Person(systemadmin, "System admin", "Manages tenants, activation/deactivation, per-tenant feature toggling.")
     Person(tenantadmin, "Tenant admin (Event admin)", "Configures one event, manages officials, publishes announcements.")
-    Person(official, "Official (funktionär)", "Views workstations, to-do lists, timeslots.")
+    Person(official, "Official (funktionär)", "Views work areas, to-do lists, timeslots.")
     Person(participant, "Participant (deltagare)", "Views event info plus personal view (bib/category, results link).")
 
     System_Boundary(platform, "Viadal Event Planner") {
@@ -12,7 +12,7 @@ C4Container
         }
         Container_Boundary(supa, "Supabase (managed · EU region)") {
             Container(auth, "Authentication", "Supabase Auth · phone/OTP · @supabase/ssr", "Logs users in by SMS one-time code. Issues the session token that carries the tenant context used by Row Level Security. Session managed via cookies in Next.js middleware. Delivers OTP codes via Twilio.")
-            ContainerDb(db, "Database", "Supabase Postgres · Row Level Security", "All tenants share one database; every row carries tenant_id and Row Level Security enforces tenant isolation at the database layer. Holds events, officials, assignments (workstations, to-do lists, timeslots), participants, announcements, and the tenants table with per-tenant tier and feature flags.")
+            ContainerDb(db, "Database", "Supabase Postgres · Row Level Security", "All tenants share one database; every row carries tenant_id and Row Level Security enforces tenant isolation at the database layer. Holds events, stages (Race / Non-race, with their times and venues), officials, work areas, assignments (work area / to-do, timeslot), participants, announcements, and the tenants table with per-tenant tier and feature flags.")
             Container(storage, "File storage", "Supabase Storage", "Stores tenant assets such as event logos.")
         }
     }

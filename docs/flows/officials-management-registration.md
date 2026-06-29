@@ -28,7 +28,7 @@ DECISION (Peter 2026-06-24): an admin is **always schedulable**. When the event 
 ## Admin flow: removing officials
 
 1. Admin removes an official from the event.
-2. If the official has existing assignments, removal frees those assignments and the admin is warned which timeslots/workstations are affected (consistent with the "warn but allow" pattern), so coverage gaps are visible rather than silent.
+2. If the official has existing assignments, removal frees those assignments and the admin is warned which timeslots/work areas are affected (consistent with the "warn but allow" pattern), so coverage gaps are visible rather than silent.
 3. A removed official can no longer sign in to this event.
 
 ## Official flow: confirming from the SMS invite
