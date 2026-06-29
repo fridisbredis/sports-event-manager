@@ -18,10 +18,10 @@ Handoff index for the development team. This `docs/` folder is the source of tru
 
 | Area | Status |
 |------|--------|
-| Scope & context (scope doc, C4 L1/L2) | Stable. Scope doc v0.6. |
-| Flows (race admin + official) | Complete. |
+| Scope & context (scope doc, C4 L1/L2) | Stable. Scope doc v0.7 (Stage model); C4 L2 v0.6. |
+| Flows (race admin + official) | Complete. Updated for Stage model (work areas, per-stage scheduling). |
 | Screen map | Complete (participant screens shown as placeholders). |
-| Screen documentation | Complete for system admin + event admin + official (v0.3). |
+| Screen documentation | Complete for system admin + event admin + official (v0.4). |
 | Wireframes | First pass generated in Claude Design; iterating. |
 
 ## Cross-cutting, non-negotiable
