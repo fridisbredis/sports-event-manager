@@ -251,6 +251,7 @@ export type Database = {
       }
       events: {
         Row: {
+          category_type: string
           created_at: string
           description: string | null
           end_date: string
@@ -265,6 +266,7 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          category_type?: string
           created_at?: string
           description?: string | null
           end_date: string
@@ -279,6 +281,7 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          category_type?: string
           created_at?: string
           description?: string | null
           end_date?: string

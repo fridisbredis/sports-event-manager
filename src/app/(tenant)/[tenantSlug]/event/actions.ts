@@ -28,6 +28,7 @@ export interface SaveEventInput {
   start_date: string
   end_date: string
   scheduling_granularity_min: number
+  category_type: 'distance' | 'time'
   stages: StageInput[]
   distances: LabelInput[]
   facilities: LabelInput[]
@@ -71,6 +72,7 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
       location: input.location || null,
       logo_url: input.logo_url || null,
       scheduling_granularity_min: input.scheduling_granularity_min,
+      category_type: input.category_type,
     })
     .eq('id', input.eventId)
     .eq('tenant_id', input.tenantId)

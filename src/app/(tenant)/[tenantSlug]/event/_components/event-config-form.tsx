@@ -19,6 +19,7 @@ interface Props {
   initialStages: StageInput[]
   initialDistances: LabelInput[]
   initialFacilities: LabelInput[]
+  initialCategoryType: 'distance' | 'time'
   isPublished: boolean
 }
 
@@ -45,6 +46,7 @@ export default function EventConfigForm({
   initialStages,
   initialDistances,
   initialFacilities,
+  initialCategoryType,
   isPublished,
 }: Props) {
   const [name, setName] = useState(initialName)
@@ -66,7 +68,9 @@ export default function EventConfigForm({
   const [facilitiesText, setFacilitiesText] = useState(
     initialFacilities.map((f) => f.label).join(', ')
   )
+  const [categoryType, setCategoryType] = useState<'distance' | 'time'>(initialCategoryType)
   const [showStagesEditor, setShowStagesEditor] = useState(false)
+  const [logoError, setLogoError] = useState(false)
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -94,6 +98,7 @@ export default function EventConfigForm({
       start_date: startDate,
       end_date: endDate,
       scheduling_granularity_min: granularity,
+      category_type: categoryType,
       stages,
       distances: parseLabelText(distancesText),
       facilities: parseLabelText(facilitiesText),
@@ -215,9 +220,14 @@ export default function EventConfigForm({
             {/* Logo */}
             <div className="flex items-start gap-4">
               <div className="w-20 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden">
-                {logoUrl ? (
+                {logoUrl && !logoError ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoUrl} alt="Event logo" className="w-full h-full object-cover" />
+                  <img
+                    src={logoUrl}
+                    alt="Event logo"
+                    className="w-full h-full object-cover"
+                    onError={() => setLogoError(true)}
+                  />
                 ) : (
                   <svg className="w-8 h-8 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -231,7 +241,7 @@ export default function EventConfigForm({
                 <input
                   type="url"
                   value={logoUrl}
-                  onChange={(e) => { setLogoUrl(e.target.value); setSaveSuccess(false) }}
+                  onChange={(e) => { setLogoUrl(e.target.value); setLogoError(false); setSaveSuccess(false) }}
                   placeholder="https://…"
                   className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
@@ -444,12 +454,32 @@ export default function EventConfigForm({
             {/* Distances + Scheduling granularity */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Distances</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    {categoryType === 'distance' ? 'Distances' : 'Times'}
+                  </label>
+                  <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+                    {(['distance', 'time'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setCategoryType(t); setSaveSuccess(false) }}
+                        className={`px-2.5 py-1 font-medium transition-colors ${
+                          categoryType === t
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-500 hover:text-gray-900 bg-white'
+                        }`}
+                      >
+                        {t === 'distance' ? 'Distance' : 'Time'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={distancesText}
                   onChange={(e) => { setDistancesText(e.target.value); setSaveSuccess(false) }}
-                  placeholder="42 km, 88 km, 120 km"
+                  placeholder={categoryType === 'distance' ? '42 km, 88 km, 120 km' : '1h, 3h, 6h, 12h'}
                   className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
               </div>

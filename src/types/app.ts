@@ -40,6 +40,7 @@ export type WorkstationUpdate = DbTables['workstations']['Update']
 // These match the CHECK constraints in migration 0003
 export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 export type EventStatus = 'draft' | 'published'
+export type EventCategoryType = 'distance' | 'time'
 export type AssignmentStatus = 'assigned' | 'available' | 'on_break' | 'blocked'
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'pending' | 'confirmed' | 'removed'

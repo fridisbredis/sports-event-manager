@@ -39,7 +39,7 @@ export default async function EventConfigPage({ params }: Props) {
   const { data: event } = await supabase
     .from('events')
     .select(
-      'id, name, event_type, description, location, logo_url, start_date, end_date, status, scheduling_granularity_min'
+      'id, name, event_type, description, location, logo_url, start_date, end_date, status, scheduling_granularity_min, category_type'
     )
     .eq('tenant_id', tenant.id)
     .maybeSingle()
@@ -80,6 +80,7 @@ export default async function EventConfigPage({ params }: Props) {
         initialStartDate={event.start_date ?? ''}
         initialEndDate={event.end_date ?? ''}
         initialGranularity={event.scheduling_granularity_min}
+        initialCategoryType={(event.category_type as 'distance' | 'time') ?? 'distance'}
         initialStages={(stages ?? []).map((s) => ({
           name: s.name,
           stage_date: s.stage_date,
