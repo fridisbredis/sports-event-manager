@@ -1,5 +1,4 @@
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import EventConfigForm from './_components/event-config-form'
 
@@ -47,39 +46,28 @@ export default async function EventConfigPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const { data: stages } = await supabase
-    .from('event_stages')
-    .select('name, stage_date, venue, position')
-    .eq('event_id', event.id)
-    .order('position', { ascending: true })
+  const [{ data: stages }, { data: distances }, { data: facilities }] = await Promise.all([
+    supabase
+      .from('event_stages')
+      .select('name, stage_date, venue, position')
+      .eq('event_id', event.id)
+      .order('position', { ascending: true }),
+    supabase
+      .from('event_distances')
+      .select('label, position')
+      .eq('event_id', event.id)
+      .order('position', { ascending: true }),
+    supabase
+      .from('event_facilities')
+      .select('label, position')
+      .eq('event_id', event.id)
+      .order('position', { ascending: true }),
+  ])
 
   const isPublished = event.status === 'published'
 
   return (
-    <div className="px-10 py-10 max-w-3xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-10">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-            <Link href={`/${tenantSlug}/dashboard`} className="hover:text-gray-600 transition-colors">
-              Dashboard
-            </Link>
-            <span>›</span>
-            <span className="text-gray-600">Event configuration</span>
-          </div>
-          <h1 className="text-2xl font-semibold text-gray-900">{tenant.name}</h1>
-        </div>
-        <span
-          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-            isPublished
-              ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20'
-              : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
-          }`}
-        >
-          {isPublished ? 'Published' : 'Draft'}
-        </span>
-      </div>
-
+    <div className="px-8 py-8">
       <EventConfigForm
         tenantSlug={tenantSlug}
         tenantId={tenant.id}
@@ -97,6 +85,14 @@ export default async function EventConfigPage({ params }: Props) {
           stage_date: s.stage_date,
           venue: s.venue ?? '',
           position: s.position,
+        }))}
+        initialDistances={(distances ?? []).map((d) => ({
+          label: d.label,
+          position: d.position,
+        }))}
+        initialFacilities={(facilities ?? []).map((f) => ({
+          label: f.label,
+          position: f.position,
         }))}
         isPublished={isPublished}
       />

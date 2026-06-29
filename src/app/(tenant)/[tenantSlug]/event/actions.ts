@@ -11,6 +11,11 @@ export interface StageInput {
   position: number
 }
 
+export interface LabelInput {
+  label: string
+  position: number
+}
+
 export interface SaveEventInput {
   tenantSlug: string
   tenantId: string
@@ -24,6 +29,8 @@ export interface SaveEventInput {
   end_date: string
   scheduling_granularity_min: number
   stages: StageInput[]
+  distances: LabelInput[]
+  facilities: LabelInput[]
 }
 
 export interface SaveEventResult {
@@ -82,6 +89,37 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
   })
 
   if (rpcError) return { error: rpcError.message }
+
+  // Atomically replace distances and facilities (delete + insert).
+  const { error: delDistError } = await supabase
+    .from('event_distances')
+    .delete()
+    .eq('event_id', input.eventId)
+    .eq('tenant_id', input.tenantId)
+  if (delDistError) return { error: delDistError.message }
+
+  const distanceRows = input.distances
+    .filter((d) => d.label.trim())
+    .map((d, i) => ({ label: d.label, position: i, event_id: input.eventId, tenant_id: input.tenantId }))
+  if (distanceRows.length > 0) {
+    const { error: insDistError } = await supabase.from('event_distances').insert(distanceRows)
+    if (insDistError) return { error: insDistError.message }
+  }
+
+  const { error: delFacError } = await supabase
+    .from('event_facilities')
+    .delete()
+    .eq('event_id', input.eventId)
+    .eq('tenant_id', input.tenantId)
+  if (delFacError) return { error: delFacError.message }
+
+  const facilityRows = input.facilities
+    .filter((f) => f.label.trim())
+    .map((f, i) => ({ label: f.label, position: i, event_id: input.eventId, tenant_id: input.tenantId }))
+  if (facilityRows.length > 0) {
+    const { error: insFacError } = await supabase.from('event_facilities').insert(facilityRows)
+    if (insFacError) return { error: insFacError.message }
+  }
 
   revalidatePath(`/${input.tenantSlug}/event`)
   revalidatePath(`/${input.tenantSlug}/dashboard`)
