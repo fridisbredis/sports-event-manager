@@ -36,7 +36,7 @@ async function initI18next(lng: string = defaultLocale, ns?: string) {
     .use(
       resourcesToBackend((language: string, namespace: string) => {
         const lang = language as keyof typeof translations
-        const nsKey = namespace as keyof typeof translations['en']
+        const nsKey = namespace as keyof (typeof translations)['en']
         return translations[lang]?.[nsKey] || {}
       })
     )

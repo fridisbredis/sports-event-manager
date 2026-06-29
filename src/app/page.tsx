@@ -20,9 +20,7 @@ export default async function RootPage() {
     return (
       <main className="max-w-md mx-auto mt-20 p-6">
         <h1 className="text-xl font-semibold">{t('errors.notAuthorized')}</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          {t('errors.noAccess')}
-        </p>
+        <p className="mt-2 text-sm text-gray-600">{t('errors.noAccess')}</p>
       </main>
     )
   }

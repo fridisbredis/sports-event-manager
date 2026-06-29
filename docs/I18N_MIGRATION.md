@@ -100,6 +100,7 @@ Choose the namespace based on the screen/feature:
 For strings with dynamic values, use `{{variable}}` syntax:
 
 **JSON:**
+
 ```json
 {
   "inviteSent": "Invite sent to {{name}}"
@@ -107,6 +108,7 @@ For strings with dynamic values, use `{{variable}}` syntax:
 ```
 
 **Component:**
+
 ```tsx
 const { t } = useTranslation('admin')
 t('officials.inviteSent', { name: official.name })
@@ -123,6 +125,7 @@ t('officials.inviteSent', { name: official.name })
 5. Call `i18next.changeLanguage('sv')` to switch
 
 Example for Swedish:
+
 ```tsx
 // In a client component
 import { useTranslation } from '@/lib/i18n/client'
@@ -130,11 +133,7 @@ import { useTranslation } from '@/lib/i18n/client'
 export function LanguageSwitcher() {
   const { i18n } = useTranslation()
 
-  return (
-    <button onClick={() => i18n.changeLanguage('sv')}>
-      Svenska
-    </button>
-  )
+  return <button onClick={() => i18n.changeLanguage('sv')}>Svenska</button>
 }
 ```
 
@@ -224,12 +223,13 @@ Open DevTools Console and search for any warnings about missing translation keys
 
 ```tsx
 // In browser console
-import('i18next').then(m => m.default.changeLanguage('sv'))
+import('i18next').then((m) => m.default.changeLanguage('sv'))
 ```
 
 ### 3. Check the JSON is valid
 
 Run:
+
 ```bash
 npm run build
 ```

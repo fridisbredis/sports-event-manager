@@ -92,7 +92,10 @@ export default async function DashboardPage({ params }: Props) {
   const dateRange = event ? formatDateRange(event.start_date, event.end_date) : null
   const eventName = event?.name?.trim() || t('dashboard.eventName')
   const eventType = event?.event_type?.trim() || null
-  const subtitle = [eventType ?? t('dashboard.typeNotSet'), dateRange ?? t('dashboard.datesNotSet')].join(' · ')
+  const subtitle = [
+    eventType ?? t('dashboard.typeNotSet'),
+    dateRange ?? t('dashboard.datesNotSet'),
+  ].join(' · ')
 
   return (
     <div className="px-8 py-8">
@@ -121,14 +124,10 @@ export default async function DashboardPage({ params }: Props) {
             {t('dashboard.publishStatus')}
           </h2>
           {isPublished ? (
-            <p className="text-sm text-gray-700">
-              {t('dashboard.publishedVisible')}
-            </p>
+            <p className="text-sm text-gray-700">{t('dashboard.publishedVisible')}</p>
           ) : canPublish ? (
             <>
-              <p className="text-sm text-gray-700 mb-5">
-                {t('dashboard.draftNotVisible')}
-              </p>
+              <p className="text-sm text-gray-700 mb-5">{t('dashboard.draftNotVisible')}</p>
               <form action={handlePublish}>
                 <button
                   type="submit"
@@ -140,9 +139,7 @@ export default async function DashboardPage({ params }: Props) {
             </>
           ) : (
             <>
-              <p className="text-sm text-gray-700 mb-4">
-                {t('dashboard.cannotPublish')}
-              </p>
+              <p className="text-sm text-gray-700 mb-4">{t('dashboard.cannotPublish')}</p>
               <ul className="space-y-2.5 mb-5">
                 {!hasName && <MissingItem label={t('dashboard.requiredEventName')} />}
                 {!hasDates && <MissingItem label={t('dashboard.requiredEventDate')} />}

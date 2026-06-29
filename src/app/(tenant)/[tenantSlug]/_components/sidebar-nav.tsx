@@ -41,9 +41,7 @@ export function SidebarNav({ tenantSlug }: Props) {
 
   return (
     <div className="flex flex-col flex-1">
-      <nav className="py-2 flex-1">
-        {navItems.map((item) => navLink(item.segment, item.label))}
-      </nav>
+      <nav className="py-2 flex-1">{navItems.map((item) => navLink(item.segment, item.label))}</nav>
       <div className="border-t border-gray-100 py-2">
         {navLink('account', t('navigation.account'))}
       </div>
