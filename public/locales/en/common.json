@@ -1,0 +1,28 @@
+{
+  "app": {
+    "name": "Sports Event Manager",
+    "description": "Plan and execute your sport event"
+  },
+  "errors": {
+    "notAuthorized": "You are not authorized to access this",
+    "noAccess": "Your account is not linked to any organization. Please contact your administrator.",
+    "notFound": "Not found"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "add": "Add",
+    "back": "Back",
+    "close": "Close",
+    "confirm": "Confirm",
+    "remove": "Remove",
+    "signOut": "Sign out"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  }
+}

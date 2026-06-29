@@ -1,0 +1,33 @@
+{
+  "home": {
+    "title": "Official Home",
+    "eventInfo": "Event Info",
+    "mySchedule": "My Schedule",
+    "announcements": "Announcements",
+    "account": "Account"
+  },
+  "eventInfo": {
+    "title": "Event Information",
+    "identity": "Identity",
+    "type": "Event type",
+    "dates": "Dates",
+    "location": "Location",
+    "description": "Description",
+    "facilities": "Facilities",
+    "raceResults": "Race Results"
+  },
+  "mySchedule": {
+    "title": "My Schedule",
+    "viewBy": "View by",
+    "byTime": "By time",
+    "byWorkstation": "By workstation",
+    "noAssignments": "You have no assignments",
+    "workstation": "Workstation",
+    "time": "Time",
+    "checklist": "Checklist"
+  },
+  "announcements": {
+    "title": "Announcements",
+    "noAnnouncements": "No announcements yet"
+  }
+}

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { saveEvent, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   tenantSlug: string
@@ -49,6 +50,7 @@ export default function EventConfigForm({
   initialCategoryType,
   isPublished,
 }: Props) {
+  const { t } = useTranslation('admin')
   const [name, setName] = useState(initialName)
   const [eventType, setEventType] = useState(initialEventType)
   const [description, setDescription] = useState(initialDescription)
@@ -163,7 +165,7 @@ export default function EventConfigForm({
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-gray-900">Event configuration</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{t('eventConfig.title')}</h1>
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
               isPublished
@@ -171,7 +173,7 @@ export default function EventConfigForm({
                 : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
             }`}
           >
-            {isPublished ? 'Published' : 'Draft'}
+            {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -188,7 +190,7 @@ export default function EventConfigForm({
                 : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900'
             }`}
           >
-            {isSaving ? 'Saving…' : saveSuccess ? 'Saved' : 'Save'}
+            {isSaving ? t('eventConfig.saving') : saveSuccess ? t('eventConfig.saved') : t('eventConfig.save')}
           </button>
           {!isPublished && (
             <button
@@ -197,7 +199,7 @@ export default function EventConfigForm({
               disabled={isSaving || isPublishing}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {isPublishing ? 'Publishing…' : 'Publish'}
+              {isPublishing ? t('eventConfig.publishing') : t('eventConfig.publish')}
             </button>
           )}
         </div>
@@ -214,7 +216,7 @@ export default function EventConfigForm({
         {/* Left: Identity */}
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
-            Identity
+            {t('eventConfig.identity')}
           </h2>
           <div className="space-y-4">
             {/* Logo */}
@@ -224,7 +226,7 @@ export default function EventConfigForm({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={logoUrl}
-                    alt="Event logo"
+                    alt={t('eventConfig.logoAlt')}
                     className="w-full h-full object-cover"
                     onError={() => setLogoError(true)}
                   />
@@ -237,12 +239,12 @@ export default function EventConfigForm({
                 )}
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.logoUrl')}</label>
                 <input
                   type="url"
                   value={logoUrl}
                   onChange={(e) => { setLogoUrl(e.target.value); setLogoError(false); setSaveSuccess(false) }}
-                  placeholder="https://…"
+                  placeholder={t('eventConfig.logoPlaceholder')}
                   className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
               </div>
@@ -250,13 +252,13 @@ export default function EventConfigForm({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Event name <span className="text-red-400">*</span>
+                {t('eventConfig.eventName')} <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => { setName(e.target.value); setSaveSuccess(false) }}
-                placeholder="e.g. Viadal 2026"
+                placeholder={t('eventConfig.eventNamePlaceholder')}
                 className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${
                   errors.name ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
                 }`}
@@ -265,23 +267,23 @@ export default function EventConfigForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.type')}</label>
               <input
                 type="text"
                 value={eventType}
                 onChange={(e) => { setEventType(e.target.value); setSaveSuccess(false) }}
-                placeholder="e.g. Multi-stage road race"
+                placeholder={t('eventConfig.typePlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.description')}</label>
               <textarea
                 value={description}
                 onChange={(e) => { setDescription(e.target.value); setSaveSuccess(false) }}
                 rows={4}
-                placeholder="Short description visible to officials and participants"
+                placeholder={t('eventConfig.descriptionPlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 resize-none"
               />
             </div>
@@ -291,14 +293,14 @@ export default function EventConfigForm({
         {/* Right: Schedule & Setup */}
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
-            Schedule &amp; Setup
+            {t('eventConfig.scheduleSetup')}
           </h2>
           <div className="space-y-4">
             {/* Dates + Stages row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Dates / duration
+                  {t('eventConfig.datesAndDuration')}
                 </label>
                 <div className="space-y-2">
                   <input
@@ -312,7 +314,7 @@ export default function EventConfigForm({
                         ...prev,
                         end_date:
                           endDate && val && endDate < val
-                            ? 'End date must be on or after start date.'
+                            ? t('eventConfig.endDateError')
                             : undefined,
                       }))
                     }}
@@ -329,7 +331,7 @@ export default function EventConfigForm({
                         ...prev,
                         end_date:
                           startDate && val && val < startDate
-                            ? 'End date must be on or after start date.'
+                            ? t('eventConfig.endDateError')
                             : undefined,
                       }))
                     }}
@@ -345,7 +347,7 @@ export default function EventConfigForm({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Stages / days
+                  {t('eventConfig.stagesAndDays')}
                 </label>
                 <button
                   type="button"
@@ -354,8 +356,8 @@ export default function EventConfigForm({
                 >
                   <span className={currentStageCount === 0 ? 'text-gray-400' : ''}>
                     {currentStageCount === 0
-                      ? 'No stages'
-                      : `${currentStageCount} stage${currentStageCount !== 1 ? 's' : ''}`}
+                      ? t('eventConfig.noStages')
+                      : `${currentStageCount} ${currentStageCount !== 1 ? t('eventConfig.stages') : t('eventConfig.stage')}`}
                   </span>
                   <svg
                     className={`h-4 w-4 text-gray-400 transition-transform ${showStagesEditor ? 'rotate-180' : ''}`}
@@ -375,14 +377,14 @@ export default function EventConfigForm({
               <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    Stages / days <span className="text-red-400">*</span>
+                    {t('eventConfig.stagesAndDays')} <span className="text-red-400">*</span>
                   </span>
                   <button
                     type="button"
                     onClick={addStage}
                     className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-md px-3 py-1.5 bg-white hover:border-gray-300 transition-colors"
                   >
-                    + Add stage
+                    {t('eventConfig.addStage')}
                   </button>
                 </div>
                 {errors.stages && <p className="text-xs text-red-500">{errors.stages}</p>}
@@ -393,17 +395,17 @@ export default function EventConfigForm({
                       className="grid grid-cols-[1fr_8rem_1fr_1.25rem] gap-2 items-start"
                     >
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">{t('eventConfig.stageName')}</label>
                         <input
                           type="text"
                           value={stage.name}
                           onChange={(e) => updateStage(i, 'name', e.target.value)}
-                          placeholder="e.g. Day 1"
+                          placeholder={t('eventConfig.stageNamePlaceholder')}
                           className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-gray-900/10"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">{t('eventConfig.stageDate')}</label>
                         <input
                           type="date"
                           value={stage.stage_date}
@@ -412,12 +414,12 @@ export default function EventConfigForm({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Venue</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">{t('eventConfig.stageVenue')}</label>
                         <input
                           type="text"
                           value={stage.venue}
                           onChange={(e) => updateStage(i, 'venue', e.target.value)}
-                          placeholder="Optional"
+                          placeholder={t('eventConfig.stageVenuePlaceholder')}
                           className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-gray-900/10"
                         />
                       </div>
@@ -427,7 +429,7 @@ export default function EventConfigForm({
                             type="button"
                             onClick={() => removeStage(i)}
                             className="text-gray-300 hover:text-red-400 transition-colors text-xl leading-none"
-                            aria-label="Remove stage"
+                            aria-label={t('eventConfig.removeStage')}
                           >
                             ×
                           </button>
@@ -441,12 +443,12 @@ export default function EventConfigForm({
 
             {/* Venues */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Venues</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.venues')}</label>
               <input
                 type="text"
                 value={location}
                 onChange={(e) => { setLocation(e.target.value); setSaveSuccess(false) }}
-                placeholder="Town Square, Lakeside Park, City Arena"
+                placeholder={t('eventConfig.venuesPlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
               />
             </div>
@@ -456,21 +458,21 @@ export default function EventConfigForm({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium text-gray-700">
-                    {categoryType === 'distance' ? 'Distances' : 'Times'}
+                    {categoryType === 'distance' ? t('eventConfig.distances') : t('eventConfig.times')}
                   </label>
                   <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
-                    {(['distance', 'time'] as const).map((t) => (
+                    {(['distance', 'time'] as const).map((typeOption) => (
                       <button
-                        key={t}
+                        key={typeOption}
                         type="button"
-                        onClick={() => { setCategoryType(t); setSaveSuccess(false) }}
+                        onClick={() => { setCategoryType(typeOption); setSaveSuccess(false) }}
                         className={`px-2.5 py-1 font-medium transition-colors ${
-                          categoryType === t
+                          categoryType === typeOption
                             ? 'bg-gray-900 text-white'
                             : 'text-gray-500 hover:text-gray-900 bg-white'
                         }`}
                       >
-                        {t === 'distance' ? 'Distance' : 'Time'}
+                        {typeOption === 'distance' ? t('eventConfig.distance') : t('eventConfig.time')}
                       </button>
                     ))}
                   </div>
@@ -479,14 +481,14 @@ export default function EventConfigForm({
                   type="text"
                   value={distancesText}
                   onChange={(e) => { setDistancesText(e.target.value); setSaveSuccess(false) }}
-                  placeholder={categoryType === 'distance' ? '42 km, 88 km, 120 km' : '1h, 3h, 6h, 12h'}
+                  placeholder={categoryType === 'distance' ? t('eventConfig.distancesPlaceholder') : t('eventConfig.timesPlaceholder')}
                   className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Scheduling granularity
+                  {t('eventConfig.schedulingGranularity')}
                 </label>
                 <div className="relative">
                   <select
@@ -494,10 +496,10 @@ export default function EventConfigForm({
                     onChange={(e) => { setGranularity(Number(e.target.value)); setSaveSuccess(false) }}
                     className="w-full appearance-none rounded-lg border border-gray-200 px-3.5 py-2.5 pr-9 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                   >
-                    <option value={30}>30 min</option>
-                    <option value={60}>60 min (default)</option>
-                    <option value={90}>90 min</option>
-                    <option value={120}>120 min</option>
+                    <option value={30}>{t('eventConfig.granularity30min')}</option>
+                    <option value={60}>{t('eventConfig.granularity60min')}</option>
+                    <option value={90}>{t('eventConfig.granularity90min')}</option>
+                    <option value={120}>{t('eventConfig.granularity120min')}</option>
                   </select>
                   <svg
                     className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
@@ -514,12 +516,12 @@ export default function EventConfigForm({
 
             {/* Facilities */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Facilities</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.facilities')}</label>
               <input
                 type="text"
                 value={facilitiesText}
                 onChange={(e) => { setFacilitiesText(e.target.value); setSaveSuccess(false) }}
-                placeholder="Parking, Officials lounge, First aid"
+                placeholder={t('eventConfig.facilitiesPlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
               />
             </div>

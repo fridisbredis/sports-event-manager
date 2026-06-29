@@ -2,15 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-const navItems = [
-  { segment: 'dashboard', label: 'Dashboard' },
-  { segment: 'event', label: 'Event configuration' },
-  { segment: 'workstations', label: 'Workstations' },
-  { segment: 'officials', label: 'Officials' },
-  { segment: 'scheduling', label: 'Scheduling' },
-  { segment: 'communication', label: 'Communication' },
-]
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   tenantSlug: string
@@ -18,6 +10,16 @@ interface Props {
 
 export function SidebarNav({ tenantSlug }: Props) {
   const pathname = usePathname()
+  const { t } = useTranslation('admin')
+
+  const navItems = [
+    { segment: 'dashboard', label: t('navigation.dashboard') },
+    { segment: 'event', label: t('navigation.eventConfig') },
+    { segment: 'workstations', label: t('navigation.workstations') },
+    { segment: 'officials', label: t('navigation.officials') },
+    { segment: 'scheduling', label: t('navigation.scheduling') },
+    { segment: 'communication', label: t('navigation.communication') },
+  ]
 
   const navLink = (segment: string, label: string) => {
     const href = `/${tenantSlug}/${segment}`
@@ -43,7 +45,7 @@ export function SidebarNav({ tenantSlug }: Props) {
         {navItems.map((item) => navLink(item.segment, item.label))}
       </nav>
       <div className="border-t border-gray-100 py-2">
-        {navLink('account', 'Account')}
+        {navLink('account', t('navigation.account'))}
       </div>
     </div>
   )

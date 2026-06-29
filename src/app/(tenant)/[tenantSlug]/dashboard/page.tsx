@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { publishEvent } from '@/lib/actions/publish-event'
+import { getServerTranslation } from '@/lib/i18n/server'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -9,6 +10,7 @@ interface Props {
 
 export default async function DashboardPage({ params }: Props) {
   const { tenantSlug } = await params
+  const t = await getServerTranslation('en', 'admin')
 
   const supabase = await createSupabaseServerClient()
   const {
@@ -88,9 +90,9 @@ export default async function DashboardPage({ params }: Props) {
   }
 
   const dateRange = event ? formatDateRange(event.start_date, event.end_date) : null
-  const eventName = event?.name?.trim() || 'Untitled event'
+  const eventName = event?.name?.trim() || t('dashboard.eventName')
   const eventType = event?.event_type?.trim() || null
-  const subtitle = [eventType ?? 'Type not set', dateRange ?? 'dates not set'].join(' · ')
+  const subtitle = [eventType ?? t('dashboard.typeNotSet'), dateRange ?? t('dashboard.datesNotSet')].join(' · ')
 
   return (
     <div className="px-8 py-8">
@@ -107,7 +109,7 @@ export default async function DashboardPage({ params }: Props) {
               : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
           }`}
         >
-          {isPublished ? 'Published' : 'Draft'}
+          {isPublished ? t('dashboard.published') : t('dashboard.draft')}
         </span>
       </div>
 
@@ -116,41 +118,41 @@ export default async function DashboardPage({ params }: Props) {
         {/* Publish Status */}
         <div className="rounded-xl border border-gray-200 bg-white p-6">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-            Publish Status
+            {t('dashboard.publishStatus')}
           </h2>
           {isPublished ? (
             <p className="text-sm text-gray-700">
-              Published — visible to officials and participants.
+              {t('dashboard.publishedVisible')}
             </p>
           ) : canPublish ? (
             <>
               <p className="text-sm text-gray-700 mb-5">
-                This event is a draft and not yet visible to officials or participants.
+                {t('dashboard.draftNotVisible')}
               </p>
               <form action={handlePublish}>
                 <button
                   type="submit"
                   className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
                 >
-                  Publish event
+                  {t('dashboard.publishEvent')}
                 </button>
               </form>
             </>
           ) : (
             <>
               <p className="text-sm text-gray-700 mb-4">
-                Cannot publish — required fields are missing:
+                {t('dashboard.cannotPublish')}
               </p>
               <ul className="space-y-2.5 mb-5">
-                {!hasName && <MissingItem label="Event name" />}
-                {!hasDates && <MissingItem label="Event date" />}
-                {!hasStage && <MissingItem label="At least one stage" />}
+                {!hasName && <MissingItem label={t('dashboard.requiredEventName')} />}
+                {!hasDates && <MissingItem label={t('dashboard.requiredEventDate')} />}
+                {!hasStage && <MissingItem label={t('dashboard.requiredStage')} />}
               </ul>
               <button
                 disabled
                 className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white opacity-40 cursor-not-allowed"
               >
-                Publish event
+                {t('dashboard.publishEvent')}
               </button>
             </>
           )}
@@ -159,11 +161,11 @@ export default async function DashboardPage({ params }: Props) {
         {/* Officials */}
         <div className="rounded-xl border border-gray-200 bg-white p-6">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-            Officials
+            {t('dashboard.officials')}
           </h2>
           <div className="flex items-end gap-8">
-            <BigStat value={officialsInvited} label="Invited" />
-            <BigStat value={officialsConfirmed} label="Confirmed" />
+            <BigStat value={officialsInvited} label={t('dashboard.invited')} />
+            <BigStat value={officialsConfirmed} label={t('dashboard.confirmed')} />
           </div>
         </div>
       </div>
@@ -172,11 +174,11 @@ export default async function DashboardPage({ params }: Props) {
       <div className="rounded-xl border border-gray-200 bg-white p-6 mb-5">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Scheduling Warnings
+            {t('dashboard.schedulingWarnings')}
           </h2>
           {totalWarnings === 0 ? (
             <span className="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-              All clear
+              {t('dashboard.allClear')}
             </span>
           ) : (
             <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
@@ -185,8 +187,8 @@ export default async function DashboardPage({ params }: Props) {
           )}
         </div>
         <div className="flex items-end gap-8">
-          <BigStat value={overCapacity} label="Over capacity" />
-          <BigStat value={doubleBooked} label="Double-booked" />
+          <BigStat value={overCapacity} label={t('dashboard.overCapacity')} />
+          <BigStat value={doubleBooked} label={t('dashboard.doubleBooked')} />
         </div>
         {totalWarnings > 0 && (
           <div className="mt-5">
@@ -194,7 +196,7 @@ export default async function DashboardPage({ params }: Props) {
               href={`/${tenantSlug}/scheduling`}
               className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors"
             >
-              Review in Scheduling ›
+              {t('dashboard.reviewInScheduling')}
             </Link>
           </div>
         )}
@@ -203,15 +205,15 @@ export default async function DashboardPage({ params }: Props) {
       {/* Admin Areas */}
       <div>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          Admin Areas
+          {t('dashboard.adminAreas')}
         </h2>
         <div className="grid grid-cols-3 gap-4">
-          <NavTile href={`/${tenantSlug}/event`} title="Event configuration" />
-          <NavTile href={`/${tenantSlug}/workstations`} title="Workstations" />
-          <NavTile href={`/${tenantSlug}/officials`} title="Officials" />
-          <NavTile href={`/${tenantSlug}/scheduling`} title="Scheduling" />
-          <NavTile href={`/${tenantSlug}/communication`} title="Communication" />
-          <NavTile href={`/${tenantSlug}/account`} title="Account" />
+          <NavTile href={`/${tenantSlug}/event`} title={t('navigation.eventConfig')} />
+          <NavTile href={`/${tenantSlug}/workstations`} title={t('navigation.workstations')} />
+          <NavTile href={`/${tenantSlug}/officials`} title={t('navigation.officials')} />
+          <NavTile href={`/${tenantSlug}/scheduling`} title={t('navigation.scheduling')} />
+          <NavTile href={`/${tenantSlug}/communication`} title={t('navigation.communication')} />
+          <NavTile href={`/${tenantSlug}/account`} title={t('navigation.account')} />
         </div>
       </div>
     </div>
