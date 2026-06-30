@@ -90,8 +90,8 @@ export default async function EventConfigPage({ params }: Props) {
         initialStages={(stages ?? []).map((s, i) => ({
           name: s.name,
           stage_type: (s.stage_type as 'race' | 'non_race') ?? 'race',
-          start_time: s.start_time ?? null,
-          end_time: s.end_time ?? null,
+          start_time: s.start_time ? s.start_time.slice(0, 16) : null,
+          end_time: s.end_time ? s.end_time.slice(0, 16) : null,
           venue: s.venue ?? '',
           position: s.position ?? i,
           distances: distancesByStageId[s.id] ?? [],
