@@ -64,17 +64,20 @@ export default function EventConfigForm({
   const [isPublishing, startPublish] = useTransition()
 
   function derivedDateRange(stageList: StageInput[]): string | null {
-    const raceTimes = stageList.filter((s) => s.stage_type === 'race' && s.start_time)
-    if (!raceTimes.length) return null
-    const starts = raceTimes.map((s) => new Date(s.start_time!))
-    const ends = raceTimes.map((s) => s.end_time ? new Date(s.end_time) : new Date(s.start_time!))
-    const min = new Date(Math.min(...starts.map((d) => d.getTime())))
-    const max = new Date(Math.max(...ends.map((d) => d.getTime())))
-    const sDay = min.getUTCDate()
-    const eDay = max.getUTCDate()
-    const sMonth = min.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
-    const eMonth = max.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
-    const year = max.getUTCFullYear()
+    // Slice the date portion directly from the datetime-local string ('YYYY-MM-DDTHH:mm')
+    // to avoid Date constructor interpreting it as local time and shifting the date.
+    const raceDates = stageList
+      .filter((s) => s.stage_type === 'race' && s.start_time)
+      .flatMap((s) => [s.start_time!.slice(0, 10), (s.end_time ?? s.start_time!).slice(0, 10)])
+      .sort()
+    if (!raceDates.length) return null
+    const minDate = new Date(raceDates[0] + 'T00:00Z')
+    const maxDate = new Date(raceDates[raceDates.length - 1] + 'T00:00Z')
+    const sDay = minDate.getUTCDate()
+    const eDay = maxDate.getUTCDate()
+    const sMonth = minDate.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
+    const eMonth = maxDate.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
+    const year = maxDate.getUTCFullYear()
     if (sMonth === eMonth) return `${sDay}–${eDay} ${sMonth} ${year}`
     return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`
   }
@@ -105,6 +108,10 @@ export default function EventConfigForm({
   }
 
   function handleSave() {
+    if (!name.trim()) {
+      setErrors({ name: t('eventConfig.eventNameEmpty') })
+      return
+    }
     setSaveSuccess(false)
     setErrors({})
     startSave(async () => {
@@ -118,6 +125,14 @@ export default function EventConfigForm({
   }
 
   function handlePublish() {
+    const errs: FormErrors = {}
+    if (!name.trim()) errs.name = t('eventConfig.publishRequiresName')
+    const hasRaceStage = stages.some((s) => s.stage_type === 'race')
+    if (!hasRaceStage) errs.stages = t('eventConfig.noRaceStageWarning')
+    if (errs.name || errs.stages) {
+      setErrors(errs)
+      return
+    }
     setErrors((prev) => ({ ...prev, publish: undefined }))
     startPublish(async () => {
       const result = await publishEvent({ tenantSlug, tenantId, eventId })
@@ -181,7 +196,7 @@ export default function EventConfigForm({
       )}
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-2 gap-10">
+      <div className="grid grid-cols-[2fr_3fr] gap-10">
         {/* Left: Identity */}
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
@@ -231,6 +246,7 @@ export default function EventConfigForm({
                 onChange={(e) => {
                   setName(e.target.value)
                   setSaveSuccess(false)
+                  if (e.target.value.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
                 }}
                 placeholder={t('eventConfig.eventNamePlaceholder')}
                 className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${

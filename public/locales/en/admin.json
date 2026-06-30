@@ -90,7 +90,9 @@
     "distancesPlaceholder": "e.g. 88 km, 44 km",
     "timesPlaceholder": "e.g. 6h, 24h, 48h",
     "saveStage": "Save stage",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "publishRequiresName": "Event name is required before publishing.",
+    "eventNameEmpty": "Event name cannot be empty."
   },
   "workstations": {
     "title": "Workstations",

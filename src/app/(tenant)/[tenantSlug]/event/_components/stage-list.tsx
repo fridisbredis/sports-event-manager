@@ -19,20 +19,26 @@ const DEFAULT_STAGES: StageInput[] = [
 ]
 
 function formatTime(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+  // datetime-local strings are 'YYYY-MM-DDTHH:mm' — no timezone suffix.
+  // Slicing avoids Date constructor interpreting them as local time.
+  return iso.slice(11, 16)
+}
+
+function weekdayFromDateString(dateStr: string): string {
+  // Append T00:00Z so the Date is parsed as UTC midnight, giving the correct weekday.
+  return new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
 }
 
 function formatTimeRange(start: string | null, end: string | null): string {
   if (!start) return ''
-  const s = new Date(start)
-  const day = s.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
-  const startTime = formatTime(start)
+  const startDate = start.slice(0, 10)
+  const startTime = start.slice(11, 16)
+  const day = weekdayFromDateString(startDate)
   if (!end) return `${day} ${startTime}`
-  const endTime = formatTime(end)
-  const sameDay = s.toISOString().slice(0, 10) === new Date(end).toISOString().slice(0, 10)
-  if (sameDay) return `${day} ${startTime}–${endTime}`
-  const endDay = new Date(end).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+  const endDate = end.slice(0, 10)
+  const endTime = end.slice(11, 16)
+  if (startDate === endDate) return `${day} ${startTime}–${endTime}`
+  const endDay = weekdayFromDateString(endDate)
   return `${day} ${startTime}–${endDay} ${endTime}`
 }
 
@@ -146,7 +152,7 @@ export default function StageList({ stages, onChange, categoryType, onCategoryTy
                   </span>
 
                   {/* Time range */}
-                  <span className="shrink-0 text-xs text-gray-400 tabular-nums w-32 text-right">
+                  <span className="shrink-0 text-xs text-gray-400 tabular-nums w-40 text-right">
                     {formatTimeRange(stage.start_time, stage.end_time)}
                   </span>
 
