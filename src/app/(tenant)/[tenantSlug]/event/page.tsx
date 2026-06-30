@@ -39,7 +39,7 @@ export default async function EventConfigPage({ params }: Props) {
   const { data: event } = await supabase
     .from('events')
     .select(
-      'id, name, event_type, description, location, logo_url, start_date, end_date, status, scheduling_granularity_min, category_type'
+      'id, name, event_type, description, location, logo_url, status, scheduling_granularity_min, category_type'
     )
     .eq('tenant_id', tenant.id)
     .maybeSingle()
@@ -49,12 +49,12 @@ export default async function EventConfigPage({ params }: Props) {
   const [{ data: stages }, { data: distances }, { data: facilities }] = await Promise.all([
     supabase
       .from('event_stages')
-      .select('name, stage_date, venue, position')
+      .select('id, name, stage_type, start_time, end_time, venue, position')
       .eq('event_id', event.id)
       .order('position', { ascending: true }),
     supabase
       .from('event_distances')
-      .select('label, position')
+      .select('label, position, stage_id')
       .eq('event_id', event.id)
       .order('position', { ascending: true }),
     supabase
@@ -65,6 +65,14 @@ export default async function EventConfigPage({ params }: Props) {
   ])
 
   const isPublished = event.status === 'published'
+
+  // Build per-stage distances map (stage_id → distances[])
+  const distancesByStageId: Record<string, { label: string; position: number }[]> = {}
+  for (const d of distances ?? []) {
+    if (!d.stage_id) continue
+    if (!distancesByStageId[d.stage_id]) distancesByStageId[d.stage_id] = []
+    distancesByStageId[d.stage_id].push({ label: d.label, position: d.position })
+  }
 
   return (
     <div className="px-8 py-8">
@@ -77,19 +85,16 @@ export default async function EventConfigPage({ params }: Props) {
         initialDescription={event.description ?? ''}
         initialLocation={event.location ?? ''}
         initialLogoUrl={event.logo_url ?? ''}
-        initialStartDate={event.start_date ?? ''}
-        initialEndDate={event.end_date ?? ''}
         initialGranularity={event.scheduling_granularity_min}
         initialCategoryType={(event.category_type as 'distance' | 'time') ?? 'distance'}
-        initialStages={(stages ?? []).map((s) => ({
+        initialStages={(stages ?? []).map((s, i) => ({
           name: s.name,
-          stage_date: s.stage_date,
+          stage_type: (s.stage_type as 'race' | 'non_race') ?? 'race',
+          start_time: s.start_time ?? null,
+          end_time: s.end_time ?? null,
           venue: s.venue ?? '',
-          position: s.position,
-        }))}
-        initialDistances={(distances ?? []).map((d) => ({
-          label: d.label,
-          position: d.position,
+          position: s.position ?? i,
+          distances: distancesByStageId[s.id] ?? [],
         }))}
         initialFacilities={(facilities ?? []).map((f) => ({
           label: f.label,

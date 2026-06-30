@@ -38,15 +38,16 @@ export default async function DashboardPage({ params }: Props) {
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, name, event_type, start_date, end_date, status, scheduling_granularity_min')
+    .select('id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url')
     .eq('tenant_id', tenant.id)
     .maybeSingle()
 
-  const { count: stagesCount } = event
+  const { count: raceStageCount } = event
     ? await supabase
         .from('event_stages')
         .select('id', { count: 'exact', head: true })
         .eq('event_id', event.id)
+        .eq('stage_type', 'race')
     : { count: 0 }
 
   const { data: officialsData } = await supabase
@@ -59,9 +60,8 @@ export default async function DashboardPage({ params }: Props) {
     officialsData?.filter((o) => o.invite_status === 'confirmed').length ?? 0
 
   const hasName = Boolean(event?.name?.trim())
-  const hasDates = Boolean(event?.start_date && event?.end_date)
-  const hasStage = (stagesCount ?? 0) > 0
-  const canPublish = hasName && hasDates && hasStage
+  const hasRaceStage = (raceStageCount ?? 0) > 0
+  const canPublish = hasName && hasRaceStage
   const isPublished = event?.status === 'published'
 
   // Scheduling warning counts — real values come once scheduling is built
@@ -101,9 +101,23 @@ export default async function DashboardPage({ params }: Props) {
     <div className="px-8 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{eventName}</h1>
-          <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+            {event?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={event.logo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <svg className="w-6 h-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 16l5-5 4 4 3-3 4 4" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+              </svg>
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">{eventName}</h1>
+            <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
+          </div>
         </div>
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
@@ -142,8 +156,7 @@ export default async function DashboardPage({ params }: Props) {
               <p className="text-sm text-gray-700 mb-4">{t('dashboard.cannotPublish')}</p>
               <ul className="space-y-2.5 mb-5">
                 {!hasName && <MissingItem label={t('dashboard.requiredEventName')} />}
-                {!hasDates && <MissingItem label={t('dashboard.requiredEventDate')} />}
-                {!hasStage && <MissingItem label={t('dashboard.requiredStage')} />}
+                {!hasRaceStage && <MissingItem label={t('dashboard.requiredStage')} />}
               </ul>
               <button
                 disabled
@@ -219,8 +232,10 @@ export default async function DashboardPage({ params }: Props) {
 
 function MissingItem({ label }: { label: string }) {
   return (
-    <li className="flex items-center gap-2.5 text-sm text-gray-500">
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-gray-300" />
+    <li className="flex items-center gap-2 text-sm text-gray-500">
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold leading-none select-none">
+        i
+      </span>
       {label}
     </li>
   )

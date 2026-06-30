@@ -17,6 +17,7 @@ export interface PublishEventResult {
 /**
  * Publishes a draft event. Shared between EVT-01 (dashboard) and EVT-02 (config).
  * Re-verifies publish requirements and admin role on the server at call time.
+ * Stage model v0.7: requires name + at least one Race stage (not event-level dates).
  */
 export async function publishEvent(input: PublishEventInput): Promise<PublishEventResult> {
   const supabase = await createSupabaseServerClient()
@@ -41,7 +42,7 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   // Re-verify publish requirements at action time
   const { data: ev } = await supabase
     .from('events')
-    .select('name, start_date, end_date, status')
+    .select('name, status')
     .eq('id', input.eventId)
     .eq('tenant_id', input.tenantId)
     .single()
@@ -50,15 +51,17 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   if (ev.status === 'published') return {}
 
   if (!ev.name?.trim()) return { error: 'Event name is required before publishing.' }
-  if (!ev.start_date || !ev.end_date) return { error: 'Date range is required before publishing.' }
 
-  const { count: stageCount } = await supabase
+  // Stage model v0.7: at least one Race stage is required (satisfies the "at least one date"
+  // requirement since a Race stage carries its own start/end time).
+  const { count: raceStageCount } = await supabase
     .from('event_stages')
     .select('id', { count: 'exact', head: true })
     .eq('event_id', input.eventId)
+    .eq('stage_type', 'race')
 
-  if (!stageCount || stageCount === 0) {
-    return { error: 'At least one stage/day is required before publishing.' }
+  if (!raceStageCount || raceStageCount === 0) {
+    return { error: 'Add at least one Race stage before publishing.' }
   }
 
   const { error } = await supabase

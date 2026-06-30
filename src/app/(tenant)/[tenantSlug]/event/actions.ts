@@ -6,9 +6,12 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 
 export interface StageInput {
   name: string
-  stage_date: string
+  stage_type: 'race' | 'non_race'
+  start_time: string | null
+  end_time: string | null
   venue: string
   position: number
+  distances: LabelInput[]
 }
 
 export interface LabelInput {
@@ -25,13 +28,11 @@ export interface SaveEventInput {
   description: string
   location: string
   logo_url: string
-  start_date: string
-  end_date: string
   scheduling_granularity_min: number
   category_type: 'distance' | 'time'
   stages: StageInput[]
-  distances: LabelInput[]
   facilities: LabelInput[]
+  // start_date and end_date are derived from Race stage times in this action
 }
 
 export interface SaveEventResult {
@@ -58,16 +59,24 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     return { error: 'Not authorized' }
   }
 
-  // NOT NULL columns: only include in the update when the value is non-empty so we
-  // don't violate the constraint while a draft is still incomplete.
-  // Nullable columns: always include so admins can clear them.
+  // Derive start_date / end_date from Race stage times so the events row stays
+  // coherent even though those columns are now nullable.
+  const raceStages = input.stages.filter((s) => s.stage_type === 'race' && s.start_time)
+  const derivedStartDate = raceStages.length > 0 ? raceStages[0].start_time!.slice(0, 10) : null
+  const derivedEndDate =
+    raceStages.length > 0
+      ? ((raceStages.at(-1)!.end_time ?? raceStages.at(-1)!.start_time)?.slice(0, 10) ?? null)
+      : null
+
+  // NOT NULL columns: only include if non-empty so we don't violate constraints
+  // on an incomplete draft. Nullable columns: always include so admins can clear them.
   const { error: eventError } = await supabase
     .from('events')
     .update({
       ...(input.name ? { name: input.name } : {}),
       ...(input.event_type ? { event_type: input.event_type } : {}),
-      ...(input.start_date ? { start_date: input.start_date } : {}),
-      ...(input.end_date ? { end_date: input.end_date } : {}),
+      start_date: derivedStartDate,
+      end_date: derivedEndDate,
       description: input.description || null,
       location: input.location || null,
       logo_url: input.logo_url || null,
@@ -79,10 +88,19 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   if (eventError) return { error: eventError.message }
 
-  // Atomically replace all stages via RPC (delete + insert in one transaction).
+  // Atomically replace all stages AND their distances via RPC (delete + insert
+  // in one transaction). Distances are now embedded per Race stage in p_stages.
   const stageRows = input.stages
-    .filter((s) => s.name.trim() && s.stage_date)
-    .map((s, i) => ({ ...s, position: i }))
+    .filter((s) => s.name.trim())
+    .map((s, i) => ({
+      name: s.name,
+      stage_type: s.stage_type,
+      start_time: s.start_time || null,
+      end_time: s.end_time || null,
+      venue: s.venue,
+      position: i,
+      distances: s.distances.filter((d) => d.label.trim()).map((d, j) => ({ label: d.label, position: j })),
+    }))
 
   const { error: rpcError } = await supabase.rpc('sync_event_stages', {
     p_event_id: input.eventId,
@@ -92,22 +110,7 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   if (rpcError) return { error: rpcError.message }
 
-  // Atomically replace distances and facilities (delete + insert).
-  const { error: delDistError } = await supabase
-    .from('event_distances')
-    .delete()
-    .eq('event_id', input.eventId)
-    .eq('tenant_id', input.tenantId)
-  if (delDistError) return { error: delDistError.message }
-
-  const distanceRows = input.distances
-    .filter((d) => d.label.trim())
-    .map((d, i) => ({ label: d.label, position: i, event_id: input.eventId, tenant_id: input.tenantId }))
-  if (distanceRows.length > 0) {
-    const { error: insDistError } = await supabase.from('event_distances').insert(distanceRows)
-    if (insDistError) return { error: insDistError.message }
-  }
-
+  // Facilities: delete + insert (unchanged pattern from before).
   const { error: delFacError } = await supabase
     .from('event_facilities')
     .delete()
@@ -117,7 +120,12 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   const facilityRows = input.facilities
     .filter((f) => f.label.trim())
-    .map((f, i) => ({ label: f.label, position: i, event_id: input.eventId, tenant_id: input.tenantId }))
+    .map((f, i) => ({
+      label: f.label,
+      position: i,
+      event_id: input.eventId,
+      tenant_id: input.tenantId,
+    }))
   if (facilityRows.length > 0) {
     const { error: insFacError } = await supabase.from('event_facilities').insert(facilityRows)
     if (insFacError) return { error: insFacError.message }

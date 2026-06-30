@@ -124,6 +124,7 @@ export type Database = {
           id: string
           label: string
           position: number
+          stage_id: string | null
           tenant_id: string
         }
         Insert: {
@@ -132,6 +133,7 @@ export type Database = {
           id?: string
           label: string
           position?: number
+          stage_id?: string | null
           tenant_id: string
         }
         Update: {
@@ -140,6 +142,7 @@ export type Database = {
           id?: string
           label?: string
           position?: number
+          stage_id?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -148,6 +151,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_distances_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "event_stages"
             referencedColumns: ["id"]
           },
           {
@@ -204,31 +214,40 @@ export type Database = {
       event_stages: {
         Row: {
           created_at: string
+          end_time: string | null
           event_id: string
           id: string
           name: string
           position: number
-          stage_date: string
+          stage_date: string | null
+          stage_type: string
+          start_time: string | null
           tenant_id: string
           venue: string | null
         }
         Insert: {
           created_at?: string
+          end_time?: string | null
           event_id: string
           id?: string
           name: string
           position?: number
-          stage_date: string
+          stage_date?: string | null
+          stage_type?: string
+          start_time?: string | null
           tenant_id: string
           venue?: string | null
         }
         Update: {
           created_at?: string
+          end_time?: string | null
           event_id?: string
           id?: string
           name?: string
           position?: number
-          stage_date?: string
+          stage_date?: string | null
+          stage_type?: string
+          start_time?: string | null
           tenant_id?: string
           venue?: string | null
         }
@@ -254,14 +273,14 @@ export type Database = {
           category_type: string
           created_at: string
           description: string | null
-          end_date: string
+          end_date: string | null
           event_type: string
           id: string
           location: string | null
           logo_url: string | null
           name: string
           scheduling_granularity_min: number
-          start_date: string
+          start_date: string | null
           status: string
           tenant_id: string
         }
@@ -269,14 +288,14 @@ export type Database = {
           category_type?: string
           created_at?: string
           description?: string | null
-          end_date: string
+          end_date?: string | null
           event_type: string
           id?: string
           location?: string | null
           logo_url?: string | null
           name: string
           scheduling_granularity_min?: number
-          start_date: string
+          start_date?: string | null
           status?: string
           tenant_id: string
         }
@@ -284,14 +303,14 @@ export type Database = {
           category_type?: string
           created_at?: string
           description?: string | null
-          end_date?: string
+          end_date?: string | null
           event_type?: string
           id?: string
           location?: string | null
           logo_url?: string | null
           name?: string
           scheduling_granularity_min?: number
-          start_date?: string
+          start_date?: string | null
           status?: string
           tenant_id?: string
         }
@@ -518,6 +537,7 @@ export type Database = {
           event_id: string
           id: string
           name: string
+          stage_id: string | null
           tenant_id: string
         }
         Insert: {
@@ -527,6 +547,7 @@ export type Database = {
           event_id: string
           id?: string
           name: string
+          stage_id?: string | null
           tenant_id: string
         }
         Update: {
@@ -536,6 +557,7 @@ export type Database = {
           event_id?: string
           id?: string
           name?: string
+          stage_id?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -544,6 +566,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workstations_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "event_stages"
             referencedColumns: ["id"]
           },
           {

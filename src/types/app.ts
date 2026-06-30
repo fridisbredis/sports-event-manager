@@ -37,10 +37,11 @@ export type WorkstationUpdate = DbTables['workstations']['Update']
 // ...add more as you need them
 
 // Domain enums — stricter than the DB's plain text columns
-// These match the CHECK constraints in migration 0003
+// These match the CHECK constraints in migrations 0003 + 0007
 export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 export type EventStatus = 'draft' | 'published'
 export type EventCategoryType = 'distance' | 'time'
+export type StageType = 'race' | 'non_race'
 export type AssignmentStatus = 'assigned' | 'available' | 'on_break' | 'blocked'
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'pending' | 'confirmed' | 'removed'
