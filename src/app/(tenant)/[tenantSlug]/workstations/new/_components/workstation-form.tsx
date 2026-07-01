@@ -57,21 +57,13 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
     return `${y}-${mo}-${dy}T${h}:${mi}`
   }
 
-  const windowBounds = (() => {
-    if (stageId === '__all__') {
-      const starts = stages.map((s) => s.start_time).filter(Boolean) as string[]
-      const ends   = stages.map((s) => s.end_time).filter(Boolean) as string[]
-      return {
-        min: starts.length ? shiftTime(starts.slice().sort()[0], -60) : undefined,
-        max: ends.length   ? shiftTime(ends.slice().sort().at(-1)!, 60) : undefined,
-      }
-    }
-    const stage = stages.find((s) => s.id === stageId)
-    return {
-      min: stage?.start_time ? shiftTime(stage.start_time, -60) : undefined,
-      max: stage?.end_time   ? shiftTime(stage.end_time, 60)   : undefined,
-    }
-  })()
+  const selectedStage = stages.find((s) => s.id === stageId)
+  const isRaceStage = selectedStage?.stage_type === 'race'
+
+  const windowBounds = isRaceStage ? {
+    min: selectedStage?.start_time ? shiftTime(selectedStage.start_time, -60) : undefined,
+    max: selectedStage?.end_time   ? shiftTime(selectedStage.end_time, 60)   : undefined,
+  } : { min: undefined, max: undefined }
 
   function addWindow() {
     setWindows((prev: TimeWindow[]) => [...prev, { start: '', end: '' }])
@@ -198,6 +190,8 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
                 const stage = stages.find((s) => s.id === newId)
                 if (stage?.stage_type === 'race' && stage.start_time && stage.end_time) {
                   setWindows([{ start: shiftTime(stage.start_time, -60), end: shiftTime(stage.end_time, 60) }])
+                } else {
+                  setWindows([{ start: '', end: '' }])
                 }
               }}
               className={inputClass()}
@@ -251,51 +245,49 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
 
           {/* Operating windows */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.operatingWindowsLabel')}
-            </h2>
-            <div className="space-y-3">
-              {windows.map((w, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <div className="flex flex-1 flex-col gap-1">
-                    <div className="flex gap-2">
-                      <DateTimePicker
-                        value={w.start}
-                        min={windowBounds.min}
-                        max={windowBounds.max}
-                        onChange={(v) => updateWindow(i, 'start', v)}
-                        hasError={!!(errors.windows?.[i])}
-                        disabled={stageId === '__all__'}
-                      />
-                      <DateTimePicker
-                        value={w.end}
-                        min={windowBounds.min}
-                        max={windowBounds.max}
-                        onChange={(v) => updateWindow(i, 'end', v)}
-                        hasError={!!(errors.windows?.[i])}
-                        disabled={stageId === '__all__'}
-                      />
+              <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {t('workstations.operatingWindowsLabel')}
+              </h2>
+              <div className="space-y-3">
+                {windows.map((w, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className="flex flex-1 flex-col gap-1">
+                      <div className="flex gap-2">
+                        <DateTimePicker
+                          value={w.start}
+                          min={windowBounds.min}
+                          max={windowBounds.max}
+                          onChange={(v) => updateWindow(i, 'start', v)}
+                          hasError={!!(errors.windows?.[i])}
+                        />
+                        <DateTimePicker
+                          value={w.end}
+                          min={windowBounds.min}
+                          max={windowBounds.max}
+                          onChange={(v) => updateWindow(i, 'end', v)}
+                          hasError={!!(errors.windows?.[i])}
+                        />
+                      </div>
+                      {errors.windows?.[i] && (
+                        <p className="text-xs text-red-500">{errors.windows[i]}</p>
+                      )}
                     </div>
-                    {errors.windows?.[i] && (
-                      <p className="text-xs text-red-500">{errors.windows[i]}</p>
-                    )}
+                    <button
+                      onClick={() => removeWindow(i)}
+                      className="mt-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
+                    >
+                      {t('workstations.removeWindow')}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => removeWindow(i)}
-                    className="mt-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
-                  >
-                    {t('workstations.removeWindow')}
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={addWindow}
-                className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-              >
-                {t('workstations.addWindow')}
-              </button>
-            </div>
-          </section>
+                ))}
+                <button
+                  onClick={addWindow}
+                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                >
+                  {t('workstations.addWindow')}
+                </button>
+              </div>
+            </section>
         </div>
 
         {/* Right column */}

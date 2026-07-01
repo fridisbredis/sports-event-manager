@@ -183,6 +183,7 @@ export default function DateTimePicker({
             disabled={disabledDays.length ? disabledDays : undefined}
             startMonth={minDay}
             endMonth={maxDay}
+            weekStartsOn={1}
           />
 
           {/* Time row */}
