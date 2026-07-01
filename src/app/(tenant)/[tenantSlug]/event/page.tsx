@@ -87,6 +87,7 @@ export default async function EventConfigPage({ params }: Props) {
         initialLogoUrl={event.logo_url ?? ''}
         initialGranularity={event.scheduling_granularity_min}
         initialStages={(stages ?? []).map((s, i) => ({
+          id: s.id,
           name: s.name,
           stage_type: (s.stage_type as 'race' | 'non_race') ?? 'race',
           race_type: (s.race_type as 'distance' | 'time') ?? 'distance',

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 
 export interface StageInput {
+  id?: string
   name: string
   stage_type: 'race' | 'non_race'
   race_type: 'distance' | 'time'
@@ -92,6 +93,7 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
   const stageRows = input.stages
     .filter((s) => s.name.trim())
     .map((s, i) => ({
+      ...(s.id ? { id: s.id } : {}),
       name: s.name,
       stage_type: s.stage_type,
       race_type: s.race_type,
