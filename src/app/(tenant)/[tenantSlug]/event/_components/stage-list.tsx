@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { StageInput } from '../actions'
 import StageModal from './stage-modal'
+import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
@@ -54,6 +55,7 @@ function formatTimeRange(start: string | null, end: string | null): string {
 export default function StageList({ stages, onChange }: Props) {
   const { t } = useTranslation('admin')
   const [modalTarget, setModalTarget] = useState<{ index: number | null }>({ index: null })
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const isModalOpen = modalTarget.index !== null || modalTarget.index === -1
 
@@ -93,9 +95,15 @@ export default function StageList({ stages, onChange }: Props) {
   function handleDelete(index: number) {
     const stage = effectiveStages[index]
     if (stage.stage_type === 'race' && raceStageCount <= 1) return
+    setDeleteTarget(index)
+  }
+
+  function confirmDelete() {
+    if (deleteTarget === null) return
     const newStages = effectiveStages
-      .filter((_, i) => i !== index)
+      .filter((_, i) => i !== deleteTarget)
       .map((s, i) => ({ ...s, position: i }))
+    setDeleteTarget(null)
     onChange(newStages)
   }
 
@@ -237,6 +245,17 @@ export default function StageList({ stages, onChange }: Props) {
           onClose={closeModal}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={t('actions.delete')}
+        body={t('eventConfig.deleteStageConfirm')}
+        cancelLabel={t('actions.cancel', { ns: 'common' })}
+        confirmLabel={t('actions.delete', { ns: 'common' })}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        destructive
+      />
     </>
   )
 }

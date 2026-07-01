@@ -1,5 +1,6 @@
 {
   "navigation": {
+    "adminLabel": "Admin",
     "dashboard": "Dashboard",
     "eventConfig": "Event configuration",
     "workstations": "Work areas",
@@ -26,6 +27,8 @@
     "confirmed": "Confirmed",
     "schedulingWarnings": "Scheduling Warnings",
     "allClear": "All clear",
+    "issues_one": "{{count}} issue",
+    "issues_other": "{{count}} issues",
     "overCapacity": "Over capacity",
     "doubleBooked": "Double-booked",
     "reviewInScheduling": "Review in Scheduling ›",
@@ -70,6 +73,7 @@
     "stageVenueLabel": "Venue",
     "stageFormalStartEnd": "Formal start / end",
     "cannotDeleteLastRace": "Cannot delete the last Race stage",
+    "deleteStageConfirm": "Are you sure you want to delete this stage?",
     "noRaceStageWarning": "All stages are Non-race. Add at least one Race stage to enable publishing.",
     "addStageTitle": "Add stage",
     "editStageTitle": "Edit stage",

@@ -192,7 +192,7 @@ export default async function DashboardPage({ params }: Props) {
             </span>
           ) : (
             <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-              {totalWarnings} issue{totalWarnings !== 1 ? 's' : ''}
+              {t('dashboard.issues', { count: totalWarnings })}
             </span>
           )}
         </div>

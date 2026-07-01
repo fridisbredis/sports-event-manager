@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
+import ConfirmDialog from '@/components/confirm-dialog'
 import DateTimePicker from '@/components/date-time-picker'
 import { updateWorkstation, deleteWorkstation } from '../../actions'
 
@@ -69,6 +70,7 @@ export default function WorkstationEditForm({
   const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isSaving, startSave] = useTransition()
   const [isDeleting, startDelete] = useTransition()
 
@@ -171,8 +173,11 @@ export default function WorkstationEditForm({
   }
 
   function handleDelete() {
-    if (!confirm(t('workstations.deleteConfirm'))) return
+    setDeleteDialogOpen(true)
+  }
 
+  function confirmDelete() {
+    setDeleteDialogOpen(false)
     startDelete(async () => {
       const result = await deleteWorkstation({ tenantSlug, tenantId, workstationId })
       if (result.error) {
@@ -194,6 +199,16 @@ export default function WorkstationEditForm({
   return (
     <div>
       <UnsavedChangesDialog {...dialogProps} />
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('workstations.delete')}
+        body={t('workstations.deleteConfirm')}
+        cancelLabel={t('actions.cancel', { ns: 'common' })}
+        confirmLabel={t('actions.delete', { ns: 'common' })}
+        onCancel={() => setDeleteDialogOpen(false)}
+        onConfirm={confirmDelete}
+        destructive
+      />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/style.css'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   value: string       // 'YYYY-MM-DDTHH:mm' or ''
@@ -47,10 +48,11 @@ export default function DateTimePicker({
   onChange,
   min,
   max,
-  placeholder = 'Select date & time',
+  placeholder,
   hasError,
   disabled,
 }: Props) {
+  const { t } = useTranslation('common')
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -156,7 +158,7 @@ export default function DateTimePicker({
         {value ? (
           <span className="text-gray-900">{formatDisplay(value)}</span>
         ) : (
-          <span className="text-gray-400">{placeholder}</span>
+          <span className="text-gray-400">{placeholder ?? t('datePicker.placeholder')}</span>
         )}
       </button>
 
@@ -188,7 +190,7 @@ export default function DateTimePicker({
 
           {/* Time row */}
           <div className="px-4 pb-3 pt-2 border-t border-gray-100 flex items-center gap-3">
-            <label className="text-xs font-medium text-gray-500 shrink-0">Time</label>
+            <label className="text-xs font-medium text-gray-500 shrink-0">{t('datePicker.timeLabel')}</label>
             <input
               type="time"
               value={time}
@@ -204,7 +206,7 @@ export default function DateTimePicker({
                 onClick={handleClear}
                 className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
               >
-                Clear
+                {t('datePicker.clear')}
               </button>
             )}
           </div>
