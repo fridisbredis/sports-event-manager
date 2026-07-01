@@ -123,7 +123,11 @@ export default function WorkstationsList({ tenantSlug, workstations }: Props) {
                       : `${formatWindow(windows[0])} +${windows.length - 1}`
 
                 return (
-                  <tr key={ws.id} className="hover:bg-gray-50">
+                  <tr
+                    key={ws.id}
+                    onClick={() => router.push(`/${tenantSlug}/workstations/${ws.id}`)}
+                    className="cursor-pointer hover:bg-gray-50"
+                  >
                     <td className="px-4 py-3 font-medium text-gray-900">{ws.name}</td>
                     <td className="px-4 py-3 text-gray-600">{stageLabel(ws)}</td>
                     <td className="px-4 py-3 text-gray-600">{windowLabel}</td>

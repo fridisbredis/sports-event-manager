@@ -126,7 +126,9 @@
     "windowEndLabel": "End",
     "windowEndError": "End must be after start.",
     "generalError": "Something went wrong. Please try again.",
-    "upTo": "Up to {{n}}"
+    "upTo": "Up to {{n}}",
+    "delete": "Delete work area",
+    "deleteConfirm": "Are you sure? This will remove the work area and all its assignments."
   },
   "officials": {
     "title": "Officials Roster",

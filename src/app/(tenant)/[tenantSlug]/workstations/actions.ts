@@ -90,3 +90,142 @@ export async function createWorkstation(
 
   return {}
 }
+
+export interface UpdateWorkstationInput {
+  tenantSlug: string
+  tenantId: string
+  workstationId: string
+  stageId: string | null
+  name: string
+  description: string
+  capacity: number
+  windows: WindowInput[]
+  todos: string[]
+}
+
+export interface UpdateWorkstationResult {
+  error?: string
+}
+
+export async function updateWorkstation(
+  input: UpdateWorkstationInput
+): Promise<UpdateWorkstationResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const service = await createSupabaseServiceClient()
+  const { data: roleRow } = await service
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('tenant_id', input.tenantId)
+    .maybeSingle()
+
+  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
+    return { error: 'Not authorized' }
+  }
+
+  const { error: wsError } = await supabase
+    .from('workstations')
+    .update({
+      stage_id: input.stageId,
+      name: input.name.trim(),
+      description: input.description.trim() || null,
+      capacity_ceiling: input.capacity,
+    })
+    .eq('id', input.workstationId)
+    .eq('tenant_id', input.tenantId)
+
+  if (wsError) return { error: wsError.message }
+
+  const { error: delWinError } = await supabase
+    .from('workstation_operating_windows')
+    .delete()
+    .eq('workstation_id', input.workstationId)
+
+  if (delWinError) return { error: delWinError.message }
+
+  const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
+  if (validWindows.length > 0) {
+    const { error: winError } = await supabase.from('workstation_operating_windows').insert(
+      validWindows.map((w) => ({
+        workstation_id: input.workstationId,
+        window_start: w.window_start,
+        window_end: w.window_end,
+      }))
+    )
+    if (winError) return { error: winError.message }
+  }
+
+  const { error: delTodoError } = await supabase
+    .from('workstation_todos')
+    .delete()
+    .eq('workstation_id', input.workstationId)
+
+  if (delTodoError) return { error: delTodoError.message }
+
+  const validTodos = input.todos.map((t) => t.trim()).filter(Boolean)
+  if (validTodos.length > 0) {
+    const { error: todoError } = await supabase.from('workstation_todos').insert(
+      validTodos.map((text, i) => ({
+        workstation_id: input.workstationId,
+        instruction_text: text,
+        position: i,
+      }))
+    )
+    if (todoError) return { error: todoError.message }
+  }
+
+  revalidatePath(`/${input.tenantSlug}/workstations`)
+
+  return {}
+}
+
+export interface DeleteWorkstationInput {
+  tenantSlug: string
+  tenantId: string
+  workstationId: string
+}
+
+export interface DeleteWorkstationResult {
+  error?: string
+}
+
+export async function deleteWorkstation(
+  input: DeleteWorkstationInput
+): Promise<DeleteWorkstationResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const service = await createSupabaseServiceClient()
+  const { data: roleRow } = await service
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('tenant_id', input.tenantId)
+    .maybeSingle()
+
+  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
+    return { error: 'Not authorized' }
+  }
+
+  const { error } = await supabase
+    .from('workstations')
+    .delete()
+    .eq('id', input.workstationId)
+    .eq('tenant_id', input.tenantId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/${input.tenantSlug}/workstations`)
+
+  return {}
+}
