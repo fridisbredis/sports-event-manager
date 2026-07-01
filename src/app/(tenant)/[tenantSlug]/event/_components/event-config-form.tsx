@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, KeyboardEvent } from 'react'
 import { saveEvent, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
@@ -55,9 +55,9 @@ export default function EventConfigForm({
   const [logoError, setLogoError] = useState(false)
   const [granularity, setGranularity] = useState(initialGranularity)
   const [stages, setStages] = useState<StageInput[]>(initialStages)
-  const [facilitiesText, setFacilitiesText] = useState(
-    initialFacilities.map((f) => f.label).join(', ')
-  )
+  const [facilities, setFacilities] = useState<LabelInput[]>(initialFacilities)
+  const [facilityInput, setFacilityInput] = useState('')
+  const facilityInputRef = useRef<HTMLInputElement>(null)
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -83,12 +83,19 @@ export default function EventConfigForm({
     return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`
   }
 
-  function parseLabelText(text: string): LabelInput[] {
-    return text
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((label, i) => ({ label, position: i }))
+  function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const label = facilityInput.trim()
+    if (!label) return
+    setFacilities((prev) => [...prev, { label, position: prev.length }])
+    setFacilityInput('')
+    setSaveSuccess(false); markDirty()
+  }
+
+  function removeFacility(index: number) {
+    setFacilities((prev) => prev.filter((_, i) => i !== index))
+    setSaveSuccess(false); markDirty()
   }
 
   function buildInput(): SaveEventInput {
@@ -103,7 +110,7 @@ export default function EventConfigForm({
       logo_url: logoUrl,
       scheduling_granularity_min: granularity,
       stages,
-      facilities: parseLabelText(facilitiesText),
+      facilities: facilities.map((f, i) => ({ label: f.label, position: i })),
     }
   }
 
@@ -365,15 +372,34 @@ export default function EventConfigForm({
                 {t('eventConfig.facilities')}
               </label>
               <input
+                ref={facilityInputRef}
                 type="text"
-                value={facilitiesText}
-                onChange={(e) => {
-                  setFacilitiesText(e.target.value)
-                  setSaveSuccess(false); markDirty()
-                }}
+                value={facilityInput}
+                onChange={(e) => setFacilityInput(e.target.value)}
+                onKeyDown={handleFacilityKeyDown}
                 placeholder={t('eventConfig.facilitiesPlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
               />
+              {facilities.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {facilities.map((f, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 text-sm rounded-md px-2 py-0.5"
+                    >
+                      {f.label}
+                      <button
+                        type="button"
+                        onClick={() => removeFacility(i)}
+                        className="text-gray-400 hover:text-gray-700 leading-none"
+                        aria-label={`Remove ${f.label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
