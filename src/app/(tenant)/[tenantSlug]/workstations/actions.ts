@@ -1,0 +1,92 @@
+'use server'
+
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+
+export interface WindowInput {
+  window_start: string
+  window_end: string
+}
+
+export interface CreateWorkstationInput {
+  tenantSlug: string
+  tenantId: string
+  eventId: string
+  stageId: string | null
+  name: string
+  description: string
+  capacity: number
+  windows: WindowInput[]
+  todos: string[]
+}
+
+export interface CreateWorkstationResult {
+  error?: string
+}
+
+export async function createWorkstation(
+  input: CreateWorkstationInput
+): Promise<CreateWorkstationResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const service = await createSupabaseServiceClient()
+  const { data: roleRow } = await service
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('tenant_id', input.tenantId)
+    .maybeSingle()
+
+  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
+    return { error: 'Not authorized' }
+  }
+
+  const { data: ws, error: wsError } = await supabase
+    .from('workstations')
+    .insert({
+      tenant_id: input.tenantId,
+      event_id: input.eventId,
+      stage_id: input.stageId,
+      name: input.name.trim(),
+      description: input.description.trim() || null,
+      capacity_ceiling: input.capacity,
+    })
+    .select('id')
+    .single()
+
+  if (wsError || !ws) return { error: wsError?.message ?? 'Failed to create work area' }
+
+  const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
+  if (validWindows.length > 0) {
+    const { error: winError } = await supabase.from('workstation_operating_windows').insert(
+      validWindows.map((w) => ({
+        workstation_id: ws.id,
+        window_start: w.window_start,
+        window_end: w.window_end,
+      }))
+    )
+    if (winError) return { error: winError.message }
+  }
+
+  const validTodos = input.todos.map((t, i) => t.trim()).filter(Boolean)
+  if (validTodos.length > 0) {
+    const { error: todoError } = await supabase.from('workstation_todos').insert(
+      validTodos.map((text, i) => ({
+        workstation_id: ws.id,
+        instruction_text: text,
+        position: i,
+      }))
+    )
+    if (todoError) return { error: todoError.message }
+  }
+
+  revalidatePath(`/${input.tenantSlug}/workstations`)
+
+  return {}
+}
