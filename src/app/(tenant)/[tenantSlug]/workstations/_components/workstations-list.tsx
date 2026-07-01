@@ -27,26 +27,42 @@ interface Props {
   workstations: Workstation[]
 }
 
+function utcDateStr(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 10)
+}
+
+function utcTimeStr(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+}
+
 function formatWindow(w: OperatingWindow): string {
-  const start = new Date(w.window_start)
-  const end = new Date(w.window_end)
-  const dayStr = start.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-  const startTime = start.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  })
-  const endTime = end.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  })
-  return `${dayStr} · ${startTime}–${endTime}`
+  const dateLabel = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+  const startDay = utcDateStr(w.window_start)
+  const endDay = utcDateStr(w.window_end)
+  const startTime = utcTimeStr(w.window_start)
+  const endTime = utcTimeStr(w.window_end)
+
+  if (startDay !== endDay) {
+    return `${dateLabel(w.window_start)} · ${startTime} – ${dateLabel(w.window_end)} · ${endTime}`
+  }
+  return `${dateLabel(w.window_start)} · ${startTime}–${endTime}`
+}
+
+function formatWindowsSummary(windows: OperatingWindow[]): string {
+  if (windows.length === 0) return '—'
+  if (windows.length === 1) return formatWindow(windows[0])
+
+  const days = new Set(windows.map((w) => utcDateStr(w.window_start)))
+  const slots = new Set(windows.map((w) => `${utcTimeStr(w.window_start)}–${utcTimeStr(w.window_end)}`))
+
+  if (windows.length === days.size * slots.size) {
+    const slotList = [...slots].join(', ')
+    return days.size === 1 ? slotList : `${slotList} · ${days.size} days`
+  }
+
+  return `${formatWindow(windows[0])} +${windows.length - 1}`
 }
 
 export default function WorkstationsList({ tenantSlug, workstations }: Props) {
@@ -115,12 +131,7 @@ export default function WorkstationsList({ tenantSlug, workstations }: Props) {
             <tbody className="divide-y divide-gray-100">
               {workstations.map((ws) => {
                 const windows = ws.workstation_operating_windows ?? []
-                const windowLabel =
-                  windows.length === 0
-                    ? '—'
-                    : windows.length === 1
-                      ? formatWindow(windows[0])
-                      : `${formatWindow(windows[0])} +${windows.length - 1}`
+                const windowLabel = formatWindowsSummary(windows)
 
                 return (
                   <tr

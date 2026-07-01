@@ -40,6 +40,50 @@ interface FormErrors {
   general?: string
 }
 
+function getRaceDays(stages: Stage[], selectedStageId: string): string[] {
+  const relevant = selectedStageId === '__all__'
+    ? stages.filter((s) => s.start_time && s.end_time)
+    : stages.filter((s) => s.id === selectedStageId && s.start_time && s.end_time)
+
+  const daySet = new Set<string>()
+  for (const s of relevant) {
+    const cur = new Date(s.start_time!)
+    cur.setHours(0, 0, 0, 0)
+    const last = new Date(s.end_time!)
+    last.setHours(0, 0, 0, 0)
+    while (cur <= last) {
+      daySet.add(cur.toISOString().slice(0, 10))
+      cur.setDate(cur.getDate() + 1)
+    }
+  }
+  return [...daySet].sort()
+}
+
+function expandRecurring(
+  times: { start: string; end: string }[],
+  days: string[]
+): { window_start: string; window_end: string }[] {
+  return days.flatMap((day) =>
+    times
+      .filter((t) => t.start && t.end)
+      .map((t) => {
+        const overnight = t.end <= t.start
+        let endDay = day
+        if (overnight) {
+          const d = new Date(day + 'T12:00:00')
+          d.setDate(d.getDate() + 1)
+          endDay = d.toISOString().slice(0, 10)
+        }
+        return { window_start: `${day}T${t.start}`, window_end: `${endDay}T${t.end}` }
+      })
+  )
+}
+
+function formatRaceDay(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 export default function WorkstationEditForm({
   tenantSlug,
   tenantId,
@@ -67,6 +111,8 @@ export default function WorkstationEditForm({
         }))
       : [{ start: '', end: '' }]
   )
+  const [recurring, setRecurring] = useState(false)
+  const [recurringTimes, setRecurringTimes] = useState<TimeWindow[]>([{ start: '', end: '' }])
   const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -93,6 +139,8 @@ export default function WorkstationEditForm({
     max: selectedStage?.end_time   ? shiftTime(selectedStage.end_time, 60)   : undefined,
   } : { min: undefined, max: undefined }
 
+  const raceDays = getRaceDays(stages, stageId)
+
   function addWindow() {
     setWindows((prev: TimeWindow[]) => [...prev, { start: '', end: '' }])
     markDirty()
@@ -105,6 +153,36 @@ export default function WorkstationEditForm({
 
   function updateWindow(index: number, field: 'start' | 'end', value: string) {
     setWindows((prev: TimeWindow[]) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
+    markDirty()
+  }
+
+  function addRecurringTime() {
+    setRecurringTimes((prev) => [...prev, { start: '', end: '' }])
+    markDirty()
+  }
+
+  function removeRecurringTime(index: number) {
+    setRecurringTimes((prev) => prev.filter((_, i) => i !== index))
+    markDirty()
+  }
+
+  function updateRecurringTime(index: number, field: 'start' | 'end', value: string) {
+    setRecurringTimes((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
+    markDirty()
+  }
+
+  function toggleRecurring() {
+    if (!recurring) {
+      // Seed recurring times from existing windows (strip dates, keep HH:MM)
+      const seeded = windows
+        .filter((w) => w.start && w.end)
+        .map((w) => ({
+          start: w.start.slice(11, 16),
+          end: w.end.slice(11, 16),
+        }))
+      setRecurringTimes(seeded.length > 0 ? seeded : [{ start: '', end: '' }])
+    }
+    setRecurring((r) => !r)
     markDirty()
   }
 
@@ -131,11 +209,13 @@ export default function WorkstationEditForm({
     }
 
     const windowErrors: Record<number, string> = {}
-    windows.forEach((w, i) => {
-      if (w.start && w.end && w.end <= w.start) {
-        windowErrors[i] = t('workstations.windowEndError')
-      }
-    })
+    if (!recurring) {
+      windows.forEach((w, i) => {
+        if (w.start && w.end && w.end <= w.start) {
+          windowErrors[i] = t('workstations.windowEndError')
+        }
+      })
+    }
     if (Object.keys(windowErrors).length > 0) {
       newErrors.windows = windowErrors
     }
@@ -149,6 +229,10 @@ export default function WorkstationEditForm({
     setSaveSuccess(false)
 
     startSave(async () => {
+      const finalWindows = recurring
+        ? expandRecurring(recurringTimes, raceDays)
+        : windows.filter((w) => w.start && w.end).map((w) => ({ window_start: w.start, window_end: w.end }))
+
       const result = await updateWorkstation({
         tenantSlug,
         tenantId,
@@ -157,9 +241,7 @@ export default function WorkstationEditForm({
         name,
         description,
         capacity,
-        windows: windows
-          .filter((w) => w.start && w.end)
-          .map((w) => ({ window_start: w.start, window_end: w.end })),
+        windows: finalWindows,
         todos: todos.filter((item) => item.trim()),
       })
 
@@ -320,48 +402,116 @@ export default function WorkstationEditForm({
 
           {/* Operating windows */}
           <section>
-              <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {t('workstations.operatingWindowsLabel')}
-              </h2>
-              <div className="space-y-3">
-                {windows.map((w, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <div className="flex flex-1 flex-col gap-1">
-                      <div className="flex gap-2">
-                        <DateTimePicker
-                          value={w.start}
-                          min={windowBounds.min}
-                          max={windowBounds.max}
-                          onChange={(v) => updateWindow(i, 'start', v)}
-                          hasError={!!(errors.windows?.[i])}
-                        />
-                        <DateTimePicker
-                          value={w.end}
-                          min={windowBounds.min}
-                          max={windowBounds.max}
-                          onChange={(v) => updateWindow(i, 'end', v)}
-                          hasError={!!(errors.windows?.[i])}
-                        />
-                      </div>
-                      {errors.windows?.[i] && (
-                        <p className="text-xs text-red-500">{errors.windows[i]}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => removeWindow(i)}
-                      className="mt-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
-                    >
-                      {t('workstations.removeWindow')}
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={addWindow}
-                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                >
-                  {t('workstations.addWindow')}
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  {t('workstations.operatingWindowsLabel')}
+                </h2>
+                <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
+                  <span title={raceDays.length === 0 ? t('workstations.noDatesForRecurrence') : undefined}>
+                    {t('workstations.repeatDaily')}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={recurring}
+                    disabled={raceDays.length === 0}
+                    onClick={toggleRecurring}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none
+                      ${recurring ? 'bg-gray-900' : 'bg-gray-200'}
+                      disabled:opacity-40 disabled:cursor-not-allowed`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform
+                      ${recurring ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                  </button>
+                </label>
               </div>
+              {recurring ? (
+                <div className="space-y-3">
+                  {recurringTimes.map((w, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="flex flex-1 flex-col gap-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="time"
+                            value={w.start}
+                            onChange={(e) => updateRecurringTime(i, 'start', e.target.value)}
+                            className={`flex-1 rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}
+                          />
+                          <input
+                            type="time"
+                            value={w.end}
+                            onChange={(e) => updateRecurringTime(i, 'end', e.target.value)}
+                            className={`flex-1 rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}
+                          />
+                        </div>
+                        {errors.windows?.[i] && (
+                          <p className="text-xs text-red-500">{errors.windows[i]}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeRecurringTime(i)}
+                        className="mt-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
+                      >
+                        {t('workstations.removeWindow')}
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={addRecurringTime}
+                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    {t('workstations.addWindow')}
+                  </button>
+                  {raceDays.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      {t('workstations.repeatsAcross', {
+                        count: raceDays.length,
+                        days: raceDays.map(formatRaceDay).join(', '),
+                      })}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {windows.map((w, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="flex flex-1 flex-col gap-1">
+                        <div className="flex gap-2">
+                          <DateTimePicker
+                            value={w.start}
+                            min={windowBounds.min}
+                            max={windowBounds.max}
+                            onChange={(v) => updateWindow(i, 'start', v)}
+                            hasError={!!(errors.windows?.[i])}
+                          />
+                          <DateTimePicker
+                            value={w.end}
+                            min={windowBounds.min}
+                            max={windowBounds.max}
+                            onChange={(v) => updateWindow(i, 'end', v)}
+                            hasError={!!(errors.windows?.[i])}
+                          />
+                        </div>
+                        {errors.windows?.[i] && (
+                          <p className="text-xs text-red-500">{errors.windows[i]}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeWindow(i)}
+                        className="mt-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
+                      >
+                        {t('workstations.removeWindow')}
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={addWindow}
+                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    {t('workstations.addWindow')}
+                  </button>
+                </div>
+              )}
             </section>
         </div>
 
