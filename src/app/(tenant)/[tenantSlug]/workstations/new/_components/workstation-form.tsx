@@ -3,12 +3,15 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
+import DateTimePicker from '@/components/date-time-picker'
 import { createWorkstation } from '../../actions'
 
 interface Stage {
   id: string
   name: string
   stage_type: string
+  start_time: string | null
+  end_time: string | null
 }
 
 interface Props {
@@ -42,6 +45,33 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, startSave] = useTransition()
+
+  function shiftTime(s: string, mins: number): string {
+    const d = new Date(s.slice(0, 16).replace('T', ' '))
+    d.setMinutes(d.getMinutes() + mins)
+    const y  = d.getFullYear()
+    const mo = String(d.getMonth() + 1).padStart(2, '0')
+    const dy = String(d.getDate()).padStart(2, '0')
+    const h  = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${y}-${mo}-${dy}T${h}:${mi}`
+  }
+
+  const windowBounds = (() => {
+    if (stageId === '__all__') {
+      const starts = stages.map((s) => s.start_time).filter(Boolean) as string[]
+      const ends   = stages.map((s) => s.end_time).filter(Boolean) as string[]
+      return {
+        min: starts.length ? shiftTime(starts.slice().sort()[0], -60) : undefined,
+        max: ends.length   ? shiftTime(ends.slice().sort().at(-1)!, 60) : undefined,
+      }
+    }
+    const stage = stages.find((s) => s.id === stageId)
+    return {
+      min: stage?.start_time ? shiftTime(stage.start_time, -60) : undefined,
+      max: stage?.end_time   ? shiftTime(stage.end_time, 60)   : undefined,
+    }
+  })()
 
   function addWindow() {
     setWindows((prev: TimeWindow[]) => [...prev, { start: '', end: '' }])
@@ -162,7 +192,14 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
             </h2>
             <select
               value={stageId}
-              onChange={(e) => setStageId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value
+                setStageId(newId)
+                const stage = stages.find((s) => s.id === newId)
+                if (stage?.stage_type === 'race' && stage.start_time && stage.end_time) {
+                  setWindows([{ start: shiftTime(stage.start_time, -60), end: shiftTime(stage.end_time, 60) }])
+                }
+              }}
               className={inputClass()}
             >
               <option value="__all__">{t('workstations.allStages')}</option>
@@ -222,17 +259,21 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
                 <div key={i} className="flex items-start gap-2">
                   <div className="flex flex-1 flex-col gap-1">
                     <div className="flex gap-2">
-                      <input
-                        type="datetime-local"
+                      <DateTimePicker
                         value={w.start}
-                        onChange={(e) => updateWindow(i, 'start', e.target.value)}
-                        className={inputClass(!!(errors.windows?.[i]))}
+                        min={windowBounds.min}
+                        max={windowBounds.max}
+                        onChange={(v) => updateWindow(i, 'start', v)}
+                        hasError={!!(errors.windows?.[i])}
+                        disabled={stageId === '__all__'}
                       />
-                      <input
-                        type="datetime-local"
+                      <DateTimePicker
                         value={w.end}
-                        onChange={(e) => updateWindow(i, 'end', e.target.value)}
-                        className={inputClass(!!(errors.windows?.[i]))}
+                        min={windowBounds.min}
+                        max={windowBounds.max}
+                        onChange={(v) => updateWindow(i, 'end', v)}
+                        hasError={!!(errors.windows?.[i])}
+                        disabled={stageId === '__all__'}
                       />
                     </div>
                     {errors.windows?.[i] && (

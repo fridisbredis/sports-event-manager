@@ -46,7 +46,7 @@ export default async function NewWorkstationPage({ params }: Props) {
 
   const { data: stages } = await supabase
     .from('event_stages')
-    .select('id, name, stage_type')
+    .select('id, name, stage_type, start_time, end_time')
     .eq('event_id', event.id)
     .eq('tenant_id', tenant.id)
     .order('position', { ascending: true })

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { StageInput } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
+import DateTimePicker from '@/components/date-time-picker'
 
 interface Props {
   stage: StageInput | null
@@ -126,26 +127,21 @@ export default function StageModal({ stage, onSave, onClose, categoryType, onCat
             </div>
           </div>
 
-          {/* Start time */}
+          {/* Start / end time */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.stageStartTime')}</label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={form.start_time ?? ''}
-                onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value || null }))}
-                className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
+                onChange={(v) => setForm((p) => ({ ...p, start_time: v || null }))}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.stageEndTime')}</label>
-              <input
-                type="datetime-local"
+              <DateTimePicker
                 value={form.end_time ?? ''}
-                onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value || null }))}
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${
-                  errors.end_time ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
-                }`}
+                onChange={(v) => setForm((p) => ({ ...p, end_time: v || null }))}
+                hasError={!!errors.end_time}
               />
               {errors.end_time && <p className="mt-1 text-xs text-red-500">{errors.end_time}</p>}
             </div>
