@@ -219,6 +219,7 @@ export type Database = {
           id: string
           name: string
           position: number
+          race_type: string
           stage_date: string | null
           stage_type: string
           start_time: string | null
@@ -232,6 +233,7 @@ export type Database = {
           id?: string
           name: string
           position?: number
+          race_type?: string
           stage_date?: string | null
           stage_type?: string
           start_time?: string | null
@@ -245,6 +247,7 @@ export type Database = {
           id?: string
           name?: string
           position?: number
+          race_type?: string
           stage_date?: string | null
           stage_type?: string
           start_time?: string | null
@@ -270,7 +273,6 @@ export type Database = {
       }
       events: {
         Row: {
-          category_type: string
           created_at: string
           description: string | null
           end_date: string | null
@@ -285,7 +287,6 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
-          category_type?: string
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -300,7 +301,6 @@ export type Database = {
           tenant_id: string
         }
         Update: {
-          category_type?: string
           created_at?: string
           description?: string | null
           end_date?: string | null

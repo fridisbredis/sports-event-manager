@@ -8,14 +8,12 @@ import { useTranslation } from '@/lib/i18n/client'
 interface Props {
   stages: StageInput[]
   onChange: (stages: StageInput[]) => void
-  categoryType: 'distance' | 'time'
-  onCategoryTypeChange: (type: 'distance' | 'time') => void
 }
 
 const DEFAULT_STAGES: StageInput[] = [
-  { name: 'Setup', stage_type: 'non_race', start_time: null, end_time: null, venue: '', position: 0, distances: [] },
-  { name: 'Race', stage_type: 'race', start_time: null, end_time: null, venue: '', position: 1, distances: [] },
-  { name: 'Teardown', stage_type: 'non_race', start_time: null, end_time: null, venue: '', position: 2, distances: [] },
+  { name: 'Setup', stage_type: 'non_race', race_type: 'distance', start_time: null, end_time: null, venue: '', position: 0, distances: [] },
+  { name: 'Race', stage_type: 'race', race_type: 'distance', start_time: null, end_time: null, venue: '', position: 1, distances: [] },
+  { name: 'Teardown', stage_type: 'non_race', race_type: 'distance', start_time: null, end_time: null, venue: '', position: 2, distances: [] },
 ]
 
 function sortStagesByStartTime(stages: StageInput[]): StageInput[] {
@@ -53,7 +51,7 @@ function formatTimeRange(start: string | null, end: string | null): string {
   return `${day} ${startTime}–${endDay} ${endTime}`
 }
 
-export default function StageList({ stages, onChange, categoryType, onCategoryTypeChange }: Props) {
+export default function StageList({ stages, onChange }: Props) {
   const { t } = useTranslation('admin')
   const [modalTarget, setModalTarget] = useState<{ index: number | null }>({ index: null })
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -199,7 +197,7 @@ export default function StageList({ stages, onChange, categoryType, onCategoryTy
                       <>
                         <div>
                           <p className="text-xs font-medium text-gray-400 mb-0.5">
-                            {categoryType === 'time' ? t('eventConfig.categoryTimes') : t('eventConfig.categoryDistances')}
+                            {stage.race_type === 'time' ? t('eventConfig.categoryTimes') : t('eventConfig.categoryDistances')}
                           </p>
                           <p className="text-xs text-gray-700">
                             {stage.distances.length > 0 ? stage.distances.map((d) => d.label).join(', ') : '–'}
@@ -237,8 +235,6 @@ export default function StageList({ stages, onChange, categoryType, onCategoryTy
           stage={editingStage}
           onSave={handleModalSave}
           onClose={closeModal}
-          categoryType={categoryType}
-          onCategoryTypeChange={onCategoryTypeChange}
         />
       )}
     </>

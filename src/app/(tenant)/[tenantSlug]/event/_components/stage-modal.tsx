@@ -10,13 +10,12 @@ interface Props {
   stage: StageInput | null
   onSave: (stage: StageInput) => void
   onClose: () => void
-  categoryType: 'distance' | 'time'
-  onCategoryTypeChange: (type: 'distance' | 'time') => void
 }
 
 const emptyStage = (): StageInput => ({
   name: '',
   stage_type: 'race',
+  race_type: 'distance',
   start_time: null,
   end_time: null,
   venue: '',
@@ -24,7 +23,7 @@ const emptyStage = (): StageInput => ({
   distances: [],
 })
 
-export default function StageModal({ stage, onSave, onClose, categoryType, onCategoryTypeChange }: Props) {
+export default function StageModal({ stage, onSave, onClose }: Props) {
   const { t } = useTranslation('admin')
   const isAdd = stage === null
 
@@ -162,7 +161,7 @@ export default function StageModal({ stage, onSave, onClose, categoryType, onCat
           {/* Distance / Time — Race only */}
           {form.stage_type === 'race' ? (
             <div className="space-y-3">
-              {/* Category type toggle */}
+              {/* Race type toggle */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.categoryType')}</label>
                 <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit text-sm">
@@ -170,9 +169,9 @@ export default function StageModal({ stage, onSave, onClose, categoryType, onCat
                     <button
                       key={type}
                       type="button"
-                      onClick={() => onCategoryTypeChange(type)}
+                      onClick={() => setForm((p) => ({ ...p, race_type: type }))}
                       className={`px-4 py-2 font-medium transition-colors ${
-                        categoryType === type
+                        form.race_type === type
                           ? 'bg-gray-900 text-white'
                           : 'text-gray-500 hover:text-gray-900 bg-white'
                       }`}
@@ -185,13 +184,13 @@ export default function StageModal({ stage, onSave, onClose, categoryType, onCat
               {/* Distances / Times input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {categoryType === 'distance' ? t('eventConfig.categoryDistances') : t('eventConfig.categoryTimes')}
+                  {form.race_type === 'distance' ? t('eventConfig.categoryDistances') : t('eventConfig.categoryTimes')}
                 </label>
                 <input
                   type="text"
                   value={distancesText}
                   onChange={(e) => setDistancesText(e.target.value)}
-                  placeholder={categoryType === 'distance' ? t('eventConfig.distancesPlaceholder') : t('eventConfig.timesPlaceholder')}
+                  placeholder={form.race_type === 'distance' ? t('eventConfig.distancesPlaceholder') : t('eventConfig.timesPlaceholder')}
                   className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
               </div>

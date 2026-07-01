@@ -7,6 +7,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 export interface StageInput {
   name: string
   stage_type: 'race' | 'non_race'
+  race_type: 'distance' | 'time'
   start_time: string | null
   end_time: string | null
   venue: string
@@ -29,7 +30,6 @@ export interface SaveEventInput {
   location: string
   logo_url: string
   scheduling_granularity_min: number
-  category_type: 'distance' | 'time'
   stages: StageInput[]
   facilities: LabelInput[]
   // start_date and end_date are derived from Race stage times in this action
@@ -81,7 +81,6 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
       location: input.location || null,
       logo_url: input.logo_url || null,
       scheduling_granularity_min: input.scheduling_granularity_min,
-      category_type: input.category_type,
     })
     .eq('id', input.eventId)
     .eq('tenant_id', input.tenantId)
@@ -95,6 +94,7 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     .map((s, i) => ({
       name: s.name,
       stage_type: s.stage_type,
+      race_type: s.race_type,
       start_time: s.start_time || null,
       end_time: s.end_time || null,
       venue: s.venue,

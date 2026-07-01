@@ -20,7 +20,6 @@ interface Props {
   initialGranularity: number
   initialStages: StageInput[]
   initialFacilities: LabelInput[]
-  initialCategoryType: 'distance' | 'time'
   isPublished: boolean
 }
 
@@ -43,7 +42,6 @@ export default function EventConfigForm({
   initialGranularity,
   initialStages,
   initialFacilities,
-  initialCategoryType,
   isPublished,
 }: Props) {
   const { t } = useTranslation('admin')
@@ -60,7 +58,6 @@ export default function EventConfigForm({
   const [facilitiesText, setFacilitiesText] = useState(
     initialFacilities.map((f) => f.label).join(', ')
   )
-  const [categoryType, setCategoryType] = useState<'distance' | 'time'>(initialCategoryType)
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -105,7 +102,6 @@ export default function EventConfigForm({
       location,
       logo_url: logoUrl,
       scheduling_granularity_min: granularity,
-      category_type: categoryType,
       stages,
       facilities: parseLabelText(facilitiesText),
     }
@@ -391,11 +387,6 @@ export default function EventConfigForm({
             {/* Stages */}
             <StageList
               stages={stages}
-              categoryType={categoryType}
-              onCategoryTypeChange={(type) => {
-                setCategoryType(type)
-                setSaveSuccess(false); markDirty()
-              }}
               onChange={(updated) => {
                 setStages(updated)
                 setSaveSuccess(false); markDirty()

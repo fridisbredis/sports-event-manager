@@ -39,7 +39,7 @@ export default async function EventConfigPage({ params }: Props) {
   const { data: event } = await supabase
     .from('events')
     .select(
-      'id, name, event_type, description, location, logo_url, status, scheduling_granularity_min, category_type'
+      'id, name, event_type, description, location, logo_url, status, scheduling_granularity_min'
     )
     .eq('tenant_id', tenant.id)
     .maybeSingle()
@@ -49,7 +49,7 @@ export default async function EventConfigPage({ params }: Props) {
   const [{ data: stages }, { data: distances }, { data: facilities }] = await Promise.all([
     supabase
       .from('event_stages')
-      .select('id, name, stage_type, start_time, end_time, venue, position')
+      .select('id, name, stage_type, race_type, start_time, end_time, venue, position')
       .eq('event_id', event.id)
       .order('position', { ascending: true }),
     supabase
@@ -86,10 +86,10 @@ export default async function EventConfigPage({ params }: Props) {
         initialLocation={event.location ?? ''}
         initialLogoUrl={event.logo_url ?? ''}
         initialGranularity={event.scheduling_granularity_min}
-        initialCategoryType={(event.category_type as 'distance' | 'time') ?? 'distance'}
         initialStages={(stages ?? []).map((s, i) => ({
           name: s.name,
           stage_type: (s.stage_type as 'race' | 'non_race') ?? 'race',
+          race_type: (s.race_type as 'distance' | 'time') ?? 'distance',
           start_time: s.start_time ? s.start_time.slice(0, 16) : null,
           end_time: s.end_time ? s.end_time.slice(0, 16) : null,
           venue: s.venue ?? '',
