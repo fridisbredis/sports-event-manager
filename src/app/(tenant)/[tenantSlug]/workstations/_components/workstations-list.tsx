@@ -55,7 +55,7 @@ export default function WorkstationsList({ tenantSlug, workstations }: Props) {
 
   function stageLabel(ws: Workstation): string {
     if (!ws.event_stages) return t('workstations.allStages')
-    const typeStr = ws.event_stages.stage_type === 'race' ? 'Race' : 'Non-race'
+    const typeStr = ws.event_stages.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')
     return `${ws.event_stages.name} · ${typeStr}`
   }
 

@@ -168,7 +168,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
               <option value="__all__">{t('workstations.allStages')}</option>
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} · {s.stage_type === 'race' ? 'Race' : 'Non-race'}
+                  {s.name} · {s.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}
                 </option>
               ))}
             </select>
