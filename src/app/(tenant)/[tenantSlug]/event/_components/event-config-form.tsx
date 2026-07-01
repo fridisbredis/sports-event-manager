@@ -4,6 +4,8 @@ import { useState, useTransition } from 'react'
 import { saveEvent, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
 
 interface Props {
@@ -45,6 +47,8 @@ export default function EventConfigForm({
   isPublished,
 }: Props) {
   const { t } = useTranslation('admin')
+  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
+
   const [name, setName] = useState(initialName)
   const [eventType, setEventType] = useState(initialEventType)
   const [description, setDescription] = useState(initialDescription)
@@ -112,7 +116,7 @@ export default function EventConfigForm({
       setErrors({ name: t('eventConfig.eventNameEmpty') })
       return
     }
-    setSaveSuccess(false)
+    setSaveSuccess(false); markDirty()
     setErrors({})
     startSave(async () => {
       const result = await saveEvent(buildInput())
@@ -120,6 +124,7 @@ export default function EventConfigForm({
         setErrors({ general: result.error })
       } else {
         setSaveSuccess(true)
+        markClean()
       }
     })
   }
@@ -144,6 +149,7 @@ export default function EventConfigForm({
 
   return (
     <div>
+      <UnsavedChangesDialog {...dialogProps} />
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
@@ -229,7 +235,7 @@ export default function EventConfigForm({
                 <input
                   type="url"
                   value={logoUrl}
-                  onChange={(e) => { setLogoUrl(e.target.value); setLogoError(false); setSaveSuccess(false) }}
+                  onChange={(e) => { setLogoUrl(e.target.value); setLogoError(false); setSaveSuccess(false); markDirty() }}
                   placeholder={t('eventConfig.logoPlaceholder')}
                   className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                 />
@@ -245,7 +251,7 @@ export default function EventConfigForm({
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value)
-                  setSaveSuccess(false)
+                  setSaveSuccess(false); markDirty()
                   if (e.target.value.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
                 }}
                 placeholder={t('eventConfig.eventNamePlaceholder')}
@@ -265,7 +271,7 @@ export default function EventConfigForm({
                 value={eventType}
                 onChange={(e) => {
                   setEventType(e.target.value)
-                  setSaveSuccess(false)
+                  setSaveSuccess(false); markDirty()
                 }}
                 placeholder={t('eventConfig.typePlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
@@ -280,7 +286,7 @@ export default function EventConfigForm({
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value)
-                  setSaveSuccess(false)
+                  setSaveSuccess(false); markDirty()
                 }}
                 rows={4}
                 placeholder={t('eventConfig.descriptionPlaceholder')}
@@ -334,7 +340,7 @@ export default function EventConfigForm({
                       value={granularity}
                       onChange={(e) => {
                         setGranularity(Number(e.target.value))
-                        setSaveSuccess(false)
+                        setSaveSuccess(false); markDirty()
                       }}
                       className="w-full appearance-none rounded-lg border border-gray-200 px-3.5 py-2.5 pr-9 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                     >
@@ -367,7 +373,7 @@ export default function EventConfigForm({
                 value={facilitiesText}
                 onChange={(e) => {
                   setFacilitiesText(e.target.value)
-                  setSaveSuccess(false)
+                  setSaveSuccess(false); markDirty()
                 }}
                 placeholder={t('eventConfig.facilitiesPlaceholder')}
                 className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
@@ -388,11 +394,11 @@ export default function EventConfigForm({
               categoryType={categoryType}
               onCategoryTypeChange={(type) => {
                 setCategoryType(type)
-                setSaveSuccess(false)
+                setSaveSuccess(false); markDirty()
               }}
               onChange={(updated) => {
                 setStages(updated)
-                setSaveSuccess(false)
+                setSaveSuccess(false); markDirty()
               }}
             />
             {errors.stages && <p className="text-xs text-red-500">{errors.stages}</p>}

@@ -18,7 +18,14 @@
     "close": "Close",
     "confirm": "Confirm",
     "remove": "Remove",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "unsavedChanges": "You have unsaved changes. Leave anyway?",
+    "leaveAnyway": "Leave anyway",
+    "stayOnPage": "Stay"
+  },
+  "unsavedChanges": {
+    "title": "Unsaved changes",
+    "body": "You have unsaved changes. If you leave, your changes will be lost."
   },
   "common": {
     "loading": "Loading...",

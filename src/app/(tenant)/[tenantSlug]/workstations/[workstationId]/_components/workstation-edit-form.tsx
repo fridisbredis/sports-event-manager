@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import { updateWorkstation, deleteWorkstation } from '../../actions'
 
 interface Stage {
@@ -48,7 +49,7 @@ export default function WorkstationEditForm({
   initialTodos,
 }: Props) {
   const { t } = useTranslation('admin')
-  const router = useRouter()
+  const { markDirty, markClean, guardedNavigate, dialogProps } = useUnsavedChanges()
 
   const [stageId, setStageId] = useState<string>(initialStageId ?? '__all__')
   const [name, setName] = useState(initialName)
@@ -70,26 +71,32 @@ export default function WorkstationEditForm({
 
   function addWindow() {
     setWindows((prev: TimeWindow[]) => [...prev, { start: '', end: '' }])
+    markDirty()
   }
 
   function removeWindow(index: number) {
     setWindows((prev: TimeWindow[]) => prev.filter((_, i) => i !== index))
+    markDirty()
   }
 
   function updateWindow(index: number, field: 'start' | 'end', value: string) {
     setWindows((prev: TimeWindow[]) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
+    markDirty()
   }
 
   function addTodo() {
     setTodos((prev) => [...prev, ''])
+    markDirty()
   }
 
   function removeTodo(index: number) {
     setTodos((prev) => prev.filter((_, i) => i !== index))
+    markDirty()
   }
 
   function updateTodo(index: number, value: string) {
     setTodos((prev) => prev.map((item, i) => (i === index ? value : item)))
+    markDirty()
   }
 
   function validate(): boolean {
@@ -136,6 +143,7 @@ export default function WorkstationEditForm({
         setErrors({ general: result.error })
       } else {
         setSaveSuccess(true)
+        markClean()
       }
     })
   }
@@ -162,11 +170,12 @@ export default function WorkstationEditForm({
 
   return (
     <div>
+      <UnsavedChangesDialog {...dialogProps} />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <button
-            onClick={() => router.push(`/${tenantSlug}/workstations`)}
+            onClick={() => guardedNavigate(`/${tenantSlug}/workstations`)}
             className="mb-1 flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >
             <span>←</span>
@@ -210,7 +219,7 @@ export default function WorkstationEditForm({
             </h2>
             <select
               value={stageId}
-              onChange={(e) => setStageId(e.target.value)}
+              onChange={(e) => { setStageId(e.target.value); markDirty() }}
               className={inputClass()}
             >
               <option value="__all__">{t('workstations.allStages')}</option>
@@ -237,6 +246,7 @@ export default function WorkstationEditForm({
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value)
+                    markDirty()
                     if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
                   }}
                   placeholder={t('workstations.namePlaceholder')}
@@ -252,7 +262,7 @@ export default function WorkstationEditForm({
                 </label>
                 <textarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => { setDescription(e.target.value); markDirty() }}
                   rows={3}
                   className={inputClass()}
                 />
@@ -320,7 +330,7 @@ export default function WorkstationEditForm({
                 type="number"
                 min={1}
                 value={capacity}
-                onChange={(e) => setCapacity(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => { setCapacity(Math.max(1, parseInt(e.target.value) || 1)); markDirty() }}
                 className={inputClass()}
               />
             </div>
