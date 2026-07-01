@@ -18,6 +18,17 @@ const DEFAULT_STAGES: StageInput[] = [
   { name: 'Teardown', stage_type: 'non_race', start_time: null, end_time: null, venue: '', position: 2, distances: [] },
 ]
 
+function sortStagesByStartTime(stages: StageInput[]): StageInput[] {
+  return [...stages]
+    .sort((a, b) => {
+      if (!a.start_time && !b.start_time) return a.position - b.position
+      if (!a.start_time) return 1
+      if (!b.start_time) return -1
+      return a.start_time.localeCompare(b.start_time)
+    })
+    .map((s, i) => ({ ...s, position: i }))
+}
+
 function formatTime(iso: string): string {
   // datetime-local strings are 'YYYY-MM-DDTHH:mm' — no timezone suffix.
   // Slicing avoids Date constructor interpreting them as local time.
@@ -48,7 +59,7 @@ export default function StageList({ stages, onChange, categoryType, onCategoryTy
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const isModalOpen = modalTarget.index !== null || modalTarget.index === -1
 
-  const effectiveStages = stages.length > 0 ? stages : DEFAULT_STAGES
+  const effectiveStages = sortStagesByStartTime(stages.length > 0 ? stages : DEFAULT_STAGES)
   const raceStageCount = effectiveStages.filter((s) => s.stage_type === 'race').length
 
   function toggleExpand(index: number) {
@@ -69,15 +80,15 @@ export default function StageList({ stages, onChange, categoryType, onCategoryTy
   }
 
   function handleModalSave(updated: StageInput) {
+    let newStages: StageInput[]
     if (modalTarget.index === -1) {
-      const newStages = [...effectiveStages, { ...updated, position: effectiveStages.length }]
-      onChange(newStages)
+      newStages = [...effectiveStages, { ...updated, position: effectiveStages.length }]
     } else {
-      const newStages = effectiveStages.map((s, i) =>
+      newStages = effectiveStages.map((s, i) =>
         i === modalTarget.index ? { ...updated, position: i } : s
       )
-      onChange(newStages)
     }
+    onChange(sortStagesByStartTime(newStages))
     setModalTarget({ index: null })
   }
 
