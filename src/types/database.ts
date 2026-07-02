@@ -329,6 +329,8 @@ export type Database = {
           created_at: string
           id: string
           invite_status: string
+          invite_token: string | null
+          invite_token_expires_at: string | null
           name: string
           phone: string
           tenant_id: string
@@ -338,6 +340,8 @@ export type Database = {
           created_at?: string
           id?: string
           invite_status?: string
+          invite_token?: string | null
+          invite_token_expires_at?: string | null
           name: string
           phone: string
           tenant_id: string
@@ -347,6 +351,8 @@ export type Database = {
           created_at?: string
           id?: string
           invite_status?: string
+          invite_token?: string | null
+          invite_token_expires_at?: string | null
           name?: string
           phone?: string
           tenant_id?: string

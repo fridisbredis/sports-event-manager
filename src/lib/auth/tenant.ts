@@ -50,6 +50,39 @@ export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | 
   }
 }
 
+/**
+ * Called after first login for a user with no roles.
+ * Looks for an 'invited' official record matching their phone number.
+ * If found: sets user_id, flips invite_status to 'confirmed', creates user_roles row.
+ * Returns the tenantSlug to redirect to, or null if no match.
+ */
+export async function confirmOfficialInvite(userId: string, phone: string): Promise<string | null> {
+  const service = await createSupabaseServiceClient()
+
+  const { data: official } = await service
+    .from('officials')
+    .select('id, tenant_id, tenants(slug)')
+    .eq('phone', phone)
+    .eq('invite_status', 'invited')
+    .maybeSingle()
+
+  if (!official) return null
+
+  const tenantSlug = (official.tenants as { slug: string } | null)?.slug
+  if (!tenantSlug) return null
+
+  await service
+    .from('officials')
+    .update({ user_id: userId, invite_status: 'confirmed' })
+    .eq('id', official.id)
+
+  await service
+    .from('user_roles')
+    .insert({ user_id: userId, tenant_id: official.tenant_id, role: 'official' })
+
+  return tenantSlug
+}
+
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
