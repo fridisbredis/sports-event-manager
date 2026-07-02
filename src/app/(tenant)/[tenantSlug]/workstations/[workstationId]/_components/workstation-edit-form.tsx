@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
@@ -114,6 +114,7 @@ export default function WorkstationEditForm({
   const [recurring, setRecurring] = useState(false)
   const [recurringTimes, setRecurringTimes] = useState<TimeWindow[]>([{ start: '', end: '' }])
   const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
+  const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -187,7 +188,11 @@ export default function WorkstationEditForm({
   }
 
   function addTodo() {
-    setTodos((prev) => [...prev, ''])
+    setTodos((prev) => {
+      const next = [...prev, '']
+      setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
+      return next
+    })
     markDirty()
   }
 
@@ -551,9 +556,11 @@ export default function WorkstationEditForm({
                       className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
                     />
                     <input
+                      ref={(el) => { todoRefs.current[i] = el }}
                       type="text"
                       value={todo}
                       onChange={(e) => updateTodo(i, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTodo(); } }}
                       placeholder={t('workstations.todoPlaceholder')}
                       className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
                     />

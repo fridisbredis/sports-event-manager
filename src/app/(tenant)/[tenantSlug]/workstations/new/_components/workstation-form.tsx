@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import DateTimePicker from '@/components/date-time-picker'
@@ -88,6 +88,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
   const [recurring, setRecurring] = useState(false)
   const [recurringTimes, setRecurringTimes] = useState<TimeWindow[]>([{ start: '', end: '' }])
   const [todos, setTodos] = useState<string[]>([''])
+  const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, startSave] = useTransition()
@@ -151,7 +152,11 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
   }
 
   function addTodo() {
-    setTodos((prev) => [...prev, ''])
+    setTodos((prev) => {
+      const next = [...prev, '']
+      setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
+      return next
+    })
   }
 
   function removeTodo(index: number) {
@@ -471,9 +476,11 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
                       className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
                     />
                     <input
+                      ref={(el) => { todoRefs.current[i] = el }}
                       type="text"
                       value={todo}
                       onChange={(e) => updateTodo(i, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTodo(); } }}
                       placeholder={t('workstations.todoPlaceholder')}
                       className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
                     />
