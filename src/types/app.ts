@@ -44,10 +44,7 @@ export type RaceType = 'distance' | 'time'
 export type StageType = 'race' | 'non_race'
 export type AssignmentStatus = 'assigned' | 'available' | 'on_break' | 'blocked'
 export type AnnouncementChannel = 'officials' | 'participants'
-export type OfficialInviteStatus = 'pending' | 'confirmed' | 'removed'
-//                                  ^^^^^^^^^^^^^^^^^^^^^^^^
-// Note: officials.invite_status is text in the DB without a CHECK constraint.
-// If we want DB-enforced values, add a CHECK in a later migration.
+export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 
 // Useful aggregate types for queries that join data
 export type WorkstationWithDetails = Workstation & {

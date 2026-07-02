@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   const { data: official, error } = await service
     .from('officials')
-    .insert({ tenant_id: tenantId, name, phone, invite_status: 'pending' })
+    .insert({ tenant_id: tenantId, name, phone, invite_status: 'invited' })
     .select()
     .single()
 
