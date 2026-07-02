@@ -543,6 +543,7 @@ export type Database = {
           event_id: string
           id: string
           name: string
+          recurring: boolean
           stage_id: string | null
           tenant_id: string
         }
@@ -553,6 +554,7 @@ export type Database = {
           event_id: string
           id?: string
           name: string
+          recurring?: boolean
           stage_id?: string | null
           tenant_id: string
         }
@@ -563,6 +565,7 @@ export type Database = {
           event_id?: string
           id?: string
           name?: string
+          recurring?: boolean
           stage_id?: string | null
           tenant_id?: string
         }

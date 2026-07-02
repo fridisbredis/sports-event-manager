@@ -48,7 +48,7 @@ export default async function EditWorkstationPage({ params }: Props) {
     supabase
       .from('workstations')
       .select(
-        'id, name, description, capacity_ceiling, stage_id, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position)'
+        'id, name, description, capacity_ceiling, stage_id, recurring, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position)'
       )
       .eq('id', workstationId)
       .eq('tenant_id', tenant.id)
@@ -76,6 +76,7 @@ export default async function EditWorkstationPage({ params }: Props) {
         initialName={ws.name}
         initialDescription={ws.description ?? ''}
         initialCapacity={ws.capacity_ceiling}
+        initialRecurring={ws.recurring}
         initialWindows={(ws.workstation_operating_windows ?? []).map((w) => ({
           window_start: w.window_start,
           window_end: w.window_end,

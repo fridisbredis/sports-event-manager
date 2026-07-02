@@ -17,6 +17,7 @@ export interface CreateWorkstationInput {
   name: string
   description: string
   capacity: number
+  recurring: boolean
   windows: WindowInput[]
   todos: string[]
 }
@@ -56,6 +57,7 @@ export async function createWorkstation(
       name: input.name.trim(),
       description: input.description.trim() || null,
       capacity_ceiling: input.capacity,
+      recurring: input.recurring,
     })
     .select('id')
     .single()
@@ -99,6 +101,7 @@ export interface UpdateWorkstationInput {
   name: string
   description: string
   capacity: number
+  recurring: boolean
   windows: WindowInput[]
   todos: string[]
 }
@@ -136,6 +139,7 @@ export async function updateWorkstation(
       name: input.name.trim(),
       description: input.description.trim() || null,
       capacity_ceiling: input.capacity,
+      recurring: input.recurring,
     })
     .eq('id', input.workstationId)
     .eq('tenant_id', input.tenantId)

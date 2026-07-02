@@ -25,6 +25,7 @@ interface Props {
   initialName: string
   initialDescription: string
   initialCapacity: number
+  initialRecurring: boolean
   initialWindows: { window_start: string; window_end: string }[]
   initialTodos: string[]
 }
@@ -93,6 +94,7 @@ export default function WorkstationEditForm({
   initialName,
   initialDescription,
   initialCapacity,
+  initialRecurring,
   initialWindows,
   initialTodos,
 }: Props) {
@@ -105,14 +107,31 @@ export default function WorkstationEditForm({
   const [capacity, setCapacity] = useState(initialCapacity)
   const [windows, setWindows] = useState<TimeWindow[]>(
     initialWindows.length > 0
-      ? initialWindows.map((w) => ({
-          start: w.window_start.slice(0, 16),
-          end: w.window_end.slice(0, 16),
-        }))
+      ? [...initialWindows]
+          .sort((a, b) => a.window_start.localeCompare(b.window_start))
+          .map((w) => ({
+            start: w.window_start.slice(0, 16),
+            end: w.window_end.slice(0, 16),
+          }))
       : [{ start: '', end: '' }]
   )
-  const [recurring, setRecurring] = useState(false)
-  const [recurringTimes, setRecurringTimes] = useState<TimeWindow[]>([{ start: '', end: '' }])
+  const [recurring, setRecurring] = useState(initialRecurring)
+  const [recurringTimes, setRecurringTimes] = useState<TimeWindow[]>(() => {
+    if (!initialRecurring || initialWindows.length === 0) return [{ start: '', end: '' }]
+    // Deduplicate by HH:MM pairs — each recurring time appears once per race day
+    const seen = new Set<string>()
+    const times: TimeWindow[] = []
+    for (const w of [...initialWindows].sort((a, b) => a.window_start.localeCompare(b.window_start))) {
+      const start = w.window_start.slice(11, 16)
+      const end = w.window_end.slice(11, 16)
+      const key = `${start}|${end}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        times.push({ start, end })
+      }
+    }
+    return times.length > 0 ? times : [{ start: '', end: '' }]
+  })
   const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
   const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
@@ -246,6 +265,7 @@ export default function WorkstationEditForm({
         name,
         description,
         capacity,
+        recurring,
         windows: finalWindows,
         todos: todos.filter((item) => item.trim()),
       })

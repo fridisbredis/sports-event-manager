@@ -207,6 +207,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages 
         name,
         description,
         capacity,
+        recurring,
         windows: finalWindows,
         todos: todos.filter((t) => t.trim()),
       })
