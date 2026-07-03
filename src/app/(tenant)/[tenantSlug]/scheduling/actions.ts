@@ -13,6 +13,7 @@ export interface AssignmentInput {
 
 export interface SaveAssignmentsResult {
   error?: string
+  inserted?: { id: string; official_id: string; workstation_id: string; timeslot_start: string }[]
 }
 
 export async function saveAssignments(
@@ -50,22 +51,28 @@ export async function saveAssignments(
     if (error) return { error: error.message }
   }
 
+  let inserted: SaveAssignmentsResult['inserted'] = []
+
   if (additions.length > 0) {
-    const { error } = await supabase.from('assignments').insert(
-      additions.map((a) => ({
-        tenant_id: tenantId,
-        official_id: a.official_id,
-        workstation_id: a.workstation_id,
-        timeslot_start: a.timeslot_start,
-        timeslot_end: a.timeslot_end,
-        status: 'assigned' as const,
-      }))
-    )
+    const { data, error } = await supabase
+      .from('assignments')
+      .insert(
+        additions.map((a) => ({
+          tenant_id: tenantId,
+          official_id: a.official_id,
+          workstation_id: a.workstation_id,
+          timeslot_start: a.timeslot_start,
+          timeslot_end: a.timeslot_end,
+          status: 'assigned' as const,
+        }))
+      )
+      .select('id, official_id, workstation_id, timeslot_start')
 
     if (error) return { error: error.message }
+    inserted = data ?? []
   }
 
   revalidatePath(`/${tenantSlug}/scheduling`)
 
-  return {}
+  return { inserted }
 }

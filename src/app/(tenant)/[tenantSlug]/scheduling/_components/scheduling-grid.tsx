@@ -69,15 +69,6 @@ interface LocalAssignment {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatStageTimeRange(stage: Stage): string {
-  if (!stage.start_time || !stage.end_time) return ''
-  const start = new Date(stage.start_time)
-  const end = new Date(stage.end_time)
-  const dateStr = start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-  const startT = start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const endT = end.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  return `${dateStr} · ${startT}–${endT}`
-}
 
 function generateSlots(stage: Stage, granularityMin: number): Date[] {
   if (!stage.start_time || !stage.end_time) return []
@@ -99,7 +90,7 @@ function slotEndTime(slot: Date, granularityMin: number): Date {
 }
 
 function formatSlotLabel(slot: Date): string {
-  return slot.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return slot.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 function isWithinWindow(slot: Date, granMin: number, windows: OperatingWindow[]): boolean {
@@ -123,6 +114,8 @@ function initials(name: string): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 8
+
 export function SchedulingGrid({
   tenantSlug,
   tenantId,
@@ -135,6 +128,7 @@ export function SchedulingGrid({
   const [selectedStageId, setSelectedStageId] = useState<string>(stages[0]?.id ?? '')
   const [view, setView] = useState<View>('by-person')
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
+  const [pageIndex, setPageIndex] = useState(0)
   const [assignments, setAssignments] = useState<LocalAssignment[]>(
     initialAssignments
       .filter((a) => a.workstation_id)
@@ -142,8 +136,8 @@ export function SchedulingGrid({
         id: a.id,
         official_id: a.official_id,
         workstation_id: a.workstation_id!,
-        timeslot_start: a.timeslot_start,
-        timeslot_end: a.timeslot_end,
+        timeslot_start: new Date(a.timeslot_start).toISOString(),
+        timeslot_end: new Date(a.timeslot_end).toISOString(),
       }))
   )
   const [deletions, setDeletions] = useState<Set<string>>(new Set())
@@ -165,6 +159,9 @@ export function SchedulingGrid({
     () => (selectedStage ? generateSlots(selectedStage, granularityMin) : []),
     [selectedStage, granularityMin]
   )
+
+  const totalPages = Math.ceil(slots.length / PAGE_SIZE)
+  const visibleSlots = slots.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE)
 
   const stageWorkstations = useMemo(
     () => workstations.filter((w) => w.stage_id === selectedStageId),
@@ -301,10 +298,23 @@ export function SchedulingGrid({
       setSaveError(result.error)
     } else {
       setSaveSuccess(true)
-      setDeletions(new Set())
-      // Mark all pending additions as persisted (we don't get IDs back, but that's OK for display)
-      setAssignments((prev) => prev.map((a) => (a.id === null ? { ...a, id: 'saved' } : a)))
       setTimeout(() => setSaveSuccess(false), 2000)
+      // Replace id:null assignments with real IDs returned from insert
+      setAssignments((prev) =>
+        prev
+          .filter((a) => !deletions.has(a.id ?? ''))
+          .map((a) => {
+            if (a.id !== null) return a
+            const match = result.inserted?.find(
+              (r) =>
+                r.official_id === a.official_id &&
+                r.workstation_id === a.workstation_id &&
+                r.timeslot_start === a.timeslot_start
+            )
+            return match ? { ...a, id: match.id } : a
+          })
+      )
+      setDeletions(new Set())
     }
     setSaving(false)
   }
@@ -318,8 +328,6 @@ export function SchedulingGrid({
       </div>
     )
   }
-
-  const timeRangeLabel = selectedStage ? formatStageTimeRange(selectedStage) : ''
 
   return (
     <div>
@@ -347,6 +355,7 @@ export function SchedulingGrid({
                     setSelectedStageId(stage.id)
                     setStageDropdownOpen(false)
                     setPickerCell(null)
+                    setPageIndex(0)
                   }}
                   className={`flex items-center justify-between w-full px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
                     stage.id === selectedStageId ? 'font-medium text-gray-900' : 'text-gray-700'
@@ -366,10 +375,34 @@ export function SchedulingGrid({
 
         <div className="flex-1" />
 
-        {timeRangeLabel && (
-          <span className="text-sm text-gray-500 border border-gray-200 rounded-md px-3 py-1.5 bg-white">
-            {timeRangeLabel}
-          </span>
+        {slots.length > 0 && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+              disabled={pageIndex === 0}
+              className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous slots"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span className="text-sm text-gray-500 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center">
+              {visibleSlots.length > 0
+                ? `${visibleSlots[0].toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })} ${formatSlotLabel(visibleSlots[0])}–${formatSlotLabel(visibleSlots[visibleSlots.length - 1])}`
+                : ''}
+            </span>
+            <button
+              onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={pageIndex >= totalPages - 1}
+              className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next slots"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         )}
 
         <button
@@ -443,7 +476,7 @@ export function SchedulingGrid({
         </div>
       ) : view === 'by-person' ? (
         <ByPersonGrid
-          slots={slots}
+          slots={visibleSlots}
           officials={officials}
           stageWorkstations={stageWorkstations}
           activeAssignments={activeAssignments}
@@ -454,7 +487,7 @@ export function SchedulingGrid({
         />
       ) : (
         <ByWorkAreaGrid
-          slots={slots}
+          slots={visibleSlots}
           granularityMin={granularityMin}
           stageWorkstations={stageWorkstations}
           activeAssignments={activeAssignments}
@@ -727,24 +760,22 @@ function ByWorkAreaGrid({
 
                 return (
                   <td key={slotStart} className="px-1 py-2">
-                    {count > 0 ? (
-                      <div
-                        className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-center ${
-                          isOver
-                            ? 'bg-orange-50 border border-orange-200 text-orange-700'
-                            : 'bg-gray-100 border border-gray-200 text-gray-700'
-                        }`}
-                      >
-                        {count}/{ws.capacity_ceiling}
-                        {isOver && (
-                          <div className="text-[10px] font-normal text-orange-500 leading-none mt-0.5">
-                            over
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-full h-10 rounded-md border border-transparent" />
-                    )}
+                    <div
+                      className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-center ${
+                        isOver
+                          ? 'bg-orange-50 border border-orange-200 text-orange-700'
+                          : count === 0
+                          ? 'bg-white border border-gray-200 text-gray-400'
+                          : 'bg-gray-100 border border-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {count}/{ws.capacity_ceiling}
+                      {isOver && (
+                        <div className="text-[10px] font-normal text-orange-500 leading-none mt-0.5">
+                          over
+                        </div>
+                      )}
+                    </div>
                   </td>
                 )
               })}
