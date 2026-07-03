@@ -41,6 +41,12 @@ interface FormErrors {
   general?: string
 }
 
+// Fix: use UTC-based date math throughout. The previous version used
+// setHours/getDate (local time), which shifted the computed race days
+// by one day whenever the browser's local timezone offset (e.g. CEST,
+// UTC+2) pushed a UTC midnight-truncated date across a local calendar
+// boundary. Stage start/end times are stored as UTC timestamptz, so day
+// boundaries must be computed in UTC, not local time.
 function getRaceDays(stages: Stage[], selectedStageId: string): string[] {
   const relevant = selectedStageId === '__all__'
     ? stages.filter((s) => s.start_time && s.end_time)
@@ -49,12 +55,12 @@ function getRaceDays(stages: Stage[], selectedStageId: string): string[] {
   const daySet = new Set<string>()
   for (const s of relevant) {
     const cur = new Date(s.start_time!)
-    cur.setHours(0, 0, 0, 0)
+    cur.setUTCHours(0, 0, 0, 0)
     const last = new Date(s.end_time!)
-    last.setHours(0, 0, 0, 0)
+    last.setUTCHours(0, 0, 0, 0)
     while (cur <= last) {
       daySet.add(cur.toISOString().slice(0, 10))
-      cur.setDate(cur.getDate() + 1)
+      cur.setUTCDate(cur.getUTCDate() + 1)
     }
   }
   return [...daySet].sort()

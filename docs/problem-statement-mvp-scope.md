@@ -54,6 +54,8 @@ Cross-cutting, non-negotiable from day one: multi-tenant isolation; i18n archite
 - Merch and promo partners.
 - Open or interactive (two-way) chat channels. v1 has admin-publish-only announcement channels for both participants and officials. Planned for a later version: per-work-area channels and two-way officials messaging with an admin "important" SMS flag.
 - Official signup waitlist.
+- **View-official detail on the Officials roster (OFF-01).** A read-only, admin-side view of a single official's captured data, planned as an inline expansion of the roster row (next version). Officials still edit their own data in their personal account (ACCT-01); the admin view is read-only.
+- **Extensible officials profile fields.** Adding more fields to the officials profile in a later version, e.g. an email address. Note: an email address as a *profile field* is distinct from *email as a communication channel*, which remains out of scope (see below).
 - Tournament event type.
 - Email as a communication channel.
 - In-house timing or results computation (owned by Race Results).
@@ -87,7 +89,7 @@ Aligned to the project instructions and kept event-neutral so the multi-tenant p
 - **To-do list / Task:** units of work tied to a work area and/or timeslot. May carry a description/instruction and single-person checkbox semantics (one official, done/not done).
 - **Timeslot:** a scheduled time window for an assignment. Its length is set by the event's scheduling granularity (e.g. 1 hour). A single timeslot can hold multiple parallel work areas and to-dos.
 - **Scheduling granularity:** the configurable length of a timeslot (e.g. 30 min, 1 hour), set per event. The scheduling grid's time rows/columns follow it. (UI label: "Scheduling granularity"; formerly "timeslot unit".)
-- **Assignment:** an Official mapped to a work area or to-do and a timeslot, within a stage. Each person-timeslot cell has a status: assigned, available ("on call"/free), on break, or blocked/unavailable. Both schedule views are pivots of this one model. Scheduling is scoped per stage.
+- **Assignment:** an Official mapped to a work area or to-do, a timeslot, and a slot index, within a stage. The slot (#1..#X, X = the work area's capacity ceiling) gives each assignment a stable lane in the By work area view. Each person-timeslot cell has a status: assigned, available ("on call"/free), on break, or blocked/unavailable. Both schedule views are pivots of this one model. Scheduling is scoped per stage.
 - **Official, Participant:** people; see Actors.
 - **Channel:** a communication stream. v1 has two announcement channels (participants and officials), admin-publish only. Later versions add per-work-area channels and two-way officials messaging with an admin "important" flag for SMS.
 - **Result:** external, accessed via Race Results links.

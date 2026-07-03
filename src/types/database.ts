@@ -57,6 +57,7 @@ export type Database = {
           created_at: string
           id: string
           official_id: string
+          slot_index: number | null
           status: string
           tenant_id: string
           timeslot_end: string
@@ -68,6 +69,7 @@ export type Database = {
           created_at?: string
           id?: string
           official_id: string
+          slot_index?: number | null
           status?: string
           tenant_id: string
           timeslot_end: string
@@ -79,6 +81,7 @@ export type Database = {
           created_at?: string
           id?: string
           official_id?: string
+          slot_index?: number | null
           status?: string
           tenant_id?: string
           timeslot_end?: string

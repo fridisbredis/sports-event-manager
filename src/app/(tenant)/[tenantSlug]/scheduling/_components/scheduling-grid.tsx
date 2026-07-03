@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { saveAssignments, type AssignmentInput } from '../actions'
+import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,10 +71,18 @@ interface LocalAssignment {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
-function generateSlots(stage: Stage, granularityMin: number): Date[] {
-  if (!stage.start_time || !stage.end_time) return []
-  const start = new Date(stage.start_time)
-  const end = new Date(stage.end_time)
+function generateSlotsForDay(stage: Stage, day: string, granularityMin: number): Date[] {
+  const range = getAllocableRange(stage)
+  if (!range) return []
+
+  const dayStart = new Date(`${day}T00:00:00.000Z`)
+  const dayEnd = new Date(`${day}T23:59:59.999Z`)
+
+  const start = new Date(Math.max(new Date(range.start).getTime(), dayStart.getTime()))
+  const end = new Date(Math.min(new Date(range.end).getTime(), dayEnd.getTime()))
+
+  if (start >= end) return []
+
   const slots: Date[] = []
   const cur = new Date(start)
   while (cur < end) {
@@ -81,6 +90,11 @@ function generateSlots(stage: Stage, granularityMin: number): Date[] {
     cur.setMinutes(cur.getMinutes() + granularityMin)
   }
   return slots
+}
+
+function formatDayLabel(day: string): string {
+  const date = new Date(`${day}T12:00:00.000Z`)
+  return date.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' })
 }
 
 function slotEndTime(slot: Date, granularityMin: number): Date {
@@ -114,8 +128,6 @@ function initials(name: string): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 8
-
 export function SchedulingGrid({
   tenantSlug,
   tenantId,
@@ -128,7 +140,11 @@ export function SchedulingGrid({
   const [selectedStageId, setSelectedStageId] = useState<string>(stages[0]?.id ?? '')
   const [view, setView] = useState<View>('by-person')
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
-  const [pageIndex, setPageIndex] = useState(0)
+  const [selectedDay, setSelectedDay] = useState<string>(() => {
+    const first = stages[0]
+    if (!first) return ''
+    return getAllocableDays(first)[0] ?? ''
+  })
   const [assignments, setAssignments] = useState<LocalAssignment[]>(
     initialAssignments
       .filter((a) => a.workstation_id)
@@ -155,13 +171,18 @@ export function SchedulingGrid({
   const pickerRef = useRef<HTMLDivElement>(null)
 
   const selectedStage = stages.find((s) => s.id === selectedStageId) ?? stages[0]
-  const slots = useMemo(
-    () => (selectedStage ? generateSlots(selectedStage, granularityMin) : []),
-    [selectedStage, granularityMin]
+
+  const availableDays = useMemo(
+    () => (selectedStage ? getAllocableDays(selectedStage) : []),
+    [selectedStage]
   )
 
-  const totalPages = Math.ceil(slots.length / PAGE_SIZE)
-  const visibleSlots = slots.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE)
+  const dayIndex = availableDays.indexOf(selectedDay)
+
+  const slots = useMemo(
+    () => (selectedStage && selectedDay ? generateSlotsForDay(selectedStage, selectedDay, granularityMin) : []),
+    [selectedStage, selectedDay, granularityMin]
+  )
 
   const stageWorkstations = useMemo(
     () => workstations.filter((w) => w.stage_id === selectedStageId),
@@ -355,7 +376,7 @@ export function SchedulingGrid({
                     setSelectedStageId(stage.id)
                     setStageDropdownOpen(false)
                     setPickerCell(null)
-                    setPageIndex(0)
+                    setSelectedDay(getAllocableDays(stage)[0] ?? '')
                   }}
                   className={`flex items-center justify-between w-full px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
                     stage.id === selectedStageId ? 'font-medium text-gray-900' : 'text-gray-700'
@@ -375,28 +396,26 @@ export function SchedulingGrid({
 
         <div className="flex-1" />
 
-        {slots.length > 0 && (
+        {availableDays.length > 0 && (
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-              disabled={pageIndex === 0}
+              onClick={() => setSelectedDay(availableDays[dayIndex - 1])}
+              disabled={dayIndex <= 0}
               className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Previous slots"
+              aria-label="Föregående dag"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-sm text-gray-500 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center">
-              {visibleSlots.length > 0
-                ? `${visibleSlots[0].toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })} ${formatSlotLabel(visibleSlots[0])}–${formatSlotLabel(visibleSlots[visibleSlots.length - 1])}`
-                : ''}
+            <span className="text-sm text-gray-600 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center capitalize">
+              {selectedDay ? formatDayLabel(selectedDay) : ''}
             </span>
             <button
-              onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={pageIndex >= totalPages - 1}
+              onClick={() => setSelectedDay(availableDays[dayIndex + 1])}
+              disabled={dayIndex >= availableDays.length - 1}
               className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Next slots"
+              aria-label="Nästa dag"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -476,7 +495,8 @@ export function SchedulingGrid({
         </div>
       ) : view === 'by-person' ? (
         <ByPersonGrid
-          slots={visibleSlots}
+          slots={slots}
+          granularityMin={granularityMin}
           officials={officials}
           stageWorkstations={stageWorkstations}
           activeAssignments={activeAssignments}
@@ -487,7 +507,7 @@ export function SchedulingGrid({
         />
       ) : (
         <ByWorkAreaGrid
-          slots={visibleSlots}
+          slots={slots}
           granularityMin={granularityMin}
           stageWorkstations={stageWorkstations}
           activeAssignments={activeAssignments}
@@ -520,6 +540,7 @@ function EmptyState() {
 
 interface ByPersonGridProps {
   slots: Date[]
+  granularityMin: number
   officials: OfficialData[]
   stageWorkstations: WorkstationData[]
   activeAssignments: LocalAssignment[]
@@ -531,6 +552,7 @@ interface ByPersonGridProps {
 
 function ByPersonGrid({
   slots,
+  granularityMin,
   officials,
   stageWorkstations,
   activeAssignments,
@@ -543,6 +565,15 @@ function ByPersonGrid({
     const map = new Map<string, LocalAssignment>()
     for (const a of activeAssignments) {
       map.set(`${a.official_id}:${a.timeslot_start}`, a)
+    }
+    return map
+  }, [activeAssignments])
+
+  const countMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const a of activeAssignments) {
+      const key = `${a.workstation_id}:${a.timeslot_start}`
+      map.set(key, (map.get(key) ?? 0) + 1)
     }
     return map
   }, [activeAssignments])
@@ -603,6 +634,8 @@ function ByPersonGrid({
                   : undefined
                 const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
 
+                const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
+
                 return (
                   <td key={slotStart} className="px-1 py-2 relative">
                     {assignment ? (
@@ -617,7 +650,10 @@ function ByPersonGrid({
                       >
                         <span className="flex items-center justify-between gap-1">
                           <span className="truncate">{ws?.name ?? '—'}</span>
-                          {isDoubleBooked && <span className="text-orange-500 shrink-0">⊗</span>}
+                          <span className={`shrink-0 tabular-nums ${isDoubleBooked ? 'text-orange-400' : 'text-gray-400'}`}>
+                            {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
+                            {isDoubleBooked && ' ⊗'}
+                          </span>
                         </span>
                       </button>
                     ) : (
@@ -635,33 +671,41 @@ function ByPersonGrid({
       </table>
 
       {/* Work-area picker — fixed so overflow-x-auto doesn't clip it */}
-      {pickerCell && stageWorkstations.length > 0 && (
-        <div
-          ref={pickerRef}
-          className="fixed w-44 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-          style={{
-            top: pickerCell.anchorTop,
-            left: pickerCell.anchorLeft,
-            transform: 'translateY(calc(-100% - 4px))',
-          }}
-        >
-          <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-            Assign to
-          </p>
-          {stageWorkstations.map((ws) => {
-            const slot = new Date(pickerCell.slotStart)
-            return (
-              <button
-                key={ws.id}
-                onClick={() => onCellClick(pickerCell.officialId, slot, ws)}
-                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                {ws.name}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      {pickerCell && (() => {
+        const slot = new Date(pickerCell.slotStart)
+        const openWorkstations = stageWorkstations.filter((ws) =>
+          isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
+        )
+        if (openWorkstations.length === 0) return null
+        return (
+          <div
+            ref={pickerRef}
+            className="fixed w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50"
+            style={{
+              top: pickerCell.anchorTop,
+              left: pickerCell.anchorLeft,
+              transform: 'translateY(calc(-100% - 4px))',
+            }}
+          >
+            <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
+              Assign to
+            </p>
+            {openWorkstations.map((ws) => {
+              const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
+              return (
+                <button
+                  key={ws.id}
+                  onClick={() => onCellClick(pickerCell.officialId, slot, ws)}
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <span className="truncate">{ws.name}</span>
+                  <span className="ml-2 text-xs text-gray-400 tabular-nums shrink-0">{count}/{ws.capacity_ceiling}</span>
+                </button>
+              )
+            })}
+          </div>
+        )
+      })()}
     </div>
   )
 }
