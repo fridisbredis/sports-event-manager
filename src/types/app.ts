@@ -42,7 +42,7 @@ export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'partici
 export type EventStatus = 'draft' | 'published'
 export type RaceType = 'distance' | 'time'
 export type StageType = 'race' | 'non_race'
-export type AssignmentStatus = 'assigned' | 'available' | 'on_break' | 'blocked'
+export type AssignmentStatus = 'assigned' | 'available'
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 

@@ -69,7 +69,7 @@ export default async function SchedulingPage({ params }: Props) {
 
       supabase
         .from('assignments')
-        .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status')
+        .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status, slot_index')
         .eq('tenant_id', tenant.id),
     ])
 
