@@ -223,10 +223,20 @@
     "channel": "Channel",
     "participants": "Participants",
     "officials": "Officials",
-    "message": "Message",
-    "messagePlaceholder": "Type your announcement...",
+    "newAnnouncement": "New announcement",
+    "announcementPlaceholder": "Write an announcement…",
+    "smsNote": "Recipients get an SMS unless they've opted out.",
     "publish": "Publish",
-    "published": "Announcement published to {{channel}}"
+    "publishing": "Publishing…",
+    "published": "Announcement published to {{channel}}",
+    "timelineParticipants": "Timeline — Participants",
+    "timelineOfficials": "Timeline — Officials",
+    "noAnnouncementsYet": "No announcements yet",
+    "noAnnouncementsHint": "Published announcements will appear here.",
+    "unsavedTitle": "Unsaved changes",
+    "unsavedBody": "You have an unpublished announcement.",
+    "discardAndContinue": "Discard and continue",
+    "cancel": "Cancel"
   },
   "account": {
     "title": "Personal Account",
