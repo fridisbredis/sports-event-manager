@@ -4,10 +4,12 @@ import WorkstationForm from './_components/workstation-form'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
+  searchParams: Promise<{ stageId?: string }>
 }
 
-export default async function NewWorkstationPage({ params }: Props) {
+export default async function NewWorkstationPage({ params, searchParams }: Props) {
   const { tenantSlug } = await params
+  const { stageId: preselectedStageId } = await searchParams
 
   const supabase = await createSupabaseServerClient()
   const {
@@ -51,6 +53,8 @@ export default async function NewWorkstationPage({ params }: Props) {
     .eq('tenant_id', tenant.id)
     .order('position', { ascending: true })
 
+  const preselectedStage = stages?.find((s) => s.id === preselectedStageId) ?? null
+
   return (
     <div className="px-8 py-8">
       <WorkstationForm
@@ -58,6 +62,7 @@ export default async function NewWorkstationPage({ params }: Props) {
         tenantId={tenant.id}
         eventId={event.id}
         stages={stages ?? []}
+        preselectedStage={preselectedStage}
       />
     </div>
   )

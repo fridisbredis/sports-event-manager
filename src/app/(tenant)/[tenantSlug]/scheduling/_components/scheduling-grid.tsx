@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
+import { useTranslation } from '@/lib/i18n/client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ export function SchedulingGrid({
   officials,
   initialAssignments,
 }: Props) {
+  const { t } = useTranslation('admin')
   const [selectedStageId, setSelectedStageId] = useState<string>(stages[0]?.id ?? '')
   const [view, setView] = useState<View>('by-person')
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
@@ -345,7 +347,7 @@ export function SchedulingGrid({
   if (stages.length === 0) {
     return (
       <div className="text-center py-16 text-gray-500">
-        <p className="text-sm">No stages configured. Add stages in Event configuration first.</p>
+        <p className="text-sm">{t('scheduling.noStages')}</p>
       </div>
     )
   }
@@ -354,7 +356,7 @@ export function SchedulingGrid({
     <div>
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Scheduling</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
 
         {/* Stage selector */}
         <div className="relative">
@@ -362,7 +364,7 @@ export function SchedulingGrid({
             onClick={() => setStageDropdownOpen((o) => !o)}
             className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400"
           >
-            {selectedStage?.name ?? 'Select stage'}
+            {selectedStage?.name ?? t('scheduling.selectStage')}
             <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
@@ -402,7 +404,7 @@ export function SchedulingGrid({
               onClick={() => setSelectedDay(availableDays[dayIndex - 1])}
               disabled={dayIndex <= 0}
               className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Föregående dag"
+              aria-label={t('scheduling.prevDay')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -415,7 +417,7 @@ export function SchedulingGrid({
               onClick={() => setSelectedDay(availableDays[dayIndex + 1])}
               disabled={dayIndex >= availableDays.length - 1}
               className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Nästa dag"
+              aria-label={t('scheduling.nextDay')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -433,7 +435,7 @@ export function SchedulingGrid({
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {saving ? 'Saving…' : saveSuccess ? 'Saved' : 'Save'}
+          {saving ? t('scheduling.saving') : saveSuccess ? t('scheduling.saved') : t('scheduling.save')}
         </button>
       </div>
 
@@ -449,7 +451,7 @@ export function SchedulingGrid({
           <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z" />
           </svg>
-          {overCapacityCount} work area{overCapacityCount > 1 ? 's are' : ' is'} over capacity for this stage. Resolve before saving.
+          {t('scheduling.overCapacity', { count: overCapacityCount })}
         </div>
       )}
       {doubleBookedCount > 0 && (
@@ -458,7 +460,7 @@ export function SchedulingGrid({
             <circle cx="12" cy="12" r="10" strokeWidth={2} />
             <path strokeLinecap="round" strokeWidth={2} d="M8 8l8 8M16 8l-8 8" />
           </svg>
-          {doubleBookedCount} official{doubleBookedCount > 1 ? 's are' : ' is'} double-booked — assigned to two work areas in the same timeslot.
+          {t('scheduling.doubleBooked', { count: doubleBookedCount })}
         </div>
       )}
 
@@ -472,7 +474,7 @@ export function SchedulingGrid({
               : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
-          By person
+          {t('scheduling.viewByPerson')}
         </button>
         <button
           onClick={() => setView('by-work-area')}
@@ -482,7 +484,7 @@ export function SchedulingGrid({
               : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
-          By work area
+          {t('scheduling.viewByWorkArea')}
         </button>
       </div>
 
@@ -491,7 +493,7 @@ export function SchedulingGrid({
         <EmptyState />
       ) : slots.length === 0 ? (
         <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
-          No time range set for this stage. Set start and end times in Event configuration.
+          {t('scheduling.noTimeRange')}
         </div>
       ) : view === 'by-person' ? (
         <ByPersonGrid
@@ -521,6 +523,7 @@ export function SchedulingGrid({
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
+  const { t } = useTranslation('admin')
   return (
     <div className="border border-gray-200 rounded-md bg-white py-16 flex flex-col items-center gap-3">
       <div className="w-16 h-16 border-2 border-gray-300 rounded-md flex items-center justify-center">
@@ -528,9 +531,9 @@ function EmptyState() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 20L20 4M4 4l16 16" />
         </svg>
       </div>
-      <p className="text-sm font-medium text-gray-700">No assignments yet</p>
+      <p className="text-sm font-medium text-gray-700">{t('scheduling.noAssignmentsTitle')}</p>
       <p className="text-sm text-gray-500 text-center max-w-xs">
-        Assign officials to work areas to build the schedule for this stage. You&apos;ll need confirmed officials and at least one work area.
+        {t('scheduling.noAssignmentsHint')}
       </p>
     </div>
   )
@@ -561,6 +564,8 @@ function ByPersonGrid({
   pickerRef,
   onCellClick,
 }: ByPersonGridProps) {
+  const { t } = useTranslation('admin')
+
   const assignmentMap = useMemo(() => {
     const map = new Map<string, LocalAssignment>()
     for (const a of activeAssignments) {
@@ -581,7 +586,7 @@ function ByPersonGrid({
   if (officials.length === 0) {
     return (
       <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
-        No confirmed officials yet. Officials must accept their invite to appear here.
+        {t('scheduling.noConfirmedOfficials')}
       </div>
     )
   }
@@ -594,11 +599,11 @@ function ByPersonGrid({
         <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
             <span className="inline-flex items-center justify-center w-4 h-4 border border-gray-400 rounded-sm text-gray-500 text-[10px]">⊗</span>
-            Double-booked (same person, overlapping slots)
+            {t('scheduling.legendDoubleBooked')}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-8 h-4 rounded-sm bg-gray-100 border border-gray-200 inline-block" />
-            Normal assignment
+            {t('scheduling.legendNormalAssignment')}
           </span>
         </div>
       )}
@@ -606,7 +611,7 @@ function ByPersonGrid({
         <thead>
           <tr className="border-b border-gray-100">
             <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40 min-w-40">
-              Official
+              {t('scheduling.colOfficial')}
             </th>
             {slots.map((slot) => (
               <th key={slot.toISOString()} className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]">
@@ -641,7 +646,7 @@ function ByPersonGrid({
                     {assignment ? (
                       <button
                         onClick={() => onCellClick(official.id, slot)}
-                        title="Click to remove assignment"
+                        title={t('scheduling.removeAssignment')}
                         className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 text-left transition-colors hover:bg-red-50 hover:text-red-700 group ${
                           isDoubleBooked
                             ? 'bg-orange-50 border border-orange-200 text-orange-700'
@@ -688,7 +693,7 @@ function ByPersonGrid({
             }}
           >
             <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-              Assign to
+              {t('scheduling.assignTo')}
             </p>
             {openWorkstations.map((ws) => {
               const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
@@ -727,6 +732,8 @@ function ByWorkAreaGrid({
   activeAssignments,
   overCapacityCells,
 }: ByWorkAreaGridProps) {
+  const { t } = useTranslation('admin')
+
   // Count assigned officials per (workstation, slot)
   const countMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -740,7 +747,7 @@ function ByWorkAreaGrid({
   if (stageWorkstations.length === 0) {
     return (
       <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
-        No work areas for this stage yet. Add work areas in Work areas.
+        {t('scheduling.noWorkAreas')}
       </div>
     )
   }
@@ -753,11 +760,11 @@ function ByWorkAreaGrid({
         <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
             <span className="w-8 h-4 rounded-sm bg-gray-100 border border-gray-200 inline-block" />
-            Assignable
+            {t('scheduling.legendAssignable')}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-8 h-4 rounded-sm bg-[repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb_3px,transparent_3px,transparent_8px)] inline-block border border-gray-200" />
-            Outside operating window — disabled
+            {t('scheduling.legendOutsideWindow')}
           </span>
         </div>
       )}
@@ -765,7 +772,7 @@ function ByWorkAreaGrid({
         <thead>
           <tr className="border-b border-gray-100">
             <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44 min-w-44">
-              Work area
+              {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
               <th key={slot.toISOString()} className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]">
@@ -779,7 +786,7 @@ function ByWorkAreaGrid({
             <tr key={ws.id} className="border-b border-gray-50 last:border-0">
               <td className="px-4 py-3">
                 <div className="text-sm font-medium text-gray-800">{ws.name}</div>
-                <div className="text-xs text-gray-400">Up to {ws.capacity_ceiling}</div>
+                <div className="text-xs text-gray-400">{t('workstations.upTo', { n: ws.capacity_ceiling })}</div>
               </td>
               {slots.map((slot) => {
                 const slotStart = slot.toISOString()
@@ -816,7 +823,7 @@ function ByWorkAreaGrid({
                       {count}/{ws.capacity_ceiling}
                       {isOver && (
                         <div className="text-[10px] font-normal text-orange-500 leading-none mt-0.5">
-                          over
+                          {t('scheduling.overCapacityBadge')}
                         </div>
                       )}
                     </div>

@@ -44,10 +44,17 @@ export default async function WorkstationsPage({ params }: Props) {
 
   if (!event) notFound()
 
+  const { data: stages } = await supabase
+    .from('event_stages')
+    .select('id, name, stage_type, start_time, end_time')
+    .eq('event_id', event.id)
+    .eq('tenant_id', tenant.id)
+    .order('position', { ascending: true })
+
   const { data: workstations } = await supabase
     .from('workstations')
     .select(
-      'id, name, capacity_ceiling, stage_id, event_stages(name, stage_type), workstation_operating_windows(window_start, window_end)'
+      'id, name, capacity_ceiling, stage_id, workstation_operating_windows(window_start, window_end)'
     )
     .eq('event_id', event.id)
     .eq('tenant_id', tenant.id)
@@ -55,7 +62,11 @@ export default async function WorkstationsPage({ params }: Props) {
 
   return (
     <div className="px-8 py-8">
-      <WorkstationsList tenantSlug={tenantSlug} workstations={workstations ?? []} />
+      <WorkstationsList
+        tenantSlug={tenantSlug}
+        stages={stages ?? []}
+        workstations={workstations ?? []}
+      />
     </div>
   )
 }
