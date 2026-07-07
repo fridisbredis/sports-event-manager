@@ -22,13 +22,16 @@
     "accountSub": "Your details & settings"
   },
   "eventInfo": {
-    "title": "Event Information",
+    "title": "Event info",
     "identity": "Identity",
     "type": "Event type",
     "dates": "Dates",
+    "datesByStage": "Dates by stage",
     "location": "Location",
+    "locationAndVenue": "Location & venue per stage",
     "description": "Description",
     "facilities": "Facilities",
+    "programme": "Event programme by stage",
     "raceResults": "Race Results"
   },
   "mySchedule": {
