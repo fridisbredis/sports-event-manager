@@ -35,12 +35,13 @@
     "raceResults": "Race Results"
   },
   "mySchedule": {
-    "title": "My Schedule",
-    "viewBy": "View by",
-    "byTime": "By time",
-    "byWorkstation": "By workstation",
-    "noAssignments": "You have no assignments",
-    "workstation": "Workstation",
+    "title": "My schedule",
+    "readOnly": "Read-only",
+    "byTime": "Time",
+    "byWorkstation": "Work area",
+    "noAssignments": "No assignments yet",
+    "noAssignmentsDescription": "Your schedule will appear here once you've been assigned.",
+    "workstation": "Work area",
     "time": "Time",
     "checklist": "Checklist"
   },
