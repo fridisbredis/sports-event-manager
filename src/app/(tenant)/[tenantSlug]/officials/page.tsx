@@ -38,7 +38,7 @@ export default async function OfficialsPage({ params }: Props) {
 
   const { data: officials } = await service
     .from('officials')
-    .select('id, name, phone, invite_status, user_id, created_at, tenant_id, invite_token, invite_token_expires_at')
+    .select('id, name, phone, invite_status, user_id, created_at, tenant_id, invite_token, invite_token_expires_at, sms_opt_out')
     .eq('tenant_id', tenant.id)
     .neq('invite_status', 'removed')
     .order('created_at', { ascending: true })

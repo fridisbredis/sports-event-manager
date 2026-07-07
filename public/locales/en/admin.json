@@ -239,13 +239,21 @@
     "cancel": "Cancel"
   },
   "account": {
-    "title": "Personal Account",
-    "name": "Name",
-    "phone": "Mobile number",
-    "notifications": "SMS Notifications",
-    "notificationsOn": "Enabled",
-    "notificationsOff": "Disabled",
-    "save": "Save"
+    "title": "Account",
+    "nameLabel": "Name (editable)",
+    "editHint": "Edit",
+    "phoneLabel": "Mobile number (read-only)",
+    "readOnlyHint": "Read-only",
+    "notificationsHeading": "Notifications",
+    "smsUpdatesLabel": "SMS updates",
+    "smsUpdatesHint": "Opt out of non-urgent SMS",
+    "scheduleHeading": "Your schedule",
+    "assignmentCount_one": "{{count}} assignment",
+    "assignmentCount_other": "{{count}} assignments",
+    "viewSchedule": "View your schedule",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
   },
   "systemAdmin": {
     "tenants": "Tenant Management",

@@ -336,6 +336,7 @@ export type Database = {
           invite_token_expires_at: string | null
           name: string
           phone: string
+          sms_opt_out: boolean
           tenant_id: string
           user_id: string | null
         }
@@ -347,6 +348,7 @@ export type Database = {
           invite_token_expires_at?: string | null
           name: string
           phone: string
+          sms_opt_out?: boolean
           tenant_id: string
           user_id?: string | null
         }
@@ -358,6 +360,7 @@ export type Database = {
           invite_token_expires_at?: string | null
           name?: string
           phone?: string
+          sms_opt_out?: boolean
           tenant_id?: string
           user_id?: string | null
         }

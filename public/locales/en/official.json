@@ -49,5 +49,22 @@
     "title": "Announcements",
     "noAnnouncements": "No announcements",
     "noAnnouncementsDescription": "Updates from the organizer will appear here."
+  },
+  "account": {
+    "title": "Account",
+    "nameLabel": "Name (editable)",
+    "editHint": "Edit",
+    "phoneLabel": "Mobile number (read-only)",
+    "readOnlyHint": "Read-only",
+    "notificationsHeading": "Notifications",
+    "smsUpdatesLabel": "SMS updates",
+    "smsUpdatesHint": "Opt out of non-urgent SMS",
+    "scheduleHeading": "Your schedule",
+    "assignmentCount_one": "{{count}} assignment",
+    "assignmentCount_other": "{{count}} assignments",
+    "viewSchedule": "View your schedule",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
   }
 }
