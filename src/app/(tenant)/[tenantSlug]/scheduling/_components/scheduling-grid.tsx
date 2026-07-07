@@ -422,6 +422,10 @@ export function SchedulingGrid({
   function handleWsSlotAdd(officialId: string) {
     if (!wsSlotModal) return
     const { workstationId, slotIndex, slotStart, slotEnd } = wsSlotModal
+    const slotTaken = assignments.some(
+      (a) => !deletions.has(a.id ?? '') && a.workstation_id === workstationId && a.slot_index === slotIndex && a.timeslot_start === slotStart
+    )
+    if (slotTaken) return
     setAssignments((prev) => [
       ...prev,
       { id: null, official_id: officialId, workstation_id: workstationId, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIndex },
@@ -792,7 +796,7 @@ export function SchedulingGrid({
                 </div>
               )}
 
-              {availableOfficials.length > 0 && (
+              {assignedInSlot.length === 0 && availableOfficials.length > 0 && (
                 <div className="px-5 pb-3">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                     {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
