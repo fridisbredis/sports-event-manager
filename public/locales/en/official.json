@@ -9,6 +9,7 @@
   "home": {
     "title": "Official Home",
     "greeting": "Hi, {{name}}",
+    "greetingAnon": "Hi",
     "eventRole": "Official",
     "goTo": "Go to",
     "eventInfo": "Event info",

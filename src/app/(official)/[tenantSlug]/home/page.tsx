@@ -123,7 +123,7 @@ export default async function OfficialHomePage({ params }: Props) {
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">
-            {t('home.greeting', { name })}
+            {name ? t('home.greeting', { name }) : t('home.greetingAnon')}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {eventName} · {t('home.eventRole')}
