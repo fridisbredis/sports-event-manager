@@ -38,6 +38,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Logged-in users have no business on the login page — send them to role routing
+  if (user && pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
   return supabaseResponse
 }
 
