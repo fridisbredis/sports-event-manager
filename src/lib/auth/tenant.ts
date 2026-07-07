@@ -86,6 +86,31 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
+export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+
+  const service = await createSupabaseServiceClient()
+  const { data: roleRow } = await service
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('role', 'system_admin')
+    .maybeSingle()
+
+  if (!roleRow) {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+
+  return { user }
+}
+
 /**
  * Verifies that the current user is authenticated and has the tenant_admin
  * role for the given tenantId. Returns either { user, role } on success or
