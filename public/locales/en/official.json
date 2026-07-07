@@ -1,10 +1,24 @@
 {
-  "home": {
-    "title": "Official Home",
-    "eventInfo": "Event Info",
-    "mySchedule": "My Schedule",
+  "nav": {
+    "home": "Home",
+    "mySchedule": "My schedule",
+    "eventInfo": "Event info",
     "announcements": "Announcements",
     "account": "Account"
+  },
+  "home": {
+    "title": "Official Home",
+    "greeting": "Hi, {{name}}",
+    "eventRole": "Official",
+    "goTo": "Go to",
+    "eventInfo": "Event info",
+    "eventInfoSub": "Schedule, venues & programme",
+    "mySchedule": "My schedule",
+    "myScheduleSub": "Your assignments",
+    "announcements": "Announcements",
+    "announcementsSub": "Latest updates for officials",
+    "accountTitle": "Personal account",
+    "accountSub": "Your details & settings"
   },
   "eventInfo": {
     "title": "Event Information",
