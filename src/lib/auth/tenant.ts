@@ -42,7 +42,7 @@ export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | 
     case 'system_admin':
       return '/admin'
     case 'tenant_admin':
-      return `/${primary.tenantSlug}/dashboard`
+      return `/${primary.tenantSlug}/admin/dashboard`
     case 'official':
       return `/${primary.tenantSlug}/home`
     case 'participant':

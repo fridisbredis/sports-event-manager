@@ -88,7 +88,7 @@ export async function createWorkstation(
     if (todoError) return { error: todoError.message }
   }
 
-  revalidatePath(`/${input.tenantSlug}/workstations`)
+  revalidatePath(`/${input.tenantSlug}/admin/workstations`)
 
   return {}
 }
@@ -184,7 +184,7 @@ export async function updateWorkstation(
     if (todoError) return { error: todoError.message }
   }
 
-  revalidatePath(`/${input.tenantSlug}/workstations`)
+  revalidatePath(`/${input.tenantSlug}/admin/workstations`)
 
   return {}
 }
@@ -229,7 +229,7 @@ export async function deleteWorkstation(
 
   if (error) return { error: error.message }
 
-  revalidatePath(`/${input.tenantSlug}/workstations`)
+  revalidatePath(`/${input.tenantSlug}/admin/workstations`)
 
   return {}
 }

@@ -71,8 +71,8 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
 
   if (error) return { error: error.message }
 
-  revalidatePath(`/${input.tenantSlug}/event`)
-  revalidatePath(`/${input.tenantSlug}/dashboard`)
+  revalidatePath(`/${input.tenantSlug}/admin/event`)
+  revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
 
   return {}
 }

@@ -1,11 +1,9 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
-import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
-import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
-import ConfirmDialog from '@/components/confirm-dialog'
-import { updateWorkstation, deleteWorkstation } from '../../actions'
+import { createWorkstation } from '../../actions'
 
 interface Stage {
   id: string
@@ -18,15 +16,9 @@ interface Stage {
 interface Props {
   tenantSlug: string
   tenantId: string
-  workstationId: string
+  eventId: string
   stages: Stage[]
-  initialStageId: string | null
-  initialName: string
-  initialDescription: string
-  initialCapacity: number
-  initialRecurring: boolean
-  initialWindows: { window_start: string; window_end: string }[]
-  initialTodos: string[]
+  preselectedStage: Stage | null
 }
 
 interface TimeWindow {
@@ -37,6 +29,7 @@ interface TimeWindow {
 
 interface FormErrors {
   name?: string
+  windows?: Record<number, string>
   general?: string
 }
 
@@ -75,95 +68,38 @@ function expandWindows(
     })
 }
 
-// Reconstruct per-window state from stored timestamps.
-// Recurring windows were expanded (same HH:MM across multiple days), so
-// deduplicate by time pair and mark recurring=true.
-// Non-recurring windows are single entries; just strip to HH:MM.
-function initWindowsFromStored(
-  stored: { window_start: string; window_end: string }[],
-  wasRecurring: boolean,
-  stageDays: string[]
-): TimeWindow[] {
-  if (stored.length === 0) return [{ start: '', end: '', recurring: false }]
-
-  const sorted = [...stored].sort((a, b) => a.window_start.localeCompare(b.window_start))
-
-  if (wasRecurring && stageDays.length > 1) {
-    // Deduplicate by HH:MM pair — each recurring time appears once per stage day
-    const seen = new Set<string>()
-    const result: TimeWindow[] = []
-    for (const w of sorted) {
-      const start = w.window_start.slice(11, 16)
-      const end = w.window_end.slice(11, 16)
-      const key = `${start}|${end}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        result.push({ start, end, recurring: true })
-      }
-    }
-    return result.length > 0 ? result : [{ start: '', end: '', recurring: false }]
-  }
-
-  return sorted.map((w) => ({
-    start: w.window_start.slice(11, 16),
-    end: w.window_end.slice(11, 16),
-    recurring: false,
-  }))
-}
-
-export default function WorkstationEditForm({
-  tenantSlug,
-  tenantId,
-  workstationId,
-  stages,
-  initialStageId,
-  initialName,
-  initialDescription,
-  initialCapacity,
-  initialRecurring,
-  initialWindows,
-  initialTodos,
-}: Props) {
+export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages, preselectedStage }: Props) {
   const { t } = useTranslation('admin')
-  const { markDirty, markClean, guardedNavigate, dialogProps } = useUnsavedChanges()
+  const router = useRouter()
 
-  const stageId = initialStageId ?? '__all__'
-  const selectedStage = stages.find((s) => s.id === stageId) ?? null
-  const stageDays = getStageDays(selectedStage)
+  const stageId = preselectedStage?.id ?? '__all__'
+  const stageDays = getStageDays(preselectedStage)
   const isMultiDay = stageDays.length > 1
 
-  const [name, setName] = useState(initialName)
-  const [description, setDescription] = useState(initialDescription)
-  const [capacity, setCapacity] = useState(initialCapacity)
-  const [windows, setWindows] = useState<TimeWindow[]>(() =>
-    initWindowsFromStored(initialWindows, initialRecurring, stageDays)
-  )
-  const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [capacity, setCapacity] = useState(1)
+  const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', recurring: false }])
+  const [todos, setTodos] = useState<string[]>([''])
   const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isSaving, startSave] = useTransition()
-  const [isDeleting, startDelete] = useTransition()
 
   function addWindow() {
     setWindows((prev) => [...prev, { start: '', end: '', recurring: false }])
-    markDirty()
   }
 
   function removeWindow(index: number) {
     setWindows((prev) => prev.filter((_, i) => i !== index))
-    markDirty()
   }
 
   function updateWindow(index: number, field: 'start' | 'end', value: string) {
     setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
-    markDirty()
   }
 
   function toggleWindowRecurring(index: number) {
     setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, recurring: !w.recurring } : w)))
-    markDirty()
   }
 
   function addTodo() {
@@ -172,17 +108,14 @@ export default function WorkstationEditForm({
       setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
       return next
     })
-    markDirty()
   }
 
   function removeTodo(index: number) {
     setTodos((prev) => prev.filter((_, i) => i !== index))
-    markDirty()
   }
 
   function updateTodo(index: number, value: string) {
-    setTodos((prev) => prev.map((item, i) => (i === index ? value : item)))
-    markDirty()
+    setTodos((prev) => prev.map((t, i) => (i === index ? value : t)))
   }
 
   function validate(): boolean {
@@ -200,41 +133,24 @@ export default function WorkstationEditForm({
       const finalWindows = expandWindows(windows, stageDays)
       const anyRecurring = windows.some((w) => w.recurring)
 
-      const result = await updateWorkstation({
+      const result = await createWorkstation({
         tenantSlug,
         tenantId,
-        workstationId,
+        eventId,
         stageId: stageId === '__all__' ? null : stageId,
         name,
         description,
         capacity,
         recurring: anyRecurring,
         windows: finalWindows,
-        todos: todos.filter((item) => item.trim()),
+        todos: todos.filter((t) => t.trim()),
       })
 
       if (result.error) {
         setErrors({ general: result.error })
       } else {
         setSaveSuccess(true)
-        markClean()
-      }
-    })
-  }
-
-  function handleDelete() {
-    setDeleteDialogOpen(true)
-  }
-
-  function confirmDelete() {
-    setDeleteDialogOpen(false)
-    startDelete(async () => {
-      const result = await deleteWorkstation({ tenantSlug, tenantId, workstationId })
-      if (result.error) {
-        setErrors({ general: result.error })
-      } else {
-        markClean()
-        guardedNavigate(`/${tenantSlug}/workstations`)
+        router.push(`/${tenantSlug}/admin/workstations`)
       }
     })
   }
@@ -244,54 +160,31 @@ export default function WorkstationEditForm({
       hasError ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
     }`
 
-  const isBusy = isSaving || isDeleting
-
   return (
     <div>
-      <UnsavedChangesDialog {...dialogProps} />
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        title={t('workstations.delete')}
-        body={t('workstations.deleteConfirm')}
-        cancelLabel={t('actions.cancel', { ns: 'common' })}
-        confirmLabel={t('actions.delete', { ns: 'common' })}
-        onCancel={() => setDeleteDialogOpen(false)}
-        onConfirm={confirmDelete}
-        destructive
-      />
-
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <button
-            onClick={() => guardedNavigate(`/${tenantSlug}/workstations`)}
+            onClick={() => router.push(`/${tenantSlug}/admin/workstations`)}
             className="mb-1 flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >
             <span>←</span>
             <span>{t('workstations.backToList')}</span>
           </button>
-          <h1 className="text-2xl font-semibold text-gray-900">{name || t('workstations.namePlaceholder')}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{t('workstations.addTitle')}</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDelete}
-            disabled={isBusy}
-            className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {t('workstations.delete')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isBusy}
-            className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-              saveSuccess
-                ? 'border border-green-200 bg-white text-green-600'
-                : 'bg-gray-900 text-white hover:bg-gray-700'
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            {isSaving ? t('workstations.saving') : saveSuccess ? t('workstations.saved') : t('workstations.save')}
-          </button>
-        </div>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+            saveSuccess
+              ? 'border border-green-200 bg-white text-green-600'
+              : 'bg-gray-900 text-white hover:bg-gray-700'
+          } disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          {isSaving ? t('workstations.saving') : saveSuccess ? t('workstations.saved') : t('workstations.save')}
+        </button>
       </div>
 
       {errors.general && (
@@ -307,8 +200,8 @@ export default function WorkstationEditForm({
               {t('workstations.stageLabel')}
             </h2>
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-600">
-              {selectedStage
-                ? `${selectedStage.name} — ${selectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
+              {preselectedStage
+                ? `${preselectedStage.name} — ${preselectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
                 : t('workstations.allStages')}
             </div>
           </section>
@@ -328,7 +221,6 @@ export default function WorkstationEditForm({
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value)
-                    markDirty()
                     if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
                   }}
                   placeholder={t('workstations.namePlaceholder')}
@@ -344,7 +236,7 @@ export default function WorkstationEditForm({
                 </label>
                 <textarea
                   value={description}
-                  onChange={(e) => { setDescription(e.target.value); markDirty() }}
+                  onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                   className={inputClass()}
                 />
@@ -428,7 +320,7 @@ export default function WorkstationEditForm({
                 type="number"
                 min={1}
                 value={capacity}
-                onChange={(e) => { setCapacity(Math.max(1, parseInt(e.target.value) || 1)); markDirty() }}
+                onChange={(e) => setCapacity(Math.max(1, parseInt(e.target.value) || 1))}
                 className={inputClass()}
               />
             </div>

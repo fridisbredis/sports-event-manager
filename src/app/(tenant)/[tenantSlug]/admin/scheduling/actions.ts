@@ -128,7 +128,7 @@ export async function saveAssignments(
     inserted = data ?? []
   }
 
-  revalidatePath(`/${tenantSlug}/scheduling`)
+  revalidatePath(`/${tenantSlug}/admin/scheduling`)
 
   return { inserted }
 }

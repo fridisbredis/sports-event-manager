@@ -203,7 +203,7 @@ export default async function DashboardPage({ params }: Props) {
         {totalWarnings > 0 && (
           <div className="mt-5">
             <Link
-              href={`/${tenantSlug}/scheduling`}
+              href={`/${tenantSlug}/admin/scheduling`}
               className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors"
             >
               {t('dashboard.reviewInScheduling')}
@@ -218,12 +218,12 @@ export default async function DashboardPage({ params }: Props) {
           {t('dashboard.adminAreas')}
         </h2>
         <div className="grid grid-cols-3 gap-4">
-          <NavTile href={`/${tenantSlug}/event`} title={t('navigation.eventConfig')} />
-          <NavTile href={`/${tenantSlug}/workstations`} title={t('navigation.workstations')} />
-          <NavTile href={`/${tenantSlug}/officials`} title={t('navigation.officials')} />
-          <NavTile href={`/${tenantSlug}/scheduling`} title={t('navigation.scheduling')} />
-          <NavTile href={`/${tenantSlug}/communication`} title={t('navigation.communication')} />
-          <NavTile href={`/${tenantSlug}/account`} title={t('navigation.account')} />
+          <NavTile href={`/${tenantSlug}/admin/event`} title={t('navigation.eventConfig')} />
+          <NavTile href={`/${tenantSlug}/admin/workstations`} title={t('navigation.workstations')} />
+          <NavTile href={`/${tenantSlug}/admin/officials`} title={t('navigation.officials')} />
+          <NavTile href={`/${tenantSlug}/admin/scheduling`} title={t('navigation.scheduling')} />
+          <NavTile href={`/${tenantSlug}/admin/communication`} title={t('navigation.communication')} />
+          <NavTile href={`/${tenantSlug}/admin/account`} title={t('navigation.account')} />
         </div>
       </div>
     </div>

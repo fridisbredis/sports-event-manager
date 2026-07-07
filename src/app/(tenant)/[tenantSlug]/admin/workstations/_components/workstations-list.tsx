@@ -162,7 +162,7 @@ function StageSection({
                   return (
                     <tr
                       key={ws.id}
-                      onClick={() => router.push(`/${tenantSlug}/workstations/${ws.id}`)}
+                      onClick={() => router.push(`/${tenantSlug}/admin/workstations/${ws.id}`)}
                       className="cursor-pointer hover:bg-gray-50"
                     >
                       <td className="px-5 py-3 font-medium text-gray-900">{ws.name}</td>
@@ -178,7 +178,7 @@ function StageSection({
           )}
           <div className="px-5 py-3.5">
             <button
-              onClick={() => router.push(`/${tenantSlug}/workstations/new?stageId=${stage.id}`)}
+              onClick={() => router.push(`/${tenantSlug}/admin/workstations/new?stageId=${stage.id}`)}
               className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
             >
               + {t('workstations.addWorkArea')}
@@ -213,7 +213,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
           <p className="text-base font-medium text-gray-900 mb-1">{t('workstations.noStages')}</p>
           <p className="text-sm text-gray-500 mb-6">{t('workstations.noStagesHint')}</p>
           <button
-            onClick={() => router.push(`/${tenantSlug}/event`)}
+            onClick={() => router.push(`/${tenantSlug}/admin/event`)}
             className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             {t('workstations.goToEventConfig')}

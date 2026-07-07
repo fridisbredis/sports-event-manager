@@ -13,12 +13,12 @@ export function SidebarNav({ tenantSlug }: Props) {
   const { t } = useTranslation('admin')
 
   const navItems = [
-    { segment: 'dashboard', label: t('navigation.dashboard') },
-    { segment: 'event', label: t('navigation.eventConfig') },
-    { segment: 'workstations', label: t('navigation.workstations') },
-    { segment: 'officials', label: t('navigation.officials') },
-    { segment: 'scheduling', label: t('navigation.scheduling') },
-    { segment: 'communication', label: t('navigation.communication') },
+    { segment: 'admin/dashboard', label: t('navigation.dashboard') },
+    { segment: 'admin/event', label: t('navigation.eventConfig') },
+    { segment: 'admin/workstations', label: t('navigation.workstations') },
+    { segment: 'admin/officials', label: t('navigation.officials') },
+    { segment: 'admin/scheduling', label: t('navigation.scheduling') },
+    { segment: 'admin/communication', label: t('navigation.communication') },
   ]
 
   const navLink = (segment: string, label: string) => {
@@ -43,7 +43,7 @@ export function SidebarNav({ tenantSlug }: Props) {
     <div className="flex flex-col flex-1">
       <nav className="py-2 flex-1">{navItems.map((item) => navLink(item.segment, item.label))}</nav>
       <div className="border-t border-gray-100 py-2">
-        {navLink('account', t('navigation.account'))}
+        {navLink('admin/account', t('navigation.account'))}
       </div>
     </div>
   )

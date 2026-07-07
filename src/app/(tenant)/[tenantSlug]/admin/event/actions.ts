@@ -133,8 +133,8 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     if (insFacError) return { error: insFacError.message }
   }
 
-  revalidatePath(`/${input.tenantSlug}/event`)
-  revalidatePath(`/${input.tenantSlug}/dashboard`)
+  revalidatePath(`/${input.tenantSlug}/admin/event`)
+  revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
 
   return {}
 }

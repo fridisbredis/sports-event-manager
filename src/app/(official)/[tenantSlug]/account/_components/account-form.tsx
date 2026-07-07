@@ -14,6 +14,7 @@ interface AccountFormProps {
   tenantSlug: string
   assignmentCount: number
   i18nNamespace: 'official' | 'admin'
+  layout?: 'mobile' | 'desktop'
 }
 
 export default function AccountForm({
@@ -24,6 +25,7 @@ export default function AccountForm({
   tenantSlug,
   assignmentCount,
   i18nNamespace,
+  layout = 'mobile',
 }: AccountFormProps) {
   const { t } = useTranslation(i18nNamespace)
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
@@ -75,9 +77,31 @@ export default function AccountForm({
         ? t('account.saved')
         : t('account.save')
 
+  const isDesktop = layout === 'desktop'
+
   return (
     <>
-      <div className="px-5 pt-10 pb-24">
+      {isDesktop && (
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-xl font-semibold text-gray-900">{t('account.title')}</h1>
+          <div className="flex items-center gap-3">
+            {error && <span className="text-sm text-red-500">{error}</span>}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saveState === 'saving'}
+              className={`rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-40 transition-colors ${
+                saveState === 'saved'
+                  ? 'border-green-200 bg-white text-green-600'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900'
+              }`}
+            >
+              {saveLabel}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-24'}>
         {/* Avatar */}
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
@@ -178,20 +202,22 @@ export default function AccountForm({
           </>
         )}
 
-        {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+        {!isDesktop && error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       </div>
 
-      {/* Save button — fixed at bottom */}
-      <div className="fixed bottom-16 inset-x-0 px-5 pb-2 bg-white border-t border-gray-100">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saveState === 'saving'}
-          className="w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors mt-3"
-        >
-          {saveLabel}
-        </button>
-      </div>
+      {/* Mobile: Save button fixed at bottom above tab bar */}
+      {!isDesktop && (
+        <div className="fixed bottom-16 inset-x-0 px-5 pb-2 bg-white border-t border-gray-100">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saveState === 'saving'}
+            className="w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors mt-3"
+          >
+            {saveLabel}
+          </button>
+        </div>
+      )}
 
       <UnsavedChangesDialog {...dialogProps} />
     </>
