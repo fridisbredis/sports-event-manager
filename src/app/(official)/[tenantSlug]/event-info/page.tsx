@@ -13,6 +13,7 @@ function formatDate(ts: string | null): string {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    timeZone: 'UTC',
   })
 }
 
@@ -21,6 +22,7 @@ function formatTime(ts: string | null): string {
   return new Date(ts).toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   })
 }
 
@@ -122,7 +124,7 @@ export default async function EventInfoPage({ params }: Props) {
           <div className="flex flex-col gap-1.5">
             {(stages ?? []).map((stage) => (
               <p key={stage.id} className="text-sm text-gray-900">
-                Stage {stage.position} · {stage.name}
+                Stage {stage.position + 1} · {stage.name}
                 {stage.start_time ? ` — ${formatDate(stage.start_time)}` : ''}
               </p>
             ))}
@@ -139,7 +141,7 @@ export default async function EventInfoPage({ params }: Props) {
             <div className="flex flex-col gap-1.5 pt-1">
               {stagesWithVenue.map((stage) => (
                 <p key={stage.id} className="text-sm text-gray-900">
-                  Stage {stage.position} · {stage.venue}
+                  Stage {stage.position + 1} · {stage.venue}
                 </p>
               ))}
             </div>
@@ -168,7 +170,7 @@ export default async function EventInfoPage({ params }: Props) {
               const times = [start, end].filter(Boolean).join(' – ')
               return (
                 <p key={stage.id} className="text-sm text-gray-900">
-                  Stage {stage.position} · {stage.name}
+                  Stage {stage.position + 1} · {stage.name}
                   {times ? ` · ${times}` : ''}
                 </p>
               )
