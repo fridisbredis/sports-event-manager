@@ -47,6 +47,7 @@
   },
   "announcements": {
     "title": "Announcements",
-    "noAnnouncements": "No announcements yet"
+    "noAnnouncements": "No announcements",
+    "noAnnouncementsDescription": "Updates from the organizer will appear here."
   }
 }
