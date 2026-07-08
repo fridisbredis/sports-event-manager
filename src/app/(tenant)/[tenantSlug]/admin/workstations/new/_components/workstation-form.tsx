@@ -24,7 +24,7 @@ interface Props {
 interface TimeWindow {
   start: string
   end: string
-  recurring: boolean
+  limitToDay: string | null
 }
 
 interface FormErrors {
@@ -49,12 +49,24 @@ function getStageDays(stage: Stage | null): string[] {
 
 function expandWindows(
   windows: TimeWindow[],
-  stageDays: string[]
+  stageDays: string[],
+  stageStart: string | null
 ): { window_start: string; window_end: string }[] {
   return windows
     .filter((w) => w.start && w.end)
     .flatMap((w) => {
-      const days = w.recurring ? stageDays : stageDays.length > 0 ? [stageDays[0]] : []
+      let days: string[]
+      if (w.limitToDay) {
+        days = [w.limitToDay]
+      } else {
+        days = stageDays
+        if (stageDays.length > 0 && stageStart) {
+          const stageStartHHMM = stageStart.slice(11, 16)
+          if (w.start < stageStartHHMM) {
+            days = stageDays.slice(1)
+          }
+        }
+      }
       return days.map((day) => {
         const overnight = w.end <= w.start
         let endDay = day
@@ -75,11 +87,29 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
   const stageId = preselectedStage?.id ?? '__all__'
   const stageDays = getStageDays(preselectedStage)
   const isMultiDay = stageDays.length > 1
+  const stageStartHHMM = preselectedStage?.start_time?.slice(11, 16) ?? null
+  const stageEndHHMM = preselectedStage?.end_time?.slice(11, 16) ?? null
+  const lastDay = stageDays[stageDays.length - 1] ?? null
+
+  function minStartFor(limitToDay: string | null) {
+    if (stageDays.length === 1 || limitToDay === stageDays[0]) return stageStartHHMM ?? undefined
+    return undefined
+  }
+  function maxEndFor(limitToDay: string | null) {
+    if (stageDays.length === 1 || limitToDay === lastDay) return stageEndHHMM ?? undefined
+    return undefined
+  }
+  function clampToDay(win: TimeWindow, newDay: string): TimeWindow {
+    let { start, end } = win
+    if (newDay === stageDays[0] && stageStartHHMM && start && start < stageStartHHMM) start = ''
+    if (newDay === lastDay && stageEndHHMM && end && end > stageEndHHMM) end = ''
+    return { ...win, start, end, limitToDay: newDay }
+  }
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [capacity, setCapacity] = useState(1)
-  const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', recurring: false }])
+  const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', limitToDay: null }])
   const [todos, setTodos] = useState<string[]>([''])
   const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
@@ -87,7 +117,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
   const [isSaving, startSave] = useTransition()
 
   function addWindow() {
-    setWindows((prev) => [...prev, { start: '', end: '', recurring: false }])
+    setWindows((prev) => [...prev, { start: '', end: '', limitToDay: null }])
   }
 
   function removeWindow(index: number) {
@@ -96,10 +126,6 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
 
   function updateWindow(index: number, field: 'start' | 'end', value: string) {
     setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
-  }
-
-  function toggleWindowRecurring(index: number) {
-    setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, recurring: !w.recurring } : w)))
   }
 
   function addTodo() {
@@ -121,6 +147,20 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
   function validate(): boolean {
     const newErrors: FormErrors = {}
     if (!name.trim()) newErrors.name = t('workstations.nameRequired')
+    const windowErrors: Record<number, string> = {}
+    windows.forEach((w, i) => {
+      if (!w.start && !w.end) return
+      if (!w.start) { windowErrors[i] = t('workstations.windowStartRequired'); return }
+      if (!w.end) { windowErrors[i] = t('workstations.windowEndRequired'); return }
+      const onFirstDay = stageDays.length === 1 || w.limitToDay === stageDays[0]
+      const onLastDay = stageDays.length === 1 || w.limitToDay === lastDay
+      if (onFirstDay && stageStartHHMM && w.start < stageStartHHMM) {
+        windowErrors[i] = t('workstations.windowBeforeStageStart', { time: stageStartHHMM })
+      } else if (onLastDay && stageEndHHMM && w.end > stageEndHHMM) {
+        windowErrors[i] = t('workstations.windowAfterStageEnd', { time: stageEndHHMM })
+      }
+    })
+    if (Object.keys(windowErrors).length > 0) newErrors.windows = windowErrors
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -130,8 +170,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
     setSaveSuccess(false)
 
     startSave(async () => {
-      const finalWindows = expandWindows(windows, stageDays)
-      const anyRecurring = windows.some((w) => w.recurring)
+      const finalWindows = expandWindows(windows, stageDays, preselectedStage?.start_time ?? null)
 
       const result = await createWorkstation({
         tenantSlug,
@@ -141,7 +180,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
         name,
         description,
         capacity,
-        recurring: anyRecurring,
+        recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
         todos: todos.filter((t) => t.trim()),
       })
@@ -251,19 +290,27 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
             </h2>
             <div className="space-y-3">
               {windows.map((w, i) => (
-                <div key={i} className="rounded-lg border border-gray-200 p-3">
+                <div key={i} className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}>
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
                       value={w.start}
-                      onChange={(e) => updateWindow(i, 'start', e.target.value)}
+                      min={minStartFor(w.limitToDay)}
+                      onChange={(e) => {
+                        updateWindow(i, 'start', e.target.value)
+                        if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
+                      }}
                       className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                     />
                     <span className="text-gray-400">–</span>
                     <input
                       type="time"
                       value={w.end}
-                      onChange={(e) => updateWindow(i, 'end', e.target.value)}
+                      max={maxEndFor(w.limitToDay)}
+                      onChange={(e) => {
+                        updateWindow(i, 'end', e.target.value)
+                        if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
+                      }}
                       className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                     />
                     <button
@@ -273,21 +320,48 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
                       {t('workstations.removeWindow')}
                     </button>
                   </div>
-                  <label
-                    className={`mt-2.5 flex items-center gap-2 text-sm select-none ${
-                      isMultiDay ? 'cursor-pointer text-gray-600' : 'cursor-not-allowed text-gray-400'
-                    }`}
-                    title={!isMultiDay ? t('workstations.recurrentDailyDisabledHint') : undefined}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={w.recurring}
-                      disabled={!isMultiDay}
-                      onChange={() => toggleWindowRecurring(i)}
-                      className="h-4 w-4 rounded border-gray-300 text-gray-900 disabled:cursor-not-allowed"
-                    />
-                    {t('workstations.recurrentDaily')}
-                  </label>
+                  {errors.windows?.[i] && (
+                    <p className="mt-1.5 text-xs text-red-500">{errors.windows[i]}</p>
+                  )}
+                  {isMultiDay && (
+                    <div className="mt-2.5 space-y-2">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-600 select-none">
+                        <input
+                          type="checkbox"
+                          checked={w.limitToDay !== null}
+                          onChange={() =>
+                            setWindows((prev) =>
+                              prev.map((win, j) =>
+                                j === i
+                                  ? win.limitToDay !== null
+                                    ? { ...win, limitToDay: null }
+                                    : clampToDay(win, stageDays[0])
+                                  : win
+                              )
+                            )
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-gray-900"
+                        />
+                        {t('workstations.limitToOneDay')}
+                      </label>
+                      {w.limitToDay !== null && (
+                        <select
+                          value={w.limitToDay}
+                          onChange={(e) => {
+                            setWindows((prev) =>
+                              prev.map((win, j) => (j === i ? clampToDay(win, e.target.value) : win))
+                            )
+                            if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
+                          }}
+                          className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
+                        >
+                          {stageDays.map((day) => (
+                            <option key={day} value={day}>{day}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               <button
@@ -296,11 +370,6 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
               >
                 {t('workstations.addWindow')}
               </button>
-              {isMultiDay && windows.some((w) => w.recurring) && (
-                <p className="text-xs text-gray-400">
-                  {t('workstations.recurrentDailyHint')}
-                </p>
-              )}
             </div>
           </section>
         </div>

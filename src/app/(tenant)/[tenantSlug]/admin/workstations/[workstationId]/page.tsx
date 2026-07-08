@@ -69,7 +69,6 @@ export default async function EditWorkstationPage({ params }: Props) {
         initialName={ws.name}
         initialDescription={ws.description ?? ''}
         initialCapacity={ws.capacity_ceiling}
-        initialRecurring={ws.recurring}
         initialWindows={(ws.workstation_operating_windows ?? []).map((w) => ({
           window_start: w.window_start,
           window_end: w.window_end,
