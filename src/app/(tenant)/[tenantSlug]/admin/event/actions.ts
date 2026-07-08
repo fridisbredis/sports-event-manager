@@ -131,3 +131,54 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   return {}
 }
+
+export interface UploadLogoResult {
+  publicUrl?: string
+  error?: string
+}
+
+function extractStoragePath(url: string, bucket: string): string | null {
+  const marker = `/storage/v1/object/public/${bucket}/`
+  const idx = url.indexOf(marker)
+  if (idx === -1) return null
+  return decodeURIComponent(url.slice(idx + marker.length))
+}
+
+export async function uploadEventLogo(formData: FormData): Promise<UploadLogoResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const file = formData.get('file')
+  const tenantId = formData.get('tenantId') as string
+  const eventId = formData.get('eventId') as string
+  const oldLogoUrl = (formData.get('oldLogoUrl') as string) || ''
+
+  if (!(file instanceof File)) return { error: 'No file provided' }
+  if (!file.type.startsWith('image/')) return { error: 'Please choose an image file' }
+  if (file.size > 2 * 1024 * 1024) return { error: 'Image must be smaller than 2 MB' }
+  if (!tenantId || !eventId) return { error: 'Missing tenant or event ID' }
+
+  if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
+
+  const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
+  const path = `${tenantId}/${eventId}/${Date.now()}.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('logos')
+    .upload(path, file, { contentType: file.type })
+
+  if (uploadError) return { error: uploadError.message }
+
+  // Best-effort cleanup of old logo — ignore errors
+  const oldPath = extractStoragePath(oldLogoUrl, 'logos')
+  if (oldPath) {
+    await supabase.storage.from('logos').remove([oldPath])
+  }
+
+  const { data } = supabase.storage.from('logos').getPublicUrl(path)
+  return { publicUrl: data.publicUrl }
+}

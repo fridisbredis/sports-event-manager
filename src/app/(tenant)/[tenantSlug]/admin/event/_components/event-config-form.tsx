@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { saveEvent, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
+import { saveEvent, uploadEventLogo, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
@@ -59,6 +59,10 @@ export default function EventConfigForm({
   const [facilityInput, setFacilityInput] = useState('')
   const facilityInputRef = useRef<HTMLInputElement>(null)
 
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | undefined>()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, startSave] = useTransition()
@@ -81,6 +85,42 @@ export default function EventConfigForm({
     const year = maxDate.getUTCFullYear()
     if (sMonth === eMonth) return `${sDay}–${eDay} ${sMonth} ${year}`
     return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`
+  }
+
+  async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError(t('eventConfig.logoInvalidType'))
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError(t('eventConfig.logoTooLarge'))
+      return
+    }
+
+    setUploadError(undefined)
+    setIsUploading(true)
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('tenantId', tenantId)
+    formData.append('eventId', eventId)
+    formData.append('oldLogoUrl', logoUrl)
+
+    const result = await uploadEventLogo(formData)
+    setIsUploading(false)
+
+    if (result.error) {
+      setUploadError(result.error)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } else if (result.publicUrl) {
+      setLogoUrl(result.publicUrl)
+      setLogoError(false)
+      setSaveSuccess(false)
+      markDirty()
+    }
   }
 
   function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -172,7 +212,7 @@ export default function EventConfigForm({
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving || isPublishing}
+            disabled={isSaving || isPublishing || isUploading}
             className={`rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
               saveSuccess && !isSaving
                 ? 'border-green-200 bg-white text-green-600'
@@ -233,15 +273,40 @@ export default function EventConfigForm({
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t('eventConfig.logoUrl')}
+                  {t('eventConfig.logoLabel')}
                 </label>
                 <input
-                  type="url"
-                  value={logoUrl}
-                  onChange={(e) => { setLogoUrl(e.target.value); setLogoError(false); setSaveSuccess(false); markDirty() }}
-                  placeholder={t('eventConfig.logoPlaceholder')}
-                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoFileChange}
+                  className="sr-only"
+                  id="logo-file-input"
                 />
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="logo-file-input"
+                    className={`inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 cursor-pointer transition-colors${isUploading ? ' opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                  >
+                    {isUploading
+                      ? t('eventConfig.logoUploading')
+                      : logoUrl
+                        ? t('eventConfig.logoChange')
+                        : t('eventConfig.logoChoose')}
+                  </label>
+                  {logoUrl && !isUploading && (
+                    <button
+                      type="button"
+                      onClick={() => { setLogoUrl(''); setLogoError(false); setSaveSuccess(false); markDirty() }}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      {t('eventConfig.logoRemove')}
+                    </button>
+                  )}
+                </div>
+                {uploadError && (
+                  <p className="mt-1.5 text-xs text-red-500">{uploadError}</p>
+                )}
               </div>
             </div>
 
