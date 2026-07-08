@@ -20,6 +20,7 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
   const [removeTarget, setRemoveTarget] = useState<Official | null>(null)
   const [pending, setPending] = useState(false)
   const [resendingId, setResendingId] = useState<string | null>(null)
+  const [addError, setAddError] = useState<string | null>(null)
 
   // Form state
   const [name, setName] = useState('')
@@ -28,6 +29,7 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
   async function handleAdd() {
     if (!name.trim() || !phone.trim() || pending) return
     setPending(true)
+    setAddError(null)
     try {
       const res = await fetch('/api/officials', {
         method: 'POST',
@@ -40,6 +42,11 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
         setName('')
         setPhone('')
         setAddModalOpen(false)
+      } else if (res.status === 401) {
+        setAddError('Session expired — please refresh the page and try again.')
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setAddError(body?.error ?? `Error ${res.status}`)
       }
     } finally {
       setPending(false)
@@ -214,6 +221,9 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
                   </div>
                 </div>
               </div>
+              {addError && (
+                <p className="px-6 pb-3 text-xs text-red-600">{addError}</p>
+              )}
               <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-6 py-4">
                 <button
                   type="button"

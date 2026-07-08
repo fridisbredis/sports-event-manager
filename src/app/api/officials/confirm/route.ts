@@ -16,11 +16,21 @@ export async function POST(request: NextRequest) {
 
   const { token, name } = parsed.data
 
-  // User must be authenticated (OTP verified) before we confirm the invite
+  // User must be authenticated (OTP verified) before we confirm the invite.
+  // Accept Bearer token from the Authorization header (set by the invite form
+  // immediately after verifyOtp) to avoid relying on cookie propagation timing.
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const authHeader = request.headers.get('Authorization')
+  let user = null
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const bearerToken = authHeader.slice(7)
+    const { data } = await supabase.auth.getUser(bearerToken)
+    user = data.user
+  } else {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  }
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,7 +41,7 @@ export async function POST(request: NextRequest) {
   // Validate token again server-side — never trust client state
   const { data: official } = await service
     .from('officials')
-    .select('id, tenant_id, invite_status, invite_token_expires_at, tenants(slug)')
+    .select('id, tenant_id, invite_status, invite_token_expires_at')
     .eq('invite_token', token)
     .maybeSingle()
 
@@ -44,7 +54,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invite not found or expired', code: 'not_found' }, { status: 404 })
   }
 
-  const tenantSlug = (official.tenants as { slug: string } | null)?.slug
+  const { data: tenant } = await service
+    .from('tenants')
+    .select('slug')
+    .eq('id', official.tenant_id)
+    .maybeSingle()
+
+  const tenantSlug = tenant?.slug
 
   // Confirm: update official, null out token (single-use), create user_roles
   await service

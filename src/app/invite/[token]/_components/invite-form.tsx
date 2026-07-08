@@ -42,7 +42,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
     if (!initialPhone) return
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       phone: initialPhone,
       token: otp,
       type: 'sms',
@@ -53,10 +53,17 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
       return
     }
 
-    // OTP verified — now confirm the invite server-side
+    const accessToken = data.session?.access_token
+
+    // OTP verified — confirm the invite server-side.
+    // Pass the access token explicitly so the route handler can authenticate
+    // without relying on cookie propagation timing in Next.js.
     const res = await fetch('/api/officials/confirm', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify({ token, name: name.trim() }),
     })
     setLoading(false)
