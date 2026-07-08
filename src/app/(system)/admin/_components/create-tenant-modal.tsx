@@ -3,14 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createTenant } from '../actions'
-
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-}
+import { toSlug } from '../_utils'
 
 interface Props {
   open: boolean

@@ -12,19 +12,19 @@ import enAuth from '../../public/locales/en/auth.json'
 import enAdmin from '../../public/locales/en/admin.json'
 import enOfficial from '../../public/locales/en/official.json'
 
-// Initialize i18next once on the client
+const enResources: Record<string, unknown> = {
+  common: enCommon,
+  auth: enAuth,
+  admin: enAdmin,
+  official: enOfficial,
+}
+
 if (!i18next.isInitialized) {
   i18next
     .use(initReactI18next)
     .use(
       resourcesToBackend((language: string, namespace: string) => {
-        // Fallback for any missing files
-        if (language === 'en') {
-          if (namespace === 'common') return enCommon
-          if (namespace === 'auth') return enAuth
-          if (namespace === 'admin') return enAdmin
-          if (namespace === 'official') return enOfficial
-        }
+        if (language === 'en') return enResources[namespace] ?? {}
         return {}
       })
     )

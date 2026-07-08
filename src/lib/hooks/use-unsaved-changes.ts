@@ -51,7 +51,6 @@ export function useUnsavedChanges() {
     setDialogOpen(false)
   }, [])
 
-  // Hard navigation: refresh, close tab, external URL
   useEffect(() => {
     if (!isDirty) return
     const handler = (e: BeforeUnloadEvent) => {
@@ -62,7 +61,6 @@ export function useUnsavedChanges() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
 
-  // Soft navigation: intercept anchor clicks before Next.js router acts
   useEffect(() => {
     if (!isDirty) return
 
@@ -77,7 +75,6 @@ export function useUnsavedChanges() {
       openDialog({ type: 'push', url: href })
     }
 
-    // Browser back/forward: push current URL back to cancel, then offer dialog
     const savedUrl = window.location.href
     const handlePopState = () => {
       window.history.pushState(null, '', savedUrl)
@@ -93,7 +90,6 @@ export function useUnsavedChanges() {
     }
   }, [isDirty, openDialog])
 
-  // For explicit programmatic navigation (e.g. a custom back button)
   const guardedNavigate = useCallback(
     (url: string) => {
       if (!isDirtyRef.current) {

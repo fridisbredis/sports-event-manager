@@ -50,12 +50,6 @@ export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | 
   }
 }
 
-/**
- * Called after first login for a user with no roles.
- * Looks for an 'invited' official record matching their phone number.
- * If found: sets user_id, flips invite_status to 'confirmed', creates user_roles row.
- * Returns the tenantSlug to redirect to, or null if no match.
- */
 export async function confirmOfficialInvite(userId: string, phone: string): Promise<string | null> {
   const service = await createSupabaseServiceClient()
 
@@ -87,10 +81,7 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
-/**
- * Returns true if the user is tenant_admin or system_admin for the given tenant.
- * system_admin access is global — no per-tenant row required.
- */
+// system_admin access is global — no per-tenant row required.
 export async function hasAdminAccessToTenant(userId: string, tenantId: string): Promise<boolean> {
   const service = await createSupabaseServiceClient()
   const { data } = await service
@@ -128,14 +119,8 @@ export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure
   return { user }
 }
 
-/**
- * Verifies that the current user is authenticated and has the tenant_admin
- * role for the given tenantId. Returns either { user, role } on success or
- * { error: NextResponse } that can be returned directly from a route handler.
- *
- * Defense-in-depth: RLS protects the database, but this also catches
- * application-level logic errors where the wrong tenant_id is passed.
- */
+// Defense-in-depth: RLS protects the database, but this also catches
+// application-level logic errors where the wrong tenant_id is passed.
 export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess | AuthFailure> {
   const supabase = await createSupabaseServerClient()
   const {

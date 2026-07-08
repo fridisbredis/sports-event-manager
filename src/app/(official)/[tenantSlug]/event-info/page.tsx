@@ -87,7 +87,9 @@ export default async function EventInfoPage({ params }: Props) {
       .order('position'),
   ])
 
-  const stagesWithVenue = (stages ?? []).filter((s) => s.venue)
+  const stageList = stages ?? []
+  const facilityList = facilities ?? []
+  const stagesWithVenue = stageList.filter((s) => s.venue)
 
   return (
     <div className="px-5 pt-10 pb-6">
@@ -118,11 +120,11 @@ export default async function EventInfoPage({ params }: Props) {
       </div>
 
       {/* Dates by stage */}
-      {(stages ?? []).length > 0 ? (
+      {stageList.length > 0 ? (
         <div className="mb-8">
           <SectionLabel>{t('eventInfo.datesByStage')}</SectionLabel>
           <div className="flex flex-col gap-1.5">
-            {(stages ?? []).map((stage) => (
+            {stageList.map((stage) => (
               <p key={stage.id} className="text-sm text-gray-900">
                 Stage {stage.position + 1} · {stage.name}
                 {stage.start_time ? ` — ${formatDate(stage.start_time)}` : ''}
@@ -150,21 +152,21 @@ export default async function EventInfoPage({ params }: Props) {
       ) : null}
 
       {/* Facilities */}
-      {(facilities ?? []).length > 0 ? (
+      {facilityList.length > 0 ? (
         <div className="mb-8">
           <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
           <p className="text-sm text-gray-900">
-            {(facilities ?? []).map((f) => f.label).join(' · ')}
+            {facilityList.map((f) => f.label).join(' · ')}
           </p>
         </div>
       ) : null}
 
       {/* Event programme by stage */}
-      {(stages ?? []).length > 0 ? (
+      {stageList.length > 0 ? (
         <div className="mb-8">
           <SectionLabel>{t('eventInfo.programme')}</SectionLabel>
           <div className="flex flex-col gap-1.5">
-            {(stages ?? []).map((stage) => {
+            {stageList.map((stage) => {
               const start = formatTime(stage.start_time)
               const end = formatTime(stage.end_time)
               const times = [start, end].filter(Boolean).join(' – ')

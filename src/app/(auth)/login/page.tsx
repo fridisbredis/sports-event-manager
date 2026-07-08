@@ -16,32 +16,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function sendOtp() {
+  async function request(fn: () => Promise<{ error: { message: string } | null }>) {
     setLoading(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithOtp({ phone })
+    const { error } = await fn()
     setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setStep('otp')
-    }
+    if (error) setError(error.message)
+    return !error
+  }
+
+  async function sendOtp() {
+    if (await request(() => supabase.auth.signInWithOtp({ phone }))) setStep('otp')
   }
 
   async function verifyOtp() {
-    setLoading(true)
-    setError(null)
-    const { error } = await supabase.auth.verifyOtp({
-      phone,
-      token: otp,
-      type: 'sms',
-    })
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      router.push('/')
-    }
+    if (await request(() => supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' }))) router.push('/')
   }
 
   return (

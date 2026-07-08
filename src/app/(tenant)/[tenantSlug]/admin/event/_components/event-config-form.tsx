@@ -50,7 +50,7 @@ export default function EventConfigForm({
   const [name, setName] = useState(initialName)
   const [eventType, setEventType] = useState(initialEventType)
   const [description, setDescription] = useState(initialDescription)
-  const [location] = useState(initialLocation)
+  const location = initialLocation
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
   const [granularity, setGranularity] = useState(initialGranularity)

@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 
 export interface PublishEventInput {
@@ -15,11 +15,6 @@ export interface PublishEventResult {
   error?: string
 }
 
-/**
- * Publishes a draft event. Shared between EVT-01 (dashboard) and EVT-02 (config).
- * Re-verifies publish requirements and admin role on the server at call time.
- * Stage model v0.7: requires name + at least one Race stage (not event-level dates).
- */
 export async function publishEvent(input: PublishEventInput): Promise<PublishEventResult> {
   const supabase = await createSupabaseServerClient()
   const {
@@ -30,9 +25,6 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
-  const service = await createSupabaseServiceClient()
-
-  // Re-verify publish requirements at action time
   const { data: ev } = await supabase
     .from('events')
     .select('name, status')

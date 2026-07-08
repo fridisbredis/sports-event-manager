@@ -43,6 +43,20 @@ function formatDisplay(raw: string): string {
   return `${weekday} ${day} ${month} · ${p.time}`
 }
 
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth()    === b.getMonth()    &&
+    a.getDate()     === b.getDate()
+  )
+}
+
+function clampTime(t: string, tMin?: string, tMax?: string): string {
+  if (tMin && t < tMin) return tMin
+  if (tMax && t > tMax) return tMax
+  return t
+}
+
 export default function DateTimePicker({
   value,
   onChange,
@@ -68,10 +82,6 @@ export default function DateTimePicker({
   const maxDay = maxParsed?.day
 
   // Constrain the time input when the selected day is a boundary day
-  const isSameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth()    === b.getMonth()    &&
-    a.getDate()     === b.getDate()
   const timeMin = selectedDay && minDay && isSameDay(selectedDay, minDay) ? minParsed?.time : undefined
   const timeMax = selectedDay && maxDay && isSameDay(selectedDay, maxDay) ? maxParsed?.time : undefined
 
@@ -90,7 +100,6 @@ export default function DateTimePicker({
     setOpen(true)
   }
 
-  // Close on outside click or Escape
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent) {
@@ -110,12 +119,6 @@ export default function DateTimePicker({
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
-
-  function clampTime(t: string, tMin?: string, tMax?: string): string {
-    if (tMin && t < tMin) return tMin
-    if (tMax && t > tMax) return tMax
-    return t
-  }
 
   function handleDaySelect(day: Date | undefined) {
     if (!day) return
@@ -188,7 +191,6 @@ export default function DateTimePicker({
             weekStartsOn={1}
           />
 
-          {/* Time row */}
           <div className="px-4 pb-3 pt-2 border-t border-gray-100 flex items-center gap-3">
             <label className="text-xs font-medium text-gray-500 shrink-0">{t('datePicker.timeLabel')}</label>
             <input
