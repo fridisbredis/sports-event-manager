@@ -64,6 +64,7 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
     .select('id, tenant_id, tenants(slug)')
     .eq('phone', phone)
     .eq('invite_status', 'invited')
+    .is('invite_token', null)
     .maybeSingle()
 
   if (!official) return null
@@ -73,7 +74,7 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 
   await service
     .from('officials')
-    .update({ user_id: userId, invite_status: 'confirmed' })
+    .update({ user_id: userId, invite_status: 'confirmed', invite_token: null })
     .eq('id', official.id)
 
   await service

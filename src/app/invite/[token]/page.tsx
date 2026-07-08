@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import InviteForm from './_components/invite-form'
 
@@ -14,6 +15,10 @@ export default async function InvitePage({ params }: Props) {
     .select('phone, name, invite_status, invite_token_expires_at')
     .eq('invite_token', token)
     .maybeSingle()
+
+  if (official?.invite_status === 'confirmed') {
+    redirect('/login')
+  }
 
   const isValid =
     official &&
