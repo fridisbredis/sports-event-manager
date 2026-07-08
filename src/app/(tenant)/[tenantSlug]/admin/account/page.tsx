@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getUserRoles } from '@/lib/auth/tenant'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
+import AdminAccountForm from './_components/admin-account-form'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -17,8 +18,9 @@ export default async function AdminAccountPage({ params }: Props) {
   if (!user) redirect('/login')
 
   const roles = await getUserRoles(user.id)
+  const isSystemAdmin = roles.some((r) => r.role === 'system_admin')
   const tenantRole = roles.find((r) => r.tenantSlug === tenantSlug)
-  if (!tenantRole) notFound()
+  if (!tenantRole && !isSystemAdmin) notFound()
 
   const service = await createSupabaseServiceClient()
 
@@ -38,10 +40,11 @@ export default async function AdminAccountPage({ params }: Props) {
     .maybeSingle()
 
   if (!official) {
+    const name = (user.user_metadata?.name as string | undefined) ?? ''
+    const phone = user.phone ?? ''
     return (
-      <div className="px-8 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Account</h1>
-        <p className="text-sm text-gray-500">{user.email}</p>
+      <div className="px-8 py-8">
+        <AdminAccountForm name={name} phone={phone} tenantId={tenant.id} />
       </div>
     )
   }

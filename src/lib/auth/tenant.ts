@@ -86,6 +86,22 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
+/**
+ * Returns true if the user is tenant_admin or system_admin for the given tenant.
+ * system_admin access is global — no per-tenant row required.
+ */
+export async function hasAdminAccessToTenant(userId: string, tenantId: string): Promise<boolean> {
+  const service = await createSupabaseServiceClient()
+  const { data } = await service
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .or(`and(tenant_id.eq.${tenantId},role.in.(tenant_admin,system_admin)),role.eq.system_admin`)
+    .limit(1)
+    .maybeSingle()
+  return !!data
+}
+
 export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {
   const supabase = await createSupabaseServerClient()
   const {

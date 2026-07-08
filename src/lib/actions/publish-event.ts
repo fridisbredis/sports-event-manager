@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 
 export interface PublishEventInput {
   tenantSlug: string
@@ -27,17 +28,9 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', input.tenantId)
-    .maybeSingle()
+  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    return { error: 'Not authorized' }
-  }
+  const service = await createSupabaseServiceClient()
 
   // Re-verify publish requirements at action time
   const { data: ev } = await supabase

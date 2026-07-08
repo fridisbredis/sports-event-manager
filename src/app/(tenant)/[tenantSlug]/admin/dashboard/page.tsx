@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { getServerTranslation } from '@/lib/i18n/server'
 
@@ -25,16 +26,9 @@ export default async function DashboardPage({ params }: Props) {
     .single()
   if (!tenant) notFound()
 
+  if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
+
   const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    notFound()
-  }
 
   const { data: event } = await supabase
     .from('events')

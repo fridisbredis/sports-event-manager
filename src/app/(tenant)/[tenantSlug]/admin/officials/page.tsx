@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import OfficialsList from './_components/officials-list'
 
 interface Props {
@@ -24,17 +25,9 @@ export default async function OfficialsPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
+  if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    notFound()
-  }
+  const service = await createSupabaseServiceClient()
 
   const { data: officials } = await service
     .from('officials')

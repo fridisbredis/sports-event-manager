@@ -21,8 +21,9 @@ export default async function TenantLayout({ children, params }: Props) {
   if (!user) redirect('/login')
 
   const roles = await getUserRoles(user.id)
+  const isSystemAdmin = roles.some((r) => r.role === 'system_admin')
   const tenantRole = roles.find((r) => r.tenantSlug === tenantSlug)
-  if (!tenantRole) notFound()
+  if (!tenantRole && !isSystemAdmin) notFound()
 
   return (
     <div className="flex min-h-screen bg-gray-50">

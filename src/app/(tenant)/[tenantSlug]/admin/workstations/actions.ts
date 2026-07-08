@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 
 export interface WindowInput {
   window_start: string
@@ -36,17 +37,9 @@ export async function createWorkstation(
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', input.tenantId)
-    .maybeSingle()
+  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    return { error: 'Not authorized' }
-  }
+  const service = await createSupabaseServiceClient()
 
   const { data: ws, error: wsError } = await supabase
     .from('workstations')
@@ -120,17 +113,9 @@ export async function updateWorkstation(
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', input.tenantId)
-    .maybeSingle()
+  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    return { error: 'Not authorized' }
-  }
+  const service = await createSupabaseServiceClient()
 
   const { error: wsError } = await supabase
     .from('workstations')
@@ -209,17 +194,9 @@ export async function deleteWorkstation(
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', input.tenantId)
-    .maybeSingle()
+  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    return { error: 'Not authorized' }
-  }
+  const service = await createSupabaseServiceClient()
 
   const { error } = await supabase
     .from('workstations')

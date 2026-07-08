@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 
 export interface AssignmentInput {
   official_id: string
@@ -42,17 +43,9 @@ export async function saveAssignments(
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', tenantId)
-    .maybeSingle()
+  if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
 
-  if (!roleRow || (roleRow.role !== 'tenant_admin' && roleRow.role !== 'system_admin')) {
-    return { error: 'Not authorized' }
-  }
+  const service = await createSupabaseServiceClient()
 
   if (deletions.length > 0) {
     const { error } = await supabase

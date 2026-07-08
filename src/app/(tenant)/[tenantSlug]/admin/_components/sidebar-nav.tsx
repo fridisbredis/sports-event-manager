@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 interface Props {
   tenantSlug: string
@@ -10,7 +11,14 @@ interface Props {
 
 export function SidebarNav({ tenantSlug }: Props) {
   const pathname = usePathname()
+  const router = useRouter()
   const { t } = useTranslation('admin')
+
+  async function handleLogout() {
+    const supabase = createSupabaseBrowserClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   const navItems = [
     { segment: 'admin/dashboard', label: t('navigation.dashboard') },
@@ -44,6 +52,12 @@ export function SidebarNav({ tenantSlug }: Props) {
       <nav className="py-2 flex-1">{navItems.map((item) => navLink(item.segment, item.label))}</nav>
       <div className="border-t border-gray-100 py-2">
         {navLink('admin/account', t('navigation.account'))}
+        <button
+          onClick={handleLogout}
+          className="block w-full text-left px-6 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+        >
+          Log out
+        </button>
       </div>
     </div>
   )
