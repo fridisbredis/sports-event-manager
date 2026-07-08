@@ -4,6 +4,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
 import { useTranslation } from '@/lib/i18n/client'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,6 +140,7 @@ export function SchedulingGrid({
   initialAssignments,
 }: Props) {
   const { t } = useTranslation('admin')
+  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
   const [selectedStageId, setSelectedStageId] = useState<string>(stages[0]?.id ?? '')
   const [view, setView] = useState<View>('by-person')
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
@@ -362,6 +365,7 @@ export function SchedulingGrid({
         { id: null, official_id: officialId, workstation_id: ws.id, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIdx },
       ])
       setPickerCell(null)
+      markDirty()
     } else {
       const rect = anchor?.getBoundingClientRect()
       setPickerCell({
@@ -400,6 +404,7 @@ export function SchedulingGrid({
       )
     }
     setCellActionCell(null)
+    markDirty()
   }
 
   function handleWsPersonPick(officialId: string) {
@@ -412,6 +417,7 @@ export function SchedulingGrid({
       { id: null, official_id: officialId, workstation_id: workstationId, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIndex },
     ])
     setWsPickerCell(null)
+    markDirty()
   }
 
   function handleWsExpandedSlotClick(wsId: string, wsName: string, slotIndex: number, slot: Date) {
@@ -430,6 +436,7 @@ export function SchedulingGrid({
       ...prev,
       { id: null, official_id: officialId, workstation_id: workstationId, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIndex },
     ])
+    markDirty()
   }
 
   function handleWsSlotRemove(assignment: LocalAssignment) {
@@ -442,6 +449,7 @@ export function SchedulingGrid({
         a.slot_index === assignment.slot_index
       ))
     )
+    markDirty()
   }
 
   async function handleSave() {
@@ -469,6 +477,7 @@ export function SchedulingGrid({
       setSaveError(result.error)
     } else {
       setSaveSuccess(true)
+      markClean()
       setTimeout(() => setSaveSuccess(false), 2000)
       setAssignments((prev) =>
         prev
@@ -501,6 +510,7 @@ export function SchedulingGrid({
 
   return (
     <div>
+      <UnsavedChangesDialog {...dialogProps} />
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
