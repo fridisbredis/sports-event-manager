@@ -1142,16 +1142,16 @@ function ByPersonGrid({
 
   return (
     <div className="border border-gray-200 rounded-md bg-white overflow-x-auto relative">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr className="border-b border-gray-100">
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40 min-w-40">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
               {t('scheduling.colOfficial')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]"
+                className="text-center px-1 py-3 text-xs font-medium text-gray-500 w-20"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -1162,11 +1162,13 @@ function ByPersonGrid({
           {officials.map((official) => (
             <tr key={official.id} className="border-b border-gray-50 last:border-0">
               <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
                     {initials(official.name)}
                   </div>
-                  <span className="text-sm text-gray-800">{official.name}</span>
+                  <span className="text-sm text-gray-800 truncate" title={official.name}>
+                    {official.name}
+                  </span>
                 </div>
               </td>
               {slots.map((slot) => {
@@ -1189,7 +1191,7 @@ function ByPersonGrid({
                     {assignment ? (
                       <button
                         onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className={`flex w-full h-8 flex-col items-center justify-center gap-px rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
+                        className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
                       >
                         <span className="w-full truncate text-center text-[11px] leading-none">
                           {ws?.name ?? '—'}
@@ -1204,11 +1206,11 @@ function ByPersonGrid({
                     ) : activeSlotSet.has(slotStart) ? (
                       <button
                         onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className="w-full h-8 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
+                        className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
                       />
                     ) : (
                       <div
-                        className="w-full h-8 rounded-md"
+                        className="w-full h-10 rounded-md"
                         style={{
                           background:
                             'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
@@ -1360,16 +1362,16 @@ function ByWorkAreaGrid({
           </span>
         </div>
       )}
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr className="border-b border-gray-100">
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44 min-w-44">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
               {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]"
+                className="text-center px-1 py-3 text-xs font-medium text-gray-500 w-20"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -1420,8 +1422,10 @@ function ByWorkAreaGrid({
                           />
                         </svg>
                       </Button>
-                      <div>
-                        <div className="text-sm font-medium text-gray-800">{ws.name}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-800 truncate" title={ws.name}>
+                          {ws.name}
+                        </div>
                         <div className="text-xs text-gray-400">
                           {t('workstations.upTo', { n: ws.capacity_ceiling })}
                         </div>
@@ -1455,7 +1459,7 @@ function ByWorkAreaGrid({
                     return (
                       <td key={slotStart} className="px-1 py-2">
                         <div
-                          className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-center ${
+                          className={`flex w-full h-10 flex-col items-center justify-center rounded-md px-2 text-xs font-medium text-center ${
                             isOver
                               ? 'bg-orange-50 border border-orange-200 text-orange-700'
                               : count === 0
@@ -1463,9 +1467,9 @@ function ByWorkAreaGrid({
                                 : 'bg-gray-100 border border-gray-200 text-gray-700'
                           }`}
                         >
-                          {count}/{ws.capacity_ceiling}
+                          {count} / {ws.capacity_ceiling}
                           {isOver && (
-                            <div className="text-[10px] font-normal text-orange-500 leading-none mt-0.5">
+                            <div className="text-[10px] font-normal text-orange-500 leading-none">
                               {t('scheduling.overCapacityBadge')}
                             </div>
                           )}
@@ -1501,7 +1505,7 @@ function ByWorkAreaGrid({
                           return (
                             <td key={slotStart} className="px-1 py-1.5">
                               <div
-                                className="w-full h-8 rounded-sm opacity-30"
+                                className="w-full h-10 rounded-md opacity-30"
                                 style={{
                                   background:
                                     'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
@@ -1515,14 +1519,14 @@ function ByWorkAreaGrid({
                             {assignment && officialName ? (
                               <button
                                 onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
-                                className="w-full h-8 rounded-sm border px-2 text-left text-xs truncate transition-colors hover:brightness-95 bg-white border-gray-200 text-gray-700"
+                                className="w-full h-10 rounded-md border px-2 text-center text-xs truncate transition-colors hover:brightness-95 bg-gray-100 border-gray-200 text-gray-700"
                               >
                                 {officialName}
                               </button>
                             ) : (
                               <button
                                 onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
-                                className="w-full h-8 rounded-sm border border-transparent hover:border-gray-200 hover:bg-white transition-colors"
+                                className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-white transition-colors"
                               />
                             )}
                           </td>
@@ -1545,7 +1549,7 @@ function ByWorkAreaGrid({
                       return (
                         <td key={slotStart} className="px-1 py-1.5">
                           {overflows.length > 0 && (
-                            <div className="w-full h-8 rounded-sm bg-orange-100 border border-orange-200 flex items-center justify-center text-xs text-orange-600 font-medium">
+                            <div className="w-full h-10 rounded-md bg-orange-100 border border-orange-200 flex items-center justify-center text-xs text-orange-600 font-medium">
                               +{overflows.length}
                             </div>
                           )}
