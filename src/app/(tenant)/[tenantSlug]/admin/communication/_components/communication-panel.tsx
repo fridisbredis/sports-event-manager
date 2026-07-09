@@ -1,8 +1,16 @@
 'use client'
 
-import { createPortal } from 'react-dom'
 import { useState, useCallback } from 'react'
 import { useTranslation } from '@/lib/i18n/client'
+import {
+  Button,
+  Textarea,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from '@heroui/react'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
 
 interface Props {
@@ -48,44 +56,42 @@ function AnnouncementGuardDialog({
   onDiscard,
   onPublish,
 }: GuardDialogProps) {
-  if (!open) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-        <div className="px-6 pt-6 pb-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-2">{title}</h2>
-          <p className="text-sm text-gray-500 leading-relaxed">{body}</p>
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-6 py-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={publishing}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors disabled:opacity-50"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onDiscard}
-            disabled={publishing}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors disabled:opacity-50"
-          >
-            {discardLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onPublish}
-            disabled={publishing}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
-          >
-            {publishing ? publishingLabel : publishLabel}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+  return (
+    <Modal isOpen={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel() }}>
+      <ModalContent>
+        {(onClose) => (
+          <>
+            <ModalHeader>{title}</ModalHeader>
+            <ModalBody>
+              <p className="text-sm text-default-500 leading-relaxed">{body}</p>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="light"
+                onPress={onClose}
+                isDisabled={publishing}
+              >
+                {cancelLabel}
+              </Button>
+              <Button
+                variant="light"
+                onPress={onDiscard}
+                isDisabled={publishing}
+              >
+                {discardLabel}
+              </Button>
+              <Button
+                color="primary"
+                onPress={onPublish}
+                isLoading={publishing}
+              >
+                {publishing ? publishingLabel : publishLabel}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   )
 }
 
@@ -182,21 +188,20 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
 
         {/* Channel toggle */}
         <div className="flex items-center gap-3 mb-6">
-          <span className="text-sm font-medium text-gray-500">{t('communication.channel')}</span>
+          <span className="text-sm font-medium text-default-500">{t('communication.channel')}</span>
           <div className="flex gap-1">
             {(['participants', 'officials'] as AnnouncementChannel[]).map((ch) => (
-              <button
+              <Button
                 key={ch}
                 type="button"
-                onClick={() => handleChannelClick(ch)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  channel === ch
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900'
-                }`}
+                onPress={() => handleChannelClick(ch)}
+                color={channel === ch ? 'primary' : 'default'}
+                variant={channel === ch ? 'solid' : 'bordered'}
+                size="sm"
+                radius="full"
               >
                 {t(`communication.${ch}`)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -206,23 +211,24 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
             {t('communication.newAnnouncement')}
           </p>
-          <textarea
+          <Textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onValueChange={setDraft}
             placeholder={t('communication.announcementPlaceholder')}
-            rows={4}
-            className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            minRows={4}
+            classNames={{ inputWrapper: 'shadow-none' }}
           />
           <div className="flex items-center justify-between mt-3">
-            <span className="text-xs text-gray-400">{t('communication.smsNote')}</span>
-            <button
+            <span className="text-xs text-default-400">{t('communication.smsNote')}</span>
+            <Button
               type="button"
-              onClick={handlePublish}
-              disabled={!isDirty || publishing}
-              className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              color="primary"
+              onPress={handlePublish}
+              isDisabled={!isDirty}
+              isLoading={publishing}
             >
               {publishing ? t('communication.publishing') : t('communication.publish')}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -250,8 +256,8 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
                 </svg>
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-500">{t('communication.noAnnouncementsYet')}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{t('communication.noAnnouncementsHint')}</p>
+                <p className="text-sm font-medium text-default-500">{t('communication.noAnnouncementsYet')}</p>
+                <p className="text-xs text-default-400 mt-0.5">{t('communication.noAnnouncementsHint')}</p>
               </div>
             </div>
           ) : (
@@ -259,7 +265,7 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
               {filtered.map((a) => (
                 <div key={a.id} className="px-5 py-4">
                   <p className="text-sm text-gray-900 leading-snug">{a.body}</p>
-                  <p className="text-xs text-gray-400 mt-1">{formatDate(a.published_at)}</p>
+                  <p className="text-xs text-default-400 mt-1">{formatDate(a.published_at)}</p>
                 </div>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
+import { Button, Input } from '@heroui/react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -39,52 +40,50 @@ export default function LoginPage() {
 
       {step === 'phone' ? (
         <div className="space-y-4">
-          <label className="block">
-            <span className="text-sm text-gray-600">{t('signIn.phoneLabel')}</span>
-            <input
-              type="tel"
-              placeholder={t('signIn.phonePlaceholder')}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 block w-full border rounded px-3 py-2"
-            />
-          </label>
-          <button
-            onClick={sendOtp}
-            disabled={loading || !phone}
-            className="w-full bg-black text-white rounded py-2 disabled:opacity-50"
+          <Input
+            type="tel"
+            label={t('signIn.phoneLabel')}
+            placeholder={t('signIn.phonePlaceholder')}
+            value={phone}
+            onValueChange={setPhone}
+          />
+          <Button
+            color="primary"
+            className="w-full"
+            onPress={sendOtp}
+            isLoading={loading}
+            isDisabled={loading || !phone}
           >
             {loading ? t('signIn.requestingCode') : t('signIn.requestCodeButton')}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">{t('signIn.codeSentTo', { phone })}</p>
-          <label className="block">
-            <span className="text-sm text-gray-600">{t('signIn.codeLabel')}</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="mt-1 block w-full border rounded px-3 py-2"
-            />
-          </label>
-          <button
-            onClick={verifyOtp}
-            disabled={loading || otp.length !== 6}
-            className="w-full bg-black text-white rounded py-2 disabled:opacity-50"
+          <p className="text-sm text-default-500">{t('signIn.codeSentTo', { phone })}</p>
+          <Input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            label={t('signIn.codeLabel')}
+            value={otp}
+            onValueChange={setOtp}
+          />
+          <Button
+            color="primary"
+            className="w-full"
+            onPress={verifyOtp}
+            isLoading={loading}
+            isDisabled={loading || otp.length !== 6}
           >
             {loading ? t('signIn.verifying') : t('signIn.verifyButton')}
-          </button>
-          <button onClick={() => setStep('phone')} className="text-sm text-gray-600 underline">
+          </Button>
+          <Button variant="light" onPress={() => setStep('phone')} className="text-sm">
             {t('signIn.changeNumber')}
-          </button>
+          </Button>
         </div>
       )}
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-sm text-danger">{error}</p>}
     </main>
   )
 }

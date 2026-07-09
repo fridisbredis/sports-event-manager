@@ -1,10 +1,43 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import {
+  Button,
+  Input,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  DateRangePicker,
+} from '@heroui/react'
+import { CalendarDateTime, type DateValue } from '@internationalized/date'
+import type { RangeValue } from '@react-types/shared'
 import type { StageInput } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
-import DateTimePicker from '@/components/date-time-picker'
+
+// start_time/end_time are stored as 'YYYY-MM-DDTHH:mm' wall-clock strings with
+// no timezone attached, so they're parsed into CalendarDateTime (not
+// ZonedDateTime) — that keeps the value tz-naive and avoids any
+// browser-timezone conversion when round-tripping through the picker.
+function parseLocal(raw: string | null): CalendarDateTime | null {
+  if (!raw || !raw.includes('T')) return null
+  const [datePart, timePart] = raw.split('T')
+  const [y, m, d] = datePart.split('-').map(Number)
+  if (!y || !m || !d) return null
+  const [h, min] = (timePart ?? '00:00').split(':').map(Number)
+  return new CalendarDateTime(y, m, d, h || 0, min || 0)
+}
+
+function toLocalString(value: DateValue): string {
+  const y = String(value.year).padStart(4, '0')
+  const m = String(value.month).padStart(2, '0')
+  const d = String(value.day).padStart(2, '0')
+  const cdt = value as CalendarDateTime
+  const h = String(cdt.hour ?? 0).padStart(2, '0')
+  const min = String(cdt.minute ?? 0).padStart(2, '0')
+  return `${y}-${m}-${d}T${h}:${min}`
+}
 
 interface Props {
   stage: StageInput | null
@@ -65,162 +98,142 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
     onSave(cleaned)
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+  return (
+    <Modal
+      isOpen
+      onOpenChange={(open) => { if (!open) onClose() }}
+      size="md"
+      scrollBehavior="inside"
     >
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">
-            {isAdd ? t('eventConfig.addStageTitle') : t('eventConfig.editStageTitle')}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
-            aria-label={t('actions.close')}
-          >
-            ×
-          </button>
-        </div>
+      <ModalContent>
+        {(onModalClose) => (
+          <>
+            <ModalHeader className="text-sm font-semibold">
+              {isAdd ? t('eventConfig.addStageTitle') : t('eventConfig.editStageTitle')}
+            </ModalHeader>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-4">
-          {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              {t('eventConfig.stageName')} <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder={t('eventConfig.stageNamePlaceholder')}
-              className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${
-                errors.name ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
-              }`}
-            />
-            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
-          </div>
-
-          {/* Type toggle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.stageTypeLabel')}</label>
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit text-sm">
-              {(['race', 'non_race'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setForm((p) => ({ ...p, stage_type: type }))}
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    form.stage_type === type
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-500 hover:text-gray-900 bg-white'
-                  }`}
-                >
-                  {type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Start / end time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.stageStartTime')}</label>
-              <DateTimePicker
-                value={form.start_time ?? ''}
-                onChange={(v) => setForm((p) => ({ ...p, start_time: v || null }))}
+            <ModalBody className="space-y-4">
+              {/* Name */}
+              <Input
+                label={t('eventConfig.stageName')}
+                isRequired
+                value={form.name}
+                onValueChange={(v) => setForm((p) => ({ ...p, name: v }))}
+                placeholder={t('eventConfig.stageNamePlaceholder')}
+                isInvalid={!!errors.name}
+                errorMessage={errors.name}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.stageEndTime')}</label>
-              <DateTimePicker
-                value={form.end_time ?? ''}
-                onChange={(v) => setForm((p) => ({ ...p, end_time: v || null }))}
-                hasError={!!errors.end_time}
-              />
-              {errors.end_time && <p className="mt-1 text-xs text-red-500">{errors.end_time}</p>}
-            </div>
-          </div>
 
-          {/* Venue */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.stageVenueLabel')}</label>
-            <input
-              type="text"
-              value={form.venue}
-              onChange={(e) => setForm((p) => ({ ...p, venue: e.target.value }))}
-              placeholder={t('eventConfig.stageVenuePlaceholder')}
-              className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-            />
-          </div>
-
-          {/* Distance / Time — Race only */}
-          {form.stage_type === 'race' ? (
-            <div className="space-y-3">
-              {/* Race type toggle */}
+              {/* Stage type toggle */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('eventConfig.categoryType')}</label>
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden w-fit text-sm">
-                  {(['distance', 'time'] as const).map((type) => (
-                    <button
+                <label className="block text-sm font-medium text-default-700 mb-1.5">
+                  {t('eventConfig.stageTypeLabel')}
+                </label>
+                <div className="flex rounded-lg border border-default-200 overflow-hidden w-fit text-sm">
+                  {(['race', 'non_race'] as const).map((type) => (
+                    <Button
                       key={type}
                       type="button"
-                      onClick={() => setForm((p) => ({ ...p, race_type: type }))}
-                      className={`px-4 py-2 font-medium transition-colors ${
-                        form.race_type === type
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:text-gray-900 bg-white'
-                      }`}
+                      size="sm"
+                      radius="none"
+                      onPress={() => setForm((p) => ({ ...p, stage_type: type }))}
+                      color={form.stage_type === type ? 'primary' : 'default'}
+                      variant={form.stage_type === type ? 'solid' : 'light'}
                     >
-                      {type === 'distance' ? t('eventConfig.categoryDistance') : t('eventConfig.categoryTime')}
-                    </button>
+                      {type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}
+                    </Button>
                   ))}
                 </div>
               </div>
-              {/* Distances / Times input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {form.race_type === 'distance' ? t('eventConfig.categoryDistances') : t('eventConfig.categoryTimes')}
-                </label>
-                <input
-                  type="text"
-                  value={distancesText}
-                  onChange={(e) => setDistancesText(e.target.value)}
-                  placeholder={form.race_type === 'distance' ? t('eventConfig.distancesPlaceholder') : t('eventConfig.timesPlaceholder')}
-                  className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-                />
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400">
-              {t('eventConfig.nonRaceHint')}
-            </p>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors"
-          >
-            {t('eventConfig.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-          >
-            {t('eventConfig.saveStage')}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+              {/* Start / end time */}
+              <DateRangePicker
+                label={t('eventConfig.stageTimeRange')}
+                granularity="minute"
+                hourCycle={24}
+                value={
+                  form.start_time && form.end_time
+                    ? { start: parseLocal(form.start_time)!, end: parseLocal(form.end_time)! }
+                    : null
+                }
+                onChange={(range: RangeValue<DateValue> | null) => {
+                  setForm((p) => ({
+                    ...p,
+                    start_time: range ? toLocalString(range.start) : null,
+                    end_time: range ? toLocalString(range.end) : null,
+                  }))
+                }}
+                isInvalid={!!errors.end_time}
+                errorMessage={errors.end_time}
+              />
+
+              {/* Venue */}
+              <Input
+                label={t('eventConfig.stageVenueLabel')}
+                value={form.venue}
+                onValueChange={(v) => setForm((p) => ({ ...p, venue: v }))}
+                placeholder={t('eventConfig.stageVenuePlaceholder')}
+              />
+
+              {/* Distance / Time — Race only */}
+              {form.stage_type === 'race' ? (
+                <div className="space-y-3">
+                  {/* Race type toggle */}
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-1.5">
+                      {t('eventConfig.categoryType')}
+                    </label>
+                    <div className="flex rounded-lg border border-default-200 overflow-hidden w-fit text-sm">
+                      {(['distance', 'time'] as const).map((type) => (
+                        <Button
+                          key={type}
+                          type="button"
+                          size="sm"
+                          radius="none"
+                          onPress={() => setForm((p) => ({ ...p, race_type: type }))}
+                          color={form.race_type === type ? 'primary' : 'default'}
+                          variant={form.race_type === type ? 'solid' : 'light'}
+                        >
+                          {type === 'distance'
+                            ? t('eventConfig.categoryDistance')
+                            : t('eventConfig.categoryTime')}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Distances / Times input */}
+                  <Input
+                    label={
+                      form.race_type === 'distance'
+                        ? t('eventConfig.categoryDistances')
+                        : t('eventConfig.categoryTimes')
+                    }
+                    value={distancesText}
+                    onValueChange={setDistancesText}
+                    placeholder={
+                      form.race_type === 'distance'
+                        ? t('eventConfig.distancesPlaceholder')
+                        : t('eventConfig.timesPlaceholder')
+                    }
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-default-400">{t('eventConfig.nonRaceHint')}</p>
+              )}
+            </ModalBody>
+
+            <ModalFooter>
+              <Button variant="light" onPress={onModalClose}>
+                {t('eventConfig.cancel')}
+              </Button>
+              <Button color="primary" onPress={handleSave}>
+                {t('eventConfig.saveStage')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   )
 }

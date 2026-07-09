@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
+import { Button, Input, Textarea, Select, SelectItem, Chip } from '@heroui/react'
 import { saveEvent, uploadEventLogo, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
@@ -57,7 +58,6 @@ export default function EventConfigForm({
   const [stages, setStages] = useState<StageInput[]>(initialStages)
   const [facilities, setFacilities] = useState<LabelInput[]>(initialFacilities)
   const [facilityInput, setFacilityInput] = useState('')
-  const facilityInputRef = useRef<HTMLInputElement>(null)
 
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | undefined>()
@@ -197,43 +197,40 @@ export default function EventConfigForm({
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-gray-900">{t('eventConfig.title')}</h1>
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              isPublished
-                ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20'
-                : 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
-            }`}
+          <Chip
+            color={isPublished ? 'success' : 'warning'}
+            variant="flat"
+            size="sm"
           >
             {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
-          </span>
+          </Chip>
         </div>
         <div className="flex items-center gap-3">
           {errors.general && <span className="text-sm text-red-500">{errors.general}</span>}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || isPublishing || isUploading}
-            className={`rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
-              saveSuccess && !isSaving
-                ? 'border-green-200 bg-white text-green-600'
-                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900'
-            }`}
+          <Button
+            variant="bordered"
+            onPress={handleSave}
+            isDisabled={isSaving || isPublishing || isUploading}
+            isLoading={isSaving}
+            color={saveSuccess && !isSaving ? 'success' : 'default'}
+            size="sm"
           >
             {isSaving
               ? t('eventConfig.saving')
               : saveSuccess
                 ? t('eventConfig.saved')
                 : t('eventConfig.save')}
-          </button>
+          </Button>
           {!isPublished && (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={isSaving || isPublishing}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            <Button
+              color="primary"
+              onPress={handlePublish}
+              isDisabled={isSaving || isPublishing}
+              isLoading={isPublishing}
+              size="sm"
             >
               {isPublishing ? t('eventConfig.publishing') : t('eventConfig.publish')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -284,24 +281,28 @@ export default function EventConfigForm({
                   id="logo-file-input"
                 />
                 <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="logo-file-input"
-                    className={`inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 cursor-pointer transition-colors${isUploading ? ' opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                  <Button
+                    variant="bordered"
+                    size="sm"
+                    isDisabled={isUploading}
+                    isLoading={isUploading}
+                    onPress={() => fileInputRef.current?.click()}
                   >
                     {isUploading
                       ? t('eventConfig.logoUploading')
                       : logoUrl
                         ? t('eventConfig.logoChange')
                         : t('eventConfig.logoChoose')}
-                  </label>
+                  </Button>
                   {logoUrl && !isUploading && (
-                    <button
-                      type="button"
-                      onClick={() => { setLogoUrl(''); setLogoError(false); setSaveSuccess(false); markDirty() }}
-                      className="text-xs text-gray-400 hover:text-gray-600"
+                    <Button
+                      variant="light"
+                      size="sm"
+                      onPress={() => { setLogoUrl(''); setLogoError(false); setSaveSuccess(false); markDirty() }}
+                      className="text-xs text-gray-400"
                     >
                       {t('eventConfig.logoRemove')}
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {uploadError && (
@@ -310,57 +311,40 @@ export default function EventConfigForm({
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('eventConfig.eventName')} <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  setSaveSuccess(false); markDirty()
-                  if (e.target.value.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
-                }}
-                placeholder={t('eventConfig.eventNamePlaceholder')}
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${
-                  errors.name ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
-                }`}
-              />
-              {errors.name && <p className="mt-1.5 text-xs text-red-500">{errors.name}</p>}
-            </div>
+            <Input
+              label={t('eventConfig.eventName')}
+              isRequired
+              value={name}
+              onValueChange={(val) => {
+                setName(val)
+                setSaveSuccess(false); markDirty()
+                if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
+              }}
+              placeholder={t('eventConfig.eventNamePlaceholder')}
+              isInvalid={!!errors.name}
+              errorMessage={errors.name}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('eventConfig.type')}
-              </label>
-              <input
-                type="text"
-                value={eventType}
-                onChange={(e) => {
-                  setEventType(e.target.value)
-                  setSaveSuccess(false); markDirty()
-                }}
-                placeholder={t('eventConfig.typePlaceholder')}
-                className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-              />
-            </div>
+            <Input
+              label={t('eventConfig.type')}
+              value={eventType}
+              onValueChange={(val) => {
+                setEventType(val)
+                setSaveSuccess(false); markDirty()
+              }}
+              placeholder={t('eventConfig.typePlaceholder')}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('eventConfig.description')}
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value)
-                  setSaveSuccess(false); markDirty()
-                }}
-                rows={4}
-                placeholder={t('eventConfig.descriptionPlaceholder')}
-                className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 resize-none"
-              />
-            </div>
+            <Textarea
+              label={t('eventConfig.description')}
+              value={description}
+              onValueChange={(val) => {
+                setDescription(val)
+                setSaveSuccess(false); markDirty()
+              }}
+              minRows={4}
+              placeholder={t('eventConfig.descriptionPlaceholder')}
+            />
 
             {/* Dates / duration */}
             {isPublished ? (
@@ -399,69 +383,43 @@ export default function EventConfigForm({
                     {derivedDateRange(stages) ?? '—'}
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    {t('eventConfig.schedulingGranularity')}
-                  </label>
-                  <div className="relative w-48">
-                    <select
-                      value={granularity}
-                      onChange={(e) => {
-                        setGranularity(Number(e.target.value))
-                        setSaveSuccess(false); markDirty()
-                      }}
-                      className="w-full appearance-none rounded-lg border border-gray-200 px-3.5 py-2.5 pr-9 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-                    >
-                      <option value={30}>{t('eventConfig.granularity30min')}</option>
-                      <option value={60}>{t('eventConfig.granularity60min')}</option>
-                      <option value={90}>{t('eventConfig.granularity90min')}</option>
-                      <option value={120}>{t('eventConfig.granularity120min')}</option>
-                    </select>
-                    <svg
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    >
-                      <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
+                <div className="w-48">
+                  <Select
+                    label={t('eventConfig.schedulingGranularity')}
+                    selectedKeys={[granularity.toString()]}
+                    onSelectionChange={(keys) => {
+                      setGranularity(Number(Array.from(keys)[0]))
+                      setSaveSuccess(false); markDirty()
+                    }}
+                  >
+                    <SelectItem key="30">{t('eventConfig.granularity30min')}</SelectItem>
+                    <SelectItem key="60">{t('eventConfig.granularity60min')}</SelectItem>
+                    <SelectItem key="90">{t('eventConfig.granularity90min')}</SelectItem>
+                    <SelectItem key="120">{t('eventConfig.granularity120min')}</SelectItem>
+                  </Select>
                 </div>
               </>
             )}
 
             {/* Facilities */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('eventConfig.facilities')}
-              </label>
-              <input
-                ref={facilityInputRef}
-                type="text"
+              <Input
+                label={t('eventConfig.facilities')}
                 value={facilityInput}
-                onChange={(e) => setFacilityInput(e.target.value)}
+                onValueChange={setFacilityInput}
                 onKeyDown={handleFacilityKeyDown}
                 placeholder={t('eventConfig.facilitiesPlaceholder')}
-                className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
               />
               {facilities.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {facilities.map((f, i) => (
-                    <span
+                    <Chip
                       key={i}
-                      className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 text-sm rounded-md px-2 py-0.5"
+                      onClose={() => removeFacility(i)}
+                      variant="flat"
                     >
                       {f.label}
-                      <button
-                        type="button"
-                        onClick={() => removeFacility(i)}
-                        className="text-gray-400 hover:text-gray-700 leading-none"
-                        aria-label={`Remove ${f.label}`}
-                      >
-                        ×
-                      </button>
-                    </span>
+                    </Chip>
                   ))}
                 </div>
               )}

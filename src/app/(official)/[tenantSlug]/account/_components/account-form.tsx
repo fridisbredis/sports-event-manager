@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { Button, Input, Switch } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
@@ -41,8 +42,8 @@ export default function AccountForm({
     setSaveState('idle')
   }
 
-  function handleToggle(checked: boolean) {
-    setSmsOptOut(!checked)
+  function handleToggle(isSelected: boolean) {
+    setSmsOptOut(!isSelected)
     markDirty()
     setSaveState('idle')
   }
@@ -86,18 +87,15 @@ export default function AccountForm({
           <h1 className="text-xl font-semibold text-gray-900">{t('account.title')}</h1>
           <div className="flex items-center gap-3">
             {error && <span className="text-sm text-red-500">{error}</span>}
-            <button
+            <Button
               type="button"
-              onClick={handleSave}
-              disabled={saveState === 'saving'}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-40 transition-colors ${
-                saveState === 'saved'
-                  ? 'border-green-200 bg-white text-green-600'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900'
-              }`}
+              variant="bordered"
+              color={saveState === 'saved' ? 'success' : 'default'}
+              isLoading={saveState === 'saving'}
+              onPress={handleSave}
             >
               {saveLabel}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -118,29 +116,26 @@ export default function AccountForm({
 
         {/* Name field */}
         <div className="mb-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-            {t('account.nameLabel')}
-          </label>
-          <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="flex-1 text-sm text-gray-900 bg-transparent outline-none"
-            />
-            <span className="text-xs font-medium text-gray-400 shrink-0">{t('account.editHint')}</span>
-          </div>
+          <Input
+            label={t('account.nameLabel')}
+            value={name}
+            onValueChange={handleNameChange}
+            description={t('account.editHint')}
+            variant="bordered"
+            labelPlacement="outside"
+          />
         </div>
 
         {/* Phone field */}
         <div className="mb-8">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-            {t('account.phoneLabel')}
-          </label>
-          <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <span className="flex-1 text-sm text-gray-500">{phone}</span>
-            <span className="text-xs font-medium text-gray-400 shrink-0">{t('account.readOnlyHint')}</span>
-          </div>
+          <Input
+            label={t('account.phoneLabel')}
+            value={phone}
+            isReadOnly
+            description={t('account.readOnlyHint')}
+            variant="bordered"
+            labelPlacement="outside"
+          />
         </div>
 
         {/* Notifications section */}
@@ -153,22 +148,12 @@ export default function AccountForm({
               <p className="text-sm font-medium text-gray-900">{t('account.smsUpdatesLabel')}</p>
               <p className="text-xs text-gray-500 mt-0.5">{t('account.smsUpdatesHint')}</p>
             </div>
-            {/* Toggle: checked = SMS ON (smsOptOut = false) */}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!smsOptOut}
-              onClick={() => handleToggle(smsOptOut)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 ${
-                !smsOptOut ? 'bg-gray-900' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  !smsOptOut ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
+            {/* isSelected=true means SMS ON (smsOptOut=false) */}
+            <Switch
+              isSelected={!smsOptOut}
+              onValueChange={handleToggle}
+              aria-label={t('account.smsUpdatesLabel')}
+            />
           </div>
         </div>
 
@@ -208,14 +193,16 @@ export default function AccountForm({
       {/* Mobile: Save button fixed at bottom above tab bar */}
       {!isDesktop && (
         <div className="fixed bottom-16 inset-x-0 px-5 pb-2 bg-white border-t border-gray-100">
-          <button
+          <Button
             type="button"
-            onClick={handleSave}
-            disabled={saveState === 'saving'}
-            className="w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors mt-3"
+            color="primary"
+            isLoading={saveState === 'saving'}
+            onPress={handleSave}
+            fullWidth
+            className="mt-3 rounded-xl py-3 text-sm font-semibold"
           >
             {saveLabel}
-          </button>
+          </Button>
         </div>
       )}
 

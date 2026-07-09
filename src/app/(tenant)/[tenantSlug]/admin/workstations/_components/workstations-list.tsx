@@ -1,7 +1,18 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Chip,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface OperatingWindow {
@@ -85,7 +96,24 @@ function formatStageDate(stage: Stage): string {
   return `${start} – ${end}`
 }
 
-function StageSection({
+function StageTitle({ stage, count }: { stage: Stage; count: number }) {
+  const { t } = useTranslation('admin')
+  const typeLabel = stage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')
+  const dateStr = formatStageDate(stage)
+
+  return (
+    <div className="flex items-center gap-3 w-full">
+      <span className="font-medium text-gray-900 text-sm">{stage.name}</span>
+      <Chip size="sm" color={stage.stage_type === 'race' ? 'primary' : 'default'} variant="flat">
+        {typeLabel}
+      </Chip>
+      {dateStr && <span className="text-xs text-gray-400">{dateStr}</span>}
+      <span className="ml-auto text-xs text-gray-400">{t('workstations.workAreaCount', { count })}</span>
+    </div>
+  )
+}
+
+function StageContent({
   stage,
   workstations,
   tenantSlug,
@@ -94,98 +122,46 @@ function StageSection({
   workstations: Workstation[]
   tenantSlug: string
 }) {
-  const [collapsed, setCollapsed] = useState(false)
   const router = useRouter()
   const { t } = useTranslation('admin')
-
-  const typeLabel = stage.stage_type === 'race'
-    ? t('eventConfig.stageTypeRace')
-    : t('eventConfig.stageTypeNonRace')
-
-  const dateStr = formatStageDate(stage)
   const count = workstations.length
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-      {/* Stage header */}
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors"
-      >
-        <svg
-          className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${collapsed ? '-rotate-90' : ''}`}
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <polyline points="4 6 8 10 12 6" />
-        </svg>
-        <span className="font-medium text-gray-900 text-sm">{stage.name}</span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-            stage.stage_type === 'race'
-              ? 'bg-blue-50 text-blue-700'
-              : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          {typeLabel}
-        </span>
-        {dateStr && (
-          <span className="text-xs text-gray-400">{dateStr}</span>
-        )}
-        <span className="ml-auto text-xs text-gray-400">
-          {t('workstations.workAreaCount', { count })}
-        </span>
-      </button>
-
-      {!collapsed && (
-        <div className="border-t border-gray-100">
-          {count > 0 && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {t('workstations.nameLabel')}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {t('workstations.colOperatingWindows')}
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {t('workstations.colCapacity')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {workstations.map((ws) => {
-                  const windows = ws.workstation_operating_windows ?? []
-                  return (
-                    <tr
-                      key={ws.id}
-                      onClick={() => router.push(`/${tenantSlug}/admin/workstations/${ws.id}`)}
-                      className="cursor-pointer hover:bg-gray-50"
-                    >
-                      <td className="px-5 py-3 font-medium text-gray-900">{ws.name}</td>
-                      <td className="px-5 py-3 text-gray-600">{formatWindowsSummary(windows)}</td>
-                      <td className="px-5 py-3 text-gray-600">
-                        {t('workstations.upTo', { n: ws.capacity_ceiling })}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-          <div className="px-5 py-3.5">
-            <button
-              onClick={() => router.push(`/${tenantSlug}/admin/workstations/new?stageId=${stage.id}`)}
-              className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              + {t('workstations.addWorkArea')}
-            </button>
-          </div>
-        </div>
+    <div>
+      {count > 0 && (
+        <Table isStriped removeWrapper aria-label={stage.name}>
+          <TableHeader>
+            <TableColumn>{t('workstations.nameLabel')}</TableColumn>
+            <TableColumn>{t('workstations.colOperatingWindows')}</TableColumn>
+            <TableColumn>{t('workstations.colCapacity')}</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {workstations.map((ws) => {
+              const windows = ws.workstation_operating_windows ?? []
+              return (
+                <TableRow
+                  key={ws.id}
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/${tenantSlug}/admin/workstations/${ws.id}`)}
+                >
+                  <TableCell className="font-medium text-gray-900">{ws.name}</TableCell>
+                  <TableCell className="text-gray-600">{formatWindowsSummary(windows)}</TableCell>
+                  <TableCell className="text-gray-600">{t('workstations.upTo', { n: ws.capacity_ceiling })}</TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
       )}
+      <div className="pt-3.5">
+        <Button
+          variant="light"
+          size="sm"
+          onPress={() => router.push(`/${tenantSlug}/admin/workstations/new?stageId=${stage.id}`)}
+        >
+          + {t('workstations.addWorkArea')}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -212,12 +188,9 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
           </svg>
           <p className="text-base font-medium text-gray-900 mb-1">{t('workstations.noStages')}</p>
           <p className="text-sm text-gray-500 mb-6">{t('workstations.noStagesHint')}</p>
-          <button
-            onClick={() => router.push(`/${tenantSlug}/admin/event`)}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
+          <Button variant="bordered" onPress={() => router.push(`/${tenantSlug}/admin/event`)}>
             {t('workstations.goToEventConfig')}
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -226,16 +199,22 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('workstations.title')}</h1>
-      <div className="space-y-4">
+      <Accordion variant="splitted" defaultExpandedKeys={stages.map((s) => s.id)}>
         {stages.map((stage) => (
-          <StageSection
+          <AccordionItem
             key={stage.id}
-            stage={stage}
-            workstations={workstations.filter((ws) => ws.stage_id === stage.id)}
-            tenantSlug={tenantSlug}
-          />
+            title={
+              <StageTitle stage={stage} count={workstations.filter((ws) => ws.stage_id === stage.id).length} />
+            }
+          >
+            <StageContent
+              stage={stage}
+              workstations={workstations.filter((ws) => ws.stage_id === stage.id)}
+              tenantSlug={tenantSlug}
+            />
+          </AccordionItem>
         ))}
-      </div>
+      </Accordion>
     </div>
   )
 }

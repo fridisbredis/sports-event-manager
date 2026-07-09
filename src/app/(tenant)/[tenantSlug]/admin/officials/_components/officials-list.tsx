@@ -1,7 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import {
+  Button,
+  Chip,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Input,
+} from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import type { Official } from '@/types/app'
@@ -84,16 +99,20 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
 
   const visibleOfficials = officials.filter((o) => o.invite_status !== 'removed')
 
+  function closeAddModal() {
+    setAddModalOpen(false)
+    setName('')
+    setPhone('')
+    setAddError(null)
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">{t('officials.title')}</h1>
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-        >
+        <Button color="primary" onPress={() => setAddModalOpen(true)}>
           {t('officials.add')}
-        </button>
+        </Button>
       </div>
 
       {visibleOfficials.length === 0 ? (
@@ -111,142 +130,99 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
           </svg>
           <p className="text-base font-medium text-gray-900 mb-1">{t('officials.empty')}</p>
           <p className="text-sm text-gray-500 mb-6">{t('officials.emptyHint')}</p>
-          <button
-            onClick={() => setAddModalOpen(true)}
-            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-          >
+          <Button color="primary" onPress={() => setAddModalOpen(true)}>
             {t('officials.add')}
-          </button>
+          </Button>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {t('officials.name')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {t('officials.phone')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {t('officials.status')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {t('officials.actions')}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {visibleOfficials.map((official) => {
-                const isCurrentUser = official.user_id === currentUserId
-                const isResending = resendingId === official.id
+        <Table isStriped aria-label={t('officials.title')}>
+          <TableHeader>
+            <TableColumn>{t('officials.name')}</TableColumn>
+            <TableColumn>{t('officials.phone')}</TableColumn>
+            <TableColumn>{t('officials.status')}</TableColumn>
+            <TableColumn>{t('officials.actions')}</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {visibleOfficials.map((official) => {
+              const isCurrentUser = official.user_id === currentUserId
+              const isResending = resendingId === official.id
 
-                return (
-                  <tr key={official.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-900 font-medium">
-                      {isCurrentUser ? `${official.name} — ${t('officials.youLabel')}` : official.name}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{official.phone}</td>
-                    <td className="px-4 py-3">
-                      {official.invite_status === 'confirmed' ? (
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                          {t('officials.confirmed')}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
-                          {t('officials.invited')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {!isCurrentUser && (
-                        <div className="flex items-center gap-2">
-                          {official.invite_status === 'invited' && (
-                            <button
-                              onClick={() => handleResend(official)}
-                              disabled={isResending}
-                              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors disabled:opacity-50"
-                            >
-                              {isResending ? t('officials.sending') : t('officials.resendInvite')}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setRemoveTarget(official)}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors"
+              return (
+                <TableRow key={official.id}>
+                  <TableCell className="font-medium text-gray-900">
+                    {isCurrentUser ? `${official.name} — ${t('officials.youLabel')}` : official.name}
+                  </TableCell>
+                  <TableCell className="text-gray-500">{official.phone}</TableCell>
+                  <TableCell>
+                    <Chip size="sm" variant="flat" color={official.invite_status === 'confirmed' ? 'default' : 'warning'}>
+                      {official.invite_status === 'confirmed' ? t('officials.confirmed') : t('officials.invited')}
+                    </Chip>
+                  </TableCell>
+                  <TableCell>
+                    {!isCurrentUser && (
+                      <div className="flex items-center gap-2">
+                        {official.invite_status === 'invited' && (
+                          <Button
+                            size="sm"
+                            variant="bordered"
+                            isLoading={isResending}
+                            onPress={() => handleResend(official)}
                           >
-                            {t('officials.remove')}
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                            {t('officials.resendInvite')}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="bordered" onPress={() => setRemoveTarget(official)}>
+                          {t('officials.remove')}
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
       )}
 
-      {/* Add official modal */}
-      {addModalOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-            <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-              <div className="px-6 pt-6 pb-5">
-                <h2 className="text-sm font-semibold text-gray-900 mb-5">{t('officials.addTitle')}</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('officials.name')}</label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder={t('officials.namePlaceholder')}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('officials.phone')}</label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+46 70 000 00 00"
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
-                      onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                    />
-                    <p className="mt-1.5 text-xs text-gray-400">{t('officials.phoneHint')}</p>
-                  </div>
-                </div>
-              </div>
-              {addError && (
-                <p className="px-6 pb-3 text-xs text-red-600">{addError}</p>
-              )}
-              <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-6 py-4">
-                <button
-                  type="button"
-                  onClick={() => { setAddModalOpen(false); setName(''); setPhone('') }}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900 transition-colors"
-                >
-                  {t('officials.cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAdd}
-                  disabled={!name.trim() || !phone.trim() || pending}
-                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  {pending ? t('officials.sending') : t('officials.sendInvite')}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      <Modal isOpen={addModalOpen} onOpenChange={(isOpen) => !isOpen && closeAddModal()}>
+        <ModalContent>
+          <ModalHeader>{t('officials.addTitle')}</ModalHeader>
+          <ModalBody>
+            <Input
+              label={t('officials.name')}
+              value={name}
+              onValueChange={setName}
+              placeholder={t('officials.namePlaceholder')}
+              autoFocus
+            />
+            <Input
+              label={t('officials.phone')}
+              type="tel"
+              value={phone}
+              onValueChange={setPhone}
+              placeholder="+46 70 000 00 00"
+              description={t('officials.phoneHint')}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              isInvalid={!!addError}
+              errorMessage={addError}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={closeAddModal}>
+              {t('officials.cancel')}
+            </Button>
+            <Button
+              color="primary"
+              isDisabled={!name.trim() || !phone.trim()}
+              isLoading={pending}
+              onPress={handleAdd}
+            >
+              {t('officials.sendInvite')}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
-      {/* Remove confirmation */}
       <ConfirmDialog
         open={removeTarget !== null}
         title={t('officials.removeConfirmTitle')}

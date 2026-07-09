@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
+import { Button, Input, Textarea, Select, SelectItem, TimeInput } from '@heroui/react'
+import { Time } from '@internationalized/date'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
@@ -19,6 +21,20 @@ interface Props {
   initialCapacity: number
   initialWindows: { window_start: string; window_end: string }[]
   initialTodos: string[]
+}
+
+// Windows are stored and compared as plain "HH:MM" wall-clock strings with no
+// associated date or timezone, so TimeInput is given a plain `Time` value —
+// never CalendarDateTime/ZonedDateTime — to avoid any browser-timezone conversion.
+function hhmmToTime(hhmm: string): Time | undefined {
+  if (!hhmm) return undefined
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Time(h, m)
+}
+
+function timeToHHMM(time: Time | null): string {
+  if (!time) return ''
+  return `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`
 }
 
 interface FormErrors {
@@ -226,11 +242,6 @@ export default function WorkstationEditForm({
     })
   }
 
-  const inputClass = (hasError?: boolean) =>
-    `w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${
-      hasError ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
-    }`
-
   const isBusy = isSaving || isDeleting
 
   return (
@@ -250,34 +261,35 @@ export default function WorkstationEditForm({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <button
-            onClick={() => guardedNavigate(`/${tenantSlug}/admin/workstations`)}
-            className="mb-1 flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          <Button
+            variant="light"
+            size="sm"
+            onPress={() => guardedNavigate(`/${tenantSlug}/admin/workstations`)}
+            className="mb-1 px-0 text-default-400"
+            startContent={<span>←</span>}
           >
-            <span>←</span>
-            <span>{t('workstations.backToList')}</span>
-          </button>
+            {t('workstations.backToList')}
+          </Button>
           <h1 className="text-2xl font-semibold text-gray-900">{name || t('workstations.namePlaceholder')}</h1>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleDelete}
-            disabled={isBusy}
-            className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          <Button
+            color="danger"
+            variant="light"
+            onPress={handleDelete}
+            isDisabled={isBusy}
           >
             {t('workstations.delete')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isBusy}
-            className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-              saveSuccess
-                ? 'border border-green-200 bg-white text-green-600'
-                : 'bg-gray-900 text-white hover:bg-gray-700'
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          </Button>
+          <Button
+            color={saveSuccess ? 'success' : 'primary'}
+            variant={saveSuccess ? 'flat' : 'solid'}
+            onPress={handleSave}
+            isDisabled={isBusy}
+            isLoading={isSaving}
           >
             {isSaving ? t('workstations.saving') : saveSuccess ? t('workstations.saved') : t('workstations.save')}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -306,36 +318,24 @@ export default function WorkstationEditForm({
               {t('workstations.identity')}
             </h2>
             <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  {t('workstations.nameLabel')}
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    markDirty()
-                    if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
-                  }}
-                  placeholder={t('workstations.namePlaceholder')}
-                  className={inputClass(!!errors.name)}
-                />
-                {errors.name && (
-                  <p className="mt-1.5 text-xs text-red-500">{errors.name}</p>
-                )}
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  {t('workstations.descriptionLabel')}
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => { setDescription(e.target.value); markDirty() }}
-                  rows={3}
-                  className={inputClass()}
-                />
-              </div>
+              <Input
+                label={t('workstations.nameLabel')}
+                value={name}
+                onValueChange={(val) => {
+                  setName(val)
+                  markDirty()
+                  if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
+                }}
+                placeholder={t('workstations.namePlaceholder')}
+                isInvalid={!!errors.name}
+                errorMessage={errors.name}
+              />
+              <Textarea
+                label={t('workstations.descriptionLabel')}
+                value={description}
+                onValueChange={(val) => { setDescription(val); markDirty() }}
+                minRows={3}
+              />
             </div>
           </section>
 
@@ -348,33 +348,41 @@ export default function WorkstationEditForm({
               {windows.map((w, i) => (
                 <div key={i} className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="time"
-                      value={w.start}
-                      min={minStartFor(w.limitToDay)}
-                      onChange={(e) => {
-                        updateWindow(i, 'start', e.target.value)
+                    <TimeInput
+                      aria-label={t('workstations.windowStartLabel')}
+                      value={hhmmToTime(w.start) ?? null}
+                      minValue={hhmmToTime(minStartFor(w.limitToDay) ?? '')}
+                      validationBehavior="aria"
+                      isInvalid={!!errors.windows?.[i]}
+                      onChange={(val) => {
+                        updateWindow(i, 'start', timeToHHMM(val as Time | null))
                         if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
                       }}
-                      className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
+                      hourCycle={24}
+                      className="flex-1"
                     />
                     <span className="text-gray-400">–</span>
-                    <input
-                      type="time"
-                      value={w.end}
-                      max={maxEndFor(w.limitToDay)}
-                      onChange={(e) => {
-                        updateWindow(i, 'end', e.target.value)
+                    <TimeInput
+                      aria-label={t('workstations.windowEndLabel')}
+                      value={hhmmToTime(w.end) ?? null}
+                      maxValue={hhmmToTime(maxEndFor(w.limitToDay) ?? '')}
+                      validationBehavior="aria"
+                      isInvalid={!!errors.windows?.[i]}
+                      onChange={(val) => {
+                        updateWindow(i, 'end', timeToHHMM(val as Time | null))
                         if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
                       }}
-                      className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
+                      hourCycle={24}
+                      className="flex-1"
                     />
-                    <button
-                      onClick={() => removeWindow(i)}
-                      className="text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
+                    <Button
+                      variant="light"
+                      size="sm"
+                      onPress={() => removeWindow(i)}
+                      className="text-default-400 whitespace-nowrap"
                     >
                       {t('workstations.removeWindow')}
-                    </button>
+                    </Button>
                   </div>
                   {errors.windows?.[i] && (
                     <p className="mt-1.5 text-xs text-red-500">{errors.windows[i]}</p>
@@ -382,7 +390,7 @@ export default function WorkstationEditForm({
                   {isMultiDay && (
                     <div className="mt-2.5 space-y-2">
                       <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-600 select-none">
-                        <input
+                        <Input
                           type="checkbox"
                           checked={w.limitToDay !== null}
                           onChange={() => {
@@ -402,32 +410,35 @@ export default function WorkstationEditForm({
                         {t('workstations.limitToOneDay')}
                       </label>
                       {w.limitToDay !== null && (
-                        <select
-                          value={w.limitToDay}
-                          onChange={(e) => {
+                        <Select
+                          selectedKeys={[w.limitToDay]}
+                          onSelectionChange={(keys) => {
+                            const day = Array.from(keys)[0] as string
                             setWindows((prev) =>
-                              prev.map((win, j) => (j === i ? clampToDay(win, e.target.value) : win))
+                              prev.map((win, j) => (j === i ? clampToDay(win, day) : win))
                             )
                             if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
                             markDirty()
                           }}
-                          className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
+                          aria-label={t('workstations.limitToOneDay')}
                         >
                           {stageDays.map((day) => (
-                            <option key={day} value={day}>{day}</option>
+                            <SelectItem key={day}>{day}</SelectItem>
                           ))}
-                        </select>
+                        </Select>
                       )}
                     </div>
                   )}
                 </div>
               ))}
-              <button
-                onClick={addWindow}
-                className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+              <Button
+                variant="light"
+                size="sm"
+                onPress={addWindow}
+                className="text-default-500 px-0"
               >
                 {t('workstations.addWindow')}
-              </button>
+              </Button>
             </div>
           </section>
         </div>
@@ -439,18 +450,13 @@ export default function WorkstationEditForm({
             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
               {t('workstations.colCapacity')}
             </h2>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                {t('workstations.capacityLabel')}
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={capacity}
-                onChange={(e) => { setCapacity(Math.max(1, parseInt(e.target.value) || 1)); markDirty() }}
-                className={inputClass()}
-              />
-            </div>
+            <Input
+              type="number"
+              label={t('workstations.capacityLabel')}
+              value={String(capacity)}
+              onValueChange={(val) => { setCapacity(Math.max(1, parseInt(val) || 1)); markDirty() }}
+              min={1}
+            />
           </section>
 
           {/* Checklists / To-dos */}
@@ -467,7 +473,7 @@ export default function WorkstationEditForm({
                       disabled
                       className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
                     />
-                    <input
+                    <Input
                       ref={(el) => { todoRefs.current[i] = el }}
                       type="text"
                       value={todo}
@@ -476,22 +482,26 @@ export default function WorkstationEditForm({
                       placeholder={t('workstations.todoPlaceholder')}
                       className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
                     />
-                    <button
-                      onClick={() => removeTodo(i)}
-                      className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                    <Button
+                      variant="light"
+                      size="sm"
+                      onPress={() => removeTodo(i)}
+                      className="text-xs text-default-400 min-w-0 px-1"
                     >
                       {t('workstations.removeTodo')}
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
               <div className="px-3 py-2.5 border-t border-gray-100">
-                <button
-                  onClick={addTodo}
-                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                <Button
+                  variant="light"
+                  size="sm"
+                  onPress={addTodo}
+                  className="text-default-500 px-0"
                 >
                   {t('workstations.addTodo')}
-                </button>
+                </Button>
               </div>
             </div>
           </section>

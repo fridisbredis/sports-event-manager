@@ -1,6 +1,21 @@
 'use client'
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
+import {
+  Button,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Card,
+  CardBody,
+  ScrollShadow,
+} from '@heroui/react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
 import { useTranslation } from '@/lib/i18n/client'
@@ -96,7 +111,12 @@ function generateSlotsForDay(stage: Stage, day: string, granularityMin: number):
 
 function formatDayLabel(day: string): string {
   const date = new Date(`${day}T12:00:00.000Z`)
-  return date.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' })
+  return date.toLocaleDateString('sv-SE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
 }
 
 function slotEndTime(slot: Date, granularityMin: number): Date {
@@ -143,7 +163,6 @@ export function SchedulingGrid({
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
   const [selectedStageId, setSelectedStageId] = useState<string>(stages[0]?.id ?? '')
   const [view, setView] = useState<View>('by-person')
-  const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string>(() => {
     const first = stages[0]
     if (!first) return ''
@@ -174,15 +193,11 @@ export function SchedulingGrid({
     anchorTop: number
     anchorLeft: number
   } | null>(null)
-  const pickerRef = useRef<HTMLDivElement>(null)
 
   // Action popup for existing assignment cells (remove / set status)
-  const [cellActionCell, setCellActionCell] = useState<{
-    assignment: LocalAssignment
-    anchorBottom: number
-    anchorLeft: number
-  } | null>(null)
-  const cellActionRef = useRef<HTMLDivElement>(null)
+  const [cellActionCell, setCellActionCell] = useState<
+    (LocalAssignment & { anchorTop: number; anchorLeft: number; anchorBottom: number }) | null
+  >(null)
 
   // By-work-area expand state
   const [expandedWorkAreas, setExpandedWorkAreas] = useState<Set<string>>(new Set())
@@ -195,7 +210,6 @@ export function SchedulingGrid({
     anchorTop: number
     anchorLeft: number
   } | null>(null)
-  const wsPickerRef = useRef<HTMLDivElement>(null)
 
   // By-work-area slot modal (expanded numbered slot rows)
   const [wsSlotModal, setWsSlotModal] = useState<{
@@ -216,7 +230,10 @@ export function SchedulingGrid({
   const dayIndex = availableDays.indexOf(selectedDay)
 
   const slots = useMemo(
-    () => (selectedStage && selectedDay ? generateSlotsForDay(selectedStage, selectedDay, granularityMin) : []),
+    () =>
+      selectedStage && selectedDay
+        ? generateSlotsForDay(selectedStage, selectedDay, granularityMin)
+        : [],
     [selectedStage, selectedDay, granularityMin]
   )
 
@@ -234,14 +251,22 @@ export function SchedulingGrid({
     return map
   }, [initialAssignments])
 
-  // Close any open popup when clicking outside
+  // Close popups when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerCell(null)
-      if (cellActionRef.current && !cellActionRef.current.contains(e.target as Node)) setCellActionCell(null)
-      if (wsPickerRef.current && !wsPickerRef.current.contains(e.target as Node)) setWsPickerCell(null)
+      if (pickerCell && !(e.target as HTMLElement).closest('[data-picker-cell]')) {
+        setPickerCell(null)
+      }
+      if (cellActionCell && !(e.target as HTMLElement).closest('[data-cell-action]')) {
+        setCellActionCell(null)
+      }
+      if (wsPickerCell && !(e.target as HTMLElement).closest('[data-ws-picker]')) {
+        setWsPickerCell(null)
+      }
     }
-    if (pickerCell || cellActionCell || wsPickerCell) document.addEventListener('mousedown', handleClick)
+    if (pickerCell || cellActionCell || wsPickerCell) {
+      document.addEventListener('mousedown', handleClick)
+    }
     return () => document.removeEventListener('mousedown', handleClick)
   }, [pickerCell, cellActionCell, wsPickerCell])
 
@@ -249,9 +274,7 @@ export function SchedulingGrid({
 
   const activeAssignments = useMemo(() => {
     const stageWsIds = new Set(stageWorkstations.map((w) => w.id))
-    return assignments.filter(
-      (a) => !deletions.has(a.id ?? '') && stageWsIds.has(a.workstation_id)
-    )
+    return assignments.filter((a) => !deletions.has(a.id ?? '') && stageWsIds.has(a.workstation_id))
   }, [assignments, deletions, stageWorkstations])
 
   const overCapacityCells = useMemo(() => {
@@ -346,23 +369,37 @@ export function SchedulingGrid({
     return idx
   }
 
-  function handleCellClick(officialId: string, slot: Date, ws?: WorkstationData, anchor?: HTMLElement) {
+  function handleCellClick(
+    officialId: string,
+    slot: Date,
+    ws?: WorkstationData,
+    anchor?: HTMLElement
+  ) {
     const slotStart = slot.toISOString()
     const existing = getAssignment(officialId, slotStart)
 
     if (existing && !ws) {
       const rect = anchor?.getBoundingClientRect()
       setCellActionCell({
-        assignment: existing,
-        anchorBottom: rect ? rect.bottom : 0,
+        ...existing,
+        anchorTop: rect ? rect.top : 0,
         anchorLeft: rect ? rect.left : 0,
+        anchorBottom: rect ? rect.bottom : 0,
       })
     } else if (ws) {
       const slotEnd = slotEndTime(slot, granularityMin).toISOString()
       const slotIdx = nextLocalFreeSlot(ws.id, slotStart)
       setAssignments((prev) => [
         ...prev,
-        { id: null, official_id: officialId, workstation_id: ws.id, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIdx },
+        {
+          id: null,
+          official_id: officialId,
+          workstation_id: ws.id,
+          timeslot_start: slotStart,
+          timeslot_end: slotEnd,
+          status: 'assigned',
+          slot_index: slotIdx,
+        },
       ])
       setPickerCell(null)
       markDirty()
@@ -379,17 +416,18 @@ export function SchedulingGrid({
 
   function handleCellAction(action: 'remove' | 'assigned') {
     if (!cellActionCell) return
-    const { assignment } = cellActionCell
+    const assignment = cellActionCell
 
     if (action === 'remove') {
       if (assignment.id) setDeletions((prev) => new Set([...prev, assignment.id!]))
       setAssignments((prev) =>
         prev.filter(
-          (a) => !(
-            a.official_id === assignment.official_id &&
-            a.timeslot_start === assignment.timeslot_start &&
-            a.workstation_id === assignment.workstation_id
-          )
+          (a) =>
+            !(
+              a.official_id === assignment.official_id &&
+              a.timeslot_start === assignment.timeslot_start &&
+              a.workstation_id === assignment.workstation_id
+            )
         )
       )
     } else {
@@ -414,7 +452,15 @@ export function SchedulingGrid({
     const slotEnd = slotEndTime(slot, granularityMin).toISOString()
     setAssignments((prev) => [
       ...prev,
-      { id: null, official_id: officialId, workstation_id: workstationId, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIndex },
+      {
+        id: null,
+        official_id: officialId,
+        workstation_id: workstationId,
+        timeslot_start: slotStart,
+        timeslot_end: slotEnd,
+        status: 'assigned',
+        slot_index: slotIndex,
+      },
     ])
     setWsPickerCell(null)
     markDirty()
@@ -422,19 +468,37 @@ export function SchedulingGrid({
 
   function handleWsExpandedSlotClick(wsId: string, wsName: string, slotIndex: number, slot: Date) {
     const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-    setWsSlotModal({ workstationId: wsId, wsName, slotIndex, slotStart: slot.toISOString(), slotEnd })
+    setWsSlotModal({
+      workstationId: wsId,
+      wsName,
+      slotIndex,
+      slotStart: slot.toISOString(),
+      slotEnd,
+    })
   }
 
   function handleWsSlotAdd(officialId: string) {
     if (!wsSlotModal) return
     const { workstationId, slotIndex, slotStart, slotEnd } = wsSlotModal
     const slotTaken = assignments.some(
-      (a) => !deletions.has(a.id ?? '') && a.workstation_id === workstationId && a.slot_index === slotIndex && a.timeslot_start === slotStart
+      (a) =>
+        !deletions.has(a.id ?? '') &&
+        a.workstation_id === workstationId &&
+        a.slot_index === slotIndex &&
+        a.timeslot_start === slotStart
     )
     if (slotTaken) return
     setAssignments((prev) => [
       ...prev,
-      { id: null, official_id: officialId, workstation_id: workstationId, timeslot_start: slotStart, timeslot_end: slotEnd, status: 'assigned', slot_index: slotIndex },
+      {
+        id: null,
+        official_id: officialId,
+        workstation_id: workstationId,
+        timeslot_start: slotStart,
+        timeslot_end: slotEnd,
+        status: 'assigned',
+        slot_index: slotIndex,
+      },
     ])
     markDirty()
   }
@@ -442,12 +506,15 @@ export function SchedulingGrid({
   function handleWsSlotRemove(assignment: LocalAssignment) {
     if (assignment.id) setDeletions((prev) => new Set([...prev, assignment.id!]))
     setAssignments((prev) =>
-      prev.filter((a) => !(
-        a.official_id === assignment.official_id &&
-        a.workstation_id === assignment.workstation_id &&
-        a.timeslot_start === assignment.timeslot_start &&
-        a.slot_index === assignment.slot_index
-      ))
+      prev.filter(
+        (a) =>
+          !(
+            a.official_id === assignment.official_id &&
+            a.workstation_id === assignment.workstation_id &&
+            a.timeslot_start === assignment.timeslot_start &&
+            a.slot_index === assignment.slot_index
+          )
+      )
     )
     markDirty()
   }
@@ -471,7 +538,13 @@ export function SchedulingGrid({
       .filter((a) => a.id !== null && originalStatusMap.get(a.id) !== a.status)
       .map((a) => ({ id: a.id!, status: a.status }))
 
-    const result = await saveAssignments(tenantSlug, tenantId, additions, [...deletions], statusUpdateList)
+    const result = await saveAssignments(
+      tenantSlug,
+      tenantId,
+      additions,
+      [...deletions],
+      statusUpdateList
+    )
 
     if (result.error) {
       setSaveError(result.error)
@@ -516,85 +589,103 @@ export function SchedulingGrid({
         <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
 
         {/* Stage selector */}
-        <div className="relative">
-          <button
-            onClick={() => setStageDropdownOpen((o) => !o)}
-            className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          >
-            {selectedStage?.name ?? t('scheduling.selectStage')}
-            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {stageDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-              {stages.map((stage) => (
-                <button
-                  key={stage.id}
-                  onClick={() => {
-                    setSelectedStageId(stage.id)
-                    setStageDropdownOpen(false)
-                    setPickerCell(null)
-                    setCellActionCell(null)
-                    setSelectedDay(getAllocableDays(stage)[0] ?? '')
-                  }}
-                  className={`flex items-center justify-between w-full px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
-                    stage.id === selectedStageId ? 'font-medium text-gray-900' : 'text-gray-700'
-                  }`}
+        <Dropdown>
+          <DropdownTrigger>
+            <Button
+              variant="bordered"
+              size="sm"
+              endContent={
+                <svg
+                  className="w-4 h-4 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  {stage.name}
-                  {stage.id === selectedStageId && (
-                    <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              }
+            >
+              {selectedStage?.name ?? t('scheduling.selectStage')}
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu
+            selectionMode="single"
+            selectedKeys={new Set([selectedStageId])}
+            onAction={(key) => {
+              const id = String(key)
+              const stage = stages.find((s) => s.id === id)
+              if (stage) {
+                setSelectedStageId(id)
+                setPickerCell(null)
+                setCellActionCell(null)
+                setSelectedDay(getAllocableDays(stage)[0] ?? '')
+              }
+            }}
+          >
+            {stages.map((stage) => (
+              <DropdownItem key={stage.id}>{stage.name}</DropdownItem>
+            ))}
+          </DropdownMenu>
+        </Dropdown>
 
         <div className="flex-1" />
 
         {availableDays.length > 0 && (
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setSelectedDay(availableDays[dayIndex - 1])}
-              disabled={dayIndex <= 0}
-              className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            <Button
+              isIconOnly
+              variant="bordered"
+              size="sm"
+              onPress={() => setSelectedDay(availableDays[dayIndex - 1])}
+              isDisabled={dayIndex <= 0}
               aria-label={t('scheduling.prevDay')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
-            </button>
+            </Button>
             <span className="text-sm text-gray-600 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center capitalize">
               {selectedDay ? formatDayLabel(selectedDay) : ''}
             </span>
-            <button
-              onClick={() => setSelectedDay(availableDays[dayIndex + 1])}
-              disabled={dayIndex >= availableDays.length - 1}
-              className="p-1.5 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            <Button
+              isIconOnly
+              variant="bordered"
+              size="sm"
+              onPress={() => setSelectedDay(availableDays[dayIndex + 1])}
+              isDisabled={dayIndex >= availableDays.length - 1}
               aria-label={t('scheduling.nextDay')}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
-            </button>
+            </Button>
           </div>
         )}
 
-        <button
-          onClick={handleSave}
-          disabled={saving || !hasPendingChanges || doubleBookedCount > 0}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            hasPendingChanges && doubleBookedCount === 0
-              ? 'bg-gray-900 text-white hover:bg-gray-700'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
+        <Button
+          color="primary"
+          size="sm"
+          onPress={handleSave}
+          isLoading={saving}
+          isDisabled={saving || !hasPendingChanges || doubleBookedCount > 0 || overCapacityCount > 0}
         >
-          {saving ? t('scheduling.saving') : saveSuccess ? t('scheduling.saved') : t('scheduling.save')}
-        </button>
+          {saveSuccess ? t('scheduling.saved') : t('scheduling.save')}
+        </Button>
       </div>
 
       {saveError && (
@@ -606,8 +697,18 @@ export function SchedulingGrid({
       {/* Conflict banners */}
       {overCapacityCount > 0 && (
         <div className="mb-3 flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-md text-sm text-gray-700">
-          <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z" />
+          <svg
+            className="w-4 h-4 text-gray-500 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z"
+            />
           </svg>
           {t('scheduling.overCapacity', { count: overCapacityCount })}
         </div>
@@ -615,7 +716,12 @@ export function SchedulingGrid({
       {doubleBookedCount > 0 && (
         <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-red-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <svg
+              className="w-4 h-4 text-red-500 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+            >
               <circle cx="12" cy="12" r="10" strokeWidth={2} />
               <path strokeLinecap="round" strokeWidth={2} d="M8 8l8 8M16 8l-8 8" />
             </svg>
@@ -633,26 +739,22 @@ export function SchedulingGrid({
 
       {/* View toggle */}
       <div className="flex gap-1 mb-5">
-        <button
-          onClick={() => setView('by-person')}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            view === 'by-person'
-              ? 'bg-gray-900 text-white'
-              : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-          }`}
+        <Button
+          size="sm"
+          color={view === 'by-person' ? 'primary' : 'default'}
+          variant={view === 'by-person' ? 'solid' : 'bordered'}
+          onPress={() => setView('by-person')}
         >
           {t('scheduling.viewByPerson')}
-        </button>
-        <button
-          onClick={() => setView('by-work-area')}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            view === 'by-work-area'
-              ? 'bg-gray-900 text-white'
-              : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-          }`}
+        </Button>
+        <Button
+          size="sm"
+          color={view === 'by-work-area' ? 'primary' : 'default'}
+          variant={view === 'by-work-area' ? 'solid' : 'bordered'}
+          onPress={() => setView('by-work-area')}
         >
           {t('scheduling.viewByWorkArea')}
-        </button>
+        </Button>
       </div>
 
       {/* Grid */}
@@ -671,7 +773,6 @@ export function SchedulingGrid({
           activeAssignments={activeAssignments}
           doubleBookedOfficials={doubleBookedOfficials}
           pickerCell={pickerCell}
-          pickerRef={pickerRef}
           onCellClick={handleCellClick}
         />
       ) : (
@@ -696,155 +797,205 @@ export function SchedulingGrid({
       )}
 
       {/* Action popup — status change / remove for an existing assignment */}
-      {cellActionCell && (() => {
-        const ws = workstations.find((w) => w.id === cellActionCell.assignment.workstation_id)
-        const status = cellActionCell.assignment.status
-        return (
-          <div
-            ref={cellActionRef}
-            className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[160px]"
-            style={{ top: cellActionCell.anchorBottom + 4, left: cellActionCell.anchorLeft }}
-          >
-            <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[200px]">
-              {ws?.name ?? '—'}
-            </p>
-            <div className="border-t border-gray-100 py-1">
-              <button onClick={() => handleCellAction('remove')} className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 text-left">
-                {t('scheduling.actionRemove')}
-              </button>
-              {status !== 'assigned' && (
-                <button onClick={() => handleCellAction('assigned')} className="w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-                  {t('scheduling.actionMarkAssigned')}
-                </button>
-              )}
+      {cellActionCell &&
+        (() => {
+          const ws = workstations.find((w) => w.id === cellActionCell.workstation_id)
+          const status = cellActionCell.status
+          return (
+            <div
+              className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[160px]"
+              style={{
+                top: cellActionCell.anchorBottom ?? 0,
+                left: cellActionCell.anchorLeft ?? 0,
+              }}
+              data-cell-action
+            >
+              <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[200px]">
+                {ws?.name ?? '—'}
+              </p>
+              <div className="border-t border-gray-100 py-1">
+                <Button
+                  color="danger"
+                  variant="light"
+                  size="sm"
+                  className="w-full justify-start rounded-none px-3 hover:bg-red-50"
+                  onPress={() => handleCellAction('remove')}
+                >
+                  {t('scheduling.actionRemove')}
+                </Button>
+                {status !== 'assigned' && (
+                  <Button
+                    variant="light"
+                    size="sm"
+                    className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
+                    onPress={() => handleCellAction('assigned')}
+                  >
+                    {t('scheduling.actionMarkAssigned')}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        )
-      })()}
+          )
+        })()}
 
       {/* Person picker for by-work-area expanded view */}
-      {wsPickerCell && (() => {
-        const slot = new Date(wsPickerCell.slotStart)
-        const assignedAtSlot = new Set(
-          activeAssignments.filter((a) => a.timeslot_start === wsPickerCell.slotStart).map((a) => a.official_id)
-        )
-        const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
-        return (
-          <div
-            ref={wsPickerRef}
-            className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-            style={{ top: wsPickerCell.anchorTop, left: wsPickerCell.anchorLeft, transform: 'translateY(calc(-100% - 4px))' }}
-          >
-            <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-              {t('scheduling.assignPerson', { slot: formatSlotLabel(slot), index: wsPickerCell.slotIndex })}
-            </p>
-            {availableOfficials.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-gray-400">{t('scheduling.noConfirmedOfficials')}</p>
-            ) : (
-              availableOfficials.map((off) => (
-                <button
-                  key={off.id}
-                  onClick={() => handleWsPersonPick(off.id)}
-                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
-                      {initials(off.name)}
-                    </span>
-                    <span className="truncate">{off.name}</span>
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        )
-      })()}
+      {wsPickerCell &&
+        (() => {
+          const slot = new Date(wsPickerCell.slotStart)
+          const assignedAtSlot = new Set(
+            activeAssignments
+              .filter((a) => a.timeslot_start === wsPickerCell.slotStart)
+              .map((a) => a.official_id)
+          )
+          const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
+          return (
+            <div
+              className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
+              style={{
+                top: wsPickerCell.anchorTop,
+                left: wsPickerCell.anchorLeft,
+                transform: 'translateY(calc(-100% - 4px))',
+              }}
+              data-ws-picker
+            >
+              <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
+                {t('scheduling.assignPerson', {
+                  slot: formatSlotLabel(slot),
+                  index: wsPickerCell.slotIndex,
+                })}
+              </p>
+              {availableOfficials.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-gray-400">
+                  {t('scheduling.noConfirmedOfficials')}
+                </p>
+              ) : (
+                <ScrollShadow className="flex flex-col max-h-64">
+                  {availableOfficials.map((off) => (
+                    <Button
+                      key={off.id}
+                      variant="light"
+                      size="sm"
+                      className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
+                      onPress={() => handleWsPersonPick(off.id)}
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
+                          {initials(off.name)}
+                        </span>
+                        <span className="truncate">{off.name}</span>
+                      </span>
+                    </Button>
+                  ))}
+                </ScrollShadow>
+              )}
+            </div>
+          )
+        })()}
 
       {/* Slot modal for by-work-area expanded rows */}
-      {wsSlotModal && (() => {
-        const slot = new Date(wsSlotModal.slotStart)
-        const assignedInSlot = activeAssignments.filter(
-          (a) => a.workstation_id === wsSlotModal.workstationId &&
-                  a.timeslot_start === wsSlotModal.slotStart &&
-                  a.slot_index === wsSlotModal.slotIndex
-        )
-        const assignedAtSlot = new Set(
-          activeAssignments.filter((a) => a.timeslot_start === wsSlotModal.slotStart).map((a) => a.official_id)
-        )
-        const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
-        return (
-          <>
-            <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setWsSlotModal(null)} />
-            <div className="fixed z-50 bg-white rounded-xl shadow-2xl border border-gray-200 w-80 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="px-5 pt-5 pb-3">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  {t('scheduling.slotModalTitle', { index: wsSlotModal.slotIndex, ws: wsSlotModal.wsName, time: formatSlotLabel(slot) })}
-                </h3>
-              </div>
+      {wsSlotModal &&
+        (() => {
+          const slot = new Date(wsSlotModal.slotStart)
+          const assignedInSlot = activeAssignments.filter(
+            (a) =>
+              a.workstation_id === wsSlotModal.workstationId &&
+              a.timeslot_start === wsSlotModal.slotStart &&
+              a.slot_index === wsSlotModal.slotIndex
+          )
+          const assignedAtSlot = new Set(
+            activeAssignments
+              .filter((a) => a.timeslot_start === wsSlotModal.slotStart)
+              .map((a) => a.official_id)
+          )
+          const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
+          return (
+            <Modal
+              isOpen
+              onOpenChange={(open) => {
+                if (!open) setWsSlotModal(null)
+              }}
+            >
+              <ModalContent>
+                {(onClose) => (
+                  <>
+                    <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
+                      {t('scheduling.slotModalTitle', {
+                        index: wsSlotModal.slotIndex,
+                        ws: wsSlotModal.wsName,
+                        time: formatSlotLabel(slot),
+                      })}
+                    </ModalHeader>
+                    <ModalBody>
+                      {assignedInSlot.length === 0 && availableOfficials.length === 0 && (
+                        <p className="text-sm text-gray-400">{t('scheduling.slotModalEmpty')}</p>
+                      )}
 
-              {assignedInSlot.length === 0 && availableOfficials.length === 0 && (
-                <p className="px-5 pb-5 text-sm text-gray-400">{t('scheduling.slotModalEmpty')}</p>
-              )}
+                      {assignedInSlot.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                            {t('scheduling.slotModalAssigned')}
+                          </p>
+                          {assignedInSlot.map((a) => {
+                            const off = officials.find((o) => o.id === a.official_id)
+                            return (
+                              <div
+                                key={a.official_id}
+                                className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2"
+                              >
+                                <span className="text-sm text-gray-900">{off?.name ?? '—'}</span>
+                                <Button
+                                  color="danger"
+                                  variant="light"
+                                  size="sm"
+                                  onPress={() => handleWsSlotRemove(a)}
+                                >
+                                  {t('scheduling.slotModalRemove')}
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
 
-              {assignedInSlot.length > 0 && (
-                <div className="px-5 pb-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t('scheduling.slotModalAssigned')}</p>
-                  {assignedInSlot.map((a) => {
-                    const off = officials.find((o) => o.id === a.official_id)
-                    return (
-                      <div key={a.official_id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2">
-                        <span className="text-sm text-gray-900">{off?.name ?? '—'}</span>
-                        <button
-                          onClick={() => handleWsSlotRemove(a)}
-                          className="text-xs text-gray-500 hover:text-red-600 border border-gray-200 rounded px-2 py-0.5 transition-colors"
-                        >
-                          {t('scheduling.slotModalRemove')}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {assignedInSlot.length === 0 && availableOfficials.length > 0 && (
-                <div className="px-5 pb-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
-                  </p>
-                  <div className="max-h-56 overflow-y-auto -mr-1 pr-1">
-                    {availableOfficials.map((off) => (
-                      <div key={off.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2">
-                        <span className="text-sm text-gray-900">{off.name}</span>
-                        <button
-                          onClick={() => handleWsSlotAdd(off.id)}
-                          className="text-xs text-gray-700 border border-gray-200 rounded px-2 py-0.5 hover:bg-gray-50 transition-colors"
-                        >
-                          {t('scheduling.slotModalAdd')}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-                <button
-                  onClick={() => setWsSlotModal(null)}
-                  className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  {t('scheduling.slotModalCancel')}
-                </button>
-                <button
-                  onClick={() => setWsSlotModal(null)}
-                  className="px-4 py-1.5 text-sm font-medium bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors"
-                >
-                  {t('scheduling.slotModalDone')}
-                </button>
-              </div>
-            </div>
-          </>
-        )
-      })()}
+                      {assignedInSlot.length === 0 && availableOfficials.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                            {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
+                          </p>
+                          <ScrollShadow className="flex flex-col max-h-56">
+                            {availableOfficials.map((off) => (
+                              <div
+                                key={off.id}
+                                className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2"
+                              >
+                                <span className="text-sm text-gray-900">{off.name}</span>
+                                <Button
+                                  variant="bordered"
+                                  size="sm"
+                                  onPress={() => handleWsSlotAdd(off.id)}
+                                >
+                                  {t('scheduling.slotModalAdd')}
+                                </Button>
+                              </div>
+                            ))}
+                          </ScrollShadow>
+                        </div>
+                      )}
+                    </ModalBody>
+                    <ModalFooter>
+                      <Button variant="light" onPress={onClose}>
+                        {t('scheduling.slotModalCancel')}
+                      </Button>
+                      <Button color="primary" onPress={onClose}>
+                        {t('scheduling.slotModalDone')}
+                      </Button>
+                    </ModalFooter>
+                  </>
+                )}
+              </ModalContent>
+            </Modal>
+          )
+        })()}
 
       <SchedulingLegend />
     </div>
@@ -858,12 +1009,24 @@ function SetupEmptyState() {
   return (
     <div className="border border-gray-200 rounded-md bg-white py-16 flex flex-col items-center gap-3">
       <div className="w-16 h-16 border-2 border-gray-300 rounded-md flex items-center justify-center">
-        <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 20L20 4M4 4l16 16" />
+        <svg
+          className="w-8 h-8 text-gray-300"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M4 20L20 4M4 4l16 16"
+          />
         </svg>
       </div>
       <p className="text-sm font-medium text-gray-700">{t('scheduling.noAssignmentsTitle')}</p>
-      <p className="text-sm text-gray-500 text-center max-w-xs">{t('scheduling.noAssignmentsHint')}</p>
+      <p className="text-sm text-gray-500 text-center max-w-xs">
+        {t('scheduling.noAssignmentsHint')}
+      </p>
     </div>
   )
 }
@@ -875,11 +1038,15 @@ function SchedulingLegend() {
   return (
     <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
       <span className="flex items-center gap-1.5">
-        <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded font-mono text-gray-700">2/3</span>
+        <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded font-mono text-gray-700">
+          2/3
+        </span>
         {t('scheduling.legendCapacity')}
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-flex items-center justify-center w-4 h-4 border border-gray-400 rounded-sm text-gray-500 text-[10px]">⊗</span>
+        <span className="inline-flex items-center justify-center w-4 h-4 border border-gray-400 rounded-sm text-gray-500 text-[10px]">
+          ⊗
+        </span>
         {t('scheduling.legendDoubleBooked')}
       </span>
       <span className="flex items-center gap-1.5">
@@ -889,7 +1056,10 @@ function SchedulingLegend() {
       <span className="flex items-center gap-1.5">
         <span
           className="w-8 h-4 rounded-sm inline-block border border-gray-200"
-          style={{ background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)' }}
+          style={{
+            background:
+              'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
+          }}
         />
         {t('scheduling.legendOutsideWindow')}
       </span>
@@ -906,8 +1076,12 @@ interface ByPersonGridProps {
   stageWorkstations: WorkstationData[]
   activeAssignments: LocalAssignment[]
   doubleBookedOfficials: Set<string>
-  pickerCell: { officialId: string; slotStart: string; anchorTop: number; anchorLeft: number } | null
-  pickerRef: React.RefObject<HTMLDivElement | null>
+  pickerCell: {
+    officialId: string
+    slotStart: string
+    anchorTop: number
+    anchorLeft: number
+  } | null
   onCellClick: (officialId: string, slot: Date, ws?: WorkstationData, anchor?: HTMLElement) => void
 }
 
@@ -919,7 +1093,6 @@ function ByPersonGrid({
   activeAssignments,
   doubleBookedOfficials,
   pickerCell,
-  pickerRef,
   onCellClick,
 }: ByPersonGridProps) {
   const { t } = useTranslation('admin')
@@ -948,7 +1121,11 @@ function ByPersonGrid({
   const activeSlotSet = useMemo(() => {
     const set = new Set<string>()
     for (const slot of slots) {
-      if (stageWorkstations.some((ws) => isWithinWindow(slot, granularityMin, ws.workstation_operating_windows))) {
+      if (
+        stageWorkstations.some((ws) =>
+          isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
+        )
+      ) {
         set.add(slot.toISOString())
       }
     }
@@ -972,7 +1149,10 @@ function ByPersonGrid({
               {t('scheduling.colOfficial')}
             </th>
             {slots.map((slot) => (
-              <th key={slot.toISOString()} className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]">
+              <th
+                key={slot.toISOString()}
+                className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]"
+              >
                 {formatSlotLabel(slot)}
               </th>
             ))}
@@ -992,10 +1172,11 @@ function ByPersonGrid({
               {slots.map((slot) => {
                 const slotStart = slot.toISOString()
                 const assignment = assignmentMap.get(`${official.id}:${slotStart}`)
-                const ws = assignment ? stageWorkstations.find((w) => w.id === assignment.workstation_id) : undefined
+                const ws = assignment
+                  ? stageWorkstations.find((w) => w.id === assignment.workstation_id)
+                  : undefined
                 const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
                 const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
-
 
                 const cellStyle = assignment
                   ? isDoubleBooked
@@ -1008,14 +1189,16 @@ function ByPersonGrid({
                     {assignment ? (
                       <button
                         onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 text-left transition-colors hover:brightness-95 ${cellStyle}`}
+                        className={`flex w-full h-8 flex-col items-center justify-center gap-px rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
                       >
-                        <span className="flex items-center justify-between gap-1">
-                          <span className="truncate">{ws?.name ?? '—'}</span>
-                          <span className={`shrink-0 tabular-nums ${isDoubleBooked ? 'text-orange-400' : 'text-gray-400'}`}>
-                            {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
-                            {isDoubleBooked && ' ⊗'}
-                          </span>
+                        <span className="w-full truncate text-center text-[11px] leading-none">
+                          {ws?.name ?? '—'}
+                        </span>
+                        <span
+                          className={`shrink-0 text-[10px] leading-none tabular-nums ${isDoubleBooked ? 'text-orange-400' : 'text-gray-400'}`}
+                        >
+                          {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
+                          {isDoubleBooked && ' ⊗'}
                         </span>
                       </button>
                     ) : activeSlotSet.has(slotStart) ? (
@@ -1026,7 +1209,10 @@ function ByPersonGrid({
                     ) : (
                       <div
                         className="w-full h-8 rounded-md"
-                        style={{ background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)' }}
+                        style={{
+                          background:
+                            'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
+                        }}
                       />
                     )}
                   </td>
@@ -1043,38 +1229,49 @@ function ByPersonGrid({
         </div>
       )}
 
-      {/* Work-area picker — fixed so overflow-x-auto doesn't clip it */}
-      {pickerCell && (() => {
-        const slot = new Date(pickerCell.slotStart)
-        const openWorkstations = stageWorkstations.filter((ws) =>
-          isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
-        )
-        if (openWorkstations.length === 0) return null
-        return (
-          <div
-            ref={pickerRef}
-            className="fixed w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-            style={{ top: pickerCell.anchorTop, left: pickerCell.anchorLeft, transform: 'translateY(calc(-100% - 4px))' }}
-          >
-            <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-              {t('scheduling.assignTo')}
-            </p>
-            {openWorkstations.map((ws) => {
-              const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
-              return (
-                <button
-                  key={ws.id}
-                  onClick={() => onCellClick(pickerCell.officialId, slot, ws)}
-                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="truncate">{ws.name}</span>
-                  <span className="ml-2 text-xs text-gray-400 tabular-nums shrink-0">{count}/{ws.capacity_ceiling}</span>
-                </button>
-              )
-            })}
-          </div>
-        )
-      })()}
+      {/* Work-area picker */}
+      {pickerCell &&
+        (() => {
+          const slot = new Date(pickerCell.slotStart)
+          const openWorkstations = stageWorkstations.filter((ws) =>
+            isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
+          )
+          if (openWorkstations.length === 0) return null
+          return (
+            <div
+              className="fixed w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50"
+              style={{
+                top: pickerCell.anchorTop,
+                left: pickerCell.anchorLeft,
+                transform: 'translateY(calc(-100% - 4px))',
+              }}
+              data-picker-cell
+            >
+              <div className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
+                {t('scheduling.assignTo')}
+              </div>
+              <ScrollShadow className="flex flex-col max-h-64">
+                {openWorkstations.map((ws) => {
+                  const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
+                  return (
+                    <Button
+                      key={ws.id}
+                      variant="light"
+                      size="sm"
+                      className="w-full justify-between rounded-none px-3"
+                      onPress={() => onCellClick(pickerCell.officialId, slot, ws)}
+                    >
+                      <span className="truncate">{ws.name}</span>
+                      <span className="ml-2 text-xs text-gray-400 tabular-nums shrink-0">
+                        {count}/{ws.capacity_ceiling}
+                      </span>
+                    </Button>
+                  )
+                })}
+              </ScrollShadow>
+            </div>
+          )
+        })()}
     </div>
   )
 }
@@ -1154,7 +1351,10 @@ function ByWorkAreaGrid({
           <span className="flex items-center gap-1.5">
             <span
               className="w-8 h-4 rounded-sm inline-block border border-gray-200"
-              style={{ background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)' }}
+              style={{
+                background:
+                  'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
+              }}
             />
             {t('scheduling.legendOutsideWindow')}
           </span>
@@ -1167,7 +1367,10 @@ function ByWorkAreaGrid({
               {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
-              <th key={slot.toISOString()} className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]">
+              <th
+                key={slot.toISOString()}
+                className="text-center px-1 py-3 text-xs font-medium text-gray-500 min-w-[80px]"
+              >
                 {formatSlotLabel(slot)}
               </th>
             ))}
@@ -1195,21 +1398,33 @@ function ByWorkAreaGrid({
                 <tr className="border-b border-gray-50">
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onToggleExpand(ws.id)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 shrink-0"
+                      <Button
+                        isIconOnly
+                        variant="light"
+                        size="sm"
+                        onPress={() => onToggleExpand(ws.id)}
                         aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        className="w-5 h-5 min-w-0 text-gray-400 shrink-0"
                       >
                         <svg
                           className={`w-4 h-4 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
                         </svg>
-                      </button>
+                      </Button>
                       <div>
                         <div className="text-sm font-medium text-gray-800">{ws.name}</div>
-                        <div className="text-xs text-gray-400">{t('workstations.upTo', { n: ws.capacity_ceiling })}</div>
+                        <div className="text-xs text-gray-400">
+                          {t('workstations.upTo', { n: ws.capacity_ceiling })}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -1217,7 +1432,11 @@ function ByWorkAreaGrid({
                     const slotStart = slot.toISOString()
                     const key = `${ws.id}:${slotStart}`
                     const count = countMap.get(key) ?? 0
-                    const inWindow = isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
+                    const inWindow = isWithinWindow(
+                      slot,
+                      granularityMin,
+                      ws.workstation_operating_windows
+                    )
                     const isOver = overCapacityCells.has(key)
 
                     if (!inWindow) {
@@ -1225,20 +1444,25 @@ function ByWorkAreaGrid({
                         <td key={slotStart} className="px-1 py-2">
                           <div
                             className="w-full h-10 rounded-md"
-                            style={{ background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)' }}
+                            style={{
+                              background:
+                                'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
+                            }}
                           />
                         </td>
                       )
                     }
                     return (
                       <td key={slotStart} className="px-1 py-2">
-                        <div className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-center ${
-                          isOver
-                            ? 'bg-orange-50 border border-orange-200 text-orange-700'
-                            : count === 0
-                            ? 'bg-white border border-gray-200 text-gray-400'
-                            : 'bg-gray-100 border border-gray-200 text-gray-700'
-                        }`}>
+                        <div
+                          className={`w-full rounded-md px-2 py-1.5 text-xs font-medium text-center ${
+                            isOver
+                              ? 'bg-orange-50 border border-orange-200 text-orange-700'
+                              : count === 0
+                                ? 'bg-white border border-gray-200 text-gray-400'
+                                : 'bg-gray-100 border border-gray-200 text-gray-700'
+                          }`}
+                        >
                           {count}/{ws.capacity_ceiling}
                           {isOver && (
                             <div className="text-[10px] font-normal text-orange-500 leading-none mt-0.5">
@@ -1252,53 +1476,68 @@ function ByWorkAreaGrid({
                 </tr>
 
                 {/* Numbered slot rows (visible when expanded) */}
-                {isExpanded && Array.from({ length: ws.capacity_ceiling }, (_, i) => i + 1).map((slotIdx) => (
-                  <tr key={`${ws.id}-slot-${slotIdx}`} className="border-b border-gray-50 bg-gray-50/40">
-                    <td className="pl-12 pr-3 py-1.5">
-                      <span className="text-xs text-gray-400 font-mono">#{slotIdx}</span>
-                    </td>
-                    {slots.map((slot) => {
-                      const slotStart = slot.toISOString()
-                      const inWindow = isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
-                      const assignment = slotIndexMap.get(`${ws.id}:${slotStart}:${slotIdx}`)
-                      const officialName = assignment ? (officialNameMap.get(assignment.official_id) ?? '—') : undefined
+                {isExpanded &&
+                  Array.from({ length: ws.capacity_ceiling }, (_, i) => i + 1).map((slotIdx) => (
+                    <tr
+                      key={`${ws.id}-slot-${slotIdx}`}
+                      className="border-b border-gray-50 bg-gray-50/40"
+                    >
+                      <td className="pl-12 pr-3 py-1.5">
+                        <span className="text-xs text-gray-400 font-mono">#{slotIdx}</span>
+                      </td>
+                      {slots.map((slot) => {
+                        const slotStart = slot.toISOString()
+                        const inWindow = isWithinWindow(
+                          slot,
+                          granularityMin,
+                          ws.workstation_operating_windows
+                        )
+                        const assignment = slotIndexMap.get(`${ws.id}:${slotStart}:${slotIdx}`)
+                        const officialName = assignment
+                          ? (officialNameMap.get(assignment.official_id) ?? '—')
+                          : undefined
 
-                      if (!inWindow) {
+                        if (!inWindow) {
+                          return (
+                            <td key={slotStart} className="px-1 py-1.5">
+                              <div
+                                className="w-full h-8 rounded-sm opacity-30"
+                                style={{
+                                  background:
+                                    'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
+                                }}
+                              />
+                            </td>
+                          )
+                        }
                         return (
                           <td key={slotStart} className="px-1 py-1.5">
-                            <div
-                              className="w-full h-8 rounded-sm opacity-30"
-                              style={{ background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)' }}
-                            />
+                            {assignment && officialName ? (
+                              <button
+                                onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
+                                className="w-full h-8 rounded-sm border px-2 text-left text-xs truncate transition-colors hover:brightness-95 bg-white border-gray-200 text-gray-700"
+                              >
+                                {officialName}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
+                                className="w-full h-8 rounded-sm border border-transparent hover:border-gray-200 hover:bg-white transition-colors"
+                              />
+                            )}
                           </td>
                         )
-                      }
-                      return (
-                        <td key={slotStart} className="px-1 py-1.5">
-                          {assignment && officialName ? (
-                            <button
-                              onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
-                              className="w-full h-8 rounded-sm border px-2 text-left text-xs truncate transition-colors hover:brightness-95 bg-white border-gray-200 text-gray-700"
-                            >
-                              {officialName}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
-                              className="w-full h-8 rounded-sm border border-transparent hover:border-gray-200 hover:bg-white transition-colors"
-                            />
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
+                      })}
+                    </tr>
+                  ))}
 
                 {/* Overflow row — assignments with slot_index > capacity_ceiling */}
                 {isExpanded && hasOverflow && (
                   <tr key={`${ws.id}-overflow`} className="border-b border-gray-50 bg-orange-50/20">
                     <td className="pl-12 pr-3 py-1.5">
-                      <span className="text-xs text-orange-500 font-medium">{t('scheduling.overflowRow')}</span>
+                      <span className="text-xs text-orange-500 font-medium">
+                        {t('scheduling.overflowRow')}
+                      </span>
                     </td>
                     {slots.map((slot) => {
                       const slotStart = slot.toISOString()

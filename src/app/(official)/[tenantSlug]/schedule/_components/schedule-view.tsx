@@ -1,6 +1,8 @@
 'use client'
 
+import { Button } from '@heroui/react';
 import { useEffect, useState } from 'react'
+
 
 type Todo = { id: string; instruction_text: string; position: number }
 type WorkstationRef = {
@@ -72,7 +74,7 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
       {assignments.map((a) => {
         const ws = a.workstations
         return (
-          <div key={a.id} className="flex items-start gap-3 py-3">
+          <div key={a.id} className="flex items-center gap-3 py-3">
             <span className="w-12 shrink-0 text-sm font-medium text-gray-500 pt-3">
               {formatTime(a.timeslot_start)}
             </span>
@@ -173,7 +175,7 @@ export function ScheduleView({ assignments, strings }: Props) {
 
       {/* View toggle */}
       <div className="flex rounded-xl border border-gray-200 overflow-hidden mb-6">
-        <button
+        <Button
           onClick={() => handleViewChange('time')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'time'
@@ -182,8 +184,8 @@ export function ScheduleView({ assignments, strings }: Props) {
           }`}
         >
           {strings.byTime}
-        </button>
-        <button
+        </Button>
+        <Button 
           onClick={() => handleViewChange('work-area')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'work-area'
@@ -192,7 +194,7 @@ export function ScheduleView({ assignments, strings }: Props) {
           }`}
         >
           {strings.byWorkstation}
-        </button>
+        </Button>
       </div>
 
       {/* Content */}

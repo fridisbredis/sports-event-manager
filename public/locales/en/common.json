@@ -31,10 +31,5 @@
     "loading": "Loading...",
     "error": "Error",
     "success": "Success"
-  },
-  "datePicker": {
-    "placeholder": "Select date & time",
-    "timeLabel": "Time",
-    "clear": "Clear"
   }
 }

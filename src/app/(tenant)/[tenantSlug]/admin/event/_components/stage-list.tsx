@@ -5,6 +5,8 @@ import type { StageInput } from '../actions'
 import StageModal from './stage-modal'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
+import { Button } from '@heroui/react'
+import { ChevronDown, ChevronRight } from '@gravity-ui/icons'
 
 interface Props {
   stages: StageInput[]
@@ -12,9 +14,36 @@ interface Props {
 }
 
 const DEFAULT_STAGES: StageInput[] = [
-  { name: 'Setup', stage_type: 'non_race', race_type: 'distance', start_time: null, end_time: null, venue: '', position: 0, distances: [] },
-  { name: 'Race', stage_type: 'race', race_type: 'distance', start_time: null, end_time: null, venue: '', position: 1, distances: [] },
-  { name: 'Teardown', stage_type: 'non_race', race_type: 'distance', start_time: null, end_time: null, venue: '', position: 2, distances: [] },
+  {
+    name: 'Setup',
+    stage_type: 'non_race',
+    race_type: 'distance',
+    start_time: null,
+    end_time: null,
+    venue: '',
+    position: 0,
+    distances: [],
+  },
+  {
+    name: 'Race',
+    stage_type: 'race',
+    race_type: 'distance',
+    start_time: null,
+    end_time: null,
+    venue: '',
+    position: 1,
+    distances: [],
+  },
+  {
+    name: 'Teardown',
+    stage_type: 'non_race',
+    race_type: 'distance',
+    start_time: null,
+    end_time: null,
+    venue: '',
+    position: 2,
+    distances: [],
+  },
 ]
 
 function sortStagesByStartTime(stages: StageInput[]): StageInput[] {
@@ -36,7 +65,10 @@ function formatTime(iso: string): string {
 
 function weekdayFromDateString(dateStr: string): string {
   // Append T00:00Z so the Date is parsed as UTC midnight, giving the correct weekday.
-  return new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+  return new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  })
 }
 
 function formatTimeRange(start: string | null, end: string | null): string {
@@ -112,9 +144,7 @@ export default function StageList({ stages, onChange }: Props) {
   }
 
   const editingStage =
-    modalTarget.index !== null && modalTarget.index >= 0
-      ? effectiveStages[modalTarget.index]
-      : null
+    modalTarget.index !== null && modalTarget.index >= 0 ? effectiveStages[modalTarget.index] : null
 
   return (
     <>
@@ -122,15 +152,16 @@ export default function StageList({ stages, onChange }: Props) {
         {/* Header row */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            {t('eventConfig.stagesLabel')} <span className="text-red-400">*</span>
+            {t('eventConfig.stagesLabel')}
+            <span className="text-red-400">*</span>
           </span>
-          <button
+          <Button
             type="button"
-            onClick={openAdd}
+            onPress={openAdd}
             className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-md px-3 py-1.5 bg-white hover:border-gray-300 transition-colors"
           >
             {t('eventConfig.addStage')}
-          </button>
+          </Button>
         </div>
 
         {/* Stage rows */}
@@ -141,16 +172,19 @@ export default function StageList({ stages, onChange }: Props) {
             return (
               <div key={i} className="bg-white">
                 {/* Collapsed row */}
-                <div className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-2 px-4 py-3 transition-colors">
                   {/* Expand toggle */}
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(i)}
-                    className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-sm font-medium"
-                    aria-label={isExpanded ? t('eventConfig.collapseStage') : t('eventConfig.expandStage')}
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="light"
+                    onPress={() => toggleExpand(i)}
+                    aria-label={
+                      isExpanded ? t('eventConfig.collapseStage') : t('eventConfig.expandStage')
+                    }
                   >
-                    {isExpanded ? '−' : '·'}
-                  </button>
+                    {isExpanded ? <ChevronDown /> : <ChevronRight />}
+                  </Button>
 
                   {/* Name */}
                   <span className="flex-1 text-sm font-medium text-gray-900 truncate min-w-0">
@@ -165,7 +199,9 @@ export default function StageList({ stages, onChange }: Props) {
                         : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
                     }`}
                   >
-                    {stage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}
+                    {stage.stage_type === 'race'
+                      ? t('eventConfig.stageTypeRace')
+                      : t('eventConfig.stageTypeNonRace')}
                   </span>
 
                   {/* Time range */}
@@ -175,44 +211,54 @@ export default function StageList({ stages, onChange }: Props) {
 
                   {/* Actions */}
                   <div className="shrink-0 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(i)}
-                      className="rounded px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                    >
+                    <Button size="sm" variant="light" onPress={() => openEdit(i)}>
                       {t('actions.edit')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      onClick={() => handleDelete(i)}
-                      disabled={isLastRace}
-                      title={isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')}
-                      className="rounded px-2 py-1 text-xs text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-300 disabled:hover:bg-transparent"
+                      size="sm"
+                      variant="light"
+                      color="danger"
+                      onPress={() => handleDelete(i)}
+                      isDisabled={isLastRace}
+                      title={
+                        isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')
+                      }
                     >
                       {t('actions.delete')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {/* Expanded details */}
                 {isExpanded && (
-                  <div className={`px-4 pb-3 ml-7 grid gap-6 w-1/2 ${stage.stage_type === 'race' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                  <div
+                    className={`px-4 pb-3 ml-7 grid gap-6 w-1/2 ${stage.stage_type === 'race' ? 'grid-cols-3' : 'grid-cols-1'}`}
+                  >
                     <div>
-                      <p className="text-xs font-medium text-gray-400 mb-0.5">{t('eventConfig.stageVenueLabel')}</p>
+                      <p className="text-xs font-medium text-gray-400 mb-0.5">
+                        {t('eventConfig.stageVenueLabel')}
+                      </p>
                       <p className="text-xs text-gray-700">{stage.venue || '–'}</p>
                     </div>
                     {stage.stage_type === 'race' && (
                       <>
                         <div>
                           <p className="text-xs font-medium text-gray-400 mb-0.5">
-                            {stage.race_type === 'time' ? t('eventConfig.categoryTimes') : t('eventConfig.categoryDistances')}
+                            {stage.race_type === 'time'
+                              ? t('eventConfig.categoryTimes')
+                              : t('eventConfig.categoryDistances')}
                           </p>
                           <p className="text-xs text-gray-700">
-                            {stage.distances.length > 0 ? stage.distances.map((d) => d.label).join(', ') : '–'}
+                            {stage.distances.length > 0
+                              ? stage.distances.map((d) => d.label).join(', ')
+                              : '–'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-gray-400 mb-0.5">{t('eventConfig.stageFormalStartEnd')}</p>
+                          <p className="text-xs font-medium text-gray-400 mb-0.5">
+                            {t('eventConfig.stageFormalStartEnd')}
+                          </p>
                           <p className="text-xs text-gray-700">
                             {stage.start_time
                               ? `${formatTime(stage.start_time)}${stage.end_time ? ` / ${formatTime(stage.end_time)}` : ''}`
@@ -232,18 +278,16 @@ export default function StageList({ stages, onChange }: Props) {
       {/* Inline Race stage validation */}
       {raceStageCount === 0 && (
         <p className="flex items-start gap-1.5 text-xs text-gray-500 mt-2">
-          <span className="shrink-0 mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-gray-400 text-[10px] font-bold leading-none">i</span>
+          <span className="shrink-0 mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-gray-400 text-[10px] font-bold leading-none">
+            i
+          </span>
           {t('eventConfig.noRaceStageWarning')}
         </p>
       )}
 
       {/* Modal */}
       {isModalOpen && (
-        <StageModal
-          stage={editingStage}
-          onSave={handleModalSave}
-          onClose={closeModal}
-        />
+        <StageModal stage={editingStage} onSave={handleModalSave} onClose={closeModal} />
       )}
 
       <ConfirmDialog

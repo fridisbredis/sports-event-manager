@@ -45,7 +45,7 @@ export default async function OfficialAccountPage({ params }: Props) {
   return (
     <div>
       <div className="px-5 pt-10 pb-2">
-        <h1 className="text-2xl font-bold text-gray-900">{t('account.title')}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('account.title')}</h1>
       </div>
       <AccountForm
         name={official.name}

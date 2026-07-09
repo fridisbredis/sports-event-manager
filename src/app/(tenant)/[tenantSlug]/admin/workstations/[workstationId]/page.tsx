@@ -27,8 +27,6 @@ export default async function EditWorkstationPage({ params }: Props) {
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const service = await createSupabaseServiceClient()
-
   const { data: event } = await supabase
     .from('events')
     .select('id')
