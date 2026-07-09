@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { BottomTabBar } from './_components/bottom-tab-bar'
+import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
   children: React.ReactNode
@@ -19,7 +20,7 @@ export default async function OfficialLayout({ children, params }: Props) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, slug')
+    .select('id, slug, color_palette')
     .eq('slug', tenantSlug)
     .single()
 
@@ -36,9 +37,12 @@ export default async function OfficialLayout({ children, params }: Props) {
   if (!roleRow) notFound()
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <div className="flex-1 pb-16">{children}</div>
-      <BottomTabBar tenantSlug={tenantSlug} />
-    </div>
+    <>
+      <TenantThemeStyle colorPalette={tenant.color_palette} />
+      <div className="flex flex-col min-h-screen bg-white">
+        <div className="flex-1 pb-16">{children}</div>
+        <BottomTabBar tenantSlug={tenantSlug} />
+      </div>
+    </>
   )
 }

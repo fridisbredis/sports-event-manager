@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 
 export interface StageInput {
   id?: string
@@ -181,4 +182,36 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
 
   const { data } = supabase.storage.from('logos').getPublicUrl(path)
   return { publicUrl: data.publicUrl }
+}
+
+export interface UpdateColorPaletteResult {
+  error?: string
+}
+
+export async function updateTenantColorPalette(
+  tenantSlug: string,
+  tenantId: string,
+  colorPalette: TenantPaletteKey
+): Promise<UpdateColorPaletteResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
+
+  if (!(colorPalette in TENANT_PALETTES)) return { error: 'Unknown color palette' }
+
+  const { error } = await supabase
+    .from('tenants')
+    .update({ color_palette: colorPalette })
+    .eq('id', tenantId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/${tenantSlug}`, 'layout')
+
+  return {}
 }

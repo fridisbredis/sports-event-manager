@@ -2,12 +2,20 @@
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
 import { Button, Input, Textarea, Select, SelectItem, Chip } from '@heroui/react'
-import { saveEvent, uploadEventLogo, type StageInput, type LabelInput, type SaveEventInput } from '../actions'
+import {
+  saveEvent,
+  uploadEventLogo,
+  updateTenantColorPalette,
+  type StageInput,
+  type LabelInput,
+  type SaveEventInput,
+} from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
+import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 
 interface Props {
   tenantSlug: string
@@ -18,6 +26,7 @@ interface Props {
   initialDescription: string
   initialLocation: string
   initialLogoUrl: string
+  initialColorPalette: string
   initialGranularity: number
   initialStages: StageInput[]
   initialFacilities: LabelInput[]
@@ -40,6 +49,7 @@ export default function EventConfigForm({
   initialDescription,
   initialLocation,
   initialLogoUrl,
+  initialColorPalette,
   initialGranularity,
   initialStages,
   initialFacilities,
@@ -54,6 +64,9 @@ export default function EventConfigForm({
   const location = initialLocation
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
+  const [colorPalette, setColorPalette] = useState(initialColorPalette)
+  const [isSavingPalette, startPaletteSave] = useTransition()
+  const [paletteError, setPaletteError] = useState<string | undefined>()
   const [granularity, setGranularity] = useState(initialGranularity)
   const [stages, setStages] = useState<StageInput[]>(initialStages)
   const [facilities, setFacilities] = useState<LabelInput[]>(initialFacilities)
@@ -121,6 +134,20 @@ export default function EventConfigForm({
       setSaveSuccess(false)
       markDirty()
     }
+  }
+
+  function handleColorPaletteSelect(key: TenantPaletteKey) {
+    if (key === colorPalette || isSavingPalette) return
+    const previous = colorPalette
+    setColorPalette(key)
+    setPaletteError(undefined)
+    startPaletteSave(async () => {
+      const result = await updateTenantColorPalette(tenantSlug, tenantId, key)
+      if (result.error) {
+        setColorPalette(previous)
+        setPaletteError(t('eventConfig.colorThemeError'))
+      }
+    })
   }
 
   function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -309,6 +336,53 @@ export default function EventConfigForm({
                   <p className="mt-1.5 text-xs text-red-500">{uploadError}</p>
                 )}
               </div>
+            </div>
+
+            {/* Color theme */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                {t('eventConfig.colorTheme')}
+              </label>
+              <div className="flex items-center gap-3">
+                {(Object.keys(TENANT_PALETTES) as TenantPaletteKey[]).map((key) => {
+                  const palette = TENANT_PALETTES[key]
+                  const isSelected = colorPalette === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleColorPaletteSelect(key)}
+                      disabled={isSavingPalette}
+                      aria-pressed={isSelected}
+                      aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
+                      className={`group flex flex-col items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors ${
+                        isSelected
+                          ? 'border-gray-900 bg-gray-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      } ${isSavingPalette ? 'opacity-60' : ''}`}
+                    >
+                      <div className="flex -space-x-1.5">
+                        <span
+                          className="h-5 w-5 rounded-full ring-2 ring-white"
+                          style={{ backgroundColor: `hsl(${palette.primary})` }}
+                        />
+                        <span
+                          className="h-5 w-5 rounded-full ring-2 ring-white"
+                          style={{ backgroundColor: `hsl(${palette.secondary})` }}
+                        />
+                        <span
+                          className="h-5 w-5 rounded-full ring-2 ring-white"
+                          style={{ backgroundColor: `hsl(${palette.accent})` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-500 group-hover:text-gray-700">
+                        {t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {paletteError && <p className="mt-1.5 text-xs text-red-500">{paletteError}</p>}
             </div>
 
             <Input

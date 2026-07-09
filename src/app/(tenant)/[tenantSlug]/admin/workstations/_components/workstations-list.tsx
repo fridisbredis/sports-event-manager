@@ -104,7 +104,18 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
   return (
     <div className="flex items-center gap-3 w-full">
       <span className="font-medium text-gray-900 text-sm">{stage.name}</span>
-      <Chip size="sm" color={stage.stage_type === 'race' ? 'primary' : 'default'} variant="flat">
+      <Chip
+        size="sm"
+        variant="flat"
+        style={
+          stage.stage_type === 'race'
+            ? {
+                color: 'hsl(var(--heroui-accent))',
+                backgroundColor: 'color-mix(in srgb, hsl(var(--heroui-accent)) 15%, white)',
+              }
+            : undefined
+        }
+      >
         {typeLabel}
       </Chip>
       {dateStr && <span className="text-xs text-gray-400">{dateStr}</span>}

@@ -19,7 +19,7 @@ export default async function EventConfigPage({ params }: Props) {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, name, slug, is_active')
+    .select('id, name, slug, is_active, color_palette')
     .eq('slug', tenantSlug)
     .single()
 
@@ -78,6 +78,7 @@ export default async function EventConfigPage({ params }: Props) {
         initialDescription={event.description ?? ''}
         initialLocation={event.location ?? ''}
         initialLogoUrl={event.logo_url ?? ''}
+        initialColorPalette={tenant.color_palette}
         initialGranularity={event.scheduling_granularity_min}
         initialStages={(stages ?? []).map((s, i) => ({
           id: s.id,

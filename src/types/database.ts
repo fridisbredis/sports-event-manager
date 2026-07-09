@@ -57,7 +57,7 @@ export type Database = {
           created_at: string
           id: string
           official_id: string
-          slot_index: number | null
+          slot_index: number
           status: string
           tenant_id: string
           timeslot_end: string
@@ -69,7 +69,7 @@ export type Database = {
           created_at?: string
           id?: string
           official_id: string
-          slot_index?: number | null
+          slot_index: number
           status?: string
           tenant_id: string
           timeslot_end: string
@@ -81,7 +81,7 @@ export type Database = {
           created_at?: string
           id?: string
           official_id?: string
-          slot_index?: number | null
+          slot_index?: number
           status?: string
           tenant_id?: string
           timeslot_end?: string
@@ -420,6 +420,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          color_palette: string
           created_at: string
           feature_flags: Json
           id: string
@@ -429,6 +430,7 @@ export type Database = {
           tier: string
         }
         Insert: {
+          color_palette?: string
           created_at?: string
           feature_flags?: Json
           id?: string
@@ -438,6 +440,7 @@ export type Database = {
           tier?: string
         }
         Update: {
+          color_palette?: string
           created_at?: string
           feature_flags?: Json
           id?: string
