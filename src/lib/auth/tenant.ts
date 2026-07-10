@@ -133,30 +133,27 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
 
   // Use service client to look up role — bypasses RLS, which is fine
   // because we're using user.id from the verified session, not from input.
+  // system_admin access is global — no per-tenant row required, same as hasAdminAccessToTenant.
   const service = await createSupabaseServiceClient()
-  const { data: roleRow, error } = await service
+  const { data: roleRows, error } = await service
     .from('user_roles')
-    .select('role')
+    .select('role, tenant_id')
     .eq('user_id', user.id)
-    .eq('tenant_id', tenantId)
-    .maybeSingle()
+    .or(`and(tenant_id.eq.${tenantId},role.in.(tenant_admin,system_admin)),role.eq.system_admin`)
 
   if (error) {
     console.error('Failed to fetch user role:', error)
     return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
   }
 
-  if (!roleRow) {
-    // User has no role in this tenant — could be a malicious cross-tenant attempt
-    // or just a stale UI. Either way, 403 is correct.
+  if (!roleRows || roleRows.length === 0) {
+    // User has no admin role in this tenant and isn't a system_admin —
+    // could be a malicious cross-tenant attempt or just a stale UI. Either way, 403 is correct.
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
 
-  const role = roleRow.role as TenantRole
-
-  if (role !== 'tenant_admin' && role !== 'system_admin') {
-    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-  }
+  const tenantRow = roleRows.find((r) => r.tenant_id === tenantId)
+  const role = (tenantRow?.role ?? roleRows[0].role) as TenantRole
 
   return { user, role }
 }
