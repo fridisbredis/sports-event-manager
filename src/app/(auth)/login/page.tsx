@@ -40,7 +40,13 @@ export default function LoginPage() {
       <h1 className="text-2xl font-semibold mb-6">{t('signIn.title')}</h1>
 
       {step === 'phone' ? (
-        <div className="space-y-4">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!loading && phone) sendOtp()
+          }}
+        >
           <Input
             type="tel"
             label={t('signIn.phoneLabel')}
@@ -49,17 +55,23 @@ export default function LoginPage() {
             onValueChange={setPhone}
           />
           <Button
+            type="submit"
             color="primary"
             className="w-full"
-            onPress={sendOtp}
             isLoading={loading}
             isDisabled={loading || !phone}
           >
             {loading ? t('signIn.requestingCode') : t('signIn.requestCodeButton')}
           </Button>
-        </div>
+        </form>
       ) : (
-        <div className="space-y-4">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!loading && otp.length === 6) verifyOtp()
+          }}
+        >
           <p className="text-sm text-default-500">{t('signIn.codeSentTo', { phone })}</p>
           <Input
             type="text"
@@ -70,18 +82,18 @@ export default function LoginPage() {
             onValueChange={setOtp}
           />
           <Button
+            type="submit"
             color="primary"
             className="w-full"
-            onPress={verifyOtp}
             isLoading={loading}
             isDisabled={loading || otp.length !== 6}
           >
             {loading ? t('signIn.verifying') : t('signIn.verifyButton')}
           </Button>
-          <Button variant="light" onPress={() => setStep('phone')} className="text-sm">
+          <Button type="button" variant="light" onPress={() => setStep('phone')} className="text-sm">
             {t('signIn.changeNumber')}
           </Button>
-        </div>
+        </form>
       )}
     </main>
   )
