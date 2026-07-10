@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { AnnouncementCard } from './_components/announcement-card'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -64,12 +65,9 @@ export default async function AnnouncementsPage({ params }: Props) {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('announcements.title')}</h1>
 
       {items.length > 0 ? (
-        <div className="divide-y divide-gray-100">
+        <div className="flex flex-col gap-3">
           {items.map((a) => (
-            <div key={a.id} className="py-4">
-              <p className="text-sm text-gray-500">{formatAnnouncementTime(a.published_at)}</p>
-              <p className="text-sm text-gray-900 leading-relaxed mt-1">{a.body}</p>
-            </div>
+            <AnnouncementCard key={a.id} time={formatAnnouncementTime(a.published_at)} body={a.body} />
           ))}
         </div>
       ) : (
