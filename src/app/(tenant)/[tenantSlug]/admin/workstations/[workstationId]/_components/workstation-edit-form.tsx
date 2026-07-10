@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from 'react'
 import { Button, Input, Textarea, Select, SelectItem, TimeInput } from '@heroui/react'
 import { Time } from '@internationalized/date'
 import { useTranslation } from '@/lib/i18n/client'
+import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import ConfirmDialog from '@/components/confirm-dialog'
@@ -40,7 +41,6 @@ function timeToHHMM(time: Time | null): string {
 interface FormErrors {
   name?: string
   windows?: Record<number, string>
-  general?: string
 }
 
 // Reconstruct per-window state from stored timestamps.
@@ -217,7 +217,7 @@ export default function WorkstationEditForm({
       })
 
       if (result.error) {
-        setErrors({ general: result.error })
+        toastError(result.error)
       } else {
         setSaveSuccess(true)
         markClean()
@@ -234,7 +234,7 @@ export default function WorkstationEditForm({
     startDelete(async () => {
       const result = await deleteWorkstation({ tenantSlug, tenantId, workstationId })
       if (result.error) {
-        setErrors({ general: result.error })
+        toastError(result.error)
       } else {
         markClean()
         guardedNavigate(`/${tenantSlug}/admin/workstations`)
@@ -292,10 +292,6 @@ export default function WorkstationEditForm({
           </Button>
         </div>
       </div>
-
-      {errors.general && (
-        <p className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{errors.general}</p>
-      )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
         {/* Left column */}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { setTenantActive, setTenantTier } from '../../actions'
+import { toastError } from '@/lib/toast'
 
 type Tier = 'standard' | 'premium' | 'professional'
 
@@ -24,7 +25,11 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
     setPendingActive(true)
     const next = !isActive
     const result = await setTenantActive(tenantId, next)
-    if (!result.error) setIsActive(next)
+    if (result.error) {
+      toastError(result.error)
+    } else {
+      setIsActive(next)
+    }
     setPendingActive(false)
   }
 
@@ -32,7 +37,11 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
     if (pendingTier || next === tier) return
     setPendingTier(true)
     const result = await setTenantTier(tenantId, next)
-    if (!result.error) setTier(next)
+    if (result.error) {
+      toastError(result.error)
+    } else {
+      setTier(next)
+    }
     setPendingTier(false)
   }
 

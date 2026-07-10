@@ -11,6 +11,7 @@ import {
   ModalBody,
   ModalFooter,
 } from '@heroui/react'
+import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
 
 interface Props {
@@ -127,7 +128,11 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tenantId, channel: targetChannel, body }),
         })
-        if (!res.ok) return false
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          toastError(extractErrorMessage(body, t('communication.publishError')))
+          return false
+        }
         const newEntry: Announcement = {
           id: crypto.randomUUID(),
           tenant_id: tenantId,
@@ -143,7 +148,7 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
         setPublishing(false)
       }
     },
-    [tenantId]
+    [tenantId, t]
   )
 
   const handlePublish = useCallback(async () => {

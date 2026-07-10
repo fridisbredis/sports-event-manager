@@ -185,7 +185,9 @@
     "added": "Official added",
     "empty": "No officials yet",
     "emptyHint": "Add officials and send them an SMS invite to join.",
-    "youLabel": "Event admin"
+    "youLabel": "Event admin",
+    "removeError": "Couldn't remove {{name}}. Try again.",
+    "resendError": "Couldn't resend the invite. Try again."
   },
   "scheduling": {
     "title": "Scheduling",
@@ -251,7 +253,8 @@
     "unsavedTitle": "Unsaved changes",
     "unsavedBody": "You have an unpublished announcement.",
     "discardAndContinue": "Discard and continue",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "publishError": "Couldn't publish the announcement. Try again."
   },
   "account": {
     "title": "Account",
@@ -268,7 +271,8 @@
     "viewSchedule": "View your schedule",
     "save": "Save",
     "saving": "Saving…",
-    "saved": "Saved"
+    "saved": "Saved",
+    "saveError": "Something went wrong. Please try again."
   },
   "systemAdmin": {
     "tenants": "Tenant Management",

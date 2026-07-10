@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button, Input } from '@heroui/react'
+import { toastError } from '@/lib/toast'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -15,14 +16,14 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function request(fn: () => Promise<{ error: { message: string } | null }>) {
     setLoading(true)
-    setError(null)
     const { error } = await fn()
     setLoading(false)
-    if (error) setError(error.message)
+    if (error) {
+      toastError(error.message)
+    }
     return !error
   }
 
@@ -82,8 +83,6 @@ export default function LoginPage() {
           </Button>
         </div>
       )}
-
-      {error && <p className="mt-4 text-sm text-danger">{error}</p>}
     </main>
   )
 }

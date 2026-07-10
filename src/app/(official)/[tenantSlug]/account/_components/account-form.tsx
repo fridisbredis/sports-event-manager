@@ -6,6 +6,7 @@ import { Button, Input, Switch } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
+import { toastError } from '@/lib/toast'
 
 interface AccountFormProps {
   name: string
@@ -34,7 +35,6 @@ export default function AccountForm({
   const [name, setName] = useState(initialName)
   const [smsOptOut, setSmsOptOut] = useState(initialSmsOptOut)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [error, setError] = useState<string | null>(null)
 
   function handleNameChange(value: string) {
     setName(value)
@@ -50,7 +50,6 @@ export default function AccountForm({
 
   async function handleSave() {
     setSaveState('saving')
-    setError(null)
 
     try {
       const res = await fetch('/api/account', {
@@ -67,7 +66,7 @@ export default function AccountForm({
       setSaveState('saved')
     } catch {
       setSaveState('idle')
-      setError('Something went wrong. Please try again.')
+      toastError(t('account.saveError'))
     }
   }
 
@@ -86,7 +85,6 @@ export default function AccountForm({
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-xl font-semibold text-gray-900">{t('account.title')}</h1>
           <div className="flex items-center gap-3">
-            {error && <span className="text-sm text-red-500">{error}</span>}
             <Button
               type="button"
               variant="bordered"
@@ -187,7 +185,6 @@ export default function AccountForm({
           </>
         )}
 
-        {!isDesktop && error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       </div>
 
       {/* Mobile: Save button fixed at bottom above tab bar */}

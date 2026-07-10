@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from '@heroui/react'
 import { createTenant } from '../actions'
 import { toSlug } from '../_utils'
+import { toastError } from '@/lib/toast'
 
 interface Props {
   open: boolean
@@ -25,6 +26,7 @@ export function CreateTenantModal({ open, onClose }: Props) {
     setPending(false)
     if (result.error) {
       setError(result.error)
+      toastError(result.error)
     } else {
       setName('')
       onClose()
@@ -44,7 +46,6 @@ export function CreateTenantModal({ open, onClose }: Props) {
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             autoFocus
             isInvalid={!!error}
-            errorMessage={error}
             description={
               slug ? (
                 <>

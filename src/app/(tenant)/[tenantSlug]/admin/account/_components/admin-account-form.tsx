@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
+import { toastError } from '@/lib/toast'
 
 interface AdminAccountFormProps {
   name: string
@@ -15,7 +16,6 @@ export default function AdminAccountForm({ name: initialName, phone, tenantId }:
 
   const [name, setName] = useState(initialName)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [error, setError] = useState<string | null>(null)
 
   function handleNameChange(value: string) {
     setName(value)
@@ -25,7 +25,6 @@ export default function AdminAccountForm({ name: initialName, phone, tenantId }:
 
   async function handleSave() {
     setSaveState('saving')
-    setError(null)
 
     try {
       const res = await fetch('/api/account', {
@@ -40,7 +39,7 @@ export default function AdminAccountForm({ name: initialName, phone, tenantId }:
       setSaveState('saved')
     } catch {
       setSaveState('idle')
-      setError('Något gick fel. Försök igen.')
+      toastError('Något gick fel. Försök igen.')
     }
   }
 
@@ -59,7 +58,6 @@ export default function AdminAccountForm({ name: initialName, phone, tenantId }:
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold text-gray-900">Account</h1>
         <div className="flex items-center gap-3">
-          {error && <span className="text-sm text-red-500">{error}</span>}
           <button
             type="button"
             onClick={handleSave}

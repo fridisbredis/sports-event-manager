@@ -19,6 +19,7 @@ import {
 } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
+import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Official } from '@/types/app'
 
 interface Props {
@@ -58,10 +59,14 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
         setPhone('')
         setAddModalOpen(false)
       } else if (res.status === 401) {
-        setAddError('Session expired — please refresh the page and try again.')
+        const message = 'Session expired — please refresh the page and try again.'
+        setAddError(message)
+        toastError(message)
       } else {
         const body = await res.json().catch(() => ({}))
-        setAddError(body?.error ?? `Error ${res.status}`)
+        const message = extractErrorMessage(body, `Error ${res.status}`)
+        setAddError(message)
+        toastError(message)
       }
     } finally {
       setPending(false)
@@ -78,6 +83,8 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
       if (res.ok) {
         setOfficials((prev) => prev.filter((o) => o.id !== removeTarget.id))
         setRemoveTarget(null)
+      } else {
+        toastError(t('officials.removeError', { name: removeTarget.name }))
       }
     } finally {
       setPending(false)
@@ -87,11 +94,14 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
   async function handleResend(official: Official) {
     setResendingId(official.id)
     try {
-      await fetch(`/api/officials/${official.id}/resend`, {
+      const res = await fetch(`/api/officials/${official.id}/resend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId }),
       })
+      if (!res.ok) {
+        toastError(t('officials.resendError'))
+      }
     } finally {
       setResendingId(null)
     }

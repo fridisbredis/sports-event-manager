@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
+import { toastError } from '@/lib/toast'
 
 type Step = 'fill-form' | 'verify-otp' | 'confirming' | 'success' | 'invalid'
 
@@ -23,16 +24,14 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   const [available, setAvailable] = useState(false)
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function handleConfirmAvailability() {
     if (!available || !initialPhone) return
     setLoading(true)
-    setError(null)
     const { error } = await supabase.auth.signInWithOtp({ phone: initialPhone })
     setLoading(false)
     if (error) {
-      setError(error.message)
+      toastError(error.message)
     } else {
       setStep('verify-otp')
     }
@@ -41,7 +40,6 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   async function handleVerifyOtp() {
     if (!initialPhone) return
     setLoading(true)
-    setError(null)
     const { data, error } = await supabase.auth.verifyOtp({
       phone: initialPhone,
       token: otp,
@@ -49,7 +47,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
     })
     if (error) {
       setLoading(false)
-      setError(t('confirmation.invalidCode'))
+      toastError(t('confirmation.invalidCode'))
       return
     }
 
@@ -139,7 +137,6 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
               placeholder="000000"
             />
           </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
         <div className="pb-8">
           <button
@@ -221,8 +218,6 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             {t('confirmation.notificationsInfo')}
           </p>
         </div>
-
-        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       </div>
 
       <div className="pb-8 pt-6">

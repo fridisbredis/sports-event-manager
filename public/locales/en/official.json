@@ -65,6 +65,7 @@
     "viewSchedule": "View your schedule",
     "save": "Save",
     "saving": "Saving…",
-    "saved": "Saved"
+    "saved": "Saved",
+    "saveError": "Something went wrong. Please try again."
   }
 }

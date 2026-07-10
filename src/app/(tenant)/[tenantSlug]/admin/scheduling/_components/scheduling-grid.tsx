@@ -19,6 +19,7 @@ import {
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
 import { useTranslation } from '@/lib/i18n/client'
+import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 
@@ -183,7 +184,6 @@ export function SchedulingGrid({
   )
   const [deletions, setDeletions] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
   // By-person work-area picker
@@ -521,7 +521,6 @@ export function SchedulingGrid({
 
   async function handleSave() {
     setSaving(true)
-    setSaveError(null)
     setSaveSuccess(false)
 
     const additions: AssignmentInput[] = assignments
@@ -547,7 +546,7 @@ export function SchedulingGrid({
     )
 
     if (result.error) {
-      setSaveError(result.error)
+      toastError(result.error)
     } else {
       setSaveSuccess(true)
       markClean()
@@ -687,12 +686,6 @@ export function SchedulingGrid({
           {saveSuccess ? t('scheduling.saved') : t('scheduling.save')}
         </Button>
       </div>
-
-      {saveError && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-          {saveError}
-        </div>
-      )}
 
       {/* Conflict banners */}
       {overCapacityCount > 0 && (

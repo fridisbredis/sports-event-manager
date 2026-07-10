@@ -12,6 +12,7 @@ import {
 } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
+import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
@@ -36,8 +37,6 @@ interface Props {
 interface FormErrors {
   name?: string
   stages?: string
-  general?: string
-  publish?: string
 }
 
 export default function EventConfigForm({
@@ -127,6 +126,7 @@ export default function EventConfigForm({
 
     if (result.error) {
       setUploadError(result.error)
+      toastError(result.error)
       if (fileInputRef.current) fileInputRef.current.value = ''
     } else if (result.publicUrl) {
       setLogoUrl(result.publicUrl)
@@ -146,6 +146,7 @@ export default function EventConfigForm({
       if (result.error) {
         setColorPalette(previous)
         setPaletteError(t('eventConfig.colorThemeError'))
+        toastError(t('eventConfig.colorThemeError'))
       }
     })
   }
@@ -191,7 +192,7 @@ export default function EventConfigForm({
     startSave(async () => {
       const result = await saveEvent(buildInput())
       if (result.error) {
-        setErrors({ general: result.error })
+        toastError(result.error)
       } else {
         setSaveSuccess(true)
         markClean()
@@ -208,11 +209,10 @@ export default function EventConfigForm({
       setErrors(errs)
       return
     }
-    setErrors((prev) => ({ ...prev, publish: undefined }))
     startPublish(async () => {
       const result = await publishEvent({ tenantSlug, tenantId, eventId })
       if (result.error) {
-        setErrors((prev) => ({ ...prev, publish: result.error }))
+        toastError(result.error)
       }
     })
   }
@@ -233,7 +233,6 @@ export default function EventConfigForm({
           </Chip>
         </div>
         <div className="flex items-center gap-3">
-          {errors.general && <span className="text-sm text-red-500">{errors.general}</span>}
           <Button
             variant="bordered"
             onPress={handleSave}
@@ -261,12 +260,6 @@ export default function EventConfigForm({
           )}
         </div>
       </div>
-
-      {errors.publish && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errors.publish}
-        </div>
-      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-[2fr_3fr] gap-10">

@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
+import { toastError } from '@/lib/toast'
 import { createWorkstation } from '../../actions'
 import { type Stage, type TimeWindow, getStageDays, expandWindows } from '../../_utils'
 
@@ -17,7 +18,6 @@ interface Props {
 interface FormErrors {
   name?: string
   windows?: Record<number, string>
-  general?: string
 }
 
 export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages, preselectedStage }: Props) {
@@ -126,7 +126,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
       })
 
       if (result.error) {
-        setErrors({ general: result.error })
+        toastError(result.error)
       } else {
         setSaveSuccess(true)
         router.push(`/${tenantSlug}/admin/workstations`)
@@ -165,10 +165,6 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
           {isSaving ? t('workstations.saving') : saveSuccess ? t('workstations.saved') : t('workstations.save')}
         </button>
       </div>
-
-      {errors.general && (
-        <p className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{errors.general}</p>
-      )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
         {/* Left column */}
