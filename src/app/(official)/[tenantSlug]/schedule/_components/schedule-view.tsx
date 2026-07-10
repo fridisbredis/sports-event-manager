@@ -179,7 +179,7 @@ export function ScheduleView({ assignments, strings }: Props) {
           onClick={() => handleViewChange('time')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'time'
-              ? 'bg-gray-900 text-white'
+              ? 'bg-primary text-primary-foreground'
               : 'bg-white text-gray-700 hover:bg-gray-50'
           }`}
         >
@@ -189,7 +189,7 @@ export function ScheduleView({ assignments, strings }: Props) {
           onClick={() => handleViewChange('work-area')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'work-area'
-              ? 'bg-gray-900 text-white'
+              ? 'bg-primary text-primary-foreground'
               : 'bg-white text-gray-700 hover:bg-gray-50'
           }`}
         >

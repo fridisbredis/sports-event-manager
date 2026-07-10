@@ -1,7 +1,10 @@
 import { redirect, notFound } from 'next/navigation'
-import Image from 'next/image'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { EventHeaderCard } from './_components/event-header-card'
+import { StageCard } from './_components/stage-card'
+import { FacilityChips } from './_components/facility-chips'
+import { SectionLabel } from './_components/section-label'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -24,28 +27,6 @@ function formatTime(ts: string | null): string {
     minute: '2-digit',
     timeZone: 'UTC',
   })
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">
-      {children}
-    </p>
-  )
-}
-
-function LogoPlaceholder({ size }: { size: number }) {
-  return (
-    <div
-      style={{ width: size, height: size }}
-      className="shrink-0 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center"
-    >
-      <svg viewBox="0 0 24 24" className="w-1/2 h-1/2 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M3 21L21 3" />
-        <rect x="3" y="3" width="18" height="18" rx="1" />
-      </svg>
-    </div>
-  )
 }
 
 export default async function EventInfoPage({ params }: Props) {
@@ -89,95 +70,45 @@ export default async function EventInfoPage({ params }: Props) {
 
   const stageList = stages ?? []
   const facilityList = facilities ?? []
-  const stagesWithVenue = stageList.filter((s) => s.venue)
 
   return (
     <div className="px-5 pt-10 pb-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('eventInfo.title')}</h1>
 
-      {/* Identity */}
-      <div className="mb-8">
-        <div className="flex items-start gap-4 mb-3">
-          {event?.logo_url ? (
-            <Image
-              src={event.logo_url}
-              alt={event.name}
-              width={72}
-              height={72}
-              className="rounded-lg object-cover shrink-0"
-            />
-          ) : (
-            <LogoPlaceholder size={72} />
-          )}
-          <div className="min-w-0">
-            <p className="text-lg font-bold text-gray-900 leading-snug">{event?.name ?? '—'}</p>
-            <p className="text-sm text-gray-500 mt-0.5">{event?.event_type ?? ''}</p>
-          </div>
-        </div>
-        {event?.description ? (
-          <p className="text-sm text-gray-600 leading-relaxed">{event.description}</p>
-        ) : null}
-      </div>
+      <EventHeaderCard
+        name={event?.name ?? '—'}
+        eventType={event?.event_type ?? ''}
+        logoUrl={event?.logo_url ?? null}
+        description={event?.description ?? null}
+      />
 
-      {/* Dates by stage */}
-      {stageList.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.datesByStage')}</SectionLabel>
-          <div className="flex flex-col gap-1.5">
-            {stageList.map((stage) => (
-              <p key={stage.id} className="text-sm text-gray-900">
-                Stage {stage.position + 1} · {stage.name}
-                {stage.start_time ? ` — ${formatDate(stage.start_time)}` : ''}
-              </p>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Location & venue per stage */}
-      {stagesWithVenue.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.locationAndVenue')}</SectionLabel>
-          <div className="flex items-start gap-4">
-            <LogoPlaceholder size={120} />
-            <div className="flex flex-col gap-1.5 pt-1">
-              {stagesWithVenue.map((stage) => (
-                <p key={stage.id} className="text-sm text-gray-900">
-                  Stage {stage.position + 1} · {stage.venue}
-                </p>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Facilities */}
-      {facilityList.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
-          <p className="text-sm text-gray-900">
-            {facilityList.map((f) => f.label).join(' · ')}
-          </p>
-        </div>
-      ) : null}
-
-      {/* Event programme by stage */}
       {stageList.length > 0 ? (
         <div className="mb-8">
           <SectionLabel>{t('eventInfo.programme')}</SectionLabel>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-3">
             {stageList.map((stage) => {
-              const start = formatTime(stage.start_time)
-              const end = formatTime(stage.end_time)
-              const times = [start, end].filter(Boolean).join(' – ')
+              const timeRange = [formatTime(stage.start_time), formatTime(stage.end_time)]
+                .filter(Boolean)
+                .join(' – ')
               return (
-                <p key={stage.id} className="text-sm text-gray-900">
-                  Stage {stage.position + 1} · {stage.name}
-                  {times ? ` · ${times}` : ''}
-                </p>
+                <StageCard
+                  key={stage.id}
+                  stageNumber={stage.position + 1}
+                  name={stage.name}
+                  date={formatDate(stage.start_time)}
+                  timeRange={timeRange}
+                  venue={stage.venue}
+                />
               )
             })}
           </div>
+        </div>
+      ) : null}
+
+      {facilityList.length > 0 ? (
+        <div className="mb-8">
+          <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
+          <FacilityChips facilities={facilityList} />
         </div>
       ) : null}
     </div>

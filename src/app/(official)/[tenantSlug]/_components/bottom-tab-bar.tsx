@@ -91,7 +91,7 @@ export function BottomTabBar({ tenantSlug }: Props) {
               key={href}
               href={href}
               className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-medium transition-colors ${
-                active ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'
+                active ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               <Icon filled={active} />
