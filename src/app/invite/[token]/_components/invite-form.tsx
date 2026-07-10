@@ -74,14 +74,14 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
 
   if (step === 'invalid') {
     return (
-      <main className="flex flex-col min-h-screen max-w-sm mx-auto px-6">
-        <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
+      <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
+        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center text-center py-16">
           <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gray-300">
             <span className="text-2xl text-gray-400">!</span>
           </div>
           <p className="text-base font-semibold text-gray-900">{t('confirmation.invalidTitle')}</p>
         </div>
-        <div className="pb-8">
+        <div className="pb-8 shrink-0">
           <button
             onClick={() => router.push('/login')}
             className="w-full rounded-xl bg-gray-100 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
@@ -95,8 +95,8 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
 
   if (step === 'success') {
     return (
-      <main className="flex flex-col min-h-screen max-w-sm mx-auto px-6">
-        <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
+      <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
+        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center text-center py-16">
           <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gray-700">
             <svg className="h-8 w-8 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -104,7 +104,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
           </div>
           <p className="text-base font-semibold text-gray-900">{t('confirmation.successTitle')}</p>
         </div>
-        <div className="pb-8">
+        <div className="pb-8 shrink-0">
           <button
             onClick={() => router.push('/')}
             className="w-full rounded-xl bg-gray-900 py-4 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
@@ -118,8 +118,8 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
 
   if (step === 'verify-otp') {
     return (
-      <main className="flex flex-col min-h-screen max-w-sm mx-auto px-6">
-        <div className="flex-1 pt-12">
+      <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
+        <div className="flex-1 overflow-y-auto pt-12">
           <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
           <hr className="border-dashed border-gray-200 mb-8" />
           <p className="text-sm text-gray-500 mb-6">{t('signIn.codeSentTo', { phone: initialPhone })}</p>
@@ -138,7 +138,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             />
           </div>
         </div>
-        <div className="pb-8">
+        <div className="pb-8 shrink-0">
           <button
             onClick={handleVerifyOtp}
             disabled={loading || otp.length !== 6}
@@ -153,8 +153,8 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
 
   // fill-form state
   return (
-    <main className="flex flex-col min-h-screen max-w-sm mx-auto px-6">
-      <div className="flex-1 pt-12">
+    <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
+      <div className="flex-1 overflow-y-auto pt-12">
         <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
         <hr className="border-dashed border-gray-200 mb-8" />
 
@@ -220,7 +220,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
         </div>
       </div>
 
-      <div className="pb-8 pt-6">
+      <div className="pb-8 pt-6 shrink-0">
         <button
           onClick={handleConfirmAvailability}
           disabled={!available || !name.trim() || loading}
