@@ -12,6 +12,18 @@ export interface TimeWindow {
   limitToDay: string | null
 }
 
+// Duration in minutes between two "HH:MM" wall-clock times, treating end <= start
+// as rolling over to the next day (matches the overnight handling in expandWindows).
+export function windowDurationMin(start: string, end: string): number {
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number)
+    return h * 60 + m
+  }
+  const startMin = toMinutes(start)
+  const endMin = toMinutes(end)
+  return endMin <= startMin ? endMin + 24 * 60 - startMin : endMin - startMin
+}
+
 export function getStageDays(stage: Stage | null): string[] {
   if (!stage?.start_time || !stage?.end_time) return []
   const daySet = new Set<string>()

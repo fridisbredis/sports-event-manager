@@ -9,7 +9,7 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { updateWorkstation, deleteWorkstation } from '../../actions'
-import { type Stage, type TimeWindow, getStageDays, expandWindows } from '../../_utils'
+import { type Stage, type TimeWindow, getStageDays, expandWindows, windowDurationMin } from '../../_utils'
 
 interface Props {
   tenantSlug: string
@@ -22,6 +22,7 @@ interface Props {
   initialCapacity: number
   initialWindows: { window_start: string; window_end: string }[]
   initialTodos: string[]
+  schedulingGranularityMin: number
 }
 
 // Windows are stored and compared as plain "HH:MM" wall-clock strings with no
@@ -100,6 +101,7 @@ export default function WorkstationEditForm({
   initialCapacity,
   initialWindows,
   initialTodos,
+  schedulingGranularityMin,
 }: Props) {
   const { t } = useTranslation('admin')
   const { markDirty, markClean, guardedNavigate, dialogProps } = useUnsavedChanges()
@@ -189,6 +191,8 @@ export default function WorkstationEditForm({
         windowErrors[i] = t('workstations.windowBeforeStageStart', { time: stageStartHHMM })
       } else if (onLastDay && stageEndHHMM && w.end > stageEndHHMM) {
         windowErrors[i] = t('workstations.windowAfterStageEnd', { time: stageEndHHMM })
+      } else if (windowDurationMin(w.start, w.end) < schedulingGranularityMin) {
+        windowErrors[i] = t('workstations.windowTooShort', { minutes: schedulingGranularityMin })
       }
     })
     if (Object.keys(windowErrors).length > 0) newErrors.windows = windowErrors
@@ -214,6 +218,7 @@ export default function WorkstationEditForm({
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
         todos: todos.filter((item) => item.trim()),
+        schedulingGranularityMin,
       })
 
       if (result.error) {
@@ -419,7 +424,7 @@ export default function WorkstationEditForm({
                           aria-label={t('workstations.limitToOneDay')}
                         >
                           {stageDays.map((day) => (
-                            <SelectItem key={day}>{day}</SelectItem>
+                            <SelectItem key={day} textValue={day}>{day}</SelectItem>
                           ))}
                         </Select>
                       )}

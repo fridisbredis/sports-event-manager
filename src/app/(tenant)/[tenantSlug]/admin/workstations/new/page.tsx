@@ -33,7 +33,7 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
 
   const { data: event } = await supabase
     .from('events')
-    .select('id')
+    .select('id, scheduling_granularity_min')
     .eq('tenant_id', tenant.id)
     .maybeSingle()
 
@@ -56,6 +56,7 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
         eventId={event.id}
         stages={stages ?? []}
         preselectedStage={preselectedStage}
+        schedulingGranularityMin={event.scheduling_granularity_min}
       />
     </div>
   )

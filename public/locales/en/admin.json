@@ -147,6 +147,7 @@
     "windowEndRequired": "End time is required.",
     "windowBeforeStageStart": "Start time must be {{time}} or later on this day.",
     "windowAfterStageEnd": "End time must be {{time}} or earlier on this day.",
+    "windowTooShort": "Window must be at least {{minutes}} minutes (scheduling granularity).",
     "repeatDaily": "Repeat daily",
     "repeatsAcross": "Repeats across {{count}} days: {{days}}",
     "noDatesForRecurrence": "Set stage dates to enable repeat",

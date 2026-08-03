@@ -21,6 +21,17 @@ export interface CreateWorkstationInput {
   recurring: boolean
   windows: WindowInput[]
   todos: string[]
+  schedulingGranularityMin: number
+}
+
+function findWindowShorterThanGranularity(
+  windows: WindowInput[],
+  schedulingGranularityMin: number
+): boolean {
+  return windows.some((w) => {
+    const durationMin = (new Date(w.window_end).getTime() - new Date(w.window_start).getTime()) / 60_000
+    return durationMin < schedulingGranularityMin
+  })
 }
 
 export interface CreateWorkstationResult {
@@ -38,6 +49,11 @@ export async function createWorkstation(
   if (!user) redirect('/login')
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+
+  const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
+  if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
+    return { error: 'Operating window is shorter than the scheduling granularity' }
+  }
 
   const service = await createSupabaseServiceClient()
 
@@ -57,7 +73,6 @@ export async function createWorkstation(
 
   if (wsError || !ws) return { error: wsError?.message ?? 'Failed to create work area' }
 
-  const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
   if (validWindows.length > 0) {
     const { error: winError } = await supabase.from('workstation_operating_windows').insert(
       validWindows.map((w) => ({
@@ -97,6 +112,7 @@ export interface UpdateWorkstationInput {
   recurring: boolean
   windows: WindowInput[]
   todos: string[]
+  schedulingGranularityMin: number
 }
 
 export interface UpdateWorkstationResult {
@@ -114,6 +130,11 @@ export async function updateWorkstation(
   if (!user) redirect('/login')
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+
+  const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
+  if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
+    return { error: 'Operating window is shorter than the scheduling granularity' }
+  }
 
   const service = await createSupabaseServiceClient()
 
@@ -138,7 +159,6 @@ export async function updateWorkstation(
 
   if (delWinError) return { error: delWinError.message }
 
-  const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
   if (validWindows.length > 0) {
     const { error: winError } = await supabase.from('workstation_operating_windows').insert(
       validWindows.map((w) => ({

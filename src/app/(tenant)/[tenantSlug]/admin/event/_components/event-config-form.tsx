@@ -459,10 +459,10 @@ export default function EventConfigForm({
                       setSaveSuccess(false); markDirty()
                     }}
                   >
-                    <SelectItem key="30">{t('eventConfig.granularity30min')}</SelectItem>
-                    <SelectItem key="60">{t('eventConfig.granularity60min')}</SelectItem>
-                    <SelectItem key="90">{t('eventConfig.granularity90min')}</SelectItem>
-                    <SelectItem key="120">{t('eventConfig.granularity120min')}</SelectItem>
+                    <SelectItem key="30" textValue={t('eventConfig.granularity30min')}>{t('eventConfig.granularity30min')}</SelectItem>
+                    <SelectItem key="60" textValue={t('eventConfig.granularity60min')}>{t('eventConfig.granularity60min')}</SelectItem>
+                    <SelectItem key="90" textValue={t('eventConfig.granularity90min')}>{t('eventConfig.granularity90min')}</SelectItem>
+                    <SelectItem key="120" textValue={t('eventConfig.granularity120min')}>{t('eventConfig.granularity120min')}</SelectItem>
                   </Select>
                 </div>
               </>

@@ -29,7 +29,7 @@ export default async function EditWorkstationPage({ params }: Props) {
 
   const { data: event } = await supabase
     .from('events')
-    .select('id')
+    .select('id, scheduling_granularity_min')
     .eq('tenant_id', tenant.id)
     .maybeSingle()
 
@@ -72,6 +72,7 @@ export default async function EditWorkstationPage({ params }: Props) {
           window_end: w.window_end,
         }))}
         initialTodos={sortedTodos.map((t) => t.instruction_text)}
+        schedulingGranularityMin={event.scheduling_granularity_min}
       />
     </div>
   )

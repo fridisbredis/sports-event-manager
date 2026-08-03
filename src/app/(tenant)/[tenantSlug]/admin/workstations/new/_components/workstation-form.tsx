@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 import { createWorkstation } from '../../actions'
-import { type Stage, type TimeWindow, getStageDays, expandWindows } from '../../_utils'
+import { type Stage, type TimeWindow, getStageDays, expandWindows, windowDurationMin } from '../../_utils'
 
 interface Props {
   tenantSlug: string
@@ -13,6 +13,7 @@ interface Props {
   eventId: string
   stages: Stage[]
   preselectedStage: Stage | null
+  schedulingGranularityMin: number
 }
 
 interface FormErrors {
@@ -20,7 +21,7 @@ interface FormErrors {
   windows?: Record<number, string>
 }
 
-export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages, preselectedStage }: Props) {
+export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages, preselectedStage, schedulingGranularityMin }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
 
@@ -98,6 +99,8 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
         windowErrors[i] = t('workstations.windowBeforeStageStart', { time: stageStartHHMM })
       } else if (onLastDay && stageEndHHMM && w.end > stageEndHHMM) {
         windowErrors[i] = t('workstations.windowAfterStageEnd', { time: stageEndHHMM })
+      } else if (windowDurationMin(w.start, w.end) < schedulingGranularityMin) {
+        windowErrors[i] = t('workstations.windowTooShort', { minutes: schedulingGranularityMin })
       }
     })
     if (Object.keys(windowErrors).length > 0) newErrors.windows = windowErrors
@@ -123,6 +126,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
         todos: todos.filter((t) => t.trim()),
+        schedulingGranularityMin,
       })
 
       if (result.error) {
