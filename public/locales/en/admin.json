@@ -129,6 +129,7 @@
     "descriptionLabel": "Description",
     "stageLabel": "Stage",
     "operatingWindowsLabel": "Operating windows",
+    "operatingWindowMidnightHint": "To run until midnight, set the end time to 00:00 — it will roll over into the next day.",
     "addWindow": "+ Add window",
     "removeWindow": "Remove",
     "capacityLabel": "Maximum officials at once",

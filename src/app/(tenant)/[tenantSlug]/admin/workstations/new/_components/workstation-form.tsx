@@ -228,6 +228,9 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages,
             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
               {t('workstations.operatingWindowsLabel')}
             </h2>
+            <p className="mb-3 text-xs text-gray-400">
+              {t('workstations.operatingWindowMidnightHint')}
+            </p>
             <div className="space-y-3">
               {windows.map((w, i) => (
                 <div key={i} className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}>

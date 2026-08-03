@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
-import { Button, Input, Textarea, Select, SelectItem, TimeInput } from '@heroui/react'
+import { Button, Input, Textarea, Select, SelectItem, TimeInput, Checkbox } from '@heroui/react'
 import { Time } from '@internationalized/date'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
@@ -345,6 +345,9 @@ export default function WorkstationEditForm({
             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
               {t('workstations.operatingWindowsLabel')}
             </h2>
+            <p className="mb-3 text-xs text-gray-400">
+              {t('workstations.operatingWindowMidnightHint')}
+            </p>
             <div className="space-y-3">
               {windows.map((w, i) => (
                 <div key={i} className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}>
@@ -390,26 +393,25 @@ export default function WorkstationEditForm({
                   )}
                   {isMultiDay && (
                     <div className="mt-2.5 space-y-2">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-600 select-none">
-                        <Input
-                          type="checkbox"
-                          checked={w.limitToDay !== null}
-                          onChange={() => {
-                            setWindows((prev) =>
-                              prev.map((win, j) =>
-                                j === i
-                                  ? win.limitToDay !== null
-                                    ? { ...win, limitToDay: null }
-                                    : clampToDay(win, stageDays[0])
-                                  : win
-                              )
+                      <Checkbox
+                        isSelected={w.limitToDay !== null}
+                        onValueChange={() => {
+                          setWindows((prev) =>
+                            prev.map((win, j) =>
+                              j === i
+                                ? win.limitToDay !== null
+                                  ? { ...win, limitToDay: null }
+                                  : clampToDay(win, stageDays[0])
+                                : win
                             )
-                            markDirty()
-                          }}
-                          className="h-4 w-4 rounded border-gray-300 text-gray-900"
-                        />
+                          )
+                          markDirty()
+                        }}
+                        size="sm"
+                        classNames={{ label: 'text-sm text-gray-600' }}
+                      >
                         {t('workstations.limitToOneDay')}
-                      </label>
+                      </Checkbox>
                       {w.limitToDay !== null && (
                         <Select
                           selectedKeys={[w.limitToDay]}
