@@ -43,6 +43,33 @@ function formatTime(ts: string): string {
   })
 }
 
+function formatDayHeader(ts: string): string {
+  return new Date(ts).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  })
+}
+
+function dayKey(ts: string): string {
+  return ts.slice(0, 10) // YYYY-MM-DD, UTC
+}
+
+function groupByDay(assignments: AssignmentRow[]) {
+  const groups: { key: string; label: string; rows: AssignmentRow[] }[] = []
+  for (const a of assignments) {
+    const key = dayKey(a.timeslot_start)
+    const last = groups[groups.length - 1]
+    if (last?.key === key) {
+      last.rows.push(a)
+    } else {
+      groups.push({ key, label: formatDayHeader(a.timeslot_start), rows: [a] })
+    }
+  }
+  return groups
+}
+
 function EmptyState({ strings }: { strings: Strings }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
@@ -69,24 +96,34 @@ function EmptyState({ strings }: { strings: Strings }) {
 }
 
 function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
+  const groups = groupByDay(assignments)
   return (
-    <div className="flex flex-col gap-0">
-      {assignments.map((a) => {
-        const ws = a.workstations
-        return (
-          <div key={a.id} className="flex items-center gap-3 py-3">
-            <span className="w-12 shrink-0 text-sm font-medium text-gray-500 pt-3">
-              {formatTime(a.timeslot_start)}
-            </span>
-            <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white px-4 py-3">
-              <p className="text-sm font-semibold text-gray-900">{ws?.name ?? '—'}</p>
-              {ws?.description ? (
-                <p className="text-xs text-gray-500 mt-0.5">{ws.description}</p>
-              ) : null}
-            </div>
+    <div className="flex flex-col gap-6">
+      {groups.map((group) => (
+        <div key={group.key}>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            {group.label}
+          </p>
+          <div className="flex flex-col gap-0">
+            {group.rows.map((a) => {
+              const ws = a.workstations
+              return (
+                <div key={a.id} className="flex items-center gap-3 py-3">
+                  <span className="w-12 shrink-0 text-sm font-medium text-gray-500 pt-3">
+                    {formatTime(a.timeslot_start)}
+                  </span>
+                  <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <p className="text-sm font-semibold text-gray-900">{ws?.name ?? '—'}</p>
+                    {ws?.description ? (
+                      <p className="text-xs text-gray-500 mt-0.5">{ws.description}</p>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        )
-      })}
+        </div>
+      ))}
     </div>
   )
 }
@@ -123,15 +160,20 @@ function WorkAreaView({ assignments }: { assignments: AssignmentRow[] }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {groups.map(({ ws }) => {
+      {groups.map(({ ws, rows }) => {
         const sortedTodos = [...ws.workstation_todos].sort((a, b) => a.position - b.position)
         return (
           <div key={ws.id}>
-            <p className="text-sm font-semibold text-gray-900 mb-2">
+            <p className="text-sm font-semibold text-gray-900 mb-1">
               {ws.name}
               {ws.description ? (
                 <span className="font-normal text-gray-500"> · {ws.description}</span>
               ) : null}
+            </p>
+            <p className="text-xs text-gray-500 mb-2">
+              {rows
+                .map((a) => `${formatDayHeader(a.timeslot_start)} · ${formatTime(a.timeslot_start)}`)
+                .join(', ')}
             </p>
             {sortedTodos.length > 0 ? (
               <div className="flex flex-col gap-2">
