@@ -71,8 +71,11 @@ export async function saveAssignments(
   let inserted: SaveAssignmentsResult['inserted'] = []
 
   if (additions.length > 0) {
-    const autoAssignItems = additions.filter((a) => a.slot_index === undefined)
-    const wsIds = [...new Set(autoAssignItems.map((a) => a.workstation_id))]
+    // Check every workstation touched by this save, not just the auto-assign
+    // additions — explicit slot_index picks (from the expanded lane view) can
+    // just as easily collide with a slot someone else took after this admin's
+    // page loaded.
+    const wsIds = [...new Set(additions.map((a) => a.workstation_id))]
 
     const usedSlots = new Map<string, Set<number>>()
 
@@ -102,19 +105,44 @@ export async function saveAssignments(
       return slot
     }
 
+    const rows: {
+      tenant_id: string
+      official_id: string
+      workstation_id: string
+      timeslot_start: string
+      timeslot_end: string
+      slot_index: number
+      status: 'assigned'
+    }[] = []
+
+    for (const a of additions) {
+      let slotIndex = a.slot_index
+      if (slotIndex !== undefined) {
+        const key = `${a.workstation_id}|${new Date(a.timeslot_start).toISOString()}`
+        const used = usedSlots.get(key) ?? new Set<number>()
+        if (used.has(slotIndex)) {
+          return { error: 'Someone else just took that slot. Please reload the schedule and try again.' }
+        }
+        used.add(slotIndex)
+        usedSlots.set(key, used)
+      } else {
+        slotIndex = nextFreeSlot(a.workstation_id, a.timeslot_start)
+      }
+
+      rows.push({
+        tenant_id: tenantId,
+        official_id: a.official_id,
+        workstation_id: a.workstation_id,
+        timeslot_start: a.timeslot_start,
+        timeslot_end: a.timeslot_end,
+        slot_index: slotIndex,
+        status: 'assigned',
+      })
+    }
+
     const { data, error } = await supabase
       .from('assignments')
-      .insert(
-        additions.map((a) => ({
-          tenant_id: tenantId,
-          official_id: a.official_id,
-          workstation_id: a.workstation_id,
-          timeslot_start: a.timeslot_start,
-          timeslot_end: a.timeslot_end,
-          slot_index: a.slot_index ?? nextFreeSlot(a.workstation_id, a.timeslot_start),
-          status: 'assigned' as const,
-        }))
-      )
+      .insert(rows)
       .select('id, official_id, workstation_id, timeslot_start, slot_index')
 
     if (error) return { error: error.message }
