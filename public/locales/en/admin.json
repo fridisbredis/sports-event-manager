@@ -235,6 +235,8 @@
     "slotModalAdd": "Add",
     "slotModalRemove": "Remove",
     "slotModalEmpty": "All officials are already assigned at this time.",
+    "dragPaintPickPerson_one": "Assign to {{count}} slot",
+    "dragPaintPickPerson_other": "Assign to {{count}} slots",
     "slotModalSearchPlaceholder": "Search by name...",
     "slotModalNoResults": "No officials match your search."
   },

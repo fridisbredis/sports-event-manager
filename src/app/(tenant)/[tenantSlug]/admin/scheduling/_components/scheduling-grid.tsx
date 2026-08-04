@@ -240,6 +240,22 @@ export function SchedulingGrid({
   } | null>(null)
   const [wsSlotModalSearch, setWsSlotModalSearch] = useState('')
 
+  // By-work-area drag-to-paint (expanded numbered slot rows)
+  const [wsDrag, setWsDrag] = useState<{
+    workstationId: string
+    wsName: string
+    slotIndex: number
+    startIdx: number
+    currentIdx: number
+  } | null>(null)
+  const [dragOfficialPicker, setDragOfficialPicker] = useState<{
+    workstationId: string
+    slotIndex: number
+    cellStarts: string[]
+    anchorTop: number
+    anchorLeft: number
+  } | null>(null)
+
   const selectedStage = stages.find((s) => s.id === selectedStageId) ?? stages[0]
 
   const availableDays = useMemo(
@@ -283,12 +299,18 @@ export function SchedulingGrid({
       if (wsPickerCell && !(e.target as HTMLElement).closest('[data-ws-picker]')) {
         setWsPickerCell(null)
       }
+      if (
+        dragOfficialPicker &&
+        !(e.target as HTMLElement).closest('[data-drag-official-picker]')
+      ) {
+        setDragOfficialPicker(null)
+      }
     }
-    if (pickerCell || cellActionCell || wsPickerCell) {
+    if (pickerCell || cellActionCell || wsPickerCell || dragOfficialPicker) {
       document.addEventListener('mousedown', handleClick)
     }
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [pickerCell, cellActionCell, wsPickerCell])
+  }, [pickerCell, cellActionCell, wsPickerCell, dragOfficialPicker])
 
   // ─── Derived conflict data ────────────────────────────────────────────────
 
@@ -368,6 +390,69 @@ export function SchedulingGrid({
     assignments.some((a) => a.id === null) ||
     deletions.size > 0 ||
     assignments.some((a) => a.id !== null && originalStatusMap.get(a.id) !== a.status)
+
+  // Finalize a by-work-area drag on mouseup (window-level so it can't get stuck
+  // if the mouse leaves the table before releasing)
+  useEffect(() => {
+    if (!wsDrag) return
+
+    function handleUp(e: PointerEvent) {
+      setWsDrag((current) => {
+        if (!current) return null
+        const { workstationId, wsName, slotIndex, startIdx, currentIdx } = current
+        const lo = Math.min(startIdx, currentIdx)
+        const hi = Math.max(startIdx, currentIdx)
+
+        if (lo === hi) {
+          // No movement — treat as an ordinary click on a single slot.
+          const slot = slots[lo]
+          if (slot) handleWsExpandedSlotClick(workstationId, wsName, slotIndex, slot)
+          return null
+        }
+
+        const ws = stageWorkstations.find((w) => w.id === workstationId)
+        const validCells: string[] = []
+        for (let i = lo; i <= hi; i++) {
+          const slot = slots[i]
+          if (!slot) continue
+          if (ws && !isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)) continue
+          const slotStart = slot.toISOString()
+          const occupied = activeAssignments.some(
+            (a) =>
+              a.workstation_id === workstationId &&
+              a.slot_index === slotIndex &&
+              a.timeslot_start === slotStart
+          )
+          if (occupied) continue
+          validCells.push(slotStart)
+        }
+
+        if (validCells.length > 0) {
+          setDragOfficialPicker({
+            workstationId,
+            slotIndex,
+            cellStarts: validCells,
+            anchorTop: e.clientY,
+            anchorLeft: e.clientX,
+          })
+        }
+        return null
+      })
+    }
+
+    window.addEventListener('pointerup', handleUp)
+    return () => window.removeEventListener('pointerup', handleUp)
+  }, [wsDrag, slots, stageWorkstations, granularityMin, activeAssignments])
+
+  const dragAvailableOfficials = useMemo(() => {
+    if (!dragOfficialPicker) return []
+    const busy = new Set(
+      activeAssignments
+        .filter((a) => dragOfficialPicker.cellStarts.includes(a.timeslot_start))
+        .map((a) => a.official_id)
+    )
+    return officials.filter((o) => !busy.has(o.id))
+  }, [dragOfficialPicker, activeAssignments, officials])
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -498,9 +583,13 @@ export function SchedulingGrid({
     setWsSlotModalSearch('')
   }
 
-  function handleWsSlotAdd(officialId: string) {
-    if (!wsSlotModal) return
-    const { workstationId, slotIndex, slotStart, slotEnd } = wsSlotModal
+  function addAssignment(
+    workstationId: string,
+    slotIndex: number,
+    slotStart: string,
+    slotEnd: string,
+    officialId: string
+  ) {
     const slotTaken = assignments.some(
       (a) =>
         !deletions.has(a.id ?? '') &&
@@ -522,6 +611,36 @@ export function SchedulingGrid({
       },
     ])
     markDirty()
+  }
+
+  function handleWsSlotAdd(officialId: string) {
+    if (!wsSlotModal) return
+    const { workstationId, slotIndex, slotStart, slotEnd } = wsSlotModal
+    addAssignment(workstationId, slotIndex, slotStart, slotEnd, officialId)
+  }
+
+  // ─── Drag-to-paint (by-work-area, expanded numbered slot rows) ───────────
+
+  function handleWsDragStart(wsId: string, wsName: string, slotIndex: number, idx: number) {
+    setWsDrag({ workstationId: wsId, wsName, slotIndex, startIdx: idx, currentIdx: idx })
+  }
+
+  function handleWsDragEnter(wsId: string, slotIndex: number, idx: number) {
+    setWsDrag((prev) => {
+      if (!prev || prev.workstationId !== wsId || prev.slotIndex !== slotIndex) return prev
+      if (prev.currentIdx === idx) return prev
+      return { ...prev, currentIdx: idx }
+    })
+  }
+
+  function handleDragOfficialPick(officialId: string) {
+    if (!dragOfficialPicker) return
+    const { workstationId, slotIndex, cellStarts } = dragOfficialPicker
+    for (const slotStart of cellStarts) {
+      const slotEnd = slotEndTime(new Date(slotStart), granularityMin).toISOString()
+      addAssignment(workstationId, slotIndex, slotStart, slotEnd, officialId)
+    }
+    setDragOfficialPicker(null)
   }
 
   function handleWsSlotRemove(assignment: LocalAssignment) {
@@ -836,6 +955,10 @@ export function SchedulingGrid({
             })
           }
           onWsExpandedSlotClick={handleWsExpandedSlotClick}
+          wsDrag={wsDrag}
+          onWsDragStart={handleWsDragStart}
+          onWsDragEnter={handleWsDragEnter}
+          dragOfficialPicker={dragOfficialPicker}
         />
       )}
 
@@ -934,6 +1057,47 @@ export function SchedulingGrid({
             </div>
           )
         })()}
+
+      {/* One-time official picker after a by-work-area drag-to-paint gesture */}
+      {dragOfficialPicker && (
+        <div
+          className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
+          style={{
+            top: dragOfficialPicker.anchorTop,
+            left: dragOfficialPicker.anchorLeft,
+            transform: 'translateY(calc(-100% - 4px))',
+          }}
+          data-drag-official-picker
+        >
+          <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
+            {t('scheduling.dragPaintPickPerson', { count: dragOfficialPicker.cellStarts.length })}
+          </p>
+          {dragAvailableOfficials.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-gray-400">
+              {t('scheduling.noConfirmedOfficials')}
+            </p>
+          ) : (
+            <ScrollShadow className="flex flex-col max-h-64">
+              {dragAvailableOfficials.map((off) => (
+                <Button
+                  key={off.id}
+                  variant="light"
+                  size="sm"
+                  className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
+                  onPress={() => handleDragOfficialPick(off.id)}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
+                      {initials(off.name)}
+                    </span>
+                    <span className="truncate">{off.name}</span>
+                  </span>
+                </Button>
+              ))}
+            </ScrollShadow>
+          )}
+        </div>
+      )}
 
       {/* Slot modal for by-work-area expanded rows */}
       {wsSlotModal &&
@@ -1346,6 +1510,19 @@ interface ByWorkAreaGridProps {
   expandedWorkAreas: Set<string>
   onToggleExpand: (wsId: string) => void
   onWsExpandedSlotClick: (wsId: string, wsName: string, slotIndex: number, slot: Date) => void
+  wsDrag: {
+    workstationId: string
+    slotIndex: number
+    startIdx: number
+    currentIdx: number
+  } | null
+  onWsDragStart: (wsId: string, wsName: string, slotIndex: number, idx: number) => void
+  onWsDragEnter: (wsId: string, slotIndex: number, idx: number) => void
+  dragOfficialPicker: {
+    workstationId: string
+    slotIndex: number
+    cellStarts: string[]
+  } | null
 }
 
 function ByWorkAreaGrid({
@@ -1358,6 +1535,10 @@ function ByWorkAreaGrid({
   expandedWorkAreas,
   onToggleExpand,
   onWsExpandedSlotClick,
+  wsDrag,
+  onWsDragStart,
+  onWsDragEnter,
+  dragOfficialPicker,
 }: ByWorkAreaGridProps) {
   const { t } = useTranslation('admin')
 
@@ -1545,7 +1726,7 @@ function ByWorkAreaGrid({
                       <td className="sticky left-0 z-10 bg-gray-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
                         <span className="text-xs text-gray-400 font-mono">#{slotIdx}</span>
                       </td>
-                      {slots.map((slot) => {
+                      {slots.map((slot, slotArrIdx) => {
                         const slotStart = slot.toISOString()
                         const inWindow = isWithinWindow(
                           slot,
@@ -1556,11 +1737,22 @@ function ByWorkAreaGrid({
                         const officialName = assignment
                           ? (officialNameMap.get(assignment.official_id) ?? '—')
                           : undefined
+                        const inDragRange =
+                          (!!wsDrag &&
+                            wsDrag.workstationId === ws.id &&
+                            wsDrag.slotIndex === slotIdx &&
+                            slotArrIdx >= Math.min(wsDrag.startIdx, wsDrag.currentIdx) &&
+                            slotArrIdx <= Math.max(wsDrag.startIdx, wsDrag.currentIdx)) ||
+                          (!!dragOfficialPicker &&
+                            dragOfficialPicker.workstationId === ws.id &&
+                            dragOfficialPicker.slotIndex === slotIdx &&
+                            dragOfficialPicker.cellStarts.includes(slotStart))
 
                         if (!inWindow) {
                           return (
                             <td key={slotStart} className="px-1 py-1.5">
                               <div
+                                onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
                                 className="w-full h-10 rounded-md opacity-30"
                                 style={{
                                   background:
@@ -1575,15 +1767,21 @@ function ByWorkAreaGrid({
                             {assignment && officialName ? (
                               <button
                                 onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
+                                onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
                                 title={officialName}
-                                className="w-full h-10 rounded-md border px-2 text-center text-xs truncate transition-colors hover:brightness-95 bg-gray-100 border-gray-200 text-gray-700"
+                                className={`w-full h-10 rounded-md border px-2 text-center text-xs truncate transition-colors hover:brightness-95 bg-gray-100 border-gray-200 text-gray-700 ${inDragRange ? 'ring-2 ring-blue-400' : ''}`}
                               >
                                 {shortName(officialName)}
                               </button>
                             ) : (
                               <button
-                                onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
-                                className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-white transition-colors"
+                                onPointerDown={() => onWsDragStart(ws.id, ws.name, slotIdx, slotArrIdx)}
+                                onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
+                                className={`w-full h-10 rounded-md border transition-colors ${
+                                  inDragRange
+                                    ? 'border-blue-300 bg-blue-50'
+                                    : 'border-transparent hover:border-gray-200 hover:bg-white'
+                                }`}
                               />
                             )}
                           </td>
