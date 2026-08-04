@@ -1162,17 +1162,17 @@ function ByPersonGrid({
   }
 
   return (
-    <div className="border border-gray-200 rounded-md bg-white overflow-x-auto relative">
+    <div className="border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh] relative">
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
-          <tr className="border-b border-gray-100">
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
+          <tr>
+            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40 border-r border-b border-gray-100">
               {t('scheduling.colOfficial')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="text-center px-1 py-3 text-xs font-medium text-gray-500 w-20"
+                className="sticky top-0 z-20 bg-white text-center px-1 py-3 text-xs font-medium text-gray-500 w-20 border-b border-gray-100"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -1182,7 +1182,7 @@ function ByPersonGrid({
         <tbody>
           {officials.map((official) => (
             <tr key={official.id} className="border-b border-gray-50 last:border-0">
-              <td className="px-4 py-3">
+              <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-gray-100">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
                     {initials(official.name)}
@@ -1364,7 +1364,7 @@ function ByWorkAreaGrid({
   const hasOutOfWindow = stageWorkstations.some((ws) => ws.workstation_operating_windows.length > 0)
 
   return (
-    <div className="border border-gray-200 rounded-md bg-white overflow-x-auto">
+    <div className="border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh]">
       {hasOutOfWindow && (
         <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
@@ -1385,14 +1385,14 @@ function ByWorkAreaGrid({
       )}
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
-          <tr className="border-b border-gray-100">
-            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44">
+          <tr>
+            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44 border-r border-b border-gray-100">
               {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="text-center px-1 py-3 text-xs font-medium text-gray-500 w-20"
+                className="sticky top-0 z-20 bg-white text-center px-1 py-3 text-xs font-medium text-gray-500 w-20 border-b border-gray-100"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -1419,7 +1419,7 @@ function ByWorkAreaGrid({
               <React.Fragment key={ws.id}>
                 {/* Summary row (always visible) */}
                 <tr className="border-b border-gray-50">
-                  <td className="px-3 py-3">
+                  <td className="sticky left-0 z-10 bg-white px-3 py-3 border-r border-gray-100">
                     <div className="flex items-center gap-2">
                       <Button
                         isIconOnly
@@ -1507,7 +1507,7 @@ function ByWorkAreaGrid({
                       key={`${ws.id}-slot-${slotIdx}`}
                       className="border-b border-gray-50 bg-gray-50/40"
                     >
-                      <td className="pl-12 pr-3 py-1.5">
+                      <td className="sticky left-0 z-10 bg-gray-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
                         <span className="text-xs text-gray-400 font-mono">#{slotIdx}</span>
                       </td>
                       {slots.map((slot) => {
@@ -1559,7 +1559,7 @@ function ByWorkAreaGrid({
                 {/* Overflow row — assignments with slot_index > capacity_ceiling */}
                 {isExpanded && hasOverflow && (
                   <tr key={`${ws.id}-overflow`} className="border-b border-gray-50 bg-orange-50/20">
-                    <td className="pl-12 pr-3 py-1.5">
+                    <td className="sticky left-0 z-10 bg-orange-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
                       <span className="text-xs text-orange-500 font-medium">
                         {t('scheduling.overflowRow')}
                       </span>
