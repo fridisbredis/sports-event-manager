@@ -89,6 +89,15 @@ interface LocalAssignment {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function getCurrentStage(stages: Stage[]): Stage | undefined {
+  const now = new Date()
+  return stages.find((stage) => {
+    const range = getAllocableRange(stage)
+    if (!range) return false
+    return now >= new Date(range.start) && now <= new Date(range.end)
+  })
+}
+
 function generateSlotsForDay(stage: Stage, day: string, granularityMin: number): Date[] {
   const range = getAllocableRange(stage)
   if (!range) return []
@@ -162,12 +171,16 @@ export function SchedulingGrid({
 }: Props) {
   const { t } = useTranslation('admin')
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
-  const [selectedStageId, setSelectedStageId] = useState<string>(stages[0]?.id ?? '')
+  const [selectedStageId, setSelectedStageId] = useState<string>(
+    () => getCurrentStage(stages)?.id ?? stages[0]?.id ?? ''
+  )
   const [view, setView] = useState<View>('by-person')
   const [selectedDay, setSelectedDay] = useState<string>(() => {
-    const first = stages[0]
-    if (!first) return ''
-    return getAllocableDays(first)[0] ?? ''
+    const stage = getCurrentStage(stages) ?? stages[0]
+    if (!stage) return ''
+    const days = getAllocableDays(stage)
+    const today = new Date().toISOString().slice(0, 10)
+    return days.includes(today) ? today : (days[0] ?? '')
   })
   const [assignments, setAssignments] = useState<LocalAssignment[]>(
     initialAssignments
@@ -589,7 +602,9 @@ export function SchedulingGrid({
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
 
-        {/* Stage selector */}
+        <div className="flex-1" />
+
+        {/* Stage + day selector — grouped together since they're one connected control */}
         <Dropdown>
           <DropdownTrigger>
             <Button
@@ -634,15 +649,8 @@ export function SchedulingGrid({
           </DropdownMenu>
         </Dropdown>
 
-        <div className="flex-1" />
-
         {availableDays.length > 0 && (
           <div className="flex items-center gap-1">
-            {selectedStage && (
-              <span className="text-sm text-gray-500 truncate max-w-[160px] mr-1">
-                {selectedStage.name}
-              </span>
-            )}
             <Button
               isIconOnly
               variant="bordered"
