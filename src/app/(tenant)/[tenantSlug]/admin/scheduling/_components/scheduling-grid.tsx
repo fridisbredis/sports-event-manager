@@ -636,6 +636,11 @@ export function SchedulingGrid({
 
         {availableDays.length > 0 && (
           <div className="flex items-center gap-1">
+            {selectedStage && (
+              <span className="text-sm text-gray-500 truncate max-w-[160px] mr-1">
+                {selectedStage.name}
+              </span>
+            )}
             <Button
               isIconOnly
               variant="bordered"
