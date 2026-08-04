@@ -11,10 +11,10 @@ import {
   ModalContent,
   ModalHeader,
   ModalBody,
-  ModalFooter,
   Card,
   CardBody,
   ScrollShadow,
+  Input,
 } from '@heroui/react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
@@ -219,6 +219,7 @@ export function SchedulingGrid({
     slotStart: string
     slotEnd: string
   } | null>(null)
+  const [wsSlotModalSearch, setWsSlotModalSearch] = useState('')
 
   const selectedStage = stages.find((s) => s.id === selectedStageId) ?? stages[0]
 
@@ -475,6 +476,7 @@ export function SchedulingGrid({
       slotStart: slot.toISOString(),
       slotEnd,
     })
+    setWsSlotModalSearch('')
   }
 
   function handleWsSlotAdd(officialId: string) {
@@ -905,16 +907,23 @@ export function SchedulingGrid({
               .filter((a) => a.timeslot_start === wsSlotModal.slotStart)
               .map((a) => a.official_id)
           )
-          const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
+          const availableOfficialsAll = officials.filter((off) => !assignedAtSlot.has(off.id))
+          const availableOfficials = availableOfficialsAll.filter((off) =>
+            off.name.toLowerCase().includes(wsSlotModalSearch.toLowerCase())
+          )
           return (
             <Modal
               isOpen
+              size="2xl"
               onOpenChange={(open) => {
-                if (!open) setWsSlotModal(null)
+                if (!open) {
+                  setWsSlotModal(null)
+                  setWsSlotModalSearch('')
+                }
               }}
             >
               <ModalContent>
-                {(onClose) => (
+                {() => (
                   <>
                     <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
                       {t('scheduling.slotModalTitle', {
@@ -924,7 +933,7 @@ export function SchedulingGrid({
                       })}
                     </ModalHeader>
                     <ModalBody>
-                      {assignedInSlot.length === 0 && availableOfficials.length === 0 && (
+                      {assignedInSlot.length === 0 && availableOfficialsAll.length === 0 && (
                         <p className="text-sm text-gray-400">{t('scheduling.slotModalEmpty')}</p>
                       )}
 
@@ -955,39 +964,45 @@ export function SchedulingGrid({
                         </div>
                       )}
 
-                      {assignedInSlot.length === 0 && availableOfficials.length > 0 && (
+                      {assignedInSlot.length === 0 && availableOfficialsAll.length > 0 && (
                         <div>
                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                             {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
                           </p>
-                          <ScrollShadow className="flex flex-col max-h-56">
-                            {availableOfficials.map((off) => (
-                              <div
-                                key={off.id}
-                                className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2"
-                              >
-                                <span className="text-sm text-gray-900">{off.name}</span>
-                                <Button
-                                  variant="bordered"
-                                  size="sm"
-                                  onPress={() => handleWsSlotAdd(off.id)}
+                          <Input
+                            type="text"
+                            size="sm"
+                            placeholder={t('scheduling.slotModalSearchPlaceholder')}
+                            value={wsSlotModalSearch}
+                            onValueChange={setWsSlotModalSearch}
+                            className="mb-2"
+                          />
+                          {availableOfficials.length === 0 ? (
+                            <p className="text-sm text-gray-400 px-1 py-2">
+                              {t('scheduling.slotModalNoResults')}
+                            </p>
+                          ) : (
+                            <ScrollShadow className="flex flex-col max-h-80 divide-y divide-gray-100">
+                              {availableOfficials.map((off) => (
+                                <div
+                                  key={off.id}
+                                  className="flex items-center justify-between px-2 py-1.5"
                                 >
-                                  {t('scheduling.slotModalAdd')}
-                                </Button>
-                              </div>
-                            ))}
-                          </ScrollShadow>
+                                  <span className="text-sm text-gray-900">{off.name}</span>
+                                  <Button
+                                    variant="bordered"
+                                    size="sm"
+                                    onPress={() => handleWsSlotAdd(off.id)}
+                                  >
+                                    {t('scheduling.slotModalAdd')}
+                                  </Button>
+                                </div>
+                              ))}
+                            </ScrollShadow>
+                          )}
                         </div>
                       )}
                     </ModalBody>
-                    <ModalFooter>
-                      <Button variant="light" onPress={onClose}>
-                        {t('scheduling.slotModalCancel')}
-                      </Button>
-                      <Button color="primary" onPress={onClose}>
-                        {t('scheduling.slotModalDone')}
-                      </Button>
-                    </ModalFooter>
                   </>
                 )}
               </ModalContent>

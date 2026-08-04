@@ -233,9 +233,9 @@
     "slotModalAvailable": "Available at {{time}}",
     "slotModalAdd": "Add",
     "slotModalRemove": "Remove",
-    "slotModalCancel": "Cancel",
-    "slotModalDone": "Done",
-    "slotModalEmpty": "All officials are already assigned at this time."
+    "slotModalEmpty": "All officials are already assigned at this time.",
+    "slotModalSearchPlaceholder": "Search by name...",
+    "slotModalNoResults": "No officials match your search."
   },
   "communication": {
     "title": "Communication",
