@@ -194,6 +194,7 @@
   "scheduling": {
     "title": "Scheduling",
     "selectStage": "Select stage",
+    "print": "Print",
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",

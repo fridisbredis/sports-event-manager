@@ -158,6 +158,12 @@ function initials(name: string): string {
     .slice(0, 2)
 }
 
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length < 2) return name
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SchedulingGrid({
@@ -597,9 +603,34 @@ export function SchedulingGrid({
 
   return (
     <div>
+      <style>{`
+        .print-only { display: none; }
+        @media print {
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .scheduling-scroll-container {
+            overflow: visible !important;
+            max-height: none !important;
+          }
+          [data-picker-cell], [data-cell-action], [data-ws-picker], [role='dialog'] {
+            display: none !important;
+          }
+          @page { size: landscape; }
+        }
+      `}</style>
       <UnsavedChangesDialog {...dialogProps} />
+
+      {/* Print-only header — replaces the interactive chrome when printing */}
+      <div className="print-only mb-4">
+        <h1 className="text-xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
+        <p className="text-sm text-gray-600">
+          {selectedStage?.name}
+          {selectedDay ? ` — ${formatDayLabel(selectedDay)}` : ''}
+        </p>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="no-print flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
 
         <div className="flex-1" />
@@ -691,6 +722,10 @@ export function SchedulingGrid({
           </div>
         )}
 
+        <Button variant="bordered" size="sm" onPress={() => window.print()}>
+          {t('scheduling.print')}
+        </Button>
+
         <Button
           color="primary"
           size="sm"
@@ -704,7 +739,7 @@ export function SchedulingGrid({
 
       {/* Conflict banners */}
       {overCapacityCount > 0 && (
-        <div className="mb-3 flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-md text-sm text-gray-700">
+        <div className="no-print mb-3 flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-md text-sm text-gray-700">
           <svg
             className="w-4 h-4 text-gray-500 shrink-0"
             fill="none"
@@ -722,7 +757,7 @@ export function SchedulingGrid({
         </div>
       )}
       {doubleBookedCount > 0 && (
-        <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+        <div className="no-print mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
           <div className="flex items-center gap-2">
             <svg
               className="w-4 h-4 text-red-500 shrink-0"
@@ -746,7 +781,7 @@ export function SchedulingGrid({
       )}
 
       {/* View toggle */}
-      <div className="flex gap-1 mb-5">
+      <div className="no-print flex gap-1 mb-5">
         <Button
           size="sm"
           color={view === 'by-person' ? 'primary' : 'default'}
@@ -1057,7 +1092,7 @@ function SetupEmptyState() {
 function SchedulingLegend() {
   const { t } = useTranslation('admin')
   return (
-    <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
+    <div className="no-print mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
       <span className="flex items-center gap-1.5">
         <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded font-mono text-gray-700">
           2/3
@@ -1162,7 +1197,7 @@ function ByPersonGrid({
   }
 
   return (
-    <div className="border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh] relative">
+    <div className="scheduling-scroll-container border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh] relative">
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr>
@@ -1364,7 +1399,7 @@ function ByWorkAreaGrid({
   const hasOutOfWindow = stageWorkstations.some((ws) => ws.workstation_operating_windows.length > 0)
 
   return (
-    <div className="border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh]">
+    <div className="scheduling-scroll-container border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh]">
       {hasOutOfWindow && (
         <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
@@ -1540,9 +1575,10 @@ function ByWorkAreaGrid({
                             {assignment && officialName ? (
                               <button
                                 onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
+                                title={officialName}
                                 className="w-full h-10 rounded-md border px-2 text-center text-xs truncate transition-colors hover:brightness-95 bg-gray-100 border-gray-200 text-gray-700"
                               >
-                                {officialName}
+                                {shortName(officialName)}
                               </button>
                             ) : (
                               <button
