@@ -139,6 +139,11 @@ function formatSlotLabel(slot: Date): string {
   return slot.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
+function formatSlotDateTimeLabel(slot: Date): string {
+  const date = slot.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  return `${date} ${formatSlotLabel(slot)}`
+}
+
 function isWithinWindow(slot: Date, granMin: number, windows: OperatingWindow[]): boolean {
   if (windows.length === 0) return true
   const slotEnd = slotEndTime(slot, granMin)
@@ -380,7 +385,7 @@ export function SchedulingGrid({
         .filter((n, i, arr) => arr.indexOf(n) === i)
       details.push({
         officialName: official.name,
-        time: formatSlotLabel(new Date(timeslotStart)),
+        time: formatSlotDateTimeLabel(new Date(timeslotStart)),
         workAreaNames,
       })
     }
