@@ -16,13 +16,12 @@ import {
   CardBody,
   ScrollShadow,
   Input,
+  Skeleton,
 } from '@heroui/react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
-import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
-import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -183,7 +182,6 @@ export function SchedulingGrid({
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
-  const { markClean, dialogProps } = useUnsavedChanges()
   const [selectedStageId, setSelectedStageId] = useState<string>(
     () => getCurrentStage(stages)?.id ?? stages[0]?.id ?? ''
   )
@@ -208,10 +206,6 @@ export function SchedulingGrid({
         slot_index: a.slot_index,
       }))
   )
-  const [deletions, setDeletions] = useState<Set<string>>(new Set())
-  const [saving, setSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-
   // By-person work-area picker
   const [pickerCell, setPickerCell] = useState<{
     officialId: string
@@ -236,6 +230,30 @@ export function SchedulingGrid({
     anchorTop: number
     anchorLeft: number
   } | null>(null)
+
+  // Cells currently mid-autosave — rendered as a skeleton so the grid doesn't
+  // look unresponsive during the round-trip to the server.
+  const [pendingCells, setPendingCells] = useState<Set<string>>(new Set())
+
+  function personCellKey(officialId: string, slotStart: string): string {
+    return `p:${officialId}:${slotStart}`
+  }
+
+  function wsCellKey(workstationId: string, slotIndex: number | null, slotStart: string): string {
+    return `w:${workstationId}:${slotIndex}:${slotStart}`
+  }
+
+  function beginPending(key: string) {
+    setPendingCells((prev) => new Set(prev).add(key))
+  }
+
+  function endPending(key: string) {
+    setPendingCells((prev) => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+  }
 
   // By-work-area slot modal (expanded numbered slot rows)
   const [wsSlotModal, setWsSlotModal] = useState<{
@@ -286,15 +304,6 @@ export function SchedulingGrid({
     [workstations, selectedStageId]
   )
 
-  // Original statuses for change detection
-  const originalStatusMap = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const a of initialAssignments) {
-      map.set(a.id, a.status ?? 'assigned')
-    }
-    return map
-  }, [initialAssignments])
-
   // Close popups when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -324,8 +333,8 @@ export function SchedulingGrid({
 
   const activeAssignments = useMemo(() => {
     const stageWsIds = new Set(stageWorkstations.map((w) => w.id))
-    return assignments.filter((a) => !deletions.has(a.id ?? '') && stageWsIds.has(a.workstation_id))
-  }, [assignments, deletions, stageWorkstations])
+    return assignments.filter((a) => stageWsIds.has(a.workstation_id))
+  }, [assignments, stageWorkstations])
 
   const overCapacityCells = useMemo(() => {
     const counts = new Map<string, number>()
@@ -342,15 +351,10 @@ export function SchedulingGrid({
     return result
   }, [activeAssignments, stageWorkstations])
 
-  const allNonDeletedAssignments = useMemo(
-    () => assignments.filter((a) => !deletions.has(a.id ?? '')),
-    [assignments, deletions]
-  )
-
   const doubleBookedOfficials = useMemo(() => {
     const result = new Set<string>()
     const seenSlots = new Map<string, string>()
-    for (const a of allNonDeletedAssignments) {
+    for (const a of assignments) {
       const key = `${a.official_id}:${a.timeslot_start}`
       if (seenSlots.has(key) && seenSlots.get(key) !== a.workstation_id) {
         result.add(key)
@@ -359,7 +363,7 @@ export function SchedulingGrid({
       }
     }
     return result
-  }, [allNonDeletedAssignments])
+  }, [assignments])
 
   const overCapacityCount = useMemo(() => {
     const wsSet = new Set<string>()
@@ -379,7 +383,7 @@ export function SchedulingGrid({
       const [officialId, timeslotStart] = key.split(/:(.+)/)
       const official = officials.find((o) => o.id === officialId)
       if (!official) continue
-      const conflictingAssignments = allNonDeletedAssignments.filter(
+      const conflictingAssignments = assignments.filter(
         (a) => a.official_id === officialId && a.timeslot_start === timeslotStart
       )
       const workAreaNames = conflictingAssignments
@@ -392,12 +396,7 @@ export function SchedulingGrid({
       })
     }
     return details
-  }, [doubleBookedOfficials, allNonDeletedAssignments, officials, workstations])
-
-  const hasPendingChanges =
-    assignments.some((a) => a.id === null) ||
-    deletions.size > 0 ||
-    assignments.some((a) => a.id !== null && originalStatusMap.get(a.id) !== a.status)
+  }, [doubleBookedOfficials, assignments, officials, workstations])
 
   // Finalize a by-work-area drag on mouseup (window-level so it can't get stuck
   // if the mouse leaves the table before releasing)
@@ -504,6 +503,8 @@ export function SchedulingGrid({
       const slotIdx = nextLocalFreeSlot(ws.id, slotStart)
       setPickerCell(null)
 
+      const key = personCellKey(officialId, slotStart)
+      beginPending(key)
       const result = await saveAssignments(
         tenantSlug,
         tenantId,
@@ -518,6 +519,7 @@ export function SchedulingGrid({
         ],
         []
       )
+      endPending(key)
 
       if (result.error) {
         toastError(result.error)
@@ -553,10 +555,13 @@ export function SchedulingGrid({
     setCellActionCell(null)
     if (!assignment.id) return
 
+    const key = personCellKey(assignment.official_id, assignment.timeslot_start)
+    beginPending(key)
     const result =
       action === 'remove'
         ? await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
         : await saveAssignments(tenantSlug, tenantId, [], [], [{ id: assignment.id, status: action }])
+    endPending(key)
 
     if (result.error) {
       toastError(result.error)
@@ -595,6 +600,8 @@ export function SchedulingGrid({
     const slotEnd = slotEndTime(slot, granularityMin).toISOString()
     setWsPickerCell(null)
 
+    const key = wsCellKey(workstationId, slotIndex, slotStart)
+    beginPending(key)
     const result = await saveAssignments(
       tenantSlug,
       tenantId,
@@ -609,6 +616,7 @@ export function SchedulingGrid({
       ],
       []
     )
+    endPending(key)
 
     if (result.error) {
       toastError(result.error)
@@ -650,13 +658,14 @@ export function SchedulingGrid({
   ) {
     const slotTaken = assignments.some(
       (a) =>
-        !deletions.has(a.id ?? '') &&
         a.workstation_id === workstationId &&
         a.slot_index === slotIndex &&
         a.timeslot_start === slotStart
     )
     if (slotTaken) return
 
+    const key = wsCellKey(workstationId, slotIndex, slotStart)
+    beginPending(key)
     const result = await saveAssignments(
       tenantSlug,
       tenantId,
@@ -671,6 +680,7 @@ export function SchedulingGrid({
       ],
       []
     )
+    endPending(key)
 
     if (result.error) {
       toastError(result.error)
@@ -759,7 +769,10 @@ export function SchedulingGrid({
   async function handleWsSlotRemove(assignment: LocalAssignment) {
     if (!assignment.id) return
 
+    const key = wsCellKey(assignment.workstation_id, assignment.slot_index, assignment.timeslot_start)
+    beginPending(key)
     const result = await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
+    endPending(key)
 
     if (result.error) {
       toastError(result.error)
@@ -778,58 +791,6 @@ export function SchedulingGrid({
       )
     )
     router.refresh()
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    setSaveSuccess(false)
-
-    const additions: AssignmentInput[] = assignments
-      .filter((a) => a.id === null)
-      .map((a) => ({
-        official_id: a.official_id,
-        workstation_id: a.workstation_id,
-        timeslot_start: a.timeslot_start,
-        timeslot_end: a.timeslot_end,
-        slot_index: a.slot_index ?? undefined,
-      }))
-
-    const statusUpdateList = assignments
-      .filter((a) => a.id !== null && originalStatusMap.get(a.id) !== a.status)
-      .map((a) => ({ id: a.id!, status: a.status }))
-
-    const result = await saveAssignments(
-      tenantSlug,
-      tenantId,
-      additions,
-      [...deletions],
-      statusUpdateList
-    )
-
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setSaveSuccess(true)
-      markClean()
-      setTimeout(() => setSaveSuccess(false), 2000)
-      setAssignments((prev) =>
-        prev
-          .filter((a) => !deletions.has(a.id ?? ''))
-          .map((a) => {
-            if (a.id !== null) return a
-            const match = result.inserted?.find(
-              (r) =>
-                r.official_id === a.official_id &&
-                r.workstation_id === a.workstation_id &&
-                new Date(r.timeslot_start).getTime() === new Date(a.timeslot_start).getTime()
-            )
-            return match ? { ...a, id: match.id, slot_index: match.slot_index ?? a.slot_index } : a
-          })
-      )
-      setDeletions(new Set())
-      router.refresh()
-    }
-    setSaving(false)
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -859,7 +820,6 @@ export function SchedulingGrid({
           @page { size: landscape; }
         }
       `}</style>
-      <UnsavedChangesDialog {...dialogProps} />
 
       {/* Print-only header — replaces the interactive chrome when printing */}
       <div className="print-only mb-4">
@@ -970,16 +930,6 @@ export function SchedulingGrid({
         <Button variant="bordered" size="sm" onPress={() => window.print()}>
           {t('scheduling.print')}
         </Button>
-
-        <Button
-          color="primary"
-          size="sm"
-          onPress={handleSave}
-          isLoading={saving}
-          isDisabled={saving || !hasPendingChanges || doubleBookedCount > 0 || overCapacityCount > 0}
-        >
-          {saveSuccess ? t('scheduling.saved') : t('scheduling.save')}
-        </Button>
       </div>
 
       {/* Conflict banners */}
@@ -1062,6 +1012,7 @@ export function SchedulingGrid({
           doubleBookedOfficials={doubleBookedOfficials}
           pickerCell={pickerCell}
           onCellClick={handleCellClick}
+          pendingCells={pendingCells}
         />
       ) : (
         <ByWorkAreaGrid
@@ -1072,6 +1023,7 @@ export function SchedulingGrid({
           activeAssignments={activeAssignments}
           overCapacityCells={overCapacityCells}
           expandedWorkAreas={expandedWorkAreas}
+          pendingCells={pendingCells}
           onToggleExpand={(wsId) =>
             setExpandedWorkAreas((prev) => {
               const next = new Set(prev)
@@ -1429,6 +1381,7 @@ interface ByPersonGridProps {
     anchorLeft: number
   } | null
   onCellClick: (officialId: string, slot: Date, ws?: WorkstationData, anchor?: HTMLElement) => void
+  pendingCells: Set<string>
 }
 
 function ByPersonGrid({
@@ -1440,6 +1393,7 @@ function ByPersonGrid({
   doubleBookedOfficials,
   pickerCell,
   onCellClick,
+  pendingCells,
 }: ByPersonGridProps) {
   const { t } = useTranslation('admin')
 
@@ -1532,9 +1486,13 @@ function ByPersonGrid({
                     : 'bg-gray-100 border border-gray-200'
                   : ''
 
+                const isPending = pendingCells.has(`p:${official.id}:${slotStart}`)
+
                 return (
                   <td key={slotStart} className="px-1 py-2 relative">
-                    {assignment ? (
+                    {isPending ? (
+                      <Skeleton className="w-full h-10 rounded-md" />
+                    ) : assignment ? (
                       <button
                         onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
                         className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
@@ -1649,6 +1607,7 @@ interface ByWorkAreaGridProps {
     slotIndex: number
     cellStarts: string[]
   } | null
+  pendingCells: Set<string>
 }
 
 function ByWorkAreaGrid({
@@ -1665,6 +1624,7 @@ function ByWorkAreaGrid({
   onWsDragStart,
   onWsDragEnter,
   dragOfficialPicker,
+  pendingCells,
 }: ByWorkAreaGridProps) {
   const { t } = useTranslation('admin')
 
@@ -1888,9 +1848,13 @@ function ByWorkAreaGrid({
                             </td>
                           )
                         }
+                        const isPending = pendingCells.has(`w:${ws.id}:${slotIdx}:${slotStart}`)
+
                         return (
                           <td key={slotStart} className="px-1 py-1.5">
-                            {assignment && officialName ? (
+                            {isPending ? (
+                              <Skeleton className="w-full h-10 rounded-md" />
+                            ) : assignment && officialName ? (
                               <button
                                 onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
