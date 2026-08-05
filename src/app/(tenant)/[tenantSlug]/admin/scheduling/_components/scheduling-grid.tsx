@@ -183,7 +183,7 @@ export function SchedulingGrid({
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
-  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
+  const { markClean, dialogProps } = useUnsavedChanges()
   const [selectedStageId, setSelectedStageId] = useState<string>(
     () => getCurrentStage(stages)?.id ?? stages[0]?.id ?? ''
   )
@@ -482,7 +482,7 @@ export function SchedulingGrid({
     return idx
   }
 
-  function handleCellClick(
+  async function handleCellClick(
     officialId: string,
     slot: Date,
     ws?: WorkstationData,
@@ -502,20 +502,40 @@ export function SchedulingGrid({
     } else if (ws) {
       const slotEnd = slotEndTime(slot, granularityMin).toISOString()
       const slotIdx = nextLocalFreeSlot(ws.id, slotStart)
-      setAssignments((prev) => [
-        ...prev,
-        {
-          id: null,
-          official_id: officialId,
-          workstation_id: ws.id,
-          timeslot_start: slotStart,
-          timeslot_end: slotEnd,
-          status: 'assigned',
-          slot_index: slotIdx,
-        },
-      ])
       setPickerCell(null)
-      markDirty()
+
+      const result = await saveAssignments(
+        tenantSlug,
+        tenantId,
+        [
+          {
+            official_id: officialId,
+            workstation_id: ws.id,
+            timeslot_start: slotStart,
+            timeslot_end: slotEnd,
+            slot_index: slotIdx,
+          },
+        ],
+        []
+      )
+
+      if (result.error) {
+        toastError(result.error)
+      } else {
+        setAssignments((prev) => [
+          ...prev,
+          ...(result.inserted ?? []).map((r) => ({
+            id: r.id,
+            official_id: r.official_id,
+            workstation_id: r.workstation_id!,
+            timeslot_start: new Date(r.timeslot_start).toISOString(),
+            timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+            status: 'assigned',
+            slot_index: r.slot_index,
+          })),
+        ])
+        router.refresh()
+      }
     } else {
       const rect = anchor?.getBoundingClientRect()
       setPickerCell({
@@ -527,12 +547,23 @@ export function SchedulingGrid({
     }
   }
 
-  function handleCellAction(action: 'remove' | 'assigned') {
+  async function handleCellAction(action: 'remove' | 'assigned') {
     if (!cellActionCell) return
     const assignment = cellActionCell
+    setCellActionCell(null)
+    if (!assignment.id) return
+
+    const result =
+      action === 'remove'
+        ? await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
+        : await saveAssignments(tenantSlug, tenantId, [], [], [{ id: assignment.id, status: action }])
+
+    if (result.error) {
+      toastError(result.error)
+      return
+    }
 
     if (action === 'remove') {
-      if (assignment.id) setDeletions((prev) => new Set([...prev, assignment.id!]))
       setAssignments((prev) =>
         prev.filter(
           (a) =>
@@ -554,29 +585,48 @@ export function SchedulingGrid({
         )
       )
     }
-    setCellActionCell(null)
-    markDirty()
+    router.refresh()
   }
 
-  function handleWsPersonPick(officialId: string) {
+  async function handleWsPersonPick(officialId: string) {
     if (!wsPickerCell) return
     const { workstationId, slotIndex, slotStart } = wsPickerCell
     const slot = new Date(slotStart)
     const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-    setAssignments((prev) => [
-      ...prev,
-      {
-        id: null,
-        official_id: officialId,
-        workstation_id: workstationId,
-        timeslot_start: slotStart,
-        timeslot_end: slotEnd,
-        status: 'assigned',
-        slot_index: slotIndex,
-      },
-    ])
     setWsPickerCell(null)
-    markDirty()
+
+    const result = await saveAssignments(
+      tenantSlug,
+      tenantId,
+      [
+        {
+          official_id: officialId,
+          workstation_id: workstationId,
+          timeslot_start: slotStart,
+          timeslot_end: slotEnd,
+          slot_index: slotIndex,
+        },
+      ],
+      []
+    )
+
+    if (result.error) {
+      toastError(result.error)
+    } else {
+      setAssignments((prev) => [
+        ...prev,
+        ...(result.inserted ?? []).map((r) => ({
+          id: r.id,
+          official_id: r.official_id,
+          workstation_id: r.workstation_id!,
+          timeslot_start: new Date(r.timeslot_start).toISOString(),
+          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+          status: 'assigned',
+          slot_index: r.slot_index,
+        })),
+      ])
+      router.refresh()
+    }
   }
 
   function handleWsExpandedSlotClick(wsId: string, wsName: string, slotIndex: number, slot: Date) {
@@ -591,7 +641,7 @@ export function SchedulingGrid({
     setWsSlotModalSearch('')
   }
 
-  function addAssignment(
+  async function addAssignment(
     workstationId: string,
     slotIndex: number,
     slotStart: string,
@@ -606,24 +656,46 @@ export function SchedulingGrid({
         a.timeslot_start === slotStart
     )
     if (slotTaken) return
-    setAssignments((prev) => [
-      ...prev,
-      {
-        id: null,
-        official_id: officialId,
-        workstation_id: workstationId,
-        timeslot_start: slotStart,
-        timeslot_end: slotEnd,
-        status: 'assigned',
-        slot_index: slotIndex,
-      },
-    ])
-    markDirty()
+
+    const result = await saveAssignments(
+      tenantSlug,
+      tenantId,
+      [
+        {
+          official_id: officialId,
+          workstation_id: workstationId,
+          timeslot_start: slotStart,
+          timeslot_end: slotEnd,
+          slot_index: slotIndex,
+        },
+      ],
+      []
+    )
+
+    if (result.error) {
+      toastError(result.error)
+    } else {
+      setAssignments((prev) => [
+        ...prev,
+        ...(result.inserted ?? []).map((r) => ({
+          id: r.id,
+          official_id: r.official_id,
+          workstation_id: r.workstation_id!,
+          timeslot_start: new Date(r.timeslot_start).toISOString(),
+          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+          status: 'assigned',
+          slot_index: r.slot_index,
+        })),
+      ])
+      router.refresh()
+    }
   }
 
   function handleWsSlotAdd(officialId: string) {
     if (!wsSlotModal) return
     const { workstationId, slotIndex, slotStart, slotEnd } = wsSlotModal
+    setWsSlotModal(null)
+    setWsSlotModalSearch('')
     addAssignment(workstationId, slotIndex, slotStart, slotEnd, officialId)
   }
 
@@ -684,8 +756,16 @@ export function SchedulingGrid({
     setDragSaving(false)
   }
 
-  function handleWsSlotRemove(assignment: LocalAssignment) {
-    if (assignment.id) setDeletions((prev) => new Set([...prev, assignment.id!]))
+  async function handleWsSlotRemove(assignment: LocalAssignment) {
+    if (!assignment.id) return
+
+    const result = await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
+
+    if (result.error) {
+      toastError(result.error)
+      return
+    }
+
     setAssignments((prev) =>
       prev.filter(
         (a) =>
@@ -697,7 +777,7 @@ export function SchedulingGrid({
           )
       )
     )
-    markDirty()
+    router.refresh()
   }
 
   async function handleSave() {
