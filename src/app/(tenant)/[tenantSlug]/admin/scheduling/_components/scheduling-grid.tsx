@@ -255,6 +255,7 @@ export function SchedulingGrid({
     anchorTop: number
     anchorLeft: number
   } | null>(null)
+  const [dragSaving, setDragSaving] = useState(false)
 
   const selectedStage = stages.find((s) => s.id === selectedStageId) ?? stages[0]
 
@@ -622,6 +623,7 @@ export function SchedulingGrid({
   // ─── Drag-to-paint (by-work-area, expanded numbered slot rows) ───────────
 
   function handleWsDragStart(wsId: string, wsName: string, slotIndex: number, idx: number) {
+    if (dragSaving) return
     setWsDrag({ workstationId: wsId, wsName, slotIndex, startIdx: idx, currentIdx: idx })
   }
 
@@ -633,14 +635,45 @@ export function SchedulingGrid({
     })
   }
 
-  function handleDragOfficialPick(officialId: string) {
+  // Persists a drag-to-paint batch immediately (rather than leaving it in
+  // local state for the manual Save button) so a slot-collision from another
+  // admin only affects this small batch, not every other pending edit on the
+  // page — and so a big drag doesn't silently discard its own valid cells if
+  // just one of them collides.
+  async function handleDragOfficialPick(officialId: string) {
     if (!dragOfficialPicker) return
     const { workstationId, slotIndex, cellStarts } = dragOfficialPicker
-    for (const slotStart of cellStarts) {
-      const slotEnd = slotEndTime(new Date(slotStart), granularityMin).toISOString()
-      addAssignment(workstationId, slotIndex, slotStart, slotEnd, officialId)
-    }
     setDragOfficialPicker(null)
+    setDragSaving(true)
+
+    const additions: AssignmentInput[] = cellStarts.map((slotStart) => ({
+      official_id: officialId,
+      workstation_id: workstationId,
+      timeslot_start: slotStart,
+      timeslot_end: slotEndTime(new Date(slotStart), granularityMin).toISOString(),
+      slot_index: slotIndex,
+    }))
+
+    const result = await saveAssignments(tenantSlug, tenantId, additions, [])
+
+    if (result.error) {
+      toastError(result.error)
+    } else {
+      setAssignments((prev) => [
+        ...prev,
+        ...(result.inserted ?? []).map((r) => ({
+          id: r.id,
+          official_id: r.official_id,
+          workstation_id: r.workstation_id!,
+          timeslot_start: new Date(r.timeslot_start).toISOString(),
+          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+          status: 'assigned',
+          slot_index: r.slot_index,
+        })),
+      ])
+    }
+
+    setDragSaving(false)
   }
 
   function handleWsSlotRemove(assignment: LocalAssignment) {
@@ -839,6 +872,10 @@ export function SchedulingGrid({
               </svg>
             </Button>
           </div>
+        )}
+
+        {dragSaving && (
+          <span className="text-xs text-gray-400">{t('scheduling.dragPaintSaving')}</span>
         )}
 
         <Button variant="bordered" size="sm" onPress={() => window.print()}>
