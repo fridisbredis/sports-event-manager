@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Button,
   Dropdown,
@@ -181,6 +182,7 @@ export function SchedulingGrid({
   initialAssignments,
 }: Props) {
   const { t } = useTranslation('admin')
+  const router = useRouter()
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
   const [selectedStageId, setSelectedStageId] = useState<string>(
     () => getCurrentStage(stages)?.id ?? stages[0]?.id ?? ''
@@ -676,6 +678,7 @@ export function SchedulingGrid({
           slot_index: r.slot_index,
         })),
       ])
+      router.refresh()
     }
 
     setDragSaving(false)
@@ -744,6 +747,7 @@ export function SchedulingGrid({
           })
       )
       setDeletions(new Set())
+      router.refresh()
     }
     setSaving(false)
   }
