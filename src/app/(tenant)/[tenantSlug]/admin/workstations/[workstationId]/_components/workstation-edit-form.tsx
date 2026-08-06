@@ -1,15 +1,23 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
-import { Button, Input, Textarea, Select, SelectItem, TimeInput, Checkbox } from '@heroui/react'
-import { Time } from '@internationalized/date'
+import { Button, Input, Textarea } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { updateWorkstation, deleteWorkstation } from '../../actions'
-import { type Stage, type TimeWindow, getStageDays, expandWindows, windowDurationMin } from '../../_utils'
+import {
+  type Stage,
+  type TimeWindow,
+  getStageDays,
+  expandWindows,
+  windowDurationMin,
+  initWindowsFromStored,
+} from '../../_utils'
+import { OperatingWindowsEditor } from './operating-windows-editor'
+import { TodosEditor } from './todos-editor'
 
 interface Props {
   tenantSlug: string
@@ -25,69 +33,9 @@ interface Props {
   schedulingGranularityMin: number
 }
 
-// Windows are stored and compared as plain "HH:MM" wall-clock strings with no
-// associated date or timezone, so TimeInput is given a plain `Time` value —
-// never CalendarDateTime/ZonedDateTime — to avoid any browser-timezone conversion.
-function hhmmToTime(hhmm: string): Time | undefined {
-  if (!hhmm) return undefined
-  const [h, m] = hhmm.split(':').map(Number)
-  return new Time(h, m)
-}
-
-function timeToHHMM(time: Time | null): string {
-  if (!time) return ''
-  return `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`
-}
-
 interface FormErrors {
   name?: string
   windows?: Record<number, string>
-}
-
-// Reconstruct per-window state from stored timestamps.
-// For multi-day stages, a window that appears exactly once is treated as limited to that day.
-// A window that appears on multiple days is recurring (limitToDay: null), deduplicated by HH:MM.
-// For single-day stages, just strip to HH:MM.
-function initWindowsFromStored(
-  stored: { window_start: string; window_end: string }[],
-  stageDays: string[]
-): TimeWindow[] {
-  if (stored.length === 0) return [{ start: '', end: '', limitToDay: null }]
-
-  const sorted = [...stored].sort((a, b) => a.window_start.localeCompare(b.window_start))
-
-  if (stageDays.length > 1) {
-    // Count occurrences per HH:MM pair
-    const counts = new Map<string, number>()
-    for (const w of sorted) {
-      const key = `${w.window_start.slice(11, 16)}|${w.window_end.slice(11, 16)}`
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-
-    const seen = new Set<string>()
-    const result: TimeWindow[] = []
-    for (const w of sorted) {
-      const start = w.window_start.slice(11, 16)
-      const end = w.window_end.slice(11, 16)
-      const key = `${start}|${end}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        const isLimited = (counts.get(key) ?? 0) === 1
-        result.push({
-          start,
-          end,
-          limitToDay: isLimited ? w.window_start.slice(0, 10) : null,
-        })
-      }
-    }
-    return result.length > 0 ? result : [{ start: '', end: '', limitToDay: null }]
-  }
-
-  return sorted.map((w) => ({
-    start: w.window_start.slice(11, 16),
-    end: w.window_end.slice(11, 16),
-    limitToDay: null,
-  }))
 }
 
 export default function WorkstationEditForm({
@@ -153,8 +101,34 @@ export default function WorkstationEditForm({
     markDirty()
   }
 
+  function clearWindowError(index: number) {
+    if (errors.windows?.[index]) {
+      setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [index]: undefined as unknown as string } }))
+    }
+  }
+
   function updateWindow(index: number, field: 'start' | 'end', value: string) {
     setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
+    clearWindowError(index)
+    markDirty()
+  }
+
+  function toggleLimitToDay(index: number) {
+    setWindows((prev) =>
+      prev.map((win, j) =>
+        j === index
+          ? win.limitToDay !== null
+            ? { ...win, limitToDay: null }
+            : clampToDay(win, stageDays[0])
+          : win
+      )
+    )
+    markDirty()
+  }
+
+  function setLimitDay(index: number, day: string) {
+    setWindows((prev) => prev.map((win, j) => (j === index ? clampToDay(win, day) : win)))
+    clearWindowError(index)
     markDirty()
   }
 
@@ -340,110 +314,19 @@ export default function WorkstationEditForm({
             </div>
           </section>
 
-          {/* Operating windows */}
-          <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.operatingWindowsLabel')}
-            </h2>
-            <p className="mb-3 text-xs text-gray-400">
-              {t('workstations.operatingWindowMidnightHint')}
-            </p>
-            <div className="space-y-3">
-              {windows.map((w, i) => (
-                <div key={i} className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}>
-                  <div className="flex items-center gap-2">
-                    <TimeInput
-                      aria-label={t('workstations.windowStartLabel')}
-                      value={hhmmToTime(w.start) ?? null}
-                      minValue={hhmmToTime(minStartFor(w.limitToDay) ?? '')}
-                      validationBehavior="aria"
-                      isInvalid={!!errors.windows?.[i]}
-                      onChange={(val) => {
-                        updateWindow(i, 'start', timeToHHMM(val as Time | null))
-                        if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
-                      }}
-                      hourCycle={24}
-                      className="flex-1"
-                    />
-                    <span className="text-gray-400">–</span>
-                    <TimeInput
-                      aria-label={t('workstations.windowEndLabel')}
-                      value={hhmmToTime(w.end) ?? null}
-                      maxValue={hhmmToTime(maxEndFor(w.limitToDay) ?? '')}
-                      validationBehavior="aria"
-                      isInvalid={!!errors.windows?.[i]}
-                      onChange={(val) => {
-                        updateWindow(i, 'end', timeToHHMM(val as Time | null))
-                        if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
-                      }}
-                      hourCycle={24}
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="light"
-                      size="sm"
-                      onPress={() => removeWindow(i)}
-                      className="text-default-400 whitespace-nowrap"
-                    >
-                      {t('workstations.removeWindow')}
-                    </Button>
-                  </div>
-                  {errors.windows?.[i] && (
-                    <p className="mt-1.5 text-xs text-red-500">{errors.windows[i]}</p>
-                  )}
-                  {isMultiDay && (
-                    <div className="mt-2.5 space-y-2">
-                      <Checkbox
-                        isSelected={w.limitToDay !== null}
-                        onValueChange={() => {
-                          setWindows((prev) =>
-                            prev.map((win, j) =>
-                              j === i
-                                ? win.limitToDay !== null
-                                  ? { ...win, limitToDay: null }
-                                  : clampToDay(win, stageDays[0])
-                                : win
-                            )
-                          )
-                          markDirty()
-                        }}
-                        size="sm"
-                        classNames={{ label: 'text-sm text-gray-600' }}
-                      >
-                        {t('workstations.limitToOneDay')}
-                      </Checkbox>
-                      {w.limitToDay !== null && (
-                        <Select
-                          selectedKeys={[w.limitToDay]}
-                          onSelectionChange={(keys) => {
-                            const day = Array.from(keys)[0] as string
-                            setWindows((prev) =>
-                              prev.map((win, j) => (j === i ? clampToDay(win, day) : win))
-                            )
-                            if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
-                            markDirty()
-                          }}
-                          aria-label={t('workstations.limitToOneDay')}
-                        >
-                          {stageDays.map((day) => (
-                            <SelectItem key={day} textValue={day}>{day}</SelectItem>
-                          ))}
-                        </Select>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-              <Button
-                variant="light"
-                size="sm"
-                onPress={addWindow}
-                className="text-default-500 px-0"
-              >
-                {t('workstations.addWindow')}
-              </Button>
-            </div>
-          </section>
+          <OperatingWindowsEditor
+            windows={windows}
+            errors={errors.windows}
+            isMultiDay={isMultiDay}
+            stageDays={stageDays}
+            minStartFor={minStartFor}
+            maxEndFor={maxEndFor}
+            onUpdateWindow={updateWindow}
+            onRemoveWindow={removeWindow}
+            onAddWindow={addWindow}
+            onToggleLimitToDay={toggleLimitToDay}
+            onSetLimitDay={setLimitDay}
+          />
         </div>
 
         {/* Right column */}
@@ -462,52 +345,13 @@ export default function WorkstationEditForm({
             />
           </section>
 
-          {/* Checklists / To-dos */}
-          <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.todosLabel')}
-            </h2>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
-              <div className="divide-y divide-gray-100">
-                {todos.map((todo, i) => (
-                  <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      disabled
-                      className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
-                    />
-                    <Input
-                      ref={(el) => { todoRefs.current[i] = el }}
-                      type="text"
-                      value={todo}
-                      onChange={(e) => updateTodo(i, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTodo(); } }}
-                      placeholder={t('workstations.todoPlaceholder')}
-                      className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-                    />
-                    <Button
-                      variant="light"
-                      size="sm"
-                      onPress={() => removeTodo(i)}
-                      className="text-xs text-default-400 min-w-0 px-1"
-                    >
-                      {t('workstations.removeTodo')}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <div className="px-3 py-2.5 border-t border-gray-100">
-                <Button
-                  variant="light"
-                  size="sm"
-                  onPress={addTodo}
-                  className="text-default-500 px-0"
-                >
-                  {t('workstations.addTodo')}
-                </Button>
-              </div>
-            </div>
-          </section>
+          <TodosEditor
+            todos={todos}
+            todoRefs={todoRefs}
+            onAddTodo={addTodo}
+            onRemoveTodo={removeTodo}
+            onUpdateTodo={updateTodo}
+          />
         </div>
       </div>
     </div>

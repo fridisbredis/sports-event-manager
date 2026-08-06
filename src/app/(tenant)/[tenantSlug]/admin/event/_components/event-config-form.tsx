@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { Button, Input, Textarea, Select, SelectItem, Chip } from '@heroui/react'
+import { Button, Input, Textarea, Chip } from '@heroui/react'
 import {
   saveEvent,
   uploadEventLogo,
@@ -16,7 +16,12 @@ import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
-import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
+import { LogoUploadField } from './logo-upload-field'
+import { ColorPalettePicker } from './color-palette-picker'
+import { DatesAndGranularitySection } from './dates-and-granularity-section'
+import { FacilitiesEditor } from './facilities-editor'
+import { derivedDateRange } from '../_utils'
+import type { TenantPaletteKey } from '@/lib/theme/tenant-colors'
 
 interface Props {
   tenantSlug: string
@@ -79,25 +84,6 @@ export default function EventConfigForm({
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, startSave] = useTransition()
   const [isPublishing, startPublish] = useTransition()
-
-  function derivedDateRange(stageList: StageInput[]): string | null {
-    // Slice the date portion directly from the datetime-local string ('YYYY-MM-DDTHH:mm')
-    // to avoid Date constructor interpreting it as local time and shifting the date.
-    const raceDates = stageList
-      .filter((s) => s.stage_type === 'race' && s.start_time)
-      .flatMap((s) => [s.start_time!.slice(0, 10), (s.end_time ?? s.start_time!).slice(0, 10)])
-      .sort()
-    if (!raceDates.length) return null
-    const minDate = new Date(raceDates[0] + 'T00:00Z')
-    const maxDate = new Date(raceDates[raceDates.length - 1] + 'T00:00Z')
-    const sDay = minDate.getUTCDate()
-    const eDay = maxDate.getUTCDate()
-    const sMonth = minDate.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
-    const eMonth = maxDate.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
-    const year = maxDate.getUTCFullYear()
-    if (sMonth === eMonth) return `${sDay}–${eDay} ${sMonth} ${year}`
-    return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`
-  }
 
   async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -269,114 +255,23 @@ export default function EventConfigForm({
             {t('eventConfig.identity')}
           </h2>
           <div className="space-y-4">
-            {/* Logo */}
-            <div className="flex items-start gap-4">
-              <div className="w-20 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden">
-                {logoUrl && !logoError ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={logoUrl}
-                    alt={t('eventConfig.logoAlt')}
-                    className="w-full h-full object-cover"
-                    onError={() => setLogoError(true)}
-                  />
-                ) : (
-                  <svg className="w-8 h-8 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M3 16l5-5 4 4 3-3 4 4" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                  </svg>
-                )}
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t('eventConfig.logoLabel')}
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoFileChange}
-                  className="sr-only"
-                  id="logo-file-input"
-                />
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="bordered"
-                    size="sm"
-                    isDisabled={isUploading}
-                    isLoading={isUploading}
-                    onPress={() => fileInputRef.current?.click()}
-                  >
-                    {isUploading
-                      ? t('eventConfig.logoUploading')
-                      : logoUrl
-                        ? t('eventConfig.logoChange')
-                        : t('eventConfig.logoChoose')}
-                  </Button>
-                  {logoUrl && !isUploading && (
-                    <Button
-                      variant="light"
-                      size="sm"
-                      onPress={() => { setLogoUrl(''); setLogoError(false); setSaveSuccess(false); markDirty() }}
-                      className="text-xs text-gray-400"
-                    >
-                      {t('eventConfig.logoRemove')}
-                    </Button>
-                  )}
-                </div>
-                {uploadError && (
-                  <p className="mt-1.5 text-xs text-red-500">{uploadError}</p>
-                )}
-              </div>
-            </div>
+            <LogoUploadField
+              logoUrl={logoUrl}
+              logoError={logoError}
+              isUploading={isUploading}
+              uploadError={uploadError}
+              fileInputRef={fileInputRef}
+              onFileChange={handleLogoFileChange}
+              onImageError={() => setLogoError(true)}
+              onRemove={() => { setLogoUrl(''); setLogoError(false); setSaveSuccess(false); markDirty() }}
+            />
 
-            {/* Color theme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('eventConfig.colorTheme')}
-              </label>
-              <div className="flex items-center gap-3">
-                {(Object.keys(TENANT_PALETTES) as TenantPaletteKey[]).map((key) => {
-                  const palette = TENANT_PALETTES[key]
-                  const isSelected = colorPalette === key
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleColorPaletteSelect(key)}
-                      disabled={isSavingPalette}
-                      aria-pressed={isSelected}
-                      aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
-                      className={`group flex flex-col items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors ${
-                        isSelected
-                          ? 'border-gray-900 bg-gray-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      } ${isSavingPalette ? 'opacity-60' : ''}`}
-                    >
-                      <div className="flex -space-x-1.5">
-                        <span
-                          className="h-5 w-5 rounded-full ring-2 ring-white"
-                          style={{ backgroundColor: `hsl(${palette.primary})` }}
-                        />
-                        <span
-                          className="h-5 w-5 rounded-full ring-2 ring-white"
-                          style={{ backgroundColor: `hsl(${palette.secondary})` }}
-                        />
-                        <span
-                          className="h-5 w-5 rounded-full ring-2 ring-white"
-                          style={{ backgroundColor: `hsl(${palette.accent})` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-500 group-hover:text-gray-700">
-                        {t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              {paletteError && <p className="mt-1.5 text-xs text-red-500">{paletteError}</p>}
-            </div>
+            <ColorPalettePicker
+              colorPalette={colorPalette}
+              isSavingPalette={isSavingPalette}
+              paletteError={paletteError}
+              onSelect={handleColorPaletteSelect}
+            />
 
             <Input
               label={t('eventConfig.eventName')}
@@ -413,84 +308,23 @@ export default function EventConfigForm({
               placeholder={t('eventConfig.descriptionPlaceholder')}
             />
 
-            {/* Dates / duration */}
-            {isPublished ? (
-              /* Published: dates + granularity side by side, then lock note */
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      {t('eventConfig.datesDuration')}
-                    </label>
-                    <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
-                      {derivedDateRange(stages) ?? '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      {t('eventConfig.schedulingGranularity')}
-                    </label>
-                    <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
-                      {granularity} min
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 -mt-2">
-                  {t('eventConfig.granularityLockedNote')}
-                </p>
-              </>
-            ) : (
-              /* Draft: dates full-width, then granularity narrow */
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    {t('eventConfig.datesDuration')}
-                  </label>
-                  <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
-                    {derivedDateRange(stages) ?? '—'}
-                  </div>
-                </div>
-                <div className="w-48">
-                  <Select
-                    label={t('eventConfig.schedulingGranularity')}
-                    selectedKeys={[granularity.toString()]}
-                    onSelectionChange={(keys) => {
-                      setGranularity(Number(Array.from(keys)[0]))
-                      setSaveSuccess(false); markDirty()
-                    }}
-                  >
-                    <SelectItem key="30" textValue={t('eventConfig.granularity30min')}>{t('eventConfig.granularity30min')}</SelectItem>
-                    <SelectItem key="60" textValue={t('eventConfig.granularity60min')}>{t('eventConfig.granularity60min')}</SelectItem>
-                    <SelectItem key="90" textValue={t('eventConfig.granularity90min')}>{t('eventConfig.granularity90min')}</SelectItem>
-                    <SelectItem key="120" textValue={t('eventConfig.granularity120min')}>{t('eventConfig.granularity120min')}</SelectItem>
-                  </Select>
-                </div>
-              </>
-            )}
+            <DatesAndGranularitySection
+              isPublished={isPublished}
+              dateRangeLabel={derivedDateRange(stages)}
+              granularity={granularity}
+              onGranularityChange={(minutes) => {
+                setGranularity(minutes)
+                setSaveSuccess(false); markDirty()
+              }}
+            />
 
-            {/* Facilities */}
-            <div>
-              <Input
-                label={t('eventConfig.facilities')}
-                value={facilityInput}
-                onValueChange={setFacilityInput}
-                onKeyDown={handleFacilityKeyDown}
-                placeholder={t('eventConfig.facilitiesPlaceholder')}
-              />
-              {facilities.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {facilities.map((f, i) => (
-                    <Chip
-                      key={i}
-                      onClose={() => removeFacility(i)}
-                      variant="flat"
-                    >
-                      {f.label}
-                    </Chip>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FacilitiesEditor
+              facilities={facilities}
+              facilityInput={facilityInput}
+              onFacilityInputChange={setFacilityInput}
+              onKeyDown={handleFacilityKeyDown}
+              onRemoveFacility={removeFacility}
+            />
           </div>
         </section>
 

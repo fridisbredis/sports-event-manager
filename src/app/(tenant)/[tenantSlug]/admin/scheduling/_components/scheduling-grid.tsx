@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Button,
@@ -12,11 +12,8 @@ import {
   ModalContent,
   ModalHeader,
   ModalBody,
-  Card,
-  CardBody,
   ScrollShadow,
   Input,
-  Skeleton,
 } from '@heroui/react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
@@ -27,56 +24,21 @@ import {
   isWithinWindow,
   formatDayLabel,
   formatSlotLabel,
-  formatSlotDateTimeLabel,
   initials,
-  shortName,
   computeOverCapacityCells,
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
+import { toLocalAssignments } from './grid-helpers'
+import { SetupEmptyState } from './setup-empty-state'
+import { SchedulingLegend } from './scheduling-legend'
+import { ByPersonGrid } from './by-person-grid'
+import { ByWorkAreaGrid } from './by-work-area-grid'
+import type { Stage, WorkstationData, OfficialData, AssignmentData, LocalAssignment } from './scheduling-types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface Stage {
-  id: string
-  name: string
-  stage_type: string
-  stage_date: string | null
-  start_time: string | null
-  end_time: string | null
-}
-
-interface OperatingWindow {
-  id: string
-  window_start: string
-  window_end: string
-}
-
-interface WorkstationData {
-  id: string
-  name: string
-  capacity_ceiling: number
-  stage_id: string | null
-  workstation_operating_windows: OperatingWindow[]
-}
-
-interface OfficialData {
-  id: string
-  name: string
-  invite_status: string
-}
-
-interface AssignmentData {
-  id: string
-  official_id: string
-  workstation_id: string | null
-  timeslot_start: string
-  timeslot_end: string
-  status: string
-  slot_index: number | null
-}
 
 interface Props {
   tenantSlug: string
@@ -90,16 +52,6 @@ interface Props {
 }
 
 type View = 'by-person' | 'by-work-area'
-
-interface LocalAssignment {
-  id: string | null
-  official_id: string
-  workstation_id: string
-  timeslot_start: string
-  timeslot_end: string
-  status: string
-  slot_index: number | null
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -378,6 +330,16 @@ export function SchedulingGrid({
     return idx
   }
 
+  async function persistAdditions(additions: AssignmentInput[]) {
+    const result = await saveAssignments(tenantSlug, tenantId, additions, [])
+    if (result.error) {
+      toastError(result.error)
+      return
+    }
+    setAssignments((prev) => [...prev, ...toLocalAssignments(result.inserted ?? [], granularityMin)])
+    router.refresh()
+  }
+
   async function handleCellClick(
     officialId: string,
     slot: Date,
@@ -402,39 +364,16 @@ export function SchedulingGrid({
 
       const key = personCellKey(officialId, slotStart)
       beginPending(key)
-      const result = await saveAssignments(
-        tenantSlug,
-        tenantId,
-        [
-          {
-            official_id: officialId,
-            workstation_id: ws.id,
-            timeslot_start: slotStart,
-            timeslot_end: slotEnd,
-            slot_index: slotIdx,
-          },
-        ],
-        []
-      )
+      await persistAdditions([
+        {
+          official_id: officialId,
+          workstation_id: ws.id,
+          timeslot_start: slotStart,
+          timeslot_end: slotEnd,
+          slot_index: slotIdx,
+        },
+      ])
       endPending(key)
-
-      if (result.error) {
-        toastError(result.error)
-      } else {
-        setAssignments((prev) => [
-          ...prev,
-          ...(result.inserted ?? []).map((r) => ({
-            id: r.id,
-            official_id: r.official_id,
-            workstation_id: r.workstation_id!,
-            timeslot_start: new Date(r.timeslot_start).toISOString(),
-            timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-            status: 'assigned',
-            slot_index: r.slot_index,
-          })),
-        ])
-        router.refresh()
-      }
     } else {
       const rect = anchor?.getBoundingClientRect()
       setPickerCell({
@@ -499,39 +438,16 @@ export function SchedulingGrid({
 
     const key = wsCellKey(workstationId, slotIndex, slotStart)
     beginPending(key)
-    const result = await saveAssignments(
-      tenantSlug,
-      tenantId,
-      [
-        {
-          official_id: officialId,
-          workstation_id: workstationId,
-          timeslot_start: slotStart,
-          timeslot_end: slotEnd,
-          slot_index: slotIndex,
-        },
-      ],
-      []
-    )
+    await persistAdditions([
+      {
+        official_id: officialId,
+        workstation_id: workstationId,
+        timeslot_start: slotStart,
+        timeslot_end: slotEnd,
+        slot_index: slotIndex,
+      },
+    ])
     endPending(key)
-
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setAssignments((prev) => [
-        ...prev,
-        ...(result.inserted ?? []).map((r) => ({
-          id: r.id,
-          official_id: r.official_id,
-          workstation_id: r.workstation_id!,
-          timeslot_start: new Date(r.timeslot_start).toISOString(),
-          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-          status: 'assigned',
-          slot_index: r.slot_index,
-        })),
-      ])
-      router.refresh()
-    }
   }
 
   function handleWsExpandedSlotClick(wsId: string, wsName: string, slotIndex: number, slot: Date) {
@@ -563,39 +479,16 @@ export function SchedulingGrid({
 
     const key = wsCellKey(workstationId, slotIndex, slotStart)
     beginPending(key)
-    const result = await saveAssignments(
-      tenantSlug,
-      tenantId,
-      [
-        {
-          official_id: officialId,
-          workstation_id: workstationId,
-          timeslot_start: slotStart,
-          timeslot_end: slotEnd,
-          slot_index: slotIndex,
-        },
-      ],
-      []
-    )
+    await persistAdditions([
+      {
+        official_id: officialId,
+        workstation_id: workstationId,
+        timeslot_start: slotStart,
+        timeslot_end: slotEnd,
+        slot_index: slotIndex,
+      },
+    ])
     endPending(key)
-
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setAssignments((prev) => [
-        ...prev,
-        ...(result.inserted ?? []).map((r) => ({
-          id: r.id,
-          official_id: r.official_id,
-          workstation_id: r.workstation_id!,
-          timeslot_start: new Date(r.timeslot_start).toISOString(),
-          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-          status: 'assigned',
-          slot_index: r.slot_index,
-        })),
-      ])
-      router.refresh()
-    }
   }
 
   function handleWsSlotAdd(officialId: string) {
@@ -640,25 +533,7 @@ export function SchedulingGrid({
       slot_index: slotIndex,
     }))
 
-    const result = await saveAssignments(tenantSlug, tenantId, additions, [])
-
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setAssignments((prev) => [
-        ...prev,
-        ...(result.inserted ?? []).map((r) => ({
-          id: r.id,
-          official_id: r.official_id,
-          workstation_id: r.workstation_id!,
-          timeslot_start: new Date(r.timeslot_start).toISOString(),
-          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-          status: 'assigned',
-          slot_index: r.slot_index,
-        })),
-      ])
-      router.refresh()
-    }
+    await persistAdditions(additions)
 
     setDragSaving(false)
   }
@@ -1193,618 +1068,6 @@ export function SchedulingGrid({
         })()}
 
       <SchedulingLegend />
-    </div>
-  )
-}
-
-// ─── Setup empty state (no officials AND no work areas configured) ─────────────
-
-function SetupEmptyState() {
-  const { t } = useTranslation('admin')
-  return (
-    <div className="border border-gray-200 rounded-md bg-white py-16 flex flex-col items-center gap-3">
-      <div className="w-16 h-16 border-2 border-gray-300 rounded-md flex items-center justify-center">
-        <svg
-          className="w-8 h-8 text-gray-300"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M4 20L20 4M4 4l16 16"
-          />
-        </svg>
-      </div>
-      <p className="text-sm font-medium text-gray-700">{t('scheduling.noAssignmentsTitle')}</p>
-      <p className="text-sm text-gray-500 text-center max-w-xs">
-        {t('scheduling.noAssignmentsHint')}
-      </p>
-    </div>
-  )
-}
-
-// ─── Legend ───────────────────────────────────────────────────────────────────
-
-function SchedulingLegend() {
-  const { t } = useTranslation('admin')
-  return (
-    <div className="no-print mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
-      <span className="flex items-center gap-1.5">
-        <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded font-mono text-gray-700">
-          2/3
-        </span>
-        {t('scheduling.legendCapacity')}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="inline-flex items-center justify-center w-4 h-4 border border-gray-400 rounded-sm text-gray-500 text-[10px]">
-          ⊗
-        </span>
-        {t('scheduling.legendDoubleBooked')}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="w-8 h-4 rounded-sm bg-orange-50 border border-orange-200 inline-block" />
-        {t('scheduling.legendOverCapacity')}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span
-          className="w-8 h-4 rounded-sm inline-block border border-gray-200"
-          style={{
-            background:
-              'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
-          }}
-        />
-        {t('scheduling.legendOutsideWindow')}
-      </span>
-    </div>
-  )
-}
-
-// ─── By-person grid ───────────────────────────────────────────────────────────
-
-interface ByPersonGridProps {
-  slots: Date[]
-  granularityMin: number
-  officials: OfficialData[]
-  stageWorkstations: WorkstationData[]
-  activeAssignments: LocalAssignment[]
-  doubleBookedOfficials: Set<string>
-  pickerCell: {
-    officialId: string
-    slotStart: string
-    anchorTop: number
-    anchorLeft: number
-  } | null
-  onCellClick: (officialId: string, slot: Date, ws?: WorkstationData, anchor?: HTMLElement) => void
-  pendingCells: Set<string>
-}
-
-function ByPersonGrid({
-  slots,
-  granularityMin,
-  officials,
-  stageWorkstations,
-  activeAssignments,
-  doubleBookedOfficials,
-  pickerCell,
-  onCellClick,
-  pendingCells,
-}: ByPersonGridProps) {
-  const { t } = useTranslation('admin')
-
-  const assignmentMap = useMemo(() => {
-    const map = new Map<string, LocalAssignment>()
-    for (const a of activeAssignments) {
-      map.set(`${a.official_id}:${a.timeslot_start}`, a)
-    }
-    return map
-  }, [activeAssignments])
-
-  const countMap = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const a of activeAssignments) {
-      const key = `${a.workstation_id}:${a.timeslot_start}`
-      map.set(key, (map.get(key) ?? 0) + 1)
-    }
-    return map
-  }, [activeAssignments])
-
-  const slotStartSet = useMemo(() => new Set(slots.map((s) => s.toISOString())), [slots])
-  const hasAssignmentsToday = activeAssignments.some((a) => slotStartSet.has(a.timeslot_start))
-
-  // Slots where at least one workstation is within its operating window
-  const activeSlotSet = useMemo(() => {
-    const set = new Set<string>()
-    for (const slot of slots) {
-      if (
-        stageWorkstations.some((ws) =>
-          isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
-        )
-      ) {
-        set.add(slot.toISOString())
-      }
-    }
-    return set
-  }, [slots, granularityMin, stageWorkstations])
-
-  if (officials.length === 0) {
-    return (
-      <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
-        {t('scheduling.noConfirmedOfficials')}
-      </div>
-    )
-  }
-
-  return (
-    <div className="scheduling-scroll-container border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh] relative">
-      <table className="w-full border-collapse text-sm table-fixed">
-        <thead>
-          <tr>
-            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40 border-r border-b border-gray-100">
-              {t('scheduling.colOfficial')}
-            </th>
-            {slots.map((slot) => (
-              <th
-                key={slot.toISOString()}
-                className="sticky top-0 z-20 bg-white text-center px-1 py-3 text-xs font-medium text-gray-500 w-20 border-b border-gray-100"
-              >
-                {formatSlotLabel(slot)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {officials.map((official) => (
-            <tr key={official.id} className="border-b border-gray-50 last:border-0">
-              <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-gray-100">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
-                    {initials(official.name)}
-                  </div>
-                  <span className="text-sm text-gray-800 truncate" title={official.name}>
-                    {official.name}
-                  </span>
-                </div>
-              </td>
-              {slots.map((slot) => {
-                const slotStart = slot.toISOString()
-                const assignment = assignmentMap.get(`${official.id}:${slotStart}`)
-                const ws = assignment
-                  ? stageWorkstations.find((w) => w.id === assignment.workstation_id)
-                  : undefined
-                const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
-                const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
-
-                const cellStyle = assignment
-                  ? isDoubleBooked
-                    ? 'bg-orange-50 border border-orange-200'
-                    : 'bg-gray-100 border border-gray-200'
-                  : ''
-
-                const isPending = pendingCells.has(`p:${official.id}:${slotStart}`)
-
-                return (
-                  <td key={slotStart} className="px-1 py-2 relative">
-                    {isPending ? (
-                      <Skeleton className="w-full h-10 rounded-md" />
-                    ) : assignment ? (
-                      <button
-                        onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
-                      >
-                        <span className="w-full truncate text-center text-[11px] leading-none">
-                          {ws?.name ?? '—'}
-                        </span>
-                        <span
-                          className={`shrink-0 text-[10px] leading-none tabular-nums ${isDoubleBooked ? 'text-orange-400' : 'text-gray-400'}`}
-                        >
-                          {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
-                          {isDoubleBooked && ' ⊗'}
-                        </span>
-                      </button>
-                    ) : activeSlotSet.has(slotStart) ? (
-                      <button
-                        onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-10 rounded-md"
-                        style={{
-                          background:
-                            'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
-                        }}
-                      />
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {!hasAssignmentsToday && (
-        <div className="px-4 py-3 border-t border-gray-50 text-center text-xs text-gray-400">
-          {t('scheduling.noAssignmentsToday')}
-        </div>
-      )}
-
-      {/* Work-area picker */}
-      {pickerCell &&
-        (() => {
-          const slot = new Date(pickerCell.slotStart)
-          const openWorkstations = stageWorkstations.filter((ws) =>
-            isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
-          )
-          if (openWorkstations.length === 0) return null
-          return (
-            <div
-              className="fixed w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-              style={{
-                top: pickerCell.anchorTop,
-                left: pickerCell.anchorLeft,
-                transform: 'translateY(calc(-100% - 4px))',
-              }}
-              data-picker-cell
-            >
-              <div className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                {t('scheduling.assignTo')}
-              </div>
-              <ScrollShadow className="flex flex-col max-h-64">
-                {openWorkstations.map((ws) => {
-                  const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
-                  return (
-                    <Button
-                      key={ws.id}
-                      variant="light"
-                      size="sm"
-                      className="w-full justify-between rounded-none px-3"
-                      onPress={() => onCellClick(pickerCell.officialId, slot, ws)}
-                    >
-                      <span className="truncate">{ws.name}</span>
-                      <span className="ml-2 text-xs text-gray-400 tabular-nums shrink-0">
-                        {count}/{ws.capacity_ceiling}
-                      </span>
-                    </Button>
-                  )
-                })}
-              </ScrollShadow>
-            </div>
-          )
-        })()}
-    </div>
-  )
-}
-
-// ─── By-work-area grid ────────────────────────────────────────────────────────
-
-interface ByWorkAreaGridProps {
-  slots: Date[]
-  granularityMin: number
-  officials: OfficialData[]
-  stageWorkstations: WorkstationData[]
-  activeAssignments: LocalAssignment[]
-  overCapacityCells: Set<string>
-  expandedWorkAreas: Set<string>
-  onToggleExpand: (wsId: string) => void
-  onWsExpandedSlotClick: (wsId: string, wsName: string, slotIndex: number, slot: Date) => void
-  wsDrag: {
-    workstationId: string
-    slotIndex: number
-    startIdx: number
-    currentIdx: number
-  } | null
-  onWsDragStart: (wsId: string, wsName: string, slotIndex: number, idx: number) => void
-  onWsDragEnter: (wsId: string, slotIndex: number, idx: number) => void
-  dragOfficialPicker: {
-    workstationId: string
-    slotIndex: number
-    cellStarts: string[]
-  } | null
-  pendingCells: Set<string>
-}
-
-function ByWorkAreaGrid({
-  slots,
-  granularityMin,
-  officials,
-  stageWorkstations,
-  activeAssignments,
-  overCapacityCells,
-  expandedWorkAreas,
-  onToggleExpand,
-  onWsExpandedSlotClick,
-  wsDrag,
-  onWsDragStart,
-  onWsDragEnter,
-  dragOfficialPicker,
-  pendingCells,
-}: ByWorkAreaGridProps) {
-  const { t } = useTranslation('admin')
-
-  const countMap = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const a of activeAssignments) {
-      const key = `${a.workstation_id}:${a.timeslot_start}`
-      map.set(key, (map.get(key) ?? 0) + 1)
-    }
-    return map
-  }, [activeAssignments])
-
-  // (wsId:slotStart:slotIndex) → assignment
-  const slotIndexMap = useMemo(() => {
-    const map = new Map<string, LocalAssignment>()
-    for (const a of activeAssignments) {
-      if (a.slot_index !== null) {
-        map.set(`${a.workstation_id}:${a.timeslot_start}:${a.slot_index}`, a)
-      }
-    }
-    return map
-  }, [activeAssignments])
-
-  // Official name lookup by id
-  const officialNameMap = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const o of officials) map.set(o.id, o.name)
-    return map
-  }, [officials])
-
-  if (stageWorkstations.length === 0) {
-    return (
-      <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
-        {t('scheduling.noWorkAreas')}
-      </div>
-    )
-  }
-
-  const hasOutOfWindow = stageWorkstations.some((ws) => ws.workstation_operating_windows.length > 0)
-
-  return (
-    <div className="scheduling-scroll-container border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh]">
-      {hasOutOfWindow && (
-        <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-8 h-4 rounded-sm bg-gray-100 border border-gray-200 inline-block" />
-            {t('scheduling.legendAssignable')}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className="w-8 h-4 rounded-sm inline-block border border-gray-200"
-              style={{
-                background:
-                  'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
-              }}
-            />
-            {t('scheduling.legendOutsideWindow')}
-          </span>
-        </div>
-      )}
-      <table className="w-full border-collapse text-sm table-fixed">
-        <thead>
-          <tr>
-            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44 border-r border-b border-gray-100">
-              {t('scheduling.colWorkArea')}
-            </th>
-            {slots.map((slot) => (
-              <th
-                key={slot.toISOString()}
-                className="sticky top-0 z-20 bg-white text-center px-1 py-3 text-xs font-medium text-gray-500 w-20 border-b border-gray-100"
-              >
-                {formatSlotLabel(slot)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {stageWorkstations.map((ws) => {
-            const isExpanded = expandedWorkAreas.has(ws.id)
-
-            // Overflow assignments: slot_index > capacity_ceiling
-            const overflowBySlot = new Map<string, LocalAssignment[]>()
-            for (const a of activeAssignments) {
-              if (a.workstation_id !== ws.id) continue
-              if (a.slot_index !== null && a.slot_index > ws.capacity_ceiling) {
-                const arr = overflowBySlot.get(a.timeslot_start) ?? []
-                arr.push(a)
-                overflowBySlot.set(a.timeslot_start, arr)
-              }
-            }
-            const hasOverflow = overflowBySlot.size > 0
-
-            return (
-              <React.Fragment key={ws.id}>
-                {/* Summary row (always visible) */}
-                <tr className="border-b border-gray-50">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-3 border-r border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        isIconOnly
-                        variant="light"
-                        size="sm"
-                        onPress={() => onToggleExpand(ws.id)}
-                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                        className="w-5 h-5 min-w-0 text-gray-400 shrink-0"
-                      >
-                        <svg
-                          className={`w-4 h-4 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </Button>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate" title={ws.name}>
-                          {ws.name}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {t('workstations.upTo', { n: ws.capacity_ceiling })}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  {slots.map((slot) => {
-                    const slotStart = slot.toISOString()
-                    const key = `${ws.id}:${slotStart}`
-                    const count = countMap.get(key) ?? 0
-                    const inWindow = isWithinWindow(
-                      slot,
-                      granularityMin,
-                      ws.workstation_operating_windows
-                    )
-                    const isOver = overCapacityCells.has(key)
-
-                    if (!inWindow) {
-                      return (
-                        <td key={slotStart} className="px-1 py-2">
-                          <div
-                            className="w-full h-10 rounded-md"
-                            style={{
-                              background:
-                                'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
-                            }}
-                          />
-                        </td>
-                      )
-                    }
-                    return (
-                      <td key={slotStart} className="px-1 py-2">
-                        <div
-                          className={`flex w-full h-10 flex-col items-center justify-center rounded-md px-2 text-xs font-medium text-center ${
-                            isOver
-                              ? 'bg-orange-50 border border-orange-200 text-orange-700'
-                              : count === 0
-                                ? 'bg-white border border-gray-200 text-gray-400'
-                                : 'bg-gray-100 border border-gray-200 text-gray-700'
-                          }`}
-                        >
-                          {count} / {ws.capacity_ceiling}
-                          {isOver && (
-                            <div className="text-[10px] font-normal text-orange-500 leading-none">
-                              {t('scheduling.overCapacityBadge')}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    )
-                  })}
-                </tr>
-
-                {/* Numbered slot rows (visible when expanded) */}
-                {isExpanded &&
-                  Array.from({ length: ws.capacity_ceiling }, (_, i) => i + 1).map((slotIdx) => (
-                    <tr
-                      key={`${ws.id}-slot-${slotIdx}`}
-                      className="border-b border-gray-50 bg-gray-50/40"
-                    >
-                      <td className="sticky left-0 z-10 bg-gray-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
-                        <span className="text-xs text-gray-400 font-mono">#{slotIdx}</span>
-                      </td>
-                      {slots.map((slot, slotArrIdx) => {
-                        const slotStart = slot.toISOString()
-                        const inWindow = isWithinWindow(
-                          slot,
-                          granularityMin,
-                          ws.workstation_operating_windows
-                        )
-                        const assignment = slotIndexMap.get(`${ws.id}:${slotStart}:${slotIdx}`)
-                        const officialName = assignment
-                          ? (officialNameMap.get(assignment.official_id) ?? '—')
-                          : undefined
-                        const inDragRange =
-                          (!!wsDrag &&
-                            wsDrag.workstationId === ws.id &&
-                            wsDrag.slotIndex === slotIdx &&
-                            slotArrIdx >= Math.min(wsDrag.startIdx, wsDrag.currentIdx) &&
-                            slotArrIdx <= Math.max(wsDrag.startIdx, wsDrag.currentIdx)) ||
-                          (!!dragOfficialPicker &&
-                            dragOfficialPicker.workstationId === ws.id &&
-                            dragOfficialPicker.slotIndex === slotIdx &&
-                            dragOfficialPicker.cellStarts.includes(slotStart))
-
-                        if (!inWindow) {
-                          return (
-                            <td key={slotStart} className="px-1 py-1.5">
-                              <div
-                                onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
-                                className="w-full h-10 rounded-md opacity-30"
-                                style={{
-                                  background:
-                                    'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
-                                }}
-                              />
-                            </td>
-                          )
-                        }
-                        const isPending = pendingCells.has(`w:${ws.id}:${slotIdx}:${slotStart}`)
-
-                        return (
-                          <td key={slotStart} className="px-1 py-1.5">
-                            {isPending ? (
-                              <Skeleton className="w-full h-10 rounded-md" />
-                            ) : assignment && officialName ? (
-                              <button
-                                onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
-                                onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
-                                title={officialName}
-                                className={`w-full h-10 rounded-md border px-2 text-center text-xs truncate transition-colors hover:brightness-95 bg-gray-100 border-gray-200 text-gray-700 ${inDragRange ? 'ring-2 ring-blue-400' : ''}`}
-                              >
-                                {shortName(officialName)}
-                              </button>
-                            ) : (
-                              <button
-                                onPointerDown={() => onWsDragStart(ws.id, ws.name, slotIdx, slotArrIdx)}
-                                onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
-                                className={`w-full h-10 rounded-md border transition-colors ${
-                                  inDragRange
-                                    ? 'border-blue-300 bg-blue-50'
-                                    : 'border-transparent hover:border-gray-200 hover:bg-white'
-                                }`}
-                              />
-                            )}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-
-                {/* Overflow row — assignments with slot_index > capacity_ceiling */}
-                {isExpanded && hasOverflow && (
-                  <tr key={`${ws.id}-overflow`} className="border-b border-gray-50 bg-orange-50/20">
-                    <td className="sticky left-0 z-10 bg-orange-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
-                      <span className="text-xs text-orange-500 font-medium">
-                        {t('scheduling.overflowRow')}
-                      </span>
-                    </td>
-                    {slots.map((slot) => {
-                      const slotStart = slot.toISOString()
-                      const overflows = overflowBySlot.get(slotStart) ?? []
-                      return (
-                        <td key={slotStart} className="px-1 py-1.5">
-                          {overflows.length > 0 && (
-                            <div className="w-full h-10 rounded-md bg-orange-100 border border-orange-200 flex items-center justify-center text-xs text-orange-600 font-medium">
-                              +{overflows.length}
-                            </div>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )}
-              </React.Fragment>
-            )
-          })}
-        </tbody>
-      </table>
     </div>
   )
 }
