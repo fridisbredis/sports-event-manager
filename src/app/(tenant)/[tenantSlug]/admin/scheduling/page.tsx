@@ -7,6 +7,46 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
+// PostgREST caps unbounded selects at its configured max-rows (1000 by
+// default) — a single .select() silently truncates once a tenant accumulates
+// more assignments than that, dropping rows with no error. Page through
+// explicitly so the grid always sees the full set regardless of event size.
+const ASSIGNMENTS_PAGE_SIZE = 1000
+
+async function fetchAllAssignments(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string
+) {
+  const rows: {
+    id: string
+    official_id: string
+    workstation_id: string | null
+    timeslot_start: string
+    timeslot_end: string
+    status: string
+    slot_index: number | null
+  }[] = []
+
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status, slot_index')
+      .eq('tenant_id', tenantId)
+      .order('id', { ascending: true })
+      .range(from, from + ASSIGNMENTS_PAGE_SIZE - 1)
+
+    if (error) throw error
+    if (!data || data.length === 0) break
+
+    rows.push(...data)
+    if (data.length < ASSIGNMENTS_PAGE_SIZE) break
+    from += ASSIGNMENTS_PAGE_SIZE
+  }
+
+  return rows
+}
+
 export default async function SchedulingPage({ params }: Props) {
   const { tenantSlug } = await params
 
@@ -37,7 +77,7 @@ export default async function SchedulingPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: stages }, { data: workstations }, { data: officials }, { data: assignments }] =
+  const [{ data: stages }, { data: workstations }, { data: officials }, assignments] =
     await Promise.all([
       supabase
         .from('event_stages')
@@ -60,10 +100,7 @@ export default async function SchedulingPage({ params }: Props) {
         .eq('invite_status', 'confirmed')
         .order('name', { ascending: true }),
 
-      supabase
-        .from('assignments')
-        .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status, slot_index')
-        .eq('tenant_id', tenant.id),
+      fetchAllAssignments(supabase, tenant.id),
     ])
 
   return (
@@ -76,7 +113,7 @@ export default async function SchedulingPage({ params }: Props) {
         stages={stages ?? []}
         workstations={workstations ?? []}
         officials={officials ?? []}
-        initialAssignments={assignments ?? []}
+        initialAssignments={assignments}
       />
     </div>
   )
