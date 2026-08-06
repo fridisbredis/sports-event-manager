@@ -1,6 +1,6 @@
 # Pre-Production Checklist
 
-Living document. Tick items as they're completed. Last updated: 2026-06-26.
+Living document. Tick items as they're completed. Last updated: 2026-08-06.
 
 ---
 
@@ -27,7 +27,7 @@ Living document. Tick items as they're completed. Last updated: 2026-06-26.
 
 ### Naming and documentation
 
-- [ ] Decide product name — repo is `sports-event-manager`, Peter's docs say "Viadal Event Planner (working title)". Align both, or pick a third for v1 launch.
+- [ ] Decide product name — repo is `sports-event-manager`, Peter's docs say "Viadal Event Planner (working title)". Note: the registered domain is `viadalevent.se`, which leans toward "Viadal Event" — confirm this is the final decision, not just a domain-availability pick.
 - [x] Peter's specification docs added to `docs/` (scope, flows, IA, screens, design prompts, C4 diagrams)
 - [x] Wireframes from Claude Design generated (three key screens saved as visual reference)
 - [x] CLAUDE.md created as project onboarding for Claude sessions
@@ -35,11 +35,11 @@ Living document. Tick items as they're completed. Last updated: 2026-06-26.
 
 ### Domain and URLs
 
-- [ ] Decide on production domain (e.g. `sportseventmanager.com`)
-- [ ] Register domain
-- [ ] Configure custom domain on Azure Container Apps (CNAME → fqdn)
-- [ ] Provision and verify SSL certificate (Azure handles this, but allow time)
-- [ ] Update `NEXT_PUBLIC_APP_URL` to the production domain
+- [x] Decide on production domain — `viadalevent.se`
+- [x] Register domain
+- [x] Configure custom domain on Azure Container Apps — `app.viadalevent.se`, managed certificate on `kanban-env`
+- [x] Provision and verify SSL certificate — managed cert active
+- [x] Update `PROD_APP_URL` (and `NEXT_PUBLIC_APP_URL`) to `https://app.viadalevent.se` — verified live on the Container App
 - [ ] Decide tenant routing strategy: subdomain (`viadal.sportseventmanager.com`) vs. path (`/viadal`)
 
 ### Twilio production
@@ -121,7 +121,7 @@ Living document. Tick items as they're completed. Last updated: 2026-06-26.
 - [x] Prod ACR or prod tag strategy in place
 - [x] Prod Container App created
 - [x] Prod environment variables configured (separate from dev)
-- [ ] Domain + SSL + custom domain on Container App (deferred — Peter to decide)
+- [x] Domain + SSL + custom domain on Container App — `app.viadalevent.se` live
 - [x] First production deployment verified
 - [ ] Quota request to Azure for dedicated prod Container Apps Environment (optional)
 
