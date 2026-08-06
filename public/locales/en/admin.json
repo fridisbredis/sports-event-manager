@@ -229,6 +229,7 @@
     "statusAssigned": "Assigned",
     "actionRemove": "Remove",
     "actionMarkAssigned": "Mark as assigned",
+    "conflictPickToRemove": "Assigned to multiple work areas — pick one to remove",
     "slotModalTitle": "Slot #{{index}} — {{ws}}, {{time}}",
     "slotModalAssigned": "Assigned",
     "slotModalAvailable": "Available at {{time}}",

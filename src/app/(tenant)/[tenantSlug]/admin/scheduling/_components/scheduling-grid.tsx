@@ -110,10 +110,14 @@ export function SchedulingGrid({
     anchorLeft: number
   } | null>(null)
 
-  // Action popup for existing assignment cells (remove / set status)
-  const [cellActionCell, setCellActionCell] = useState<
-    (LocalAssignment & { anchorTop: number; anchorLeft: number; anchorBottom: number }) | null
-  >(null)
+  // Action popup for existing assignment cells (remove / set status).
+  // Holds all assignments in the cell so double-booked officials can pick which one to remove.
+  const [cellActionCell, setCellActionCell] = useState<{
+    assignments: LocalAssignment[]
+    anchorTop: number
+    anchorLeft: number
+    anchorBottom: number
+  } | null>(null)
 
   // By-work-area expand state
   const [expandedWorkAreas, setExpandedWorkAreas] = useState<Set<string>>(new Set())
@@ -324,8 +328,11 @@ export function SchedulingGrid({
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
-  function getAssignment(officialId: string, slotStart: string): LocalAssignment | undefined {
-    return activeAssignments.find(
+  // Reads from the unfiltered `assignments`, not `activeAssignments` (which is
+  // scoped to the currently selected stage) — a conflicting assignment can
+  // belong to a different stage's workstation and would otherwise be invisible here.
+  function getAssignmentsForCell(officialId: string, slotStart: string): LocalAssignment[] {
+    return assignments.filter(
       (a) => a.official_id === officialId && a.timeslot_start === slotStart
     )
   }
@@ -359,12 +366,12 @@ export function SchedulingGrid({
     anchor?: HTMLElement
   ) {
     const slotStart = slot.toISOString()
-    const existing = getAssignment(officialId, slotStart)
+    const existing = getAssignmentsForCell(officialId, slotStart)
 
-    if (existing && !ws) {
+    if (existing.length > 0 && !ws) {
       const rect = anchor?.getBoundingClientRect()
       setCellActionCell({
-        ...existing,
+        assignments: existing,
         anchorTop: rect ? rect.top : 0,
         anchorLeft: rect ? rect.left : 0,
         anchorBottom: rect ? rect.bottom : 0,
@@ -397,9 +404,7 @@ export function SchedulingGrid({
     }
   }
 
-  async function handleCellAction(action: 'remove' | 'assigned') {
-    if (!cellActionCell) return
-    const assignment = cellActionCell
+  async function handleCellAction(action: 'remove' | 'assigned', assignment: LocalAssignment) {
     setCellActionCell(null)
     if (!assignment.id) return
 
@@ -417,25 +422,10 @@ export function SchedulingGrid({
     }
 
     if (action === 'remove') {
-      setAssignments((prev) =>
-        prev.filter(
-          (a) =>
-            !(
-              a.official_id === assignment.official_id &&
-              a.timeslot_start === assignment.timeslot_start &&
-              a.workstation_id === assignment.workstation_id
-            )
-        )
-      )
+      setAssignments((prev) => prev.filter((a) => a.id !== assignment.id))
     } else {
       setAssignments((prev) =>
-        prev.map((a) =>
-          a.official_id === assignment.official_id &&
-          a.timeslot_start === assignment.timeslot_start &&
-          a.workstation_id === assignment.workstation_id
-            ? { ...a, status: action }
-            : a
-        )
+        prev.map((a) => (a.id === assignment.id ? { ...a, status: action } : a))
       )
     }
     router.refresh()
@@ -827,41 +817,51 @@ export function SchedulingGrid({
       {/* Action popup — status change / remove for an existing assignment */}
       {cellActionCell &&
         (() => {
-          const ws = workstations.find((w) => w.id === cellActionCell.workstation_id)
-          const status = cellActionCell.status
           return (
             <div
-              className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[160px]"
+              className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px]"
               style={{
                 top: cellActionCell.anchorBottom ?? 0,
                 left: cellActionCell.anchorLeft ?? 0,
               }}
               data-cell-action
             >
-              <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[200px]">
-                {ws?.name ?? '—'}
-              </p>
-              <div className="border-t border-gray-100 py-1">
-                <Button
-                  color="danger"
-                  variant="light"
-                  size="sm"
-                  className="w-full justify-start rounded-none px-3 hover:bg-red-50"
-                  onPress={() => handleCellAction('remove')}
-                >
-                  {t('scheduling.actionRemove')}
-                </Button>
-                {status !== 'assigned' && (
-                  <Button
-                    variant="light"
-                    size="sm"
-                    className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                    onPress={() => handleCellAction('assigned')}
-                  >
-                    {t('scheduling.actionMarkAssigned')}
-                  </Button>
-                )}
-              </div>
+              {cellActionCell.assignments.length > 1 && (
+                <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
+                  {t('scheduling.conflictPickToRemove')}
+                </p>
+              )}
+              {cellActionCell.assignments.map((assignment, i) => {
+                const ws = workstations.find((w) => w.id === assignment.workstation_id)
+                return (
+                  <div key={assignment.id ?? i} className="border-t border-gray-100 py-1 first:border-t-0">
+                    <div className="flex items-center justify-between gap-2 px-3 py-1">
+                      <span className="text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[160px]">
+                        {ws?.name ?? '—'}
+                      </span>
+                      <Button
+                        color="danger"
+                        variant="light"
+                        size="sm"
+                        className="shrink-0 px-2 hover:bg-red-50"
+                        onPress={() => handleCellAction('remove', assignment)}
+                      >
+                        {t('scheduling.actionRemove')}
+                      </Button>
+                    </div>
+                    {assignment.status !== 'assigned' && (
+                      <Button
+                        variant="light"
+                        size="sm"
+                        className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
+                        onPress={() => handleCellAction('assigned', assignment)}
+                      >
+                        {t('scheduling.actionMarkAssigned')}
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )
         })()}
