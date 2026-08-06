@@ -111,9 +111,11 @@ export function SchedulingGrid({
   } | null>(null)
 
   // Action popup for existing assignment cells (remove / set status).
-  // Holds all assignments in the cell so double-booked officials can pick which one to remove.
+  // Holds all assignments in the cell so double-booked officials (labelBy: 'workArea')
+  // or over-capacity/overflow work areas (labelBy: 'official') can pick which one to remove.
   const [cellActionCell, setCellActionCell] = useState<{
     assignments: LocalAssignment[]
+    labelBy: 'workArea' | 'official'
     anchorTop: number
     anchorLeft: number
     anchorBottom: number
@@ -372,6 +374,7 @@ export function SchedulingGrid({
       const rect = anchor?.getBoundingClientRect()
       setCellActionCell({
         assignments: existing,
+        labelBy: 'workArea',
         anchorTop: rect ? rect.top : 0,
         anchorLeft: rect ? rect.left : 0,
         anchorBottom: rect ? rect.bottom : 0,
@@ -462,6 +465,17 @@ export function SchedulingGrid({
       slotEnd,
     })
     setWsSlotModalSearch('')
+  }
+
+  function handleOverflowClick(overflowAssignments: LocalAssignment[], anchor: HTMLElement) {
+    const rect = anchor.getBoundingClientRect()
+    setCellActionCell({
+      assignments: overflowAssignments,
+      labelBy: 'official',
+      anchorTop: rect.top,
+      anchorLeft: rect.left,
+      anchorBottom: rect.bottom,
+    })
   }
 
   async function addAssignment(
@@ -807,6 +821,7 @@ export function SchedulingGrid({
             })
           }
           onWsExpandedSlotClick={handleWsExpandedSlotClick}
+          onOverflowClick={handleOverflowClick}
           wsDrag={wsDrag}
           onWsDragStart={handleWsDragStart}
           onWsDragEnter={handleWsDragEnter}
@@ -828,16 +843,21 @@ export function SchedulingGrid({
             >
               {cellActionCell.assignments.length > 1 && (
                 <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                  {t('scheduling.conflictPickToRemove')}
+                  {cellActionCell.labelBy === 'official'
+                    ? t('scheduling.overflowPickToRemove')
+                    : t('scheduling.conflictPickToRemove')}
                 </p>
               )}
               {cellActionCell.assignments.map((assignment, i) => {
-                const ws = workstations.find((w) => w.id === assignment.workstation_id)
+                const label =
+                  cellActionCell.labelBy === 'official'
+                    ? (officials.find((o) => o.id === assignment.official_id)?.name ?? '—')
+                    : (workstations.find((w) => w.id === assignment.workstation_id)?.name ?? '—')
                 return (
                   <div key={assignment.id ?? i} className="border-t border-gray-100 py-1 first:border-t-0">
                     <div className="flex items-center justify-between gap-2 px-3 py-1">
                       <span className="text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[160px]">
-                        {ws?.name ?? '—'}
+                        {label}
                       </span>
                       <Button
                         color="danger"

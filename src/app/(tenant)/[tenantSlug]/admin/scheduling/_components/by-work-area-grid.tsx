@@ -15,6 +15,7 @@ interface ByWorkAreaGridProps {
   expandedWorkAreas: Set<string>
   onToggleExpand: (wsId: string) => void
   onWsExpandedSlotClick: (wsId: string, wsName: string, slotIndex: number, slot: Date) => void
+  onOverflowClick: (overflowAssignments: LocalAssignment[], anchor: HTMLElement) => void
   wsDrag: {
     workstationId: string
     slotIndex: number
@@ -41,6 +42,7 @@ export function ByWorkAreaGrid({
   expandedWorkAreas,
   onToggleExpand,
   onWsExpandedSlotClick,
+  onOverflowClick,
   wsDrag,
   onWsDragStart,
   onWsDragEnter,
@@ -303,9 +305,12 @@ export function ByWorkAreaGrid({
                       return (
                         <td key={slotStart} className="px-1 py-1.5">
                           {overflows.length > 0 && (
-                            <div className="w-full h-10 rounded-md bg-orange-100 border border-orange-200 flex items-center justify-center text-xs text-orange-600 font-medium">
+                            <button
+                              onClick={(e) => onOverflowClick(overflows, e.currentTarget)}
+                              className="w-full h-10 rounded-md bg-orange-100 border border-orange-200 flex items-center justify-center text-xs text-orange-600 font-medium hover:brightness-95 transition-colors"
+                            >
                               +{overflows.length}
-                            </div>
+                            </button>
                           )}
                         </td>
                       )
