@@ -6,6 +6,7 @@ import {
   generateSlotsForDay,
   isWithinWindow,
   getCurrentStage,
+  saveErrorMessage,
 } from './grid-logic'
 
 // These two functions back the warning badges in SCHED-01:
@@ -201,5 +202,24 @@ describe('getCurrentStage', () => {
     }
 
     expect(getCurrentStage([past])).toBeUndefined()
+  })
+})
+
+describe('saveErrorMessage', () => {
+  it('tells the user to reload when a stale Server Action ID is rejected post-deploy', () => {
+    const err = new Error('Failed to find Server Action "abc123"')
+
+    expect(saveErrorMessage(err)).toBe('This page is out of date. Please reload the page to continue.')
+  })
+
+  it('falls back to a generic message for other Error instances', () => {
+    const err = new Error('Network request failed')
+
+    expect(saveErrorMessage(err)).toBe('Something went wrong while saving. Please try again.')
+  })
+
+  it('falls back to a generic message for non-Error throws', () => {
+    expect(saveErrorMessage('some string')).toBe('Something went wrong while saving. Please try again.')
+    expect(saveErrorMessage(undefined)).toBe('Something went wrong while saving. Please try again.')
   })
 })

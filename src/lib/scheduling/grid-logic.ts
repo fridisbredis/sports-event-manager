@@ -196,4 +196,16 @@ export function computeDoubleBookedDetails(
   return details
 }
 
+// A page left open across a deploy calls a Server Action ID the new server
+// no longer recognizes (Container App is in single-revision mode, so every
+// deploy fully swaps the process). Without this, the throw skips
+// endPending/setDragSaving and the cell shows its loading Skeleton forever.
+export function saveErrorMessage(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (msg.includes('Failed to find Server Action')) {
+    return 'This page is out of date. Please reload the page to continue.'
+  }
+  return 'Something went wrong while saving. Please try again.'
+}
+
 export { getAllocableRange, getAllocableDays }

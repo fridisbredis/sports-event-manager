@@ -33,6 +33,7 @@ import {
   computeOverCapacityCells,
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
+  saveErrorMessage,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
@@ -402,38 +403,43 @@ export function SchedulingGrid({
 
       const key = personCellKey(officialId, slotStart)
       beginPending(key)
-      const result = await saveAssignments(
-        tenantSlug,
-        tenantId,
-        [
-          {
-            official_id: officialId,
-            workstation_id: ws.id,
-            timeslot_start: slotStart,
-            timeslot_end: slotEnd,
-            slot_index: slotIdx,
-          },
-        ],
-        []
-      )
-      endPending(key)
+      try {
+        const result = await saveAssignments(
+          tenantSlug,
+          tenantId,
+          [
+            {
+              official_id: officialId,
+              workstation_id: ws.id,
+              timeslot_start: slotStart,
+              timeslot_end: slotEnd,
+              slot_index: slotIdx,
+            },
+          ],
+          []
+        )
 
-      if (result.error) {
-        toastError(result.error)
-      } else {
-        setAssignments((prev) => [
-          ...prev,
-          ...(result.inserted ?? []).map((r) => ({
-            id: r.id,
-            official_id: r.official_id,
-            workstation_id: r.workstation_id!,
-            timeslot_start: new Date(r.timeslot_start).toISOString(),
-            timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-            status: 'assigned',
-            slot_index: r.slot_index,
-          })),
-        ])
-        router.refresh()
+        if (result.error) {
+          toastError(result.error)
+        } else {
+          setAssignments((prev) => [
+            ...prev,
+            ...(result.inserted ?? []).map((r) => ({
+              id: r.id,
+              official_id: r.official_id,
+              workstation_id: r.workstation_id!,
+              timeslot_start: new Date(r.timeslot_start).toISOString(),
+              timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+              status: 'assigned',
+              slot_index: r.slot_index,
+            })),
+          ])
+          router.refresh()
+        }
+      } catch (err) {
+        toastError(saveErrorMessage(err))
+      } finally {
+        endPending(key)
       }
     } else {
       const rect = anchor?.getBoundingClientRect()
@@ -454,40 +460,45 @@ export function SchedulingGrid({
 
     const key = personCellKey(assignment.official_id, assignment.timeslot_start)
     beginPending(key)
-    const result =
-      action === 'remove'
-        ? await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
-        : await saveAssignments(tenantSlug, tenantId, [], [], [{ id: assignment.id, status: action }])
-    endPending(key)
+    try {
+      const result =
+        action === 'remove'
+          ? await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
+          : await saveAssignments(tenantSlug, tenantId, [], [], [{ id: assignment.id, status: action }])
 
-    if (result.error) {
-      toastError(result.error)
-      return
-    }
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
 
-    if (action === 'remove') {
-      setAssignments((prev) =>
-        prev.filter(
-          (a) =>
-            !(
-              a.official_id === assignment.official_id &&
-              a.timeslot_start === assignment.timeslot_start &&
-              a.workstation_id === assignment.workstation_id
-            )
+      if (action === 'remove') {
+        setAssignments((prev) =>
+          prev.filter(
+            (a) =>
+              !(
+                a.official_id === assignment.official_id &&
+                a.timeslot_start === assignment.timeslot_start &&
+                a.workstation_id === assignment.workstation_id
+              )
+          )
         )
-      )
-    } else {
-      setAssignments((prev) =>
-        prev.map((a) =>
-          a.official_id === assignment.official_id &&
-          a.timeslot_start === assignment.timeslot_start &&
-          a.workstation_id === assignment.workstation_id
-            ? { ...a, status: action }
-            : a
+      } else {
+        setAssignments((prev) =>
+          prev.map((a) =>
+            a.official_id === assignment.official_id &&
+            a.timeslot_start === assignment.timeslot_start &&
+            a.workstation_id === assignment.workstation_id
+              ? { ...a, status: action }
+              : a
+          )
         )
-      )
+      }
+      router.refresh()
+    } catch (err) {
+      toastError(saveErrorMessage(err))
+    } finally {
+      endPending(key)
     }
-    router.refresh()
   }
 
   async function handleWsPersonPick(officialId: string) {
@@ -499,38 +510,43 @@ export function SchedulingGrid({
 
     const key = wsCellKey(workstationId, slotIndex, slotStart)
     beginPending(key)
-    const result = await saveAssignments(
-      tenantSlug,
-      tenantId,
-      [
-        {
-          official_id: officialId,
-          workstation_id: workstationId,
-          timeslot_start: slotStart,
-          timeslot_end: slotEnd,
-          slot_index: slotIndex,
-        },
-      ],
-      []
-    )
-    endPending(key)
+    try {
+      const result = await saveAssignments(
+        tenantSlug,
+        tenantId,
+        [
+          {
+            official_id: officialId,
+            workstation_id: workstationId,
+            timeslot_start: slotStart,
+            timeslot_end: slotEnd,
+            slot_index: slotIndex,
+          },
+        ],
+        []
+      )
 
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setAssignments((prev) => [
-        ...prev,
-        ...(result.inserted ?? []).map((r) => ({
-          id: r.id,
-          official_id: r.official_id,
-          workstation_id: r.workstation_id!,
-          timeslot_start: new Date(r.timeslot_start).toISOString(),
-          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-          status: 'assigned',
-          slot_index: r.slot_index,
-        })),
-      ])
-      router.refresh()
+      if (result.error) {
+        toastError(result.error)
+      } else {
+        setAssignments((prev) => [
+          ...prev,
+          ...(result.inserted ?? []).map((r) => ({
+            id: r.id,
+            official_id: r.official_id,
+            workstation_id: r.workstation_id!,
+            timeslot_start: new Date(r.timeslot_start).toISOString(),
+            timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+            status: 'assigned',
+            slot_index: r.slot_index,
+          })),
+        ])
+        router.refresh()
+      }
+    } catch (err) {
+      toastError(saveErrorMessage(err))
+    } finally {
+      endPending(key)
     }
   }
 
@@ -563,38 +579,43 @@ export function SchedulingGrid({
 
     const key = wsCellKey(workstationId, slotIndex, slotStart)
     beginPending(key)
-    const result = await saveAssignments(
-      tenantSlug,
-      tenantId,
-      [
-        {
-          official_id: officialId,
-          workstation_id: workstationId,
-          timeslot_start: slotStart,
-          timeslot_end: slotEnd,
-          slot_index: slotIndex,
-        },
-      ],
-      []
-    )
-    endPending(key)
+    try {
+      const result = await saveAssignments(
+        tenantSlug,
+        tenantId,
+        [
+          {
+            official_id: officialId,
+            workstation_id: workstationId,
+            timeslot_start: slotStart,
+            timeslot_end: slotEnd,
+            slot_index: slotIndex,
+          },
+        ],
+        []
+      )
 
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setAssignments((prev) => [
-        ...prev,
-        ...(result.inserted ?? []).map((r) => ({
-          id: r.id,
-          official_id: r.official_id,
-          workstation_id: r.workstation_id!,
-          timeslot_start: new Date(r.timeslot_start).toISOString(),
-          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-          status: 'assigned',
-          slot_index: r.slot_index,
-        })),
-      ])
-      router.refresh()
+      if (result.error) {
+        toastError(result.error)
+      } else {
+        setAssignments((prev) => [
+          ...prev,
+          ...(result.inserted ?? []).map((r) => ({
+            id: r.id,
+            official_id: r.official_id,
+            workstation_id: r.workstation_id!,
+            timeslot_start: new Date(r.timeslot_start).toISOString(),
+            timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+            status: 'assigned',
+            slot_index: r.slot_index,
+          })),
+        ])
+        router.refresh()
+      }
+    } catch (err) {
+      toastError(saveErrorMessage(err))
+    } finally {
+      endPending(key)
     }
   }
 
@@ -640,27 +661,31 @@ export function SchedulingGrid({
       slot_index: slotIndex,
     }))
 
-    const result = await saveAssignments(tenantSlug, tenantId, additions, [])
+    try {
+      const result = await saveAssignments(tenantSlug, tenantId, additions, [])
 
-    if (result.error) {
-      toastError(result.error)
-    } else {
-      setAssignments((prev) => [
-        ...prev,
-        ...(result.inserted ?? []).map((r) => ({
-          id: r.id,
-          official_id: r.official_id,
-          workstation_id: r.workstation_id!,
-          timeslot_start: new Date(r.timeslot_start).toISOString(),
-          timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
-          status: 'assigned',
-          slot_index: r.slot_index,
-        })),
-      ])
-      router.refresh()
+      if (result.error) {
+        toastError(result.error)
+      } else {
+        setAssignments((prev) => [
+          ...prev,
+          ...(result.inserted ?? []).map((r) => ({
+            id: r.id,
+            official_id: r.official_id,
+            workstation_id: r.workstation_id!,
+            timeslot_start: new Date(r.timeslot_start).toISOString(),
+            timeslot_end: slotEndTime(new Date(r.timeslot_start), granularityMin).toISOString(),
+            status: 'assigned',
+            slot_index: r.slot_index,
+          })),
+        ])
+        router.refresh()
+      }
+    } catch (err) {
+      toastError(saveErrorMessage(err))
+    } finally {
+      setDragSaving(false)
     }
-
-    setDragSaving(false)
   }
 
   async function handleWsSlotRemove(assignment: LocalAssignment) {
@@ -668,26 +693,31 @@ export function SchedulingGrid({
 
     const key = wsCellKey(assignment.workstation_id, assignment.slot_index, assignment.timeslot_start)
     beginPending(key)
-    const result = await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
-    endPending(key)
+    try {
+      const result = await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
 
-    if (result.error) {
-      toastError(result.error)
-      return
-    }
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
 
-    setAssignments((prev) =>
-      prev.filter(
-        (a) =>
-          !(
-            a.official_id === assignment.official_id &&
-            a.workstation_id === assignment.workstation_id &&
-            a.timeslot_start === assignment.timeslot_start &&
-            a.slot_index === assignment.slot_index
-          )
+      setAssignments((prev) =>
+        prev.filter(
+          (a) =>
+            !(
+              a.official_id === assignment.official_id &&
+              a.workstation_id === assignment.workstation_id &&
+              a.timeslot_start === assignment.timeslot_start &&
+              a.slot_index === assignment.slot_index
+            )
+        )
       )
-    )
-    router.refresh()
+      router.refresh()
+    } catch (err) {
+      toastError(saveErrorMessage(err))
+    } finally {
+      endPending(key)
+    }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
