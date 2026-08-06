@@ -19,7 +19,21 @@ import {
   Skeleton,
 } from '@heroui/react'
 import { saveAssignments, type AssignmentInput } from '../actions'
-import { getAllocableRange, getAllocableDays } from '@/lib/scheduling/allocable-range'
+import { getAllocableDays } from '@/lib/scheduling/allocable-range'
+import {
+  getCurrentStage,
+  generateSlotsForDay,
+  slotEndTime,
+  isWithinWindow,
+  formatDayLabel,
+  formatSlotLabel,
+  formatSlotDateTimeLabel,
+  initials,
+  shortName,
+  computeOverCapacityCells,
+  computeDoubleBookedOfficials,
+  computeDoubleBookedDetails,
+} from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 
@@ -85,88 +99,6 @@ interface LocalAssignment {
   timeslot_end: string
   status: string
   slot_index: number | null
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getCurrentStage(stages: Stage[]): Stage | undefined {
-  const now = new Date()
-  return stages.find((stage) => {
-    const range = getAllocableRange(stage)
-    if (!range) return false
-    return now >= new Date(range.start) && now <= new Date(range.end)
-  })
-}
-
-function generateSlotsForDay(stage: Stage, day: string, granularityMin: number): Date[] {
-  const range = getAllocableRange(stage)
-  if (!range) return []
-
-  const dayStart = new Date(`${day}T00:00:00.000Z`)
-  const dayEnd = new Date(`${day}T23:59:59.999Z`)
-
-  const start = new Date(Math.max(new Date(range.start).getTime(), dayStart.getTime()))
-  const end = new Date(Math.min(new Date(range.end).getTime(), dayEnd.getTime()))
-
-  if (start >= end) return []
-
-  const slots: Date[] = []
-  const cur = new Date(start)
-  while (cur < end) {
-    slots.push(new Date(cur))
-    cur.setMinutes(cur.getMinutes() + granularityMin)
-  }
-  return slots
-}
-
-function formatDayLabel(day: string): string {
-  const date = new Date(`${day}T12:00:00.000Z`)
-  return date.toLocaleDateString('sv-SE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-}
-
-function slotEndTime(slot: Date, granularityMin: number): Date {
-  const end = new Date(slot)
-  end.setMinutes(end.getMinutes() + granularityMin)
-  return end
-}
-
-function formatSlotLabel(slot: Date): string {
-  return slot.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
-}
-
-function formatSlotDateTimeLabel(slot: Date): string {
-  const date = slot.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-  return `${date} ${formatSlotLabel(slot)}`
-}
-
-function isWithinWindow(slot: Date, granMin: number, windows: OperatingWindow[]): boolean {
-  if (windows.length === 0) return true
-  const slotEnd = slotEndTime(slot, granMin)
-  return windows.some((w) => {
-    const wStart = new Date(w.window_start)
-    const wEnd = new Date(w.window_end)
-    return slot >= wStart && slotEnd <= wEnd
-  })
-}
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
-
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/)
-  if (parts.length < 2) return name
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -336,34 +268,15 @@ export function SchedulingGrid({
     return assignments.filter((a) => stageWsIds.has(a.workstation_id))
   }, [assignments, stageWorkstations])
 
-  const overCapacityCells = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const a of activeAssignments) {
-      const key = `${a.workstation_id}:${a.timeslot_start}`
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-    const result = new Set<string>()
-    for (const [key, count] of counts) {
-      const wsId = key.split(':')[0]
-      const ws = stageWorkstations.find((w) => w.id === wsId)
-      if (ws && count > ws.capacity_ceiling) result.add(key)
-    }
-    return result
-  }, [activeAssignments, stageWorkstations])
+  const overCapacityCells = useMemo(
+    () => computeOverCapacityCells(activeAssignments, stageWorkstations),
+    [activeAssignments, stageWorkstations]
+  )
 
-  const doubleBookedOfficials = useMemo(() => {
-    const result = new Set<string>()
-    const seenSlots = new Map<string, string>()
-    for (const a of assignments) {
-      const key = `${a.official_id}:${a.timeslot_start}`
-      if (seenSlots.has(key) && seenSlots.get(key) !== a.workstation_id) {
-        result.add(key)
-      } else {
-        seenSlots.set(key, a.workstation_id)
-      }
-    }
-    return result
-  }, [assignments])
+  const doubleBookedOfficials = useMemo(
+    () => computeDoubleBookedOfficials(assignments),
+    [assignments]
+  )
 
   const overCapacityCount = useMemo(() => {
     const wsSet = new Set<string>()
@@ -377,26 +290,10 @@ export function SchedulingGrid({
     return officialSet.size
   }, [doubleBookedOfficials])
 
-  const doubleBookedDetails = useMemo(() => {
-    const details: { officialName: string; time: string; workAreaNames: string[] }[] = []
-    for (const key of doubleBookedOfficials) {
-      const [officialId, timeslotStart] = key.split(/:(.+)/)
-      const official = officials.find((o) => o.id === officialId)
-      if (!official) continue
-      const conflictingAssignments = assignments.filter(
-        (a) => a.official_id === officialId && a.timeslot_start === timeslotStart
-      )
-      const workAreaNames = conflictingAssignments
-        .map((a) => workstations.find((w) => w.id === a.workstation_id)?.name ?? '—')
-        .filter((n, i, arr) => arr.indexOf(n) === i)
-      details.push({
-        officialName: official.name,
-        time: formatSlotDateTimeLabel(new Date(timeslotStart)),
-        workAreaNames,
-      })
-    }
-    return details
-  }, [doubleBookedOfficials, assignments, officials, workstations])
+  const doubleBookedDetails = useMemo(
+    () => computeDoubleBookedDetails(doubleBookedOfficials, assignments, officials, workstations),
+    [doubleBookedOfficials, assignments, officials, workstations]
+  )
 
   // Finalize a by-work-area drag on mouseup (window-level so it can't get stuck
   // if the mouse leaves the table before releasing)
