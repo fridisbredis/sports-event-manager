@@ -53,6 +53,20 @@ interface Props {
 
 type View = 'by-person' | 'by-work-area'
 
+function toLocalAssignmentsFromInitial(initialAssignments: AssignmentData[]): LocalAssignment[] {
+  return initialAssignments
+    .filter((a) => a.workstation_id)
+    .map((a) => ({
+      id: a.id,
+      official_id: a.official_id,
+      workstation_id: a.workstation_id!,
+      timeslot_start: new Date(a.timeslot_start).toISOString(),
+      timeslot_end: new Date(a.timeslot_end).toISOString(),
+      status: a.status ?? 'assigned',
+      slot_index: a.slot_index,
+    }))
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SchedulingGrid({
@@ -77,19 +91,17 @@ export function SchedulingGrid({
     const today = new Date().toISOString().slice(0, 10)
     return days.includes(today) ? today : (days[0] ?? '')
   })
-  const [assignments, setAssignments] = useState<LocalAssignment[]>(
-    initialAssignments
-      .filter((a) => a.workstation_id)
-      .map((a) => ({
-        id: a.id,
-        official_id: a.official_id,
-        workstation_id: a.workstation_id!,
-        timeslot_start: new Date(a.timeslot_start).toISOString(),
-        timeslot_end: new Date(a.timeslot_end).toISOString(),
-        status: a.status ?? 'assigned',
-        slot_index: a.slot_index,
-      }))
+  const [assignments, setAssignments] = useState<LocalAssignment[]>(() =>
+    toLocalAssignmentsFromInitial(initialAssignments)
   )
+
+  // `initialAssignments` is a new array on every server re-render (e.g. after
+  // router.refresh()), but useState only reads it once at mount — without this,
+  // local state goes stale relative to the DB and autosave rejects edits to
+  // cells that look empty but are already taken.
+  useEffect(() => {
+    setAssignments(toLocalAssignmentsFromInitial(initialAssignments))
+  }, [initialAssignments])
   // By-person work-area picker
   const [pickerCell, setPickerCell] = useState<{
     officialId: string
