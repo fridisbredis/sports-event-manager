@@ -42,6 +42,14 @@ export interface DoubleBookedDetail {
   workAreaNames: string[]
 }
 
+export interface OverCapacityDetail {
+  workAreaName: string
+  time: string
+  count: number
+  ceiling: number
+  officialNames: string[]
+}
+
 // ─── Stage / slot helpers ──────────────────────────────────────────────────
 
 export function getCurrentStage<T extends StageWindow>(stages: T[]): T | undefined {
@@ -154,6 +162,34 @@ export function computeOverCapacityCells(
     if (ws && count > ws.capacity_ceiling) result.add(key)
   }
   return result
+}
+
+export function computeOverCapacityDetails(
+  overCapacityCells: Set<string>,
+  activeAssignments: AssignmentLike[],
+  stageWorkstations: (WorkstationLike & WorkstationCapacity)[],
+  officials: OfficialLike[]
+): OverCapacityDetail[] {
+  const details: OverCapacityDetail[] = []
+  for (const key of overCapacityCells) {
+    const [wsId, timeslotStart] = key.split(/:(.+)/)
+    const ws = stageWorkstations.find((w) => w.id === wsId)
+    if (!ws) continue
+    const cellAssignments = activeAssignments.filter(
+      (a) => a.workstation_id === wsId && a.timeslot_start === timeslotStart
+    )
+    const officialNames = cellAssignments.map(
+      (a) => officials.find((o) => o.id === a.official_id)?.name ?? '—'
+    )
+    details.push({
+      workAreaName: ws.name,
+      time: formatSlotDateTimeLabel(new Date(timeslotStart)),
+      count: cellAssignments.length,
+      ceiling: ws.capacity_ceiling,
+      officialNames,
+    })
+  }
+  return details
 }
 
 export function computeDoubleBookedOfficials(assignments: AssignmentLike[]): Set<string> {

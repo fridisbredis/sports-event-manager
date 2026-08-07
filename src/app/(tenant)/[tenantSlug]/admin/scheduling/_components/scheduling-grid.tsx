@@ -26,6 +26,7 @@ import {
   formatSlotLabel,
   initials,
   computeOverCapacityCells,
+  computeOverCapacityDetails,
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
 } from '@/lib/scheduling/grid-logic'
@@ -263,6 +264,11 @@ export function SchedulingGrid({
   const doubleBookedDetails = useMemo(
     () => computeDoubleBookedDetails(doubleBookedOfficials, assignments, officials, workstations),
     [doubleBookedOfficials, assignments, officials, workstations]
+  )
+
+  const overCapacityDetails = useMemo(
+    () => computeOverCapacityDetails(overCapacityCells, activeAssignments, stageWorkstations, officials),
+    [overCapacityCells, activeAssignments, stageWorkstations, officials]
   )
 
   // Finalize a by-work-area drag on mouseup (window-level so it can't get stuck
@@ -722,21 +728,30 @@ export function SchedulingGrid({
 
       {/* Conflict banners */}
       {overCapacityCount > 0 && (
-        <div className="no-print mb-3 flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-md text-sm text-gray-700">
-          <svg
-            className="w-4 h-4 text-gray-500 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z"
-            />
-          </svg>
-          {t('scheduling.overCapacity', { count: overCapacityCount })}
+        <div className="no-print mb-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-md text-sm text-orange-700">
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-4 h-4 text-orange-500 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z"
+              />
+            </svg>
+            {t('scheduling.overCapacity', { count: overCapacityCount })}
+          </div>
+          <ul className="mt-1.5 ml-6 space-y-0.5 text-xs text-orange-600">
+            {overCapacityDetails.map((d, i) => (
+              <li key={i}>
+                {d.workAreaName} — {d.time} ({d.count}/{d.ceiling}): {d.officialNames.join(', ')}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {doubleBookedCount > 0 && (

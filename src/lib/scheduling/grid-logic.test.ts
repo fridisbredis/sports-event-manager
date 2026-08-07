@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeOverCapacityCells,
+  computeOverCapacityDetails,
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
   generateSlotsForDay,
@@ -53,6 +54,50 @@ describe('computeOverCapacityCells (by-work-area)', () => {
     ]
 
     expect(computeOverCapacityCells(assignments, workstations)).toEqual(new Set())
+  })
+})
+
+describe('computeOverCapacityDetails', () => {
+  it('resolves work area and official names and reports the count against the ceiling', () => {
+    const workstations = [{ id: 'ws-1', name: 'Start line', capacity_ceiling: 1 }]
+    const officials = [
+      { id: 'o1', name: 'Frida' },
+      { id: 'o2', name: 'Mikael Saras' },
+    ]
+    const assignments = [
+      { official_id: 'o1', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+      { official_id: 'o2', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+    ]
+    const overCapacityCells = computeOverCapacityCells(assignments, workstations)
+
+    const details = computeOverCapacityDetails(overCapacityCells, assignments, workstations, officials)
+
+    expect(details).toHaveLength(1)
+    expect(details[0].workAreaName).toBe('Start line')
+    expect(details[0].count).toBe(2)
+    expect(details[0].ceiling).toBe(1)
+    expect(details[0].officialNames.sort()).toEqual(['Frida', 'Mikael Saras'])
+  })
+
+  it('lists one entry per over-capacity timeslot, even for the same work area', () => {
+    const workstations = [{ id: 'ws-1', name: 'Start line', capacity_ceiling: 1 }]
+    const officials = [
+      { id: 'o1', name: 'Frida' },
+      { id: 'o2', name: 'Mikael Saras' },
+      { id: 'o3', name: 'Anna Andersson' },
+    ]
+    const assignments = [
+      { official_id: 'o1', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+      { official_id: 'o2', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+      { official_id: 'o2', workstation_id: 'ws-1', timeslot_start: '2026-08-06T14:00:00.000Z' },
+      { official_id: 'o3', workstation_id: 'ws-1', timeslot_start: '2026-08-06T14:00:00.000Z' },
+    ]
+    const overCapacityCells = computeOverCapacityCells(assignments, workstations)
+
+    const details = computeOverCapacityDetails(overCapacityCells, assignments, workstations, officials)
+
+    expect(details).toHaveLength(2)
+    expect(details.every((d) => d.workAreaName === 'Start line' && d.count === 2)).toBe(true)
   })
 })
 
