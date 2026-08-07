@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { Button, Skeleton } from '@heroui/react'
 import { isWithinWindow, formatSlotLabel, shortName } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
+import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
 interface ByWorkAreaGridProps {
@@ -125,16 +125,7 @@ export function ByWorkAreaGrid({
           {stageWorkstations.map((ws) => {
             const isExpanded = expandedWorkAreas.has(ws.id)
 
-            // Overflow assignments: slot_index > capacity_ceiling
-            const overflowBySlot = new Map<string, LocalAssignment[]>()
-            for (const a of activeAssignments) {
-              if (a.workstation_id !== ws.id) continue
-              if (a.slot_index !== null && a.slot_index > ws.capacity_ceiling) {
-                const arr = overflowBySlot.get(a.timeslot_start) ?? []
-                arr.push(a)
-                overflowBySlot.set(a.timeslot_start, arr)
-              }
-            }
+            const overflowBySlot = getOverflowBySlot(activeAssignments, ws.id, ws.capacity_ceiling)
             const hasOverflow = overflowBySlot.size > 0
 
             return (

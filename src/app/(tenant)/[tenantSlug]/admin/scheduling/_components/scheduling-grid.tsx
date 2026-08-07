@@ -32,7 +32,7 @@ import {
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
-import { toLocalAssignments } from './grid-helpers'
+import { toLocalAssignments, getAssignmentsForCell, applyCellAction, resolveCellActionLabel } from './grid-helpers'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
 import { ByPersonGrid } from './by-person-grid'
@@ -336,15 +336,6 @@ export function SchedulingGrid({
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
-  // Reads from the unfiltered `assignments`, not `activeAssignments` (which is
-  // scoped to the currently selected stage) — a conflicting assignment can
-  // belong to a different stage's workstation and would otherwise be invisible here.
-  function getAssignmentsForCell(officialId: string, slotStart: string): LocalAssignment[] {
-    return assignments.filter(
-      (a) => a.official_id === officialId && a.timeslot_start === slotStart
-    )
-  }
-
   function nextLocalFreeSlot(wsId: string, slotStart: string): number {
     const used = new Set<number>()
     for (const a of activeAssignments) {
@@ -374,7 +365,7 @@ export function SchedulingGrid({
     anchor?: HTMLElement
   ) {
     const slotStart = slot.toISOString()
-    const existing = getAssignmentsForCell(officialId, slotStart)
+    const existing = getAssignmentsForCell(assignments, officialId, slotStart)
 
     if (existing.length > 0 && !ws) {
       const rect = anchor?.getBoundingClientRect()
@@ -430,13 +421,7 @@ export function SchedulingGrid({
       return
     }
 
-    if (action === 'remove') {
-      setAssignments((prev) => prev.filter((a) => a.id !== assignment.id))
-    } else {
-      setAssignments((prev) =>
-        prev.map((a) => (a.id === assignment.id ? { ...a, status: action } : a))
-      )
-    }
+    setAssignments((prev) => applyCellAction(prev, action, assignment.id!))
     router.refresh()
   }
 
@@ -864,10 +849,12 @@ export function SchedulingGrid({
                 </p>
               )}
               {cellActionCell.assignments.map((assignment, i) => {
-                const label =
-                  cellActionCell.labelBy === 'official'
-                    ? (officials.find((o) => o.id === assignment.official_id)?.name ?? '—')
-                    : (workstations.find((w) => w.id === assignment.workstation_id)?.name ?? '—')
+                const label = resolveCellActionLabel(
+                  cellActionCell.labelBy,
+                  assignment,
+                  officials,
+                  workstations
+                )
                 return (
                   <div key={assignment.id ?? i} className="border-t border-gray-100 py-1 first:border-t-0">
                     <div className="flex items-center justify-between gap-2 px-3 py-1">
