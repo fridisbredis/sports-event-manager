@@ -37,3 +37,10 @@ DEVELOPMENT.md
 # Personal Claude context — not committed
 CLAUDE.md
 .claude/*
+!.claude/CLAUDE.md
+!.claude/commands/
+!.claude/commands/**
+!.claude/agents/
+!.claude/agents/**
+!.claude/skills/
+!.claude/skills/**
