@@ -29,15 +29,15 @@ The initial assessment was a static review of the repository plus local quality
 checks on 2026-08-10. It did not test the live Supabase configuration, Azure
 configuration, Twilio account, or production traffic.
 
-| Check                | Result                                                                                                                                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit/component tests | 14 test files and 145 tests passed                                                                                                                                                               |
-| Type check           | Passed (`tsc --noEmit`)                                                                                                                                                                          |
-| Lint                 | Passed: `eslint .` exits successfully with no reported errors or warnings. A pull-request CI workflow is configured; GitHub branch protection must still require its `Lint` status before merge. |
-| Formatting check     | Passed: `npm run format:check` reports no style issues. A pull-request CI workflow is configured; GitHub branch protection must still require its `Format` status before merge.                  |
-| Production build     | Could not complete in the assessment environment because `next/font` could not fetch Google Fonts; it also warned about an inferred workspace root and the deprecated `middleware` convention    |
-| Dependency audit     | Reported three high-severity production dependency findings, including Next.js, PostCSS, and Sharp                                                                                               |
-| CI/SAST              | CodeQL is configured for pushes, pull requests, manual runs, and weekly scans. A separate lint and format workflow is configured for pushes and pull requests.                                   |
+| Check                | Result                                                                                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit/component tests | 14 test files and 145 tests passed                                                                                                                                                                  |
+| Type check           | Passed (`tsc --noEmit`)                                                                                                                                                                             |
+| Lint                 | Passed: `eslint .` exits successfully with no reported errors or warnings. The `Lint` status is selected as required by the `main` branch ruleset.                                                  |
+| Formatting check     | Passed: `npm run format:check` reports no style issues. The `Format` status is selected as required by the `main` branch ruleset.                                                                   |
+| Production build     | Could not complete in the assessment environment because `next/font` could not fetch Google Fonts; it also warned about an inferred workspace root and the deprecated `middleware` convention       |
+| Dependency audit     | Reported three high-severity production dependency findings, including Next.js, PostCSS, and Sharp                                                                                                  |
+| CI/SAST              | CodeQL is configured for pushes, pull requests, manual runs, and weekly scans. The `main` branch ruleset selects the CodeQL analysis as required and requires high-or-higher code-scanning results. |
 
 ## Quality objectives and release requirements
 
@@ -82,6 +82,11 @@ must be replaced with numbers agreed with the product owner before release:
 | MNT-05 | Complex scheduling code is understandable and independently testable. | Scheduling domain logic is kept in small, pure modules with unit tests; the current large grid component is split into focused view and interaction components.                                                                 | Code review; module-level test coverage.                      | Should   |
 | MNT-06 | Builds are repeatable in CI.                                          | The build has an explicit Turbopack workspace root and does not depend on an uncontrolled external font download, or that dependency is deliberately provisioned and monitored.                                                 | Clean CI build from a fresh checkout.                         | Should   |
 
+**Current CI coverage:** lint, formatting, and CodeQL are configured as
+required checks for `main`. MNT-01 remains incomplete until type checking,
+unit tests, integration tests, production build, and dependency audit are also
+run and required in pull-request CI.
+
 ## Initial findings register
 
 | ID        | Finding and evidence                                                                                                                                                       | Impact                                                                                                                                                      | Required follow-up                                                                                                                          | Priority |
@@ -99,10 +104,27 @@ must be replaced with numbers agreed with the product owner before release:
 
 ## Resolved findings
 
-| ID       | Resolution and evidence                                                                                                                                                              | Remaining follow-up                                                                     | Status                               |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------ |
-| F-MNT-01 | The lint script uses `eslint .`, and `npm run lint` passed with no errors or warnings on 2026-08-11. The `Quality checks` workflow runs lint for pull requests and pushes to `main`. | In GitHub branch protection, require the `Quality checks / Lint` status before merge.   | Automated; branch protection pending |
-| F-MNT-02 | `npm run format:check` passed with no style issues on 2026-08-11. The `Quality checks` workflow runs formatting for pull requests and pushes to `main`.                              | In GitHub branch protection, require the `Quality checks / Format` status before merge. | Automated; branch protection pending |
+| ID       | Resolution and evidence                                                                                                                                                              | Remaining follow-up                                                                                                                | Status                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| F-MNT-01 | The lint script uses `eslint .`, and `npm run lint` passed with no errors or warnings on 2026-08-11. The `Quality checks` workflow runs lint for pull requests and pushes to `main`. | The `Lint` status is selected as required in the `main` branch ruleset; save the ruleset and verify it on the next pull request.   | Automated; activation verification pending |
+| F-MNT-02 | `npm run format:check` passed with no style issues on 2026-08-11. The `Quality checks` workflow runs formatting for pull requests and pushes to `main`.                              | The `Format` status is selected as required in the `main` branch ruleset; save the ruleset and verify it on the next pull request. | Automated; activation verification pending |
+
+## Main branch ruleset
+
+The GitHub ruleset shown in repository settings targets the default branch,
+`main`. Once its changes are saved and the ruleset is active, it is configured
+to enforce the following:
+
+- Pull requests are required before merging, and the branch must be up to date.
+- Required status checks: `Lint`, `Format`, and
+  `Analyze Source Code (javascript-typescript)`.
+- Force pushes are blocked.
+- Code-scanning results at high severity or above are required.
+- The bypass list is empty.
+
+The ruleset currently requires zero approving reviews. Requiring one approval
+is recommended when another maintainer is available, but is a product/team
+decision rather than a technical prerequisite.
 
 ## Evidence references
 
