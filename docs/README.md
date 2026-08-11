@@ -13,6 +13,7 @@ Handoff index for the development team. This `docs/` folder is the source of tru
 5. **`ia/screen-map.md`** — information architecture: every screen per role and how they connect (`ia/screen-map.mermaid` is the diagram).
 6. **`screens/screen-documentation.md`** — the developer-ready screen spec in pipe format (IDs, blocks, states, flows). Build from this.
 7. **Wireframes** — lo-fi wireframes are in Claude Design (Peter shares access). `screens/claude-design-prompt.md` shows how they were generated and the platform/navigation rules.
+8. **`quality-requirements.md`** — SQuaRE/ISO 25010 quality requirements, acceptance criteria, initial assessment findings, and release priorities.
 
 ## Status
 
