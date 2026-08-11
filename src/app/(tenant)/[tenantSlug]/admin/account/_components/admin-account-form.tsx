@@ -11,7 +11,11 @@ interface AdminAccountFormProps {
   tenantId: string
 }
 
-export default function AdminAccountForm({ name: initialName, phone, tenantId }: AdminAccountFormProps) {
+export default function AdminAccountForm({
+  name: initialName,
+  phone,
+  tenantId,
+}: AdminAccountFormProps) {
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
 
   const [name, setName] = useState(initialName)
@@ -43,8 +47,7 @@ export default function AdminAccountForm({ name: initialName, phone, tenantId }:
     }
   }
 
-  const saveLabel =
-    saveState === 'saving' ? 'Sparar…' : saveState === 'saved' ? 'Sparat' : 'Spara'
+  const saveLabel = saveState === 'saving' ? 'Sparar…' : saveState === 'saved' ? 'Sparat' : 'Spara'
 
   const initials = name
     .split(' ')
@@ -100,9 +103,7 @@ export default function AdminAccountForm({ name: initialName, phone, tenantId }:
             Mobile number (read-only)
           </label>
           <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <span className="flex-1 text-sm text-gray-500">
-              {phone ? `+${phone}` : '—'}
-            </span>
+            <span className="flex-1 text-sm text-gray-500">{phone ? `+${phone}` : '—'}</span>
             <span className="text-xs font-medium text-gray-400 shrink-0">Read only</span>
           </div>
         </div>

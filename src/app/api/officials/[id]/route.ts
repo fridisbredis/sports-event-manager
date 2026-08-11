@@ -7,7 +7,10 @@ const deleteSchema = z.object({
   tenantId: z.string().uuid(),
 })
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const { id } = await params
   const tenantId = request.nextUrl.searchParams.get('tenantId')
 
@@ -33,7 +36,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
 
   // Free any assignments this official holds
-  await service.from('assignments').delete().eq('official_id', id).eq('tenant_id', parsed.data.tenantId)
+  await service
+    .from('assignments')
+    .delete()
+    .eq('official_id', id)
+    .eq('tenant_id', parsed.data.tenantId)
 
   const { error } = await service
     .from('officials')

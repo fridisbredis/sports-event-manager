@@ -8,7 +8,12 @@ interface Props {
   onSelect: (key: TenantPaletteKey) => void
 }
 
-export function ColorPalettePicker({ colorPalette, isSavingPalette, paletteError, onSelect }: Props) {
+export function ColorPalettePicker({
+  colorPalette,
+  isSavingPalette,
+  paletteError,
+  onSelect,
+}: Props) {
   const { t } = useTranslation('admin')
 
   return (
@@ -29,9 +34,7 @@ export function ColorPalettePicker({ colorPalette, isSavingPalette, paletteError
               aria-pressed={isSelected}
               aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
               className={`group flex flex-col items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors ${
-                isSelected
-                  ? 'border-gray-900 bg-gray-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                isSelected ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'
               } ${isSavingPalette ? 'opacity-60' : ''}`}
             >
               <div className="flex -space-x-1.5">

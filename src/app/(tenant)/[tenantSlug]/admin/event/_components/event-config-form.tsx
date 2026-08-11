@@ -144,12 +144,14 @@ export default function EventConfigForm({
     if (!label) return
     setFacilities((prev) => [...prev, { label, position: prev.length }])
     setFacilityInput('')
-    setSaveSuccess(false); markDirty()
+    setSaveSuccess(false)
+    markDirty()
   }
 
   function removeFacility(index: number) {
     setFacilities((prev) => prev.filter((_, i) => i !== index))
-    setSaveSuccess(false); markDirty()
+    setSaveSuccess(false)
+    markDirty()
   }
 
   function buildInput(): SaveEventInput {
@@ -173,7 +175,8 @@ export default function EventConfigForm({
       setErrors({ name: t('eventConfig.eventNameEmpty') })
       return
     }
-    setSaveSuccess(false); markDirty()
+    setSaveSuccess(false)
+    markDirty()
     setErrors({})
     startSave(async () => {
       const result = await saveEvent(buildInput())
@@ -210,11 +213,7 @@ export default function EventConfigForm({
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-gray-900">{t('eventConfig.title')}</h1>
-          <Chip
-            color={isPublished ? 'success' : 'warning'}
-            variant="flat"
-            size="sm"
-          >
+          <Chip color={isPublished ? 'success' : 'warning'} variant="flat" size="sm">
             {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
           </Chip>
         </div>
@@ -263,7 +262,12 @@ export default function EventConfigForm({
               fileInputRef={fileInputRef}
               onFileChange={handleLogoFileChange}
               onImageError={() => setLogoError(true)}
-              onRemove={() => { setLogoUrl(''); setLogoError(false); setSaveSuccess(false); markDirty() }}
+              onRemove={() => {
+                setLogoUrl('')
+                setLogoError(false)
+                setSaveSuccess(false)
+                markDirty()
+              }}
             />
 
             <ColorPalettePicker
@@ -279,7 +283,8 @@ export default function EventConfigForm({
               value={name}
               onValueChange={(val) => {
                 setName(val)
-                setSaveSuccess(false); markDirty()
+                setSaveSuccess(false)
+                markDirty()
                 if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
               }}
               placeholder={t('eventConfig.eventNamePlaceholder')}
@@ -292,7 +297,8 @@ export default function EventConfigForm({
               value={eventType}
               onValueChange={(val) => {
                 setEventType(val)
-                setSaveSuccess(false); markDirty()
+                setSaveSuccess(false)
+                markDirty()
               }}
               placeholder={t('eventConfig.typePlaceholder')}
             />
@@ -302,7 +308,8 @@ export default function EventConfigForm({
               value={description}
               onValueChange={(val) => {
                 setDescription(val)
-                setSaveSuccess(false); markDirty()
+                setSaveSuccess(false)
+                markDirty()
               }}
               minRows={4}
               placeholder={t('eventConfig.descriptionPlaceholder')}
@@ -314,7 +321,8 @@ export default function EventConfigForm({
               granularity={granularity}
               onGranularityChange={(minutes) => {
                 setGranularity(minutes)
-                setSaveSuccess(false); markDirty()
+                setSaveSuccess(false)
+                markDirty()
               }}
             />
 
@@ -339,7 +347,8 @@ export default function EventConfigForm({
               stages={stages}
               onChange={(updated) => {
                 setStages(updated)
-                setSaveSuccess(false); markDirty()
+                setSaveSuccess(false)
+                markDirty()
               }}
             />
             {errors.stages && <p className="text-xs text-red-500">{errors.stages}</p>}

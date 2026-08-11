@@ -136,7 +136,10 @@ describe('getOverflowBySlot', () => {
   })
 
   it('returns an empty map when nothing exceeds the ceiling', () => {
-    const assignments = [makeAssignment({ slot_index: 1 }), makeAssignment({ id: 'a2', slot_index: 2 })]
+    const assignments = [
+      makeAssignment({ slot_index: 1 }),
+      makeAssignment({ id: 'a2', slot_index: 2 }),
+    ]
 
     expect(getOverflowBySlot(assignments, 'ws-1', 2).size).toBe(0)
   })
@@ -191,7 +194,9 @@ describe('resolveCellActionLabel', () => {
   it('resolves the work area name when labelBy is "workArea" (double-booking conflicts)', () => {
     const assignment = makeAssignment({ workstation_id: 'ws-1' })
 
-    expect(resolveCellActionLabel('workArea', assignment, officials, workstations)).toBe('Water Station')
+    expect(resolveCellActionLabel('workArea', assignment, officials, workstations)).toBe(
+      'Water Station'
+    )
   })
 
   it('falls back to an em dash when the referenced official or work area is unknown', () => {

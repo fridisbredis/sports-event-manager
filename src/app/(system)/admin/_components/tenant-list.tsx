@@ -2,7 +2,16 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Chip } from '@heroui/react'
+import {
+  Button,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+} from '@heroui/react'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'
 
@@ -70,7 +79,10 @@ export function TenantList({ tenants }: Props) {
               {tenants.map((tenant) => (
                 <TableRow key={tenant.id}>
                   <TableCell>
-                    <Link href={`/admin/${tenant.id}`} className="font-medium text-gray-900 hover:underline">
+                    <Link
+                      href={`/admin/${tenant.id}`}
+                      className="font-medium text-gray-900 hover:underline"
+                    >
                       {tenant.name}
                     </Link>
                     <p className="text-xs text-gray-400 font-mono mt-0.5">{tenant.slug}</p>

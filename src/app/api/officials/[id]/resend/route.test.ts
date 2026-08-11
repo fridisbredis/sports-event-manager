@@ -69,7 +69,10 @@ describe('POST /api/officials/[id]/resend', () => {
   })
 
   it('validates tenantId via requireTenantAdmin and scopes the official lookup to that tenant', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const officialsBuilder = chain({
       data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' },
     })
@@ -88,7 +91,10 @@ describe('POST /api/officials/[id]/resend', () => {
   })
 
   it('returns 404 when the official is not found', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
@@ -99,9 +105,14 @@ describe('POST /api/officials/[id]/resend', () => {
   })
 
   it('returns 400 and does not send sms when the official is not in the invited state', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const fromMock = vi.fn().mockReturnValueOnce(
-      chain({ data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'confirmed' } })
+      chain({
+        data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'confirmed' },
+      })
     )
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
@@ -112,7 +123,10 @@ describe('POST /api/officials/[id]/resend', () => {
   })
 
   it('regenerates the invite token and resends the confirmation text via Twilio', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
 
     const officialsSelectBuilder = chain({
       data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' },
@@ -145,10 +159,17 @@ describe('POST /api/officials/[id]/resend', () => {
   })
 
   it('returns 500 and never sends sms when the token refresh fails', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const fromMock = vi.fn()
     fromMock
-      .mockReturnValueOnce(chain({ data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' } }))
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' },
+        })
+      )
       .mockReturnValueOnce(chain({ data: null }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 

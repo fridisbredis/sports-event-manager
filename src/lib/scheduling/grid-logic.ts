@@ -92,11 +92,7 @@ export function slotEndTime(slot: Date, granularityMin: number): Date {
   return end
 }
 
-export function isWithinWindow(
-  slot: Date,
-  granMin: number,
-  windows: OperatingWindow[]
-): boolean {
+export function isWithinWindow(slot: Date, granMin: number, windows: OperatingWindow[]): boolean {
   if (windows.length === 0) return true
   const slotEnd = slotEndTime(slot, granMin)
   return windows.some((w) => {

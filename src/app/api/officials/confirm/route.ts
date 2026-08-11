@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
     !official.invite_token_expires_at ||
     new Date(official.invite_token_expires_at) <= new Date()
   ) {
-    return NextResponse.json({ error: 'Invite not found or expired', code: 'not_found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Invite not found or expired', code: 'not_found' },
+      { status: 404 }
+    )
   }
 
   const { data: tenant } = await service
@@ -75,10 +78,12 @@ export async function POST(request: NextRequest) {
     .eq('id', official.id)
 
   // Upsert in case they somehow already have a role (e.g. from the fallback flow)
-  await service.from('user_roles').upsert(
-    { user_id: user.id, tenant_id: official.tenant_id, role: 'official' },
-    { onConflict: 'user_id,tenant_id' }
-  )
+  await service
+    .from('user_roles')
+    .upsert(
+      { user_id: user.id, tenant_id: official.tenant_id, role: 'official' },
+      { onConflict: 'user_id,tenant_id' }
+    )
 
   return NextResponse.json({ ok: true, tenantSlug })
 }

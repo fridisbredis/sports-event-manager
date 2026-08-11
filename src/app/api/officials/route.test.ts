@@ -67,9 +67,14 @@ describe('POST /api/officials', () => {
   })
 
   it('validates tenantId via requireTenantAdmin before creating the invite', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }))
+    fromMock.mockReturnValueOnce(
+      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null })
+    )
     fromMock.mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
@@ -79,7 +84,10 @@ describe('POST /api/officials', () => {
   })
 
   it('normalizes the phone, inserts the official, and sends the invite SMS with the confirmation text', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
 
     const official = {
       id: 'off-1',
@@ -96,7 +104,9 @@ describe('POST /api/officials', () => {
     fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(tenantsBuilder)
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '070-123 45 67' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '070-123 45 67' })
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -120,7 +130,10 @@ describe('POST /api/officials', () => {
   })
 
   it('falls back to "an event" in the confirmation text when the tenant has no name', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
 
     const official = { id: 'off-1', name: 'Bo', phone: '0709998877', invite_token: 'tok-xyz' }
     const fromMock = vi.fn()
@@ -139,7 +152,10 @@ describe('POST /api/officials', () => {
   })
 
   it('returns 500 and never sends sms when the insert fails', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 

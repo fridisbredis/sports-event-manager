@@ -68,7 +68,9 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
               }`}
             />
           </button>
-          <span className="text-sm font-medium text-gray-900">{isActive ? 'Active' : 'Inactive'}</span>
+          <span className="text-sm font-medium text-gray-900">
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
         </div>
         <p className="mt-2 text-sm text-gray-500">
           {isActive

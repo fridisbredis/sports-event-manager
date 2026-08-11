@@ -47,12 +47,21 @@ function utcDateStr(iso: string): string {
 }
 
 function utcTimeStr(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+  return new Date(iso).toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  })
 }
 
 function formatWindow(w: OperatingWindow): string {
   const dateLabel = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+    new Date(iso).toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    })
 
   const startDay = utcDateStr(w.window_start)
   const endDay = utcDateStr(w.window_end)
@@ -70,7 +79,9 @@ function formatWindowsSummary(windows: OperatingWindow[]): string {
   if (windows.length === 1) return formatWindow(windows[0])
 
   const days = new Set(windows.map((w) => utcDateStr(w.window_start)))
-  const slots = new Set(windows.map((w) => `${utcTimeStr(w.window_start)}–${utcTimeStr(w.window_end)}`))
+  const slots = new Set(
+    windows.map((w) => `${utcTimeStr(w.window_start)}–${utcTimeStr(w.window_end)}`)
+  )
 
   if (windows.length === days.size * slots.size) {
     const slotList = [...slots].join(', ')
@@ -82,7 +93,12 @@ function formatWindowsSummary(windows: OperatingWindow[]): string {
 
 function formatStageDate(stage: Stage): string {
   if (!stage.start_time) return ''
-  const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }
   const start = new Date(stage.start_time).toLocaleDateString('en-GB', opts)
   if (!stage.end_time) return start
   const startDay = utcDateStr(stage.start_time)
@@ -98,7 +114,8 @@ function formatStageDate(stage: Stage): string {
 
 function StageTitle({ stage, count }: { stage: Stage; count: number }) {
   const { t } = useTranslation('admin')
-  const typeLabel = stage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')
+  const typeLabel =
+    stage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')
   const dateStr = formatStageDate(stage)
 
   return (
@@ -119,7 +136,9 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
         {typeLabel}
       </Chip>
       {dateStr && <span className="text-xs text-gray-400">{dateStr}</span>}
-      <span className="ml-auto text-xs text-gray-400">{t('workstations.workAreaCount', { count })}</span>
+      <span className="ml-auto text-xs text-gray-400">
+        {t('workstations.workAreaCount', { count })}
+      </span>
     </div>
   )
 }
@@ -157,7 +176,9 @@ function StageContent({
                 >
                   <TableCell className="font-medium text-gray-900">{ws.name}</TableCell>
                   <TableCell className="text-gray-600">{formatWindowsSummary(windows)}</TableCell>
-                  <TableCell className="text-gray-600">{t('workstations.upTo', { n: ws.capacity_ceiling })}</TableCell>
+                  <TableCell className="text-gray-600">
+                    {t('workstations.upTo', { n: ws.capacity_ceiling })}
+                  </TableCell>
                 </TableRow>
               )
             })}
@@ -215,7 +236,10 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
           <AccordionItem
             key={stage.id}
             title={
-              <StageTitle stage={stage} count={workstations.filter((ws) => ws.stage_id === stage.id).length} />
+              <StageTitle
+                stage={stage}
+                count={workstations.filter((ws) => ws.stage_id === stage.id).length}
+              />
             }
           >
             <StageContent

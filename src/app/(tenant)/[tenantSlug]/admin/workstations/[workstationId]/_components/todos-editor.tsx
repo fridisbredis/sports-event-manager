@@ -28,11 +28,18 @@ export function TodosEditor({ todos, todoRefs, onAddTodo, onRemoveTodo, onUpdate
                 className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
               />
               <Input
-                ref={(el) => { todoRefs.current[i] = el }}
+                ref={(el) => {
+                  todoRefs.current[i] = el
+                }}
                 type="text"
                 value={todo}
                 onChange={(e) => onUpdateTodo(i, e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onAddTodo(); } }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    onAddTodo()
+                  }
+                }}
                 placeholder={t('workstations.todoPlaceholder')}
                 className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
               />

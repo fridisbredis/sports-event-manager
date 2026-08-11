@@ -32,12 +32,23 @@ import {
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
-import { toLocalAssignments, getAssignmentsForCell, applyCellAction, resolveCellActionLabel } from './grid-helpers'
+import {
+  toLocalAssignments,
+  getAssignmentsForCell,
+  applyCellAction,
+  resolveCellActionLabel,
+} from './grid-helpers'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
 import { ByPersonGrid } from './by-person-grid'
 import { ByWorkAreaGrid } from './by-work-area-grid'
-import type { Stage, WorkstationData, OfficialData, AssignmentData, LocalAssignment } from './scheduling-types'
+import type {
+  Stage,
+  WorkstationData,
+  OfficialData,
+  AssignmentData,
+  LocalAssignment,
+} from './scheduling-types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -224,10 +235,7 @@ export function SchedulingGrid({
       if (wsPickerCell && !(e.target as HTMLElement).closest('[data-ws-picker]')) {
         setWsPickerCell(null)
       }
-      if (
-        dragOfficialPicker &&
-        !(e.target as HTMLElement).closest('[data-drag-official-picker]')
-      ) {
+      if (dragOfficialPicker && !(e.target as HTMLElement).closest('[data-drag-official-picker]')) {
         setDragOfficialPicker(null)
       }
     }
@@ -272,7 +280,13 @@ export function SchedulingGrid({
   )
 
   const overCapacityDetails = useMemo(
-    () => computeOverCapacityDetails(overCapacityCells, activeAssignments, stageWorkstations, officials),
+    () =>
+      computeOverCapacityDetails(
+        overCapacityCells,
+        activeAssignments,
+        stageWorkstations,
+        officials
+      ),
     [overCapacityCells, activeAssignments, stageWorkstations, officials]
   )
 
@@ -315,7 +329,8 @@ export function SchedulingGrid({
         for (let i = lo; i <= hi; i++) {
           const slot = slots[i]
           if (!slot) continue
-          if (ws && !isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)) continue
+          if (ws && !isWithinWindow(slot, granularityMin, ws.workstation_operating_windows))
+            continue
           const slotStart = slot.toISOString()
           const occupied = activeAssignments.some(
             (a) =>
@@ -342,7 +357,14 @@ export function SchedulingGrid({
 
     window.addEventListener('pointerup', handleUp)
     return () => window.removeEventListener('pointerup', handleUp)
-  }, [wsDrag, slots, stageWorkstations, granularityMin, activeAssignments, handleWsExpandedSlotClick])
+  }, [
+    wsDrag,
+    slots,
+    stageWorkstations,
+    granularityMin,
+    activeAssignments,
+    handleWsExpandedSlotClick,
+  ])
 
   const dragAvailableOfficials = useMemo(() => {
     if (!dragOfficialPicker) return []
@@ -374,7 +396,10 @@ export function SchedulingGrid({
       toastError(result.error)
       return
     }
-    setAssignments((prev) => [...prev, ...toLocalAssignments(result.inserted ?? [], granularityMin)])
+    setAssignments((prev) => [
+      ...prev,
+      ...toLocalAssignments(result.inserted ?? [], granularityMin),
+    ])
     router.refresh()
   }
 
@@ -433,7 +458,13 @@ export function SchedulingGrid({
     const result =
       action === 'remove'
         ? await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
-        : await saveAssignments(tenantSlug, tenantId, [], [], [{ id: assignment.id, status: action }])
+        : await saveAssignments(
+            tenantSlug,
+            tenantId,
+            [],
+            [],
+            [{ id: assignment.id, status: action }]
+          )
     endPending(key)
 
     if (result.error) {
@@ -556,7 +587,11 @@ export function SchedulingGrid({
   async function handleWsSlotRemove(assignment: LocalAssignment) {
     if (!assignment.id) return
 
-    const key = wsCellKey(assignment.workstation_id, assignment.slot_index, assignment.timeslot_start)
+    const key = wsCellKey(
+      assignment.workstation_id,
+      assignment.slot_index,
+      assignment.timeslot_start
+    )
     beginPending(key)
     const result = await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
     endPending(key)
@@ -864,7 +899,10 @@ export function SchedulingGrid({
                   workstations
                 )
                 return (
-                  <div key={assignment.id ?? i} className="border-t border-gray-100 py-1 first:border-t-0">
+                  <div
+                    key={assignment.id ?? i}
+                    className="border-t border-gray-100 py-1 first:border-t-0"
+                  >
                     <div className="flex items-center justify-between gap-2 px-3 py-1">
                       <span className="text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[160px]">
                         {label}

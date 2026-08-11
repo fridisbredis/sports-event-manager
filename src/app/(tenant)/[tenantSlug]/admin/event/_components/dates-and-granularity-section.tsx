@@ -37,9 +37,7 @@ export function DatesAndGranularitySection({
             </div>
           </div>
         </div>
-        <p className="text-xs text-gray-400 -mt-2">
-          {t('eventConfig.granularityLockedNote')}
-        </p>
+        <p className="text-xs text-gray-400 -mt-2">{t('eventConfig.granularityLockedNote')}</p>
       </>
     )
   }
@@ -60,10 +58,18 @@ export function DatesAndGranularitySection({
           selectedKeys={[granularity.toString()]}
           onSelectionChange={(keys) => onGranularityChange(Number(Array.from(keys)[0]))}
         >
-          <SelectItem key="30" textValue={t('eventConfig.granularity30min')}>{t('eventConfig.granularity30min')}</SelectItem>
-          <SelectItem key="60" textValue={t('eventConfig.granularity60min')}>{t('eventConfig.granularity60min')}</SelectItem>
-          <SelectItem key="90" textValue={t('eventConfig.granularity90min')}>{t('eventConfig.granularity90min')}</SelectItem>
-          <SelectItem key="120" textValue={t('eventConfig.granularity120min')}>{t('eventConfig.granularity120min')}</SelectItem>
+          <SelectItem key="30" textValue={t('eventConfig.granularity30min')}>
+            {t('eventConfig.granularity30min')}
+          </SelectItem>
+          <SelectItem key="60" textValue={t('eventConfig.granularity60min')}>
+            {t('eventConfig.granularity60min')}
+          </SelectItem>
+          <SelectItem key="90" textValue={t('eventConfig.granularity90min')}>
+            {t('eventConfig.granularity90min')}
+          </SelectItem>
+          <SelectItem key="120" textValue={t('eventConfig.granularity120min')}>
+            {t('eventConfig.granularity120min')}
+          </SelectItem>
         </Select>
       </div>
     </>

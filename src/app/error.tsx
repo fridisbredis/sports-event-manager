@@ -3,9 +3,18 @@
 import { Space_Grotesk } from 'next/font/google'
 import { useTranslation } from '@/lib/i18n/client'
 
-const display = Space_Grotesk({ subsets: ['latin'], weight: ['300', '500'], variable: '--font-display' })
+const display = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['300', '500'],
+  variable: '--font-display',
+})
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
   const { t } = useTranslation('common')
 
   return (
@@ -13,7 +22,9 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
       className={`${display.variable} flex min-h-screen flex-col items-center justify-center bg-white px-6 py-24 text-center`}
       style={{ fontFamily: 'var(--font-display)' }}
     >
-      <p className="text-xs font-medium uppercase tracking-[0.3em] text-gray-400">{t('errorPage.eyebrow')}</p>
+      <p className="text-xs font-medium uppercase tracking-[0.3em] text-gray-400">
+        {t('errorPage.eyebrow')}
+      </p>
 
       <div className="mt-8 h-px w-16 bg-gray-200" />
 

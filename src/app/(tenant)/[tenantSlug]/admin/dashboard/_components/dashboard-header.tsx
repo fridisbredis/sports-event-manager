@@ -43,7 +43,11 @@ export function DashboardHeader({
           <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
         </div>
       </div>
-      <PublishedPill isPublished={isPublished} publishedString={publishedLabel} unpublishedString={draftLabel} />
+      <PublishedPill
+        isPublished={isPublished}
+        publishedString={publishedLabel}
+        unpublishedString={draftLabel}
+      />
     </div>
   )
 }

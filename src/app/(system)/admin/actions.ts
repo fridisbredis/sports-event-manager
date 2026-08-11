@@ -7,7 +7,9 @@ import { toSlug } from './_utils'
 
 async function assertSystemAdmin(): Promise<{ error?: string }> {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const service = await createSupabaseServiceClient()
@@ -58,9 +60,30 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   if (eventError || !event) return { error: 'Failed to create event' }
 
   const { error: stagesError } = await service.from('event_stages').insert([
-    { event_id: event.id, tenant_id: tenant.id, name: 'Setup', stage_type: 'non_race', race_type: 'distance', position: 0 },
-    { event_id: event.id, tenant_id: tenant.id, name: 'Race', stage_type: 'race', race_type: 'distance', position: 1 },
-    { event_id: event.id, tenant_id: tenant.id, name: 'Teardown', stage_type: 'non_race', race_type: 'distance', position: 2 },
+    {
+      event_id: event.id,
+      tenant_id: tenant.id,
+      name: 'Setup',
+      stage_type: 'non_race',
+      race_type: 'distance',
+      position: 0,
+    },
+    {
+      event_id: event.id,
+      tenant_id: tenant.id,
+      name: 'Race',
+      stage_type: 'race',
+      race_type: 'distance',
+      position: 1,
+    },
+    {
+      event_id: event.id,
+      tenant_id: tenant.id,
+      name: 'Teardown',
+      stage_type: 'non_race',
+      race_type: 'distance',
+      position: 2,
+    },
   ])
 
   if (stagesError) return { error: 'Failed to create default stages' }
@@ -69,15 +92,15 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   return {}
 }
 
-export async function setTenantActive(tenantId: string, isActive: boolean): Promise<{ error?: string }> {
+export async function setTenantActive(
+  tenantId: string,
+  isActive: boolean
+): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
   if (check.error) return check
 
   const service = await createSupabaseServiceClient()
-  const { error } = await service
-    .from('tenants')
-    .update({ is_active: isActive })
-    .eq('id', tenantId)
+  const { error } = await service.from('tenants').update({ is_active: isActive }).eq('id', tenantId)
 
   if (error) return { error: 'Failed to update tenant' }
 
@@ -94,10 +117,7 @@ export async function setTenantTier(
   if (check.error) return check
 
   const service = await createSupabaseServiceClient()
-  const { error } = await service
-    .from('tenants')
-    .update({ tier })
-    .eq('id', tenantId)
+  const { error } = await service.from('tenants').update({ tier }).eq('id', tenantId)
 
   if (error) return { error: 'Failed to update tier' }
 

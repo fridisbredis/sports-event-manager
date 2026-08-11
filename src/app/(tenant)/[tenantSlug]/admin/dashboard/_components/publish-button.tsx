@@ -9,7 +9,12 @@ interface PublishButtonProps {
   children: React.ReactNode
 }
 
-export function PublishButton({ disabled, loading, type = 'submit', children }: PublishButtonProps) {
+export function PublishButton({
+  disabled,
+  loading,
+  type = 'submit',
+  children,
+}: PublishButtonProps) {
   return (
     <Button type={type} color="primary" isDisabled={disabled} isLoading={loading}>
       {children}

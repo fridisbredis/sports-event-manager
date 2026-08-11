@@ -29,7 +29,11 @@ interface Props {
   currentUserId: string
 }
 
-export default function OfficialsList({ tenantId, officials: initialOfficials, currentUserId }: Props) {
+export default function OfficialsList({
+  tenantId,
+  officials: initialOfficials,
+  currentUserId,
+}: Props) {
   const { t } = useTranslation('admin')
   const [officials, setOfficials] = useState<Official[]>(initialOfficials)
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -160,12 +164,20 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
               return (
                 <TableRow key={official.id}>
                   <TableCell className="font-medium text-gray-900">
-                    {isCurrentUser ? `${official.name} — ${t('officials.youLabel')}` : official.name}
+                    {isCurrentUser
+                      ? `${official.name} — ${t('officials.youLabel')}`
+                      : official.name}
                   </TableCell>
                   <TableCell className="text-gray-500">{official.phone}</TableCell>
                   <TableCell>
-                    <Chip size="sm" variant="flat" color={official.invite_status === 'confirmed' ? 'default' : 'warning'}>
-                      {official.invite_status === 'confirmed' ? t('officials.confirmed') : t('officials.invited')}
+                    <Chip
+                      size="sm"
+                      variant="flat"
+                      color={official.invite_status === 'confirmed' ? 'default' : 'warning'}
+                    >
+                      {official.invite_status === 'confirmed'
+                        ? t('officials.confirmed')
+                        : t('officials.invited')}
                     </Chip>
                   </TableCell>
                   <TableCell>
@@ -181,7 +193,11 @@ export default function OfficialsList({ tenantId, officials: initialOfficials, c
                             {t('officials.resendInvite')}
                           </Button>
                         )}
-                        <Button size="sm" variant="bordered" onPress={() => setRemoveTarget(official)}>
+                        <Button
+                          size="sm"
+                          variant="bordered"
+                          onPress={() => setRemoveTarget(official)}
+                        >
                           {t('officials.remove')}
                         </Button>
                       </div>

@@ -93,7 +93,9 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
       end_time: s.end_time || null,
       venue: s.venue,
       position: i,
-      distances: s.distances.filter((d) => d.label.trim()).map((d, j) => ({ label: d.label, position: j })),
+      distances: s.distances
+        .filter((d) => d.label.trim())
+        .map((d, j) => ({ label: d.label, position: j })),
     }))
 
   const { error: rpcError } = await supabase.rpc('sync_event_stages', {

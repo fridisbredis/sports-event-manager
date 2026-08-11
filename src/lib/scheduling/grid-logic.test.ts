@@ -48,9 +48,21 @@ describe('computeOverCapacityCells (by-work-area)', () => {
 
   it('ignores assignments for workstations outside the current stage', () => {
     const assignments = [
-      { official_id: 'o1', workstation_id: 'ws-unknown', timeslot_start: '2026-08-10T08:00:00.000Z' },
-      { official_id: 'o2', workstation_id: 'ws-unknown', timeslot_start: '2026-08-10T08:00:00.000Z' },
-      { official_id: 'o3', workstation_id: 'ws-unknown', timeslot_start: '2026-08-10T08:00:00.000Z' },
+      {
+        official_id: 'o1',
+        workstation_id: 'ws-unknown',
+        timeslot_start: '2026-08-10T08:00:00.000Z',
+      },
+      {
+        official_id: 'o2',
+        workstation_id: 'ws-unknown',
+        timeslot_start: '2026-08-10T08:00:00.000Z',
+      },
+      {
+        official_id: 'o3',
+        workstation_id: 'ws-unknown',
+        timeslot_start: '2026-08-10T08:00:00.000Z',
+      },
     ]
 
     expect(computeOverCapacityCells(assignments, workstations)).toEqual(new Set())
@@ -70,7 +82,12 @@ describe('computeOverCapacityDetails', () => {
     ]
     const overCapacityCells = computeOverCapacityCells(assignments, workstations)
 
-    const details = computeOverCapacityDetails(overCapacityCells, assignments, workstations, officials)
+    const details = computeOverCapacityDetails(
+      overCapacityCells,
+      assignments,
+      workstations,
+      officials
+    )
 
     expect(details).toHaveLength(1)
     expect(details[0].workAreaName).toBe('Start line')
@@ -94,7 +111,12 @@ describe('computeOverCapacityDetails', () => {
     ]
     const overCapacityCells = computeOverCapacityCells(assignments, workstations)
 
-    const details = computeOverCapacityDetails(overCapacityCells, assignments, workstations, officials)
+    const details = computeOverCapacityDetails(
+      overCapacityCells,
+      assignments,
+      workstations,
+      officials
+    )
 
     expect(details).toHaveLength(2)
     expect(details.every((d) => d.workAreaName === 'Start line' && d.count === 2)).toBe(true)
@@ -190,8 +212,14 @@ describe('generateSlotsForDay', () => {
     const day1 = generateSlotsForDay(multiDayStage, '2026-08-10', 60)
     const day2 = generateSlotsForDay(multiDayStage, '2026-08-11', 60)
 
-    expect(day1.map((s) => s.toISOString())).toEqual(['2026-08-10T22:00:00.000Z', '2026-08-10T23:00:00.000Z'])
-    expect(day2.map((s) => s.toISOString())).toEqual(['2026-08-11T00:00:00.000Z', '2026-08-11T01:00:00.000Z'])
+    expect(day1.map((s) => s.toISOString())).toEqual([
+      '2026-08-10T22:00:00.000Z',
+      '2026-08-10T23:00:00.000Z',
+    ])
+    expect(day2.map((s) => s.toISOString())).toEqual([
+      '2026-08-11T00:00:00.000Z',
+      '2026-08-11T01:00:00.000Z',
+    ])
   })
 
   it('applies the one-hour race buffer before and after a race stage', () => {
@@ -213,7 +241,9 @@ describe('generateSlotsForDay', () => {
 })
 
 describe('isWithinWindow', () => {
-  const windows = [{ window_start: '2026-08-10T08:00:00.000Z', window_end: '2026-08-10T09:00:00.000Z' }]
+  const windows = [
+    { window_start: '2026-08-10T08:00:00.000Z', window_end: '2026-08-10T09:00:00.000Z' },
+  ]
 
   it('allows a slot fully inside an operating window', () => {
     expect(isWithinWindow(new Date('2026-08-10T08:00:00.000Z'), 30, windows)).toBe(true)
@@ -231,8 +261,18 @@ describe('isWithinWindow', () => {
 describe('getCurrentStage', () => {
   it('picks the stage whose allocable range contains now', () => {
     const now = new Date()
-    const past = { id: 'past', stage_type: 'other', start_time: new Date(now.getTime() - 7200_000).toISOString(), end_time: new Date(now.getTime() - 3600_000).toISOString() }
-    const current = { id: 'current', stage_type: 'other', start_time: new Date(now.getTime() - 1800_000).toISOString(), end_time: new Date(now.getTime() + 1800_000).toISOString() }
+    const past = {
+      id: 'past',
+      stage_type: 'other',
+      start_time: new Date(now.getTime() - 7200_000).toISOString(),
+      end_time: new Date(now.getTime() - 3600_000).toISOString(),
+    }
+    const current = {
+      id: 'current',
+      stage_type: 'other',
+      start_time: new Date(now.getTime() - 1800_000).toISOString(),
+      end_time: new Date(now.getTime() + 1800_000).toISOString(),
+    }
 
     expect(getCurrentStage([past, current])?.id).toBe('current')
   })

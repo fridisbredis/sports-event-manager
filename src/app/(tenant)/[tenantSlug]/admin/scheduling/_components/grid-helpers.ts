@@ -3,7 +3,8 @@ import type { SaveAssignmentsResult } from '../actions'
 import type { LocalAssignment, OfficialData, WorkstationData } from './scheduling-types'
 
 export const STRIPED_UNAVAILABLE_STYLE = {
-  background: 'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
+  background:
+    'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
 }
 
 export function toLocalAssignments(

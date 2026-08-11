@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 import { createWorkstation } from '../../actions'
-import { type Stage, type TimeWindow, getStageDays, expandWindows, windowDurationMin } from '../../_utils'
+import {
+  type Stage,
+  type TimeWindow,
+  getStageDays,
+  expandWindows,
+  windowDurationMin,
+} from '../../_utils'
 
 interface Props {
   tenantSlug: string
@@ -20,7 +26,13 @@ interface FormErrors {
   windows?: Record<number, string>
 }
 
-export default function WorkstationForm({ tenantSlug, tenantId, eventId, preselectedStage, schedulingGranularityMin }: Props) {
+export default function WorkstationForm({
+  tenantSlug,
+  tenantId,
+  eventId,
+  preselectedStage,
+  schedulingGranularityMin,
+}: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
 
@@ -90,8 +102,14 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
     const windowErrors: Record<number, string> = {}
     windows.forEach((w, i) => {
       if (!w.start && !w.end) return
-      if (!w.start) { windowErrors[i] = t('workstations.windowStartRequired'); return }
-      if (!w.end) { windowErrors[i] = t('workstations.windowEndRequired'); return }
+      if (!w.start) {
+        windowErrors[i] = t('workstations.windowStartRequired')
+        return
+      }
+      if (!w.end) {
+        windowErrors[i] = t('workstations.windowEndRequired')
+        return
+      }
       const onFirstDay = stageDays.length === 1 || w.limitToDay === stageDays[0]
       const onLastDay = stageDays.length === 1 || w.limitToDay === lastDay
       if (onFirstDay && stageStartHHMM && w.start < stageStartHHMM) {
@@ -165,7 +183,11 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
               : 'bg-gray-900 text-white hover:bg-gray-700'
           } disabled:opacity-40 disabled:cursor-not-allowed`}
         >
-          {isSaving ? t('workstations.saving') : saveSuccess ? t('workstations.saved') : t('workstations.save')}
+          {isSaving
+            ? t('workstations.saving')
+            : saveSuccess
+              ? t('workstations.saved')
+              : t('workstations.save')}
         </button>
       </div>
 
@@ -204,9 +226,7 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
                   placeholder={t('workstations.namePlaceholder')}
                   className={inputClass(!!errors.name)}
                 />
-                {errors.name && (
-                  <p className="mt-1.5 text-xs text-red-500">{errors.name}</p>
-                )}
+                {errors.name && <p className="mt-1.5 text-xs text-red-500">{errors.name}</p>}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -232,7 +252,10 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
             </p>
             <div className="space-y-3">
               {windows.map((w, i) => (
-                <div key={i} className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}>
+                <div
+                  key={i}
+                  className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}
+                >
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
@@ -240,7 +263,11 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
                       min={minStartFor(w.limitToDay)}
                       onChange={(e) => {
                         updateWindow(i, 'start', e.target.value)
-                        if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
+                        if (errors.windows?.[i])
+                          setErrors((prev) => ({
+                            ...prev,
+                            windows: { ...prev.windows, [i]: undefined as unknown as string },
+                          }))
                       }}
                       className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                     />
@@ -251,7 +278,11 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
                       max={maxEndFor(w.limitToDay)}
                       onChange={(e) => {
                         updateWindow(i, 'end', e.target.value)
-                        if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
+                        if (errors.windows?.[i])
+                          setErrors((prev) => ({
+                            ...prev,
+                            windows: { ...prev.windows, [i]: undefined as unknown as string },
+                          }))
                       }}
                       className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                     />
@@ -291,14 +322,22 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
                           value={w.limitToDay}
                           onChange={(e) => {
                             setWindows((prev) =>
-                              prev.map((win, j) => (j === i ? clampToDay(win, e.target.value) : win))
+                              prev.map((win, j) =>
+                                j === i ? clampToDay(win, e.target.value) : win
+                              )
                             )
-                            if (errors.windows?.[i]) setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [i]: undefined as unknown as string } }))
+                            if (errors.windows?.[i])
+                              setErrors((prev) => ({
+                                ...prev,
+                                windows: { ...prev.windows, [i]: undefined as unknown as string },
+                              }))
                           }}
                           className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
                         >
                           {stageDays.map((day) => (
-                            <option key={day} value={day}>{day}</option>
+                            <option key={day} value={day}>
+                              {day}
+                            </option>
                           ))}
                         </select>
                       )}
@@ -352,11 +391,18 @@ export default function WorkstationForm({ tenantSlug, tenantId, eventId, presele
                       className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
                     />
                     <input
-                      ref={(el) => { todoRefs.current[i] = el }}
+                      ref={(el) => {
+                        todoRefs.current[i] = el
+                      }}
                       type="text"
                       value={todo}
                       onChange={(e) => updateTodo(i, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTodo(); } }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addTodo()
+                        }
+                      }}
                       placeholder={t('workstations.todoPlaceholder')}
                       className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
                     />

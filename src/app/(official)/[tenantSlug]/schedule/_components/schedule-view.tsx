@@ -1,8 +1,7 @@
 'use client'
 
-import { Button } from '@heroui/react';
+import { Button } from '@heroui/react'
 import { useEffect, useState } from 'react'
-
 
 type Todo = { id: string; instruction_text: string; position: number }
 type WorkstationRef = {
@@ -85,12 +84,8 @@ function EmptyState({ strings }: { strings: Strings }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
         </svg>
       </div>
-      <p className="text-base font-semibold text-gray-900 mb-1">
-        {strings.noAssignments}
-      </p>
-      <p className="text-sm text-gray-500 leading-relaxed">
-        {strings.noAssignmentsDescription}
-      </p>
+      <p className="text-base font-semibold text-gray-900 mb-1">{strings.noAssignments}</p>
+      <p className="text-sm text-gray-500 leading-relaxed">{strings.noAssignmentsDescription}</p>
     </div>
   )
 }
@@ -172,7 +167,9 @@ function WorkAreaView({ assignments }: { assignments: AssignmentRow[] }) {
             </p>
             <p className="text-xs text-gray-500 mb-2">
               {rows
-                .map((a) => `${formatDayHeader(a.timeslot_start)} · ${formatTime(a.timeslot_start)}`)
+                .map(
+                  (a) => `${formatDayHeader(a.timeslot_start)} · ${formatTime(a.timeslot_start)}`
+                )
                 .join(', ')}
             </p>
             {sortedTodos.length > 0 ? (
@@ -231,7 +228,7 @@ export function ScheduleView({ assignments, strings }: Props) {
         >
           {strings.byTime}
         </Button>
-        <Button 
+        <Button
           onClick={() => handleViewChange('work-area')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'work-area'

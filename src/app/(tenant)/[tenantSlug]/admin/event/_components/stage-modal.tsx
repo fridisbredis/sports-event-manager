@@ -95,7 +95,9 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
   return (
     <Modal
       isOpen
-      onOpenChange={(open) => { if (!open) onClose() }}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
       size="md"
       scrollBehavior="inside"
     >
@@ -134,7 +136,9 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
                       color={form.stage_type === type ? 'primary' : 'default'}
                       variant={form.stage_type === type ? 'solid' : 'light'}
                     >
-                      {type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}
+                      {type === 'race'
+                        ? t('eventConfig.stageTypeRace')
+                        : t('eventConfig.stageTypeNonRace')}
                     </Button>
                   ))}
                 </div>

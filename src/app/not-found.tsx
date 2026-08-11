@@ -2,7 +2,11 @@ import { Space_Grotesk } from 'next/font/google'
 import Link from 'next/link'
 import { getServerTranslation } from '@/lib/i18n/server'
 
-const display = Space_Grotesk({ subsets: ['latin'], weight: ['300', '500'], variable: '--font-display' })
+const display = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['300', '500'],
+  variable: '--font-display',
+})
 
 export default async function NotFound() {
   const t = await getServerTranslation('en')
@@ -23,7 +27,9 @@ export default async function NotFound() {
       <div className="mt-8 h-px w-16 bg-gray-200" />
 
       <h1 className="mt-8 text-xl font-medium text-gray-900">{t('notFoundPage.heading')}</h1>
-      <p className="mt-3 max-w-sm text-sm leading-relaxed text-gray-500">{t('notFoundPage.body')}</p>
+      <p className="mt-3 max-w-sm text-sm leading-relaxed text-gray-500">
+        {t('notFoundPage.body')}
+      </p>
 
       <Link
         href="/"

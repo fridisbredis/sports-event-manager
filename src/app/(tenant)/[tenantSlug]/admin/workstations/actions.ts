@@ -29,7 +29,8 @@ function findWindowShorterThanGranularity(
   schedulingGranularityMin: number
 ): boolean {
   return windows.some((w) => {
-    const durationMin = (new Date(w.window_end).getTime() - new Date(w.window_start).getTime()) / 60_000
+    const durationMin =
+      (new Date(w.window_end).getTime() - new Date(w.window_start).getTime()) / 60_000
     return durationMin < schedulingGranularityMin
   })
 }

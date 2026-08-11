@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from '@heroui/react'
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Input,
+} from '@heroui/react'
 import { createTenant } from '../actions'
 import { toSlug } from '../_utils'
 import { toastError } from '@/lib/toast'
@@ -61,7 +69,12 @@ export function CreateTenantModal({ open, onClose }: Props) {
           <Button variant="light" onPress={onClose}>
             Cancel
           </Button>
-          <Button color="primary" isDisabled={!name.trim()} isLoading={pending} onPress={handleSubmit}>
+          <Button
+            color="primary"
+            isDisabled={!name.trim()}
+            isLoading={pending}
+            onPress={handleSubmit}
+          >
             Create
           </Button>
         </ModalFooter>

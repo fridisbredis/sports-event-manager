@@ -58,7 +58,12 @@ function AnnouncementGuardDialog({
   onPublish,
 }: GuardDialogProps) {
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel() }}>
+    <Modal
+      isOpen={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onCancel()
+      }}
+    >
       <ModalContent>
         {(onClose) => (
           <>
@@ -67,25 +72,13 @@ function AnnouncementGuardDialog({
               <p className="text-sm text-default-500 leading-relaxed">{body}</p>
             </ModalBody>
             <ModalFooter>
-              <Button
-                variant="light"
-                onPress={onClose}
-                isDisabled={publishing}
-              >
+              <Button variant="light" onPress={onClose} isDisabled={publishing}>
                 {cancelLabel}
               </Button>
-              <Button
-                variant="light"
-                onPress={onDiscard}
-                isDisabled={publishing}
-              >
+              <Button variant="light" onPress={onDiscard} isDisabled={publishing}>
                 {discardLabel}
               </Button>
-              <Button
-                color="primary"
-                onPress={onPublish}
-                isLoading={publishing}
-              >
+              <Button color="primary" onPress={onPublish} isLoading={publishing}>
                 {publishing ? publishingLabel : publishLabel}
               </Button>
             </ModalFooter>
@@ -261,8 +254,12 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
                 </svg>
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium text-default-500">{t('communication.noAnnouncementsYet')}</p>
-                <p className="text-xs text-default-400 mt-0.5">{t('communication.noAnnouncementsHint')}</p>
+                <p className="text-sm font-medium text-default-500">
+                  {t('communication.noAnnouncementsYet')}
+                </p>
+                <p className="text-xs text-default-400 mt-0.5">
+                  {t('communication.noAnnouncementsHint')}
+                </p>
               </div>
             </div>
           ) : (

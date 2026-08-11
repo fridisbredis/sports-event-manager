@@ -67,7 +67,10 @@ describe('DELETE /api/officials/[id]', () => {
   })
 
   it('scopes the official lookup to both id and tenantId, and returns 404 when not found', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const selectBuilder = chain({ data: null })
     const fromMock = vi.fn().mockReturnValueOnce(selectBuilder)
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
@@ -81,7 +84,10 @@ describe('DELETE /api/officials/[id]', () => {
   })
 
   it('returns 500 and does not report success when the removal update fails', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const selectBuilder = chain({ data: { id: OFFICIAL_ID, tenant_id: TENANT_ID } })
     const assignmentsBuilder = chain({ data: null, error: null })
     const updateBuilder = chain({ data: null, error: { message: 'boom' } })
@@ -98,7 +104,10 @@ describe('DELETE /api/officials/[id]', () => {
   })
 
   it('frees tenant-scoped assignments and marks the official removed on success', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({ user: { id: 'admin-1' }, role: 'tenant_admin' } as never)
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
     const selectBuilder = chain({ data: { id: OFFICIAL_ID, tenant_id: TENANT_ID } })
     const assignmentsBuilder = chain({ data: null, error: null })
     const updateBuilder = chain({ data: null, error: null })

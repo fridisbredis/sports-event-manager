@@ -3,10 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-type PendingNavigation =
-  | { type: 'push'; url: string }
-  | { type: 'back' }
-  | null
+type PendingNavigation = { type: 'push'; url: string } | { type: 'back' } | null
 
 export interface UnsavedChangesDialogProps {
   open: boolean
@@ -69,7 +66,8 @@ export function useUnsavedChanges() {
       const anchor = (e.target as Element).closest('a')
       if (!anchor) return
       const href = anchor.getAttribute('href')
-      if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:')) return
+      if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:'))
+        return
       e.preventDefault()
       e.stopImmediatePropagation()
       openDialog({ type: 'push', url: href })

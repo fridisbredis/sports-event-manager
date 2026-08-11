@@ -43,7 +43,8 @@ export default async function SchedulePage({ params }: Props) {
   if (official) {
     const { data } = await service
       .from('assignments')
-      .select(`
+      .select(
+        `
         id,
         timeslot_start,
         timeslot_end,
@@ -54,7 +55,8 @@ export default async function SchedulePage({ params }: Props) {
           description,
           workstation_todos ( id, instruction_text, position )
         )
-      `)
+      `
+      )
       .eq('official_id', official.id)
       .eq('tenant_id', tenant.id)
       .eq('status', 'assigned')

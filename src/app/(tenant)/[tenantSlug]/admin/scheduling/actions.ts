@@ -119,7 +119,9 @@ export async function saveAssignments(
         const key = `${a.workstation_id}|${new Date(a.timeslot_start).toISOString()}`
         const used = usedSlots.get(key) ?? new Set<number>()
         if (used.has(slotIndex)) {
-          return { error: 'Someone else just took that slot. Please reload the schedule and try again.' }
+          return {
+            error: 'Someone else just took that slot. Please reload the schedule and try again.',
+          }
         }
         used.add(slotIndex)
         usedSlots.set(key, used)

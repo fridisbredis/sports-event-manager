@@ -23,7 +23,9 @@ describe('getAllocableRange', () => {
   })
 
   it('returns null when the stage has no configured times', () => {
-    expect(getAllocableRange({ stage_type: 'training', start_time: null, end_time: null })).toBeNull()
+    expect(
+      getAllocableRange({ stage_type: 'training', start_time: null, end_time: null })
+    ).toBeNull()
   })
 })
 
@@ -39,6 +41,8 @@ describe('getAllocableDays', () => {
   })
 
   it('returns an empty list when the stage has no configured times', () => {
-    expect(getAllocableDays({ stage_type: 'training', start_time: null, end_time: null })).toEqual([])
+    expect(getAllocableDays({ stage_type: 'training', start_time: null, end_time: null })).toEqual(
+      []
+    )
   })
 })

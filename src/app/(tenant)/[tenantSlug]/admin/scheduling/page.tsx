@@ -86,7 +86,9 @@ export default async function SchedulingPage({ params }: Props) {
 
       supabase
         .from('workstations')
-        .select('id, name, capacity_ceiling, stage_id, workstation_operating_windows(id, window_start, window_end)')
+        .select(
+          'id, name, capacity_ceiling, stage_id, workstation_operating_windows(id, window_start, window_end)'
+        )
         .eq('event_id', event.id)
         .eq('tenant_id', tenant.id)
         .order('created_at', { ascending: true }),

@@ -46,7 +46,9 @@ export default async function DashboardPage({ params }: Props) {
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url')
+    .select(
+      'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
+    )
     .eq('tenant_id', tenant.id)
     .maybeSingle()
 
@@ -64,7 +66,8 @@ export default async function DashboardPage({ params }: Props) {
     .eq('tenant_id', tenant.id)
 
   const officialsInvited = officialsData?.filter((o) => o.invite_status === 'invited').length ?? 0
-  const officialsConfirmed = officialsData?.filter((o) => o.invite_status === 'confirmed').length ?? 0
+  const officialsConfirmed =
+    officialsData?.filter((o) => o.invite_status === 'confirmed').length ?? 0
 
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = (raceStageCount ?? 0) > 0
@@ -81,7 +84,10 @@ export default async function DashboardPage({ params }: Props) {
   const dateRange = event ? formatDateRange(event.start_date, event.end_date) : null
   const eventName = event?.name?.trim() || t('dashboard.eventName')
   const eventType = event?.event_type?.trim() || null
-  const subtitle = [eventType ?? t('dashboard.typeNotSet'), dateRange ?? t('dashboard.datesNotSet')].join(' · ')
+  const subtitle = [
+    eventType ?? t('dashboard.typeNotSet'),
+    dateRange ?? t('dashboard.datesNotSet'),
+  ].join(' · ')
 
   return (
     <div className="px-8 py-8">

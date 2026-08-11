@@ -32,7 +32,8 @@ export default function LoginPage() {
   }
 
   async function verifyOtp() {
-    if (await request(() => supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' }))) router.push('/')
+    if (await request(() => supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })))
+      router.push('/')
   }
 
   return (
@@ -90,7 +91,12 @@ export default function LoginPage() {
           >
             {loading ? t('signIn.verifying') : t('signIn.verifyButton')}
           </Button>
-          <Button type="button" variant="light" onPress={() => setStep('phone')} className="text-sm">
+          <Button
+            type="button"
+            variant="light"
+            onPress={() => setStep('phone')}
+            className="text-sm"
+          >
             {t('signIn.changeNumber')}
           </Button>
         </form>

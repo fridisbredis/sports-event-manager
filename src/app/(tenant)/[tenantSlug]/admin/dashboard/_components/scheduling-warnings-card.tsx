@@ -34,7 +34,11 @@ export function SchedulingWarningsCard({
       <CardBody className="p-6">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</h2>
-          <Chip size="sm" variant={totalWarnings === 0 ? 'bordered' : 'flat'} color={totalWarnings === 0 ? 'default' : 'warning'}>
+          <Chip
+            size="sm"
+            variant={totalWarnings === 0 ? 'bordered' : 'flat'}
+            color={totalWarnings === 0 ? 'default' : 'warning'}
+          >
             {totalWarnings === 0 ? allClearLabel : issuesLabel}
           </Chip>
         </div>

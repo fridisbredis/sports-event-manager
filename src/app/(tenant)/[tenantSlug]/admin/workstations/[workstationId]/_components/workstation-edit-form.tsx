@@ -103,7 +103,10 @@ export default function WorkstationEditForm({
 
   function clearWindowError(index: number) {
     if (errors.windows?.[index]) {
-      setErrors((prev) => ({ ...prev, windows: { ...prev.windows, [index]: undefined as unknown as string } }))
+      setErrors((prev) => ({
+        ...prev,
+        windows: { ...prev.windows, [index]: undefined as unknown as string },
+      }))
     }
   }
 
@@ -157,8 +160,14 @@ export default function WorkstationEditForm({
     const windowErrors: Record<number, string> = {}
     windows.forEach((w, i) => {
       if (!w.start && !w.end) return
-      if (!w.start) { windowErrors[i] = t('workstations.windowStartRequired'); return }
-      if (!w.end) { windowErrors[i] = t('workstations.windowEndRequired'); return }
+      if (!w.start) {
+        windowErrors[i] = t('workstations.windowStartRequired')
+        return
+      }
+      if (!w.end) {
+        windowErrors[i] = t('workstations.windowEndRequired')
+        return
+      }
       const onFirstDay = stageDays.length === 1 || w.limitToDay === stageDays[0]
       const onLastDay = stageDays.length === 1 || w.limitToDay === lastDay
       if (onFirstDay && stageStartHHMM && w.start < stageStartHHMM) {
@@ -249,15 +258,12 @@ export default function WorkstationEditForm({
           >
             {t('workstations.backToList')}
           </Button>
-          <h1 className="text-2xl font-semibold text-gray-900">{name || t('workstations.namePlaceholder')}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {name || t('workstations.namePlaceholder')}
+          </h1>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            color="danger"
-            variant="light"
-            onPress={handleDelete}
-            isDisabled={isBusy}
-          >
+          <Button color="danger" variant="light" onPress={handleDelete} isDisabled={isBusy}>
             {t('workstations.delete')}
           </Button>
           <Button
@@ -267,7 +273,11 @@ export default function WorkstationEditForm({
             isDisabled={isBusy}
             isLoading={isSaving}
           >
-            {isSaving ? t('workstations.saving') : saveSuccess ? t('workstations.saved') : t('workstations.save')}
+            {isSaving
+              ? t('workstations.saving')
+              : saveSuccess
+                ? t('workstations.saved')
+                : t('workstations.save')}
           </Button>
         </div>
       </div>
@@ -308,7 +318,10 @@ export default function WorkstationEditForm({
               <Textarea
                 label={t('workstations.descriptionLabel')}
                 value={description}
-                onValueChange={(val) => { setDescription(val); markDirty() }}
+                onValueChange={(val) => {
+                  setDescription(val)
+                  markDirty()
+                }}
                 minRows={3}
               />
             </div>
@@ -340,7 +353,10 @@ export default function WorkstationEditForm({
               type="number"
               label={t('workstations.capacityLabel')}
               value={String(capacity)}
-              onValueChange={(val) => { setCapacity(Math.max(1, parseInt(val) || 1)); markDirty() }}
+              onValueChange={(val) => {
+                setCapacity(Math.max(1, parseInt(val) || 1))
+                markDirty()
+              }}
               min={1}
             />
           </section>

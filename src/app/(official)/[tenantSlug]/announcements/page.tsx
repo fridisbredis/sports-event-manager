@@ -12,7 +12,11 @@ function formatAnnouncementTime(ts: string): string {
   const todayUTC = new Date().toISOString().slice(0, 10)
   const tsUTC = date.toISOString().slice(0, 10)
   const yesterdayUTC = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
-  const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+  const time = date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  })
   if (tsUTC === todayUTC) return `Today · ${time}`
   if (tsUTC === yesterdayUTC) return `Yesterday · ${time}`
   const weekday = date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
@@ -22,7 +26,13 @@ function formatAnnouncementTime(ts: string): string {
 function EmptyIcon() {
   return (
     <div className="w-20 h-20 rounded-xl border border-gray-200 bg-gray-100 flex items-center justify-center">
-      <svg viewBox="0 0 24 24" className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <svg
+        viewBox="0 0 24 24"
+        className="w-10 h-10 text-gray-300"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M3 21L21 3" />
         <rect x="3" y="3" width="18" height="18" rx="1" />
       </svg>
@@ -67,15 +77,23 @@ export default async function AnnouncementsPage({ params }: Props) {
       {items.length > 0 ? (
         <div className="flex flex-col gap-3">
           {items.map((a) => (
-            <AnnouncementCard key={a.id} time={formatAnnouncementTime(a.published_at)} body={a.body} />
+            <AnnouncementCard
+              key={a.id}
+              time={formatAnnouncementTime(a.published_at)}
+              body={a.body}
+            />
           ))}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
           <EmptyIcon />
           <div>
-            <p className="text-base font-semibold text-gray-900">{t('announcements.noAnnouncements')}</p>
-            <p className="text-sm text-gray-500 mt-1">{t('announcements.noAnnouncementsDescription')}</p>
+            <p className="text-base font-semibold text-gray-900">
+              {t('announcements.noAnnouncements')}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              {t('announcements.noAnnouncementsDescription')}
+            </p>
           </div>
         </div>
       )}

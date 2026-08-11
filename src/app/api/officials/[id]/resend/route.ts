@@ -34,7 +34,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   if (official.invite_status !== 'invited') {
-    return NextResponse.json({ error: 'Can only resend invite to invited officials' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Can only resend invite to invited officials' },
+      { status: 400 }
+    )
   }
 
   // Regenerate token + expiry to invalidate the old link

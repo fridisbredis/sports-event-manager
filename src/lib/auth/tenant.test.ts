@@ -118,9 +118,9 @@ describe('confirmOfficialInvite', () => {
   })
 
   it('returns null and does not confirm when the official has no tenant slug', async () => {
-    const fromMock = vi.fn().mockReturnValueOnce(
-      chain({ data: { id: 'off-1', tenant_id: TENANT_ID, tenants: null } })
-    )
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(chain({ data: { id: 'off-1', tenant_id: TENANT_ID, tenants: null } }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
@@ -236,9 +236,11 @@ describe('requireTenantAdmin', () => {
 
   it('returns the tenant-specific role when the user is tenant_admin for this tenant', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(
-      chain({ data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null })
-    )
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(
+        chain({ data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null })
+      )
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await requireTenantAdmin(TENANT_ID)
@@ -248,9 +250,11 @@ describe('requireTenantAdmin', () => {
 
   it('falls back to the first role row when the user is system_admin without a row for this tenant', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(
-      chain({ data: [{ role: 'system_admin', tenant_id: 'other-tenant' }], error: null })
-    )
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(
+        chain({ data: [{ role: 'system_admin', tenant_id: 'other-tenant' }], error: null })
+      )
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await requireTenantAdmin(TENANT_ID)

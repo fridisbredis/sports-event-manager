@@ -180,7 +180,10 @@ export function ByWorkAreaGrid({
                     if (!inWindow) {
                       return (
                         <td key={slotStart} className="px-1 py-2">
-                          <div className="w-full h-10 rounded-md" style={STRIPED_UNAVAILABLE_STYLE} />
+                          <div
+                            className="w-full h-10 rounded-md"
+                            style={STRIPED_UNAVAILABLE_STYLE}
+                          />
                         </td>
                       )
                     }
@@ -267,7 +270,9 @@ export function ByWorkAreaGrid({
                               </button>
                             ) : (
                               <button
-                                onPointerDown={() => onWsDragStart(ws.id, ws.name, slotIdx, slotArrIdx)}
+                                onPointerDown={() =>
+                                  onWsDragStart(ws.id, ws.name, slotIdx, slotArrIdx)
+                                }
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
                                 className={`w-full h-10 rounded-md border transition-colors ${
                                   inDragRange

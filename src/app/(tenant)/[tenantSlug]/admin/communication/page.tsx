@@ -37,10 +37,7 @@ export default async function CommunicationPage({ params }: Props) {
 
   return (
     <div className="px-8 py-8">
-      <CommunicationPanel
-        tenantId={tenant.id}
-        announcements={announcements ?? []}
-      />
+      <CommunicationPanel tenantId={tenant.id} announcements={announcements ?? []} />
     </div>
   )
 }
