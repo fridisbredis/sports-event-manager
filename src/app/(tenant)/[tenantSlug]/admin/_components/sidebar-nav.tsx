@@ -33,6 +33,10 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
+    // Must run after mount, not during a lazy useState initializer: localStorage
+    // isn't available during SSR, so reading it there would make the client's
+    // hydration render disagree with the server-rendered HTML.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsed(localStorage.getItem(COLLAPSE_STORAGE_KEY) === 'true')
   }, [])
 

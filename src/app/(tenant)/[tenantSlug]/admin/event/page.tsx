@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import EventConfigForm from './_components/event-config-form'
 
@@ -26,8 +26,6 @@ export default async function EventConfigPage({ params }: Props) {
   if (!tenant) notFound()
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
-
-  const service = await createSupabaseServiceClient()
 
   const { data: event } = await supabase
     .from('events')

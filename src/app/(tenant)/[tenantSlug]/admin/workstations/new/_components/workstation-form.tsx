@@ -11,7 +11,6 @@ interface Props {
   tenantSlug: string
   tenantId: string
   eventId: string
-  stages: Stage[]
   preselectedStage: Stage | null
   schedulingGranularityMin: number
 }
@@ -21,7 +20,7 @@ interface FormErrors {
   windows?: Record<number, string>
 }
 
-export default function WorkstationForm({ tenantSlug, tenantId, eventId, stages, preselectedStage, schedulingGranularityMin }: Props) {
+export default function WorkstationForm({ tenantSlug, tenantId, eventId, preselectedStage, schedulingGranularityMin }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   Button,
   Input,
@@ -65,12 +65,6 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
     isAdd ? '' : stage.distances.map((d) => d.label).join(', ')
   )
   const [errors, setErrors] = useState<{ name?: string; end_time?: string }>({})
-
-  useEffect(() => {
-    setForm(isAdd ? emptyStage() : { ...stage! })
-    setDistancesText(isAdd ? '' : stage!.distances.map((d) => d.label).join(', '))
-    setErrors({})
-  }, [stage, isAdd])
 
   function validate(): boolean {
     const errs: { name?: string; end_time?: string } = {}

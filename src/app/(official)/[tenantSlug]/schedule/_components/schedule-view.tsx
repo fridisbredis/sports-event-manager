@@ -196,7 +196,11 @@ export function ScheduleView({ assignments, strings }: Props) {
   const [view, setView] = useState<View>('time')
 
   useEffect(() => {
+    // Must run after mount, not during a lazy useState initializer: localStorage
+    // isn't available during SSR, so reading it there would make the client's
+    // hydration render disagree with the server-rendered HTML.
     const saved = localStorage.getItem('official-schedule-view')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === 'time' || saved === 'work-area') setView(saved)
   }, [])
 

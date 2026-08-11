@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Button,
@@ -99,10 +99,15 @@ export function SchedulingGrid({
   // `initialAssignments` is a new array on every server re-render (e.g. after
   // router.refresh()), but useState only reads it once at mount — without this,
   // local state goes stale relative to the DB and autosave rejects edits to
-  // cells that look empty but are already taken.
-  useEffect(() => {
+  // cells that look empty but are already taken. Resyncing during render
+  // (rather than in an effect) avoids an extra cascading render and still
+  // preserves unrelated local UI state (pickerCell, expandedWorkAreas, etc.)
+  // that a remount-by-key approach would lose.
+  const [prevInitialAssignments, setPrevInitialAssignments] = useState(initialAssignments)
+  if (initialAssignments !== prevInitialAssignments) {
+    setPrevInitialAssignments(initialAssignments)
     setAssignments(toLocalAssignmentsFromInitial(initialAssignments))
-  }, [initialAssignments])
+  }
   // By-person work-area picker
   const [pickerCell, setPickerCell] = useState<{
     officialId: string
@@ -271,6 +276,21 @@ export function SchedulingGrid({
     [overCapacityCells, activeAssignments, stageWorkstations, officials]
   )
 
+  const handleWsExpandedSlotClick = useCallback(
+    (wsId: string, wsName: string, slotIndex: number, slot: Date) => {
+      const slotEnd = slotEndTime(slot, granularityMin).toISOString()
+      setWsSlotModal({
+        workstationId: wsId,
+        wsName,
+        slotIndex,
+        slotStart: slot.toISOString(),
+        slotEnd,
+      })
+      setWsSlotModalSearch('')
+    },
+    [granularityMin]
+  )
+
   // Finalize a by-work-area drag on mouseup (window-level so it can't get stuck
   // if the mouse leaves the table before releasing)
   useEffect(() => {
@@ -322,7 +342,7 @@ export function SchedulingGrid({
 
     window.addEventListener('pointerup', handleUp)
     return () => window.removeEventListener('pointerup', handleUp)
-  }, [wsDrag, slots, stageWorkstations, granularityMin, activeAssignments])
+  }, [wsDrag, slots, stageWorkstations, granularityMin, activeAssignments, handleWsExpandedSlotClick])
 
   const dragAvailableOfficials = useMemo(() => {
     if (!dragOfficialPicker) return []
@@ -444,18 +464,6 @@ export function SchedulingGrid({
       },
     ])
     endPending(key)
-  }
-
-  function handleWsExpandedSlotClick(wsId: string, wsName: string, slotIndex: number, slot: Date) {
-    const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-    setWsSlotModal({
-      workstationId: wsId,
-      wsName,
-      slotIndex,
-      slotStart: slot.toISOString(),
-      slotEnd,
-    })
-    setWsSlotModalSearch('')
   }
 
   function handleOverflowClick(overflowAssignments: LocalAssignment[], anchor: HTMLElement) {

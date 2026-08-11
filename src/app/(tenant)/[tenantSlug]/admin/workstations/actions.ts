@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 
 export interface WindowInput {
@@ -55,8 +55,6 @@ export async function createWorkstation(
     return { error: 'Operating window is shorter than the scheduling granularity' }
   }
 
-  const service = await createSupabaseServiceClient()
-
   const { data: ws, error: wsError } = await supabase
     .from('workstations')
     .insert({
@@ -84,7 +82,7 @@ export async function createWorkstation(
     if (winError) return { error: winError.message }
   }
 
-  const validTodos = input.todos.map((t, i) => t.trim()).filter(Boolean)
+  const validTodos = input.todos.map((t) => t.trim()).filter(Boolean)
   if (validTodos.length > 0) {
     const { error: todoError } = await supabase.from('workstation_todos').insert(
       validTodos.map((text, i) => ({
@@ -135,8 +133,6 @@ export async function updateWorkstation(
   if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
     return { error: 'Operating window is shorter than the scheduling granularity' }
   }
-
-  const service = await createSupabaseServiceClient()
 
   const { error: wsError } = await supabase
     .from('workstations')
@@ -215,8 +211,6 @@ export async function deleteWorkstation(
   if (!user) redirect('/login')
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
-
-  const service = await createSupabaseServiceClient()
 
   const { error } = await supabase
     .from('workstations')

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 
 export interface AssignmentInput {
@@ -44,8 +44,6 @@ export async function saveAssignments(
   if (!user) redirect('/login')
 
   if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
-
-  const service = await createSupabaseServiceClient()
 
   if (deletions.length > 0) {
     const { error } = await supabase

@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import WorkstationForm from './_components/workstation-form'
 
@@ -29,8 +29,6 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const service = await createSupabaseServiceClient()
-
   const { data: event } = await supabase
     .from('events')
     .select('id, scheduling_granularity_min')
@@ -54,7 +52,6 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
         tenantSlug={tenantSlug}
         tenantId={tenant.id}
         eventId={event.id}
-        stages={stages ?? []}
         preselectedStage={preselectedStage}
         schedulingGranularityMin={event.scheduling_granularity_min}
       />

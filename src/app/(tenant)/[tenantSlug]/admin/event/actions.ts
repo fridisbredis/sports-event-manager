@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 
@@ -51,8 +51,6 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
   if (!user) redirect('/login')
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
-
-  const service = await createSupabaseServiceClient()
 
   // Derive start_date / end_date from Race stage times so the events row stays
   // coherent even though those columns are now nullable.

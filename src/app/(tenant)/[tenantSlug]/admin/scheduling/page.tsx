@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { SchedulingGrid } from './_components/scheduling-grid'
 
@@ -66,8 +66,6 @@ export default async function SchedulingPage({ params }: Props) {
   if (!tenant) notFound()
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
-
-  const service = await createSupabaseServiceClient()
 
   const { data: event } = await supabase
     .from('events')
