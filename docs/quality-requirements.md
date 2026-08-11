@@ -5,7 +5,7 @@
 - **Version:** 0.1
 - **Date:** 2026-08-11
 - **Status:** Proposed requirements; initial source-code assessment completed
-- **Last verified:** 2026-08-11 after the lint errors were fixed
+- **Last verified:** 2026-08-11 after the lint and Prettier errors were fixed
 
 ## Purpose and scope
 
@@ -34,10 +34,10 @@ configuration, Twilio account, or production traffic.
 | Unit/component tests | 14 test files and 145 tests passed                                                                                                                                                               |
 | Type check           | Passed (`tsc --noEmit`)                                                                                                                                                                          |
 | Lint                 | Passed: `eslint .` exits successfully with no reported errors or warnings. A pull-request CI workflow is configured; GitHub branch protection must still require its `Lint` status before merge. |
-| Formatting check     | Failed: Prettier reported style issues in 61 source files                                                                                                                                        |
+| Formatting check     | Passed: `npm run format:check` reports no style issues. A pull-request CI workflow is configured; GitHub branch protection must still require its `Format` status before merge.                  |
 | Production build     | Could not complete in the assessment environment because `next/font` could not fetch Google Fonts; it also warned about an inferred workspace root and the deprecated `middleware` convention    |
 | Dependency audit     | Reported three high-severity production dependency findings, including Next.js, PostCSS, and Sharp                                                                                               |
-| CI/SAST              | CodeQL is configured for pushes, pull requests, manual runs, and weekly scans. A separate lint workflow is configured for pushes and pull requests.                                              |
+| CI/SAST              | CodeQL is configured for pushes, pull requests, manual runs, and weekly scans. A separate lint and format workflow is configured for pushes and pull requests.                                   |
 
 ## Quality objectives and release requirements
 
@@ -93,16 +93,16 @@ must be replaced with numbers agreed with the product owner before release:
 | F-SEC-05  | The dependency audit reported three high-severity production findings.                                                                                                     | Known vulnerabilities may be released.                                                                                                                      | Apply reviewed dependency upgrades, run regression tests, and make audit a merge/release gate.                                              | High     |
 | F-PERF-01 | The scheduling page correctly pages beyond PostgREST's 1,000-row limit, but it still assembles every assignment for the tenant and passes the full collection to the grid. | Time, memory, and client rendering cost grow with the entire event rather than the user's current view.                                                     | Load-test the agreed event size; introduce stage/date/range queries and grid virtualisation or bounded pagination.                          | Medium   |
 | F-PERF-02 | Schedule status updates are issued one at a time and related schedule edits are not one atomic database operation.                                                         | More round trips and partial-update risk under load or failure.                                                                                             | Move batch validation and mutation to a transaction/RPC; retain database constraints as the final concurrency guard.                        | Medium   |
-| F-MNT-02  | Prettier check reports 61 files with formatting issues.                                                                                                                    | Noise obscures meaningful changes and prevents a clean quality gate.                                                                                        | Apply the agreed formatter once, then enforce check-only CI.                                                                                | Medium   |
 | F-MNT-03  | The test suite is healthy at unit/component level, but no repository tests prove RLS against a real database or exercise the end-to-end OTP/invitation flow.               | The most important access-control behaviours are unproven in their deployed form.                                                                           | Add disposable-database integration tests and a staged end-to-end smoke test.                                                               | High     |
 | F-MNT-04  | The production build depended on downloading Google Fonts in the assessment environment and warned about an inferred workspace root.                                       | Builds may be less deterministic; the warning can conceal unintended workspace boundaries.                                                                  | Make font loading and Turbopack root explicit; verify a clean build in CI.                                                                  | Medium   |
 | F-MNT-05  | The scheduling grid component is approximately 1,100 lines.                                                                                                                | High cognitive load and higher regression risk in the product's most complex UI.                                                                            | Split domain calculation, state management, rendering, and interactions into focused modules with tests.                                    | Medium   |
 
 ## Resolved findings
 
-| ID       | Resolution and evidence                                                                                                                                                              | Remaining follow-up                                                                   | Status                               |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------ |
-| F-MNT-01 | The lint script uses `eslint .`, and `npm run lint` passed with no errors or warnings on 2026-08-11. The `Quality checks` workflow runs lint for pull requests and pushes to `main`. | In GitHub branch protection, require the `Quality checks / Lint` status before merge. | Automated; branch protection pending |
+| ID       | Resolution and evidence                                                                                                                                                              | Remaining follow-up                                                                     | Status                               |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------ |
+| F-MNT-01 | The lint script uses `eslint .`, and `npm run lint` passed with no errors or warnings on 2026-08-11. The `Quality checks` workflow runs lint for pull requests and pushes to `main`. | In GitHub branch protection, require the `Quality checks / Lint` status before merge.   | Automated; branch protection pending |
+| F-MNT-02 | `npm run format:check` passed with no style issues on 2026-08-11. The `Quality checks` workflow runs formatting for pull requests and pushes to `main`.                              | In GitHub branch protection, require the `Quality checks / Format` status before merge. | Automated; branch protection pending |
 
 ## Evidence references
 
@@ -113,7 +113,7 @@ must be replaced with numbers agreed with the product owner before release:
 - Schedule fetching and mutation: [`src/app/(tenant)/[tenantSlug]/admin/scheduling/page.tsx`](<../src/app/(tenant)/[tenantSlug]/admin/scheduling/page.tsx>) and [`actions.ts`](<../src/app/(tenant)/[tenantSlug]/admin/scheduling/actions.ts>)
 - Dependency and local quality commands: [`package.json`](../package.json)
 - Current SAST workflow: [`code-ql-analysis.yml`](../.github/workflows/code-ql-analysis.yml)
-- Current lint workflow: [`quality.yml`](../.github/workflows/quality.yml)
+- Current lint and format workflow: [`quality.yml`](../.github/workflows/quality.yml)
 
 ## Recommended delivery sequence
 
