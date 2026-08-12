@@ -1,12 +1,6 @@
-import { Space_Grotesk } from 'next/font/google'
 import Link from 'next/link'
 import { getServerTranslation } from '@/lib/i18n/server'
-
-const display = Space_Grotesk({
-  subsets: ['latin'],
-  weight: ['300', '500'],
-  variable: '--font-display',
-})
+import { display } from '@/fonts/space-grotesk'
 
 export default async function NotFound() {
   const t = await getServerTranslation('en')

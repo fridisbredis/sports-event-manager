@@ -1,13 +1,7 @@
 'use client'
 
-import { Space_Grotesk } from 'next/font/google'
 import { useTranslation } from '@/lib/i18n/client'
-
-const display = Space_Grotesk({
-  subsets: ['latin'],
-  weight: ['300', '500'],
-  variable: '--font-display',
-})
+import { display } from '@/fonts/space-grotesk'
 
 export default function GlobalError({
   reset,
