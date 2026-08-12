@@ -41,7 +41,7 @@ AUTHORIZATION HELPER:
 
 COMMON BUGS:
 - OTP success but no session: cookie not set — check @supabase/ssr middleware config
-- Session lost after reload: middleware not refreshing session — verify middleware.ts runs on all protected routes
+- Session lost after reload: proxy not refreshing session — verify proxy.ts runs on all protected routes
 - Double verification error: Twilio + Supabase mismatch — ensure OTP type is 'sms' not 'phone_change'
 - Wrong redirect after login: user_roles row missing for user — check DB insert on first login
 
