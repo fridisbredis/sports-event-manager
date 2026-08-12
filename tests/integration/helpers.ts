@@ -25,20 +25,43 @@ export async function createTenant(name: string) {
 }
 
 // Fixed numbers from supabase/config.toml [auth.sms.test_otp] — the local
-// GoTrue container persists users across test runs, so each number must be
-// freed up before reuse rather than minted fresh.
-const TEST_PHONES = ['+46700000001', '+46700000002', '+46700000003']
-let phoneIndex = 0
+// GoTrue container persists users across test runs. Test files can run in
+// the same worker process (module state survives across files even with
+// fileParallelism: false), so a blind round-robin index would eventually
+// reclaim a number still held by another file's still-signed-in client.
+// Instead, always pick a number with no existing user, only falling back to
+// deleting the oldest-claimed one if every number is genuinely in use at
+// once — the pool must stay larger than the max number of distinct users
+// alive at the same time across the whole suite.
+const TEST_PHONES = [
+  '+46700000001',
+  '+46700000002',
+  '+46700000003',
+  '+46700000004',
+  '+46700000005',
+  '+46700000006',
+  '+46700000007',
+  '+46700000008',
+  '+46700000009',
+  '+46700000010',
+]
+const claimedOrder: string[] = []
 
 async function claimTestPhone(admin: ReturnType<typeof serviceClient>) {
-  const phone = TEST_PHONES[phoneIndex % TEST_PHONES.length]
-  phoneIndex += 1
-
   const { data: existing } = await admin.auth.admin.listUsers()
-  const existingUser = existing?.users.find((u) => u.phone === phone.replace('+', ''))
-  if (existingUser) {
-    await admin.auth.admin.deleteUser(existingUser.id)
+  const takenPhones = new Set(existing?.users.map((u) => u.phone).filter(Boolean))
+
+  let phone = TEST_PHONES.find((candidate) => !takenPhones.has(candidate.replace('+', '')))
+
+  if (!phone) {
+    const oldest = claimedOrder.shift()
+    if (!oldest) throw new Error('No free test phone number and no claimed number to evict')
+    const staleUser = existing?.users.find((u) => u.phone === oldest.replace('+', ''))
+    if (staleUser) await admin.auth.admin.deleteUser(staleUser.id)
+    phone = oldest
   }
+
+  claimedOrder.push(phone)
   return phone
 }
 
@@ -74,6 +97,41 @@ export async function signInAsClient(phone: string, otp: string): Promise<Supaba
   const { error } = await client.auth.verifyOtp({ phone, token: otp, type: 'sms' })
   if (error) throw error
   return client
+}
+
+// Creates an `officials` row linked to the given auth user's id, so RLS
+// policies keyed on `officials.user_id = auth.uid()` (e.g.
+// official_read_own_assignments) resolve to this official.
+export async function createOfficialLinkedToUser(
+  tenantId: string,
+  userId: string,
+  name: string,
+) {
+  const admin = serviceClient()
+  const { data, error } = await admin
+    .from('officials')
+    .insert({ tenant_id: tenantId, user_id: userId, name, phone: `+46701${Math.floor(Math.random() * 1_000_000)}` })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// Creates a `participants` row linked to the given auth user's id, so
+// `participant_read_own` (user_id = auth.uid()) resolves to this participant.
+export async function createParticipantLinkedToUser(
+  tenantId: string,
+  userId: string,
+  name: string,
+) {
+  const admin = serviceClient()
+  const { data, error } = await admin
+    .from('participants')
+    .insert({ tenant_id: tenantId, user_id: userId, name, phone: `+46702${Math.floor(Math.random() * 1_000_000)}` })
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }
 
 export async function cleanupTenant(tenantId: string) {

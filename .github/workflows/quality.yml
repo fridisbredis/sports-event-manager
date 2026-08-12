@@ -125,6 +125,26 @@ jobs:
             | grep -E '^(SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
             > .env.test.local
 
+      - name: Wait for PostgREST to accept service-role queries
+        run: |
+          set -a
+          source .env.test.local
+          set +a
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              "${SUPABASE_URL}/rest/v1/tenants?select=id&limit=1")
+            if [ "$status" = "200" ]; then
+              echo "PostgREST is ready (attempt $i)"
+              exit 0
+            fi
+            echo "PostgREST not ready yet (attempt $i, status $status), retrying..."
+            sleep 2
+          done
+          echo "PostgREST did not become ready in time"
+          exit 1
+
       - name: Run integration tests
         run: npm run test:integration
 
