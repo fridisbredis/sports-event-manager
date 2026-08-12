@@ -23,7 +23,9 @@ beforeEach(() => {
 
 describe('SystemAdminPage', () => {
   it('queries tenants ordered by newest first and passes them to TenantList', async () => {
-    const tenants = [{ id: 't-1', name: 'Viadal', slug: 'viadal', is_active: true, tier: 'standard' }]
+    const tenants = [
+      { id: 't-1', name: 'Viadal', slug: 'viadal', is_active: true, tier: 'standard' },
+    ]
     const tenantsBuilder = chain({ data: tenants })
     const fromMock = vi.fn().mockReturnValue(tenantsBuilder)
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)

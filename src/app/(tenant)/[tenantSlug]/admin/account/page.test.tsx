@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminAccountPage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getUserRoles } from '@/lib/auth/tenant'
-import { redirect } from 'next/navigation'
 import AdminAccountForm from './_components/admin-account-form'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 

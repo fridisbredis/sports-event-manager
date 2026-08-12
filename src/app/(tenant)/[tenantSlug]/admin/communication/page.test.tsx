@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import CommunicationPage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
-import { redirect } from 'next/navigation'
 import { CommunicationPanel } from './_components/communication-panel'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -57,7 +56,9 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 function mockServerClient(userId: string | null, tenant: unknown) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }) },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
+    },
     from: vi.fn().mockReturnValue(chain({ data: tenant })),
   } as never)
 }

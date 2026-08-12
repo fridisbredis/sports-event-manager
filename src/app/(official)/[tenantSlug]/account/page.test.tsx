@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialAccountPage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import AccountForm from './_components/account-form'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -58,7 +57,9 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 function mockUser(userId: string | null) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }) },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
+    },
   } as never)
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialLayout from './layout'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -56,7 +56,9 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 function mockUser(userId: string | null, tenant: unknown) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }) },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
+    },
     from: vi.fn().mockReturnValue(chain({ data: tenant })),
   } as never)
 }
@@ -69,9 +71,9 @@ describe('OfficialLayout', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     mockUser(null, null)
 
-    await expect(
-      OfficialLayout({ children: null, params: PARAMS })
-    ).rejects.toThrow('NEXT_REDIRECT')
+    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
+      'NEXT_REDIRECT'
+    )
     expect(redirect).toHaveBeenCalledWith('/login')
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
@@ -79,9 +81,9 @@ describe('OfficialLayout', () => {
   it('calls notFound when the tenant slug does not resolve', async () => {
     mockUser('user-1', null)
 
-    await expect(
-      OfficialLayout({ children: null, params: PARAMS })
-    ).rejects.toThrow('NEXT_NOT_FOUND')
+    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
+      'NEXT_NOT_FOUND'
+    )
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
@@ -91,9 +93,9 @@ describe('OfficialLayout', () => {
       from: vi.fn().mockReturnValue(chain({ data: null })),
     } as never)
 
-    await expect(
-      OfficialLayout({ children: null, params: PARAMS })
-    ).rejects.toThrow('NEXT_NOT_FOUND')
+    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
+      'NEXT_NOT_FOUND'
+    )
   })
 
   it('renders children and BottomTabBar when a role row exists for this tenant', async () => {

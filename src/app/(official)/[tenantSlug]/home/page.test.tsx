@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialHomePage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -35,7 +34,9 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 function mockUser(userId: string | null, tenant: unknown) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }) },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
+    },
     from: vi.fn().mockReturnValue(chain({ data: tenant })),
   } as never)
 }
