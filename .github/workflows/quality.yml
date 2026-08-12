@@ -22,7 +22,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -42,7 +42,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -50,3 +50,134 @@ jobs:
 
       - name: Check formatting
         run: npm run format:check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  test-integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          # Pinned to match the version verified locally. `latest` drifts and
+          # previously caused a version skew where `supabase status -o env`
+          # returned a key format PostgREST rejected with a consistent 403.
+          version: 2.95.4
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Write .env.test.local from local Supabase status
+        run: |
+          supabase status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.anon_key=SUPABASE_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+            | grep -E '^(SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
+            > .env.test.local
+
+      - name: Wait for PostgREST to accept service-role queries
+        run: |
+          set -a
+          source .env.test.local
+          set +a
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              "${SUPABASE_URL}/rest/v1/tenants?select=id&limit=1")
+            if [ "$status" = "200" ]; then
+              echo "PostgREST is ready (attempt $i)"
+              exit 0
+            fi
+            echo "PostgREST not ready yet (attempt $i, status $status), retrying..."
+            sleep 2
+          done
+          echo "PostgREST did not become ready in time"
+          exit 1
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run production build
+        run: npm run build
+        env:
+          # Dummy values: NEXT_PUBLIC_* vars are inlined into the client
+          # bundle at build time and must be present for prerender to
+          # succeed (see F-MNT-07), but their real values are only needed
+          # at runtime, not to verify the build itself.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key

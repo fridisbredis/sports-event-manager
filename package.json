@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.mts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:types": "supabase gen types typescript --project-id lhflutwvwvzawzbcuwup --schema public > src/types/database.ts"
@@ -38,6 +39,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "^16.3.0",
     "jsdom": "^29.1.1",
