@@ -111,7 +111,10 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned to match the version verified locally. `latest` drifts and
+          # previously caused a version skew where `supabase status -o env`
+          # returned a key format PostgREST rejected with a consistent 403.
+          version: 2.95.4
 
       - name: Start local Supabase stack
         run: supabase start
