@@ -13,7 +13,7 @@ Error:
 
 Checklist:
 - OTP sent but no session created → check @supabase/ssr middleware config, cookies being set
-- Session lost after reload → verify middleware.ts runs on protected routes and calls supabase.auth.getUser()
+- Session lost after reload → verify proxy.ts runs on protected routes and calls supabase.auth.getUser()
 - Wrong redirect after login → check user_roles row exists for user + role-based routing logic
 - getSession() used instead of getUser() → always use getUser() for auth checks
 - "Invalid login credentials" → OTP expired (60s) or already used
