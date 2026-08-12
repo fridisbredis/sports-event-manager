@@ -4,6 +4,21 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { toSlug } from './_utils'
+import { z } from 'zod'
+
+const createTenantSchema = z.object({
+  name: z.string().trim().min(1),
+})
+
+const setTenantActiveSchema = z.object({
+  tenantId: z.string().uuid(),
+  isActive: z.boolean(),
+})
+
+const setTenantTierSchema = z.object({
+  tenantId: z.string().uuid(),
+  tier: z.enum(['standard', 'premium', 'professional']),
+})
 
 async function assertSystemAdmin(): Promise<{ error?: string }> {
   const supabase = await createSupabaseServerClient()
@@ -29,14 +44,23 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
   if (check.error) return check
 
-  const slug = toSlug(name)
+  const parsed = createTenantSchema.safeParse({ name })
+  if (!parsed.success) return { error: 'Invalid name' }
+
+  const slug = toSlug(parsed.data.name)
   if (!slug) return { error: 'Invalid name' }
 
   const service = await createSupabaseServiceClient()
 
   const { data: tenant, error: tenantError } = await service
     .from('tenants')
-    .insert({ name: name.trim(), slug, is_active: true, tier: 'standard', feature_flags: {} })
+    .insert({
+      name: parsed.data.name,
+      slug,
+      is_active: true,
+      tier: 'standard',
+      feature_flags: {},
+    })
     .select('id')
     .single()
 
@@ -49,7 +73,7 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
     .from('events')
     .insert({
       tenant_id: tenant.id,
-      name: name.trim(),
+      name: parsed.data.name,
       event_type: 'Event',
       status: 'draft',
       scheduling_granularity_min: 60,
@@ -99,13 +123,19 @@ export async function setTenantActive(
   const check = await assertSystemAdmin()
   if (check.error) return check
 
+  const parsed = setTenantActiveSchema.safeParse({ tenantId, isActive })
+  if (!parsed.success) return { error: 'Invalid request' }
+
   const service = await createSupabaseServiceClient()
-  const { error } = await service.from('tenants').update({ is_active: isActive }).eq('id', tenantId)
+  const { error } = await service
+    .from('tenants')
+    .update({ is_active: parsed.data.isActive })
+    .eq('id', parsed.data.tenantId)
 
   if (error) return { error: 'Failed to update tenant' }
 
   revalidatePath('/admin')
-  revalidatePath('/admin/' + tenantId)
+  revalidatePath('/admin/' + parsed.data.tenantId)
   return {}
 }
 
@@ -116,11 +146,17 @@ export async function setTenantTier(
   const check = await assertSystemAdmin()
   if (check.error) return check
 
+  const parsed = setTenantTierSchema.safeParse({ tenantId, tier })
+  if (!parsed.success) return { error: 'Invalid request' }
+
   const service = await createSupabaseServiceClient()
-  const { error } = await service.from('tenants').update({ tier }).eq('id', tenantId)
+  const { error } = await service
+    .from('tenants')
+    .update({ tier: parsed.data.tier })
+    .eq('id', parsed.data.tenantId)
 
   if (error) return { error: 'Failed to update tier' }
 
-  revalidatePath('/admin/' + tenantId)
+  revalidatePath('/admin/' + parsed.data.tenantId)
   return {}
 }
