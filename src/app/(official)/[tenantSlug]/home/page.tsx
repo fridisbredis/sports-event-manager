@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 interface Props {
@@ -108,11 +109,7 @@ export default async function OfficialHomePage({ params }: Props) {
 
   if (!user) redirect('/login')
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('slug', tenantSlug)
-    .single()
+  const tenant = await resolveTenantForOfficial(tenantSlug, user.id)
 
   if (!tenant) notFound()
 

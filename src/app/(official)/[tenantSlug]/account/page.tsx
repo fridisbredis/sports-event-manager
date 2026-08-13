@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
 
 interface Props {
@@ -18,15 +19,11 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id')
-    .eq('slug', tenantSlug)
-    .single()
+  const tenant = await resolveTenantForOfficial(tenantSlug, user.id)
 
   if (!tenant) notFound()
+
+  const service = await createSupabaseServiceClient()
 
   const { data: official } = await service
     .from('officials')

@@ -4,8 +4,11 @@ import {
   resolvePostLoginRedirect,
   confirmOfficialInvite,
   hasAdminAccessToTenant,
+  canViewOfficialSurfaces,
   requireSystemAdmin,
   requireTenantAdmin,
+  resolveTenantForAdmin,
+  resolveTenantForOfficial,
   type UserRoleWithTenant,
 } from './tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
@@ -33,7 +36,18 @@ function mockServerClient(user: { id: string } | null) {
   } as never)
 }
 
+// hasAdminAccessToTenant, canViewOfficialSurfaces and requireTenantAdmin each
+// fetch role rows and tenant status via two independent `.from()` calls
+// (Promise.all). This dispatches each call to a canned response keyed by
+// table name so both queries can be mocked independently in one setup call.
+function mockServiceClientByTable(responses: Record<string, unknown>) {
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({
+    from: vi.fn((table: string) => chain(responses[table])),
+  } as never)
+}
+
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+const OTHER_TENANT_ID = '22222222-2222-2222-2222-222222222222'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -169,19 +183,178 @@ describe('confirmOfficialInvite', () => {
   })
 })
 
+// Both predicates below fetch role rows and tenant status via parameterized
+// `.eq()` queries only — there is no filter string built from `tenantId`, so
+// there is nothing for a crafted value to inject into. Real cross-tenant and
+// injection-payload behaviour is proven against live PostgREST in
+// tests/integration/tenant-isolation-official-access.test.ts; these unit tests
+// cover the TypeScript-side authorization decision over role rows.
 describe('hasAdminAccessToTenant', () => {
-  it('returns true when a matching role row exists', async () => {
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: { role: 'tenant_admin' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  it('fails closed when tenantId is not a valid UUID', async () => {
+    expect(await hasAdminAccessToTenant('user-1', 'not-a-uuid')).toBe(false)
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('fails closed on an injected OR-term tenantId', async () => {
+    const maliciousTenantId = `${TENANT_ID}),or(role.not.is.null`
+    expect(await hasAdminAccessToTenant('user-1', maliciousTenantId)).toBe(false)
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('returns true when the caller has a tenant_admin row for this tenant and it is active', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(true)
   })
 
-  it('returns false when no role row exists', async () => {
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  it('returns false when the tenant_admin row is for a different tenant', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: OTHER_TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('denies a tenant_admin when the tenant has been deactivated', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: false }, error: null },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('allows a global system_admin even when the tenant has been deactivated', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
+      tenants: { data: { is_active: false }, error: null },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('returns false when the caller has no role rows at all', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('fails closed and logs when the role query errors', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: null, error: { message: 'boom' } },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+
+  it('fails closed and logs when the tenant status query errors', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: null, error: { message: 'boom' } },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+})
+
+describe('canViewOfficialSurfaces', () => {
+  it('fails closed when tenantId is not a valid UUID', async () => {
+    expect(await canViewOfficialSurfaces('user-1', 'not-a-uuid')).toBe(false)
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('fails closed on an injected OR-term tenantId', async () => {
+    const maliciousTenantId = `${TENANT_ID}),or(role.not.is.null`
+    expect(await canViewOfficialSurfaces('user-1', maliciousTenantId)).toBe(false)
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('allows an official in their own active tenant', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('allows a tenant_admin in their own active tenant', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('denies a participant in their own tenant', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'participant', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('denies an official once the tenant has been deactivated', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: false }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('allows a global system_admin even when the tenant has been deactivated', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
+      tenants: { data: { is_active: false }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('returns false when the caller has no role rows at all', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('fails closed and logs when the role query errors', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: null, error: { message: 'boom' } },
+      tenants: { data: { is_active: true }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+
+  it('fails closed and logs when the tenant status query errors', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: null, error: { message: 'boom' } },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+    expect(consoleSpy).toHaveBeenCalled()
   })
 })
 
@@ -196,9 +369,21 @@ describe('requireSystemAdmin', () => {
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
+  it('returns a 500 error and logs when the role query fails', async () => {
+    mockServerClient({ id: 'user-1' })
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const result = await requireSystemAdmin()
+
+    expect((result as { error: { status: number } }).error.status).toBe(500)
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+
   it('returns a 403 error when the user has no system_admin role row', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
+    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: [], error: null }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await requireSystemAdmin()
@@ -206,9 +391,28 @@ describe('requireSystemAdmin', () => {
     expect((result as { error: { status: number } }).error.status).toBe(403)
   })
 
-  it('returns the user when a system_admin role row exists', async () => {
+  it('returns the user when a single system_admin role row exists', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: { role: 'system_admin' } }))
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(chain({ data: [{ role: 'system_admin' }], error: null }))
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const result = await requireSystemAdmin()
+
+    expect(result).toEqual({ user: { id: 'user-1' } })
+  })
+
+  // user_roles is unique per (user_id, tenant_id), not per role, so a
+  // system_admin can legally hold a row in more than one tenant.
+  it('authorizes a system_admin holding role rows in more than one tenant', async () => {
+    mockServerClient({ id: 'user-1' })
+    const fromMock = vi.fn().mockReturnValueOnce(
+      chain({
+        data: [{ role: 'system_admin' }, { role: 'system_admin' }],
+        error: null,
+      })
+    )
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await requireSystemAdmin()
@@ -227,51 +431,160 @@ describe('requireTenantAdmin', () => {
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
-  it('returns a 500 error when the role lookup fails', async () => {
+  it('fails closed with a 403 when tenantId is not a valid UUID', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const result = await requireTenantAdmin('not-a-uuid')
+
+    expect((result as { error: { status: number } }).error.status).toBe(403)
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('fails closed with a 403 on an injected OR-term tenantId', async () => {
+    mockServerClient({ id: 'user-1' })
+    const maliciousTenantId = `${TENANT_ID}),or(role.not.is.null`
+
+    const result = await requireTenantAdmin(maliciousTenantId)
+
+    expect((result as { error: { status: number } }).error.status).toBe(403)
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('returns a 500 error and logs when the role lookup fails', async () => {
+    mockServerClient({ id: 'user-1' })
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: null, error: { message: 'boom' } },
+      tenants: { data: { is_active: true }, error: null },
+    })
 
     const result = await requireTenantAdmin(TENANT_ID)
 
     expect((result as { error: { status: number } }).error.status).toBe(500)
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+
+  it('returns a 500 error and logs when the tenant status lookup fails', async () => {
+    mockServerClient({ id: 'user-1' })
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: null, error: { message: 'boom' } },
+    })
+
+    const result = await requireTenantAdmin(TENANT_ID)
+
+    expect((result as { error: { status: number } }).error.status).toBe(500)
+    expect(consoleSpy).toHaveBeenCalled()
   })
 
   it('returns a 403 error when the user has no admin role rows at all', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: [], error: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockServiceClientByTable({
+      user_roles: { data: [], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
 
     const result = await requireTenantAdmin(TENANT_ID)
 
     expect((result as { error: { status: number } }).error.status).toBe(403)
   })
 
-  it('returns the tenant-specific role when the user is tenant_admin for this tenant', async () => {
+  it('returns a 403 error when the tenant_admin row is for this tenant but the tenant is inactive', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(
-        chain({ data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null })
-      )
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: false }, error: null },
+    })
+
+    const result = await requireTenantAdmin(TENANT_ID)
+
+    expect((result as { error: { status: number } }).error.status).toBe(403)
+  })
+
+  it('returns the tenant-specific role when the user is tenant_admin for this active tenant', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+    })
 
     const result = await requireTenantAdmin(TENANT_ID)
 
     expect(result).toEqual({ user: { id: 'user-1' }, role: 'tenant_admin' })
   })
 
-  it('falls back to the first role row when the user is system_admin without a row for this tenant', async () => {
+  it('authorizes a global system_admin without a row for this tenant, even if the tenant is inactive', async () => {
     mockServerClient({ id: 'user-1' })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(
-        chain({ data: [{ role: 'system_admin', tenant_id: 'other-tenant' }], error: null })
-      )
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
+      tenants: { data: { is_active: false }, error: null },
+    })
 
     const result = await requireTenantAdmin(TENANT_ID)
 
     expect(result).toEqual({ user: { id: 'user-1' }, role: 'system_admin' })
+  })
+})
+
+describe('resolveTenantForAdmin', () => {
+  it('returns null when no tenant matches the slug', async () => {
+    mockServiceClientByTable({ tenants: { data: null, error: null } })
+
+    expect(await resolveTenantForAdmin('viadal', 'user-1')).toBeNull()
+  })
+
+  it('returns null when the caller fails the admin access check', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [], error: null },
+    })
+
+    expect(await resolveTenantForAdmin('viadal', 'user-1')).toBeNull()
+  })
+
+  it('returns the tenant row when the caller passes the admin access check', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+    })
+
+    expect(await resolveTenantForAdmin('viadal', 'user-1')).toEqual({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+    })
+  })
+})
+
+describe('resolveTenantForOfficial', () => {
+  it('returns null when no tenant matches the slug', async () => {
+    mockServiceClientByTable({ tenants: { data: null, error: null } })
+
+    expect(await resolveTenantForOfficial('viadal', 'user-1')).toBeNull()
+  })
+
+  it('returns null when the caller fails the official surfaces check', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'participant', tenant_id: TENANT_ID }], error: null },
+    })
+
+    expect(await resolveTenantForOfficial('viadal', 'user-1')).toBeNull()
+  })
+
+  it('returns the tenant row when the caller passes the official surfaces check', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+    })
+
+    expect(await resolveTenantForOfficial('viadal', 'user-1')).toEqual({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+    })
   })
 })

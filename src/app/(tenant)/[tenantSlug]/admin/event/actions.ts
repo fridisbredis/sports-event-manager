@@ -2,9 +2,12 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
+
+const tenantIdSchema = z.string().uuid()
 
 export interface StageInput {
   id?: string
@@ -163,10 +166,17 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
   if (file.size > 2 * 1024 * 1024) return { error: 'Image must be smaller than 2 MB' }
   if (!tenantId || !eventId) return { error: 'Missing tenant or event ID' }
 
-  if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(tenantId)
+  if (!parsedTenantId.success) {
+    console.error('uploadEventLogo: invalid tenantId', tenantId)
+    return { error: 'Missing tenant or event ID' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
-  const path = `${tenantId}/${eventId}/${Date.now()}.${ext}`
+  const path = `${parsedTenantId.data}/${eventId}/${Date.now()}.${ext}`
 
   const { error: uploadError } = await supabase.storage
     .from('logos')
@@ -200,14 +210,21 @@ export async function updateTenantColorPalette(
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(tenantId)
+  if (!parsedTenantId.success) {
+    console.error('updateTenantColorPalette: invalid tenantId', tenantId)
+    return { error: 'Not authorized' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   if (!(colorPalette in TENANT_PALETTES)) return { error: 'Unknown color palette' }
 
   const { error } = await supabase
     .from('tenants')
     .update({ color_palette: colorPalette })
-    .eq('id', tenantId)
+    .eq('id', parsedTenantId.data)
 
   if (error) return { error: error.message }
 

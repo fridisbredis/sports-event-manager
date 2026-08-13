@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminAccountPage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { getUserRoles } from '@/lib/auth/tenant'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import AdminAccountForm from './_components/admin-account-form'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 
@@ -11,7 +11,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
-  getUserRoles: vi.fn(),
+  hasAdminAccessToTenant: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -82,36 +82,34 @@ describe('AdminAccountPage', () => {
     mockUser(null)
 
     await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
-    expect(getUserRoles).not.toHaveBeenCalled()
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the user has neither a role in this tenant nor system_admin', async () => {
+  it('calls notFound when the user has no admin access to this tenant', async () => {
     mockUser('user-1')
-    vi.mocked(getUserRoles).mockResolvedValue([
-      { role: 'tenant_admin', tenant_id: 'other-tenant', tenantSlug: 'other' },
-    ])
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(chain({ data: { id: TENANT_ID } })),
+    } as never)
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
 
     await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
   })
 
   it('calls notFound when the resolved tenant slug does not exist', async () => {
     mockUser('user-1')
-    vi.mocked(getUserRoles).mockResolvedValue([
-      { role: 'tenant_admin', tenant_id: TENANT_ID, tenantSlug: 'viadal' },
-    ])
     vi.mocked(createSupabaseServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue(chain({ data: null })),
     } as never)
 
     await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
+    // The tenant must resolve before the guard runs — the guard needs its id.
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
   })
 
   it('renders AdminAccountForm with metadata name/phone when no official row exists yet', async () => {
     mockUser('user-1', { name: 'Peter' })
-    vi.mocked(getUserRoles).mockResolvedValue([
-      { role: 'tenant_admin', tenant_id: TENANT_ID, tenantSlug: 'viadal' },
-    ])
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(chain({ data: { id: TENANT_ID } })) // tenants
@@ -127,9 +125,7 @@ describe('AdminAccountPage', () => {
 
   it('renders AccountForm with the official row and assignment count when it exists', async () => {
     mockUser('user-1')
-    vi.mocked(getUserRoles).mockResolvedValue([
-      { role: 'tenant_admin', tenant_id: TENANT_ID, tenantSlug: 'viadal' },
-    ])
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const official = { id: 'off-1', name: 'Peter', phone: '0701234567', sms_opt_out: false }
     const fromMock = vi.fn()
     fromMock
@@ -154,11 +150,12 @@ describe('AdminAccountPage', () => {
     })
   })
 
-  it('grants access via system_admin even without a tenant-specific role', async () => {
+  // The system_admin-is-global rule now lives in hasAdminAccessToTenant, which
+  // owns it for every admin surface. This page's job is only to delegate, and to
+  // delegate with the tenant it actually resolved — not the slug from the URL.
+  it('delegates the access decision to hasAdminAccessToTenant with the resolved tenant id', async () => {
     mockUser('user-1', { name: 'Sys' })
-    vi.mocked(getUserRoles).mockResolvedValue([
-      { role: 'system_admin', tenant_id: 'system', tenantSlug: '' },
-    ])
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(chain({ data: { id: TENANT_ID } }))
@@ -167,6 +164,7 @@ describe('AdminAccountPage', () => {
 
     const result = await AdminAccountPage({ params: PARAMS })
 
+    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(findByType(result, AdminAccountForm)).not.toBeNull()
   })
 })

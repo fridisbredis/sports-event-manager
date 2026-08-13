@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import EventInfoPage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/auth/tenant', () => ({
+  resolveTenantForOfficial: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -35,13 +40,21 @@ function chain(result: unknown) {
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockUser(userId: string | null, tenant: unknown) {
+function mockUser(userId: string | null) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
     },
-    from: vi.fn().mockReturnValue(chain({ data: tenant })),
   } as never)
+}
+
+function mockResolvedTenant() {
+  vi.mocked(resolveTenantForOfficial).mockResolvedValue({
+    id: TENANT_ID,
+    slug: 'viadal',
+    color_palette: 'default',
+    is_active: true,
+  })
 }
 
 beforeEach(() => {
@@ -50,20 +63,24 @@ beforeEach(() => {
 
 describe('EventInfoPage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    mockUser(null, null)
+    mockUser(null)
 
     await expect(EventInfoPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
+    expect(resolveTenantForOfficial).not.toHaveBeenCalled()
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the tenant slug does not resolve', async () => {
-    mockUser('user-1', null)
+  it('calls notFound when resolveTenantForOfficial denies access or the tenant is missing', async () => {
+    mockUser('user-1')
+    vi.mocked(resolveTenantForOfficial).mockResolvedValue(null)
 
     await expect(EventInfoPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(resolveTenantForOfficial).toHaveBeenCalledWith('viadal', 'user-1')
   })
 
   it('scopes events, event_stages, and event_facilities queries by tenant_id', async () => {
-    mockUser('user-1', { id: TENANT_ID })
+    mockUser('user-1')
+    mockResolvedTenant()
     const eventBuilder = chain({ data: { name: 'Viadal 2026' } })
     const stagesBuilder = chain({ data: [] })
     const facilitiesBuilder = chain({ data: [] })
@@ -85,7 +102,8 @@ describe('EventInfoPage', () => {
   })
 
   it('renders successfully with empty stages and facilities lists', async () => {
-    mockUser('user-1', { id: TENANT_ID })
+    mockUser('user-1')
+    mockResolvedTenant()
     const serviceFromMock = vi.fn().mockReturnValue(chain({ data: null }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
 

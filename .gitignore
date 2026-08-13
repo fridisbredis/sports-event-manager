@@ -44,3 +44,5 @@ CLAUDE.md
 !.claude/agents/**
 !.claude/skills/
 !.claude/skills/**
+bash.exe.stackdump
+reviewerfindings.json

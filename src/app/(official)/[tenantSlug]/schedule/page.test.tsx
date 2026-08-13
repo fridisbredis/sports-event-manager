@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SchedulePage from './page'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { ScheduleView } from './_components/schedule-view'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/auth/tenant', () => ({
+  resolveTenantForOfficial: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -55,13 +60,21 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockUser(userId: string | null, tenant: unknown) {
+function mockUser(userId: string | null) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
     },
-    from: vi.fn().mockReturnValue(chain({ data: tenant })),
   } as never)
+}
+
+function mockResolvedTenant() {
+  vi.mocked(resolveTenantForOfficial).mockResolvedValue({
+    id: TENANT_ID,
+    slug: 'viadal',
+    color_palette: 'default',
+    is_active: true,
+  })
 }
 
 beforeEach(() => {
@@ -70,20 +83,24 @@ beforeEach(() => {
 
 describe('SchedulePage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    mockUser(null, null)
+    mockUser(null)
 
     await expect(SchedulePage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
+    expect(resolveTenantForOfficial).not.toHaveBeenCalled()
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the tenant slug does not resolve', async () => {
-    mockUser('user-1', null)
+  it('calls notFound when resolveTenantForOfficial denies access or the tenant is missing', async () => {
+    mockUser('user-1')
+    vi.mocked(resolveTenantForOfficial).mockResolvedValue(null)
 
     await expect(SchedulePage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(resolveTenantForOfficial).toHaveBeenCalledWith('viadal', 'user-1')
   })
 
   it('renders an empty assignments list when the user has no confirmed official row', async () => {
-    mockUser('user-1', { id: TENANT_ID })
+    mockUser('user-1')
+    mockResolvedTenant()
     const serviceFromMock = vi.fn().mockReturnValue(chain({ data: [] }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
 
@@ -95,7 +112,8 @@ describe('SchedulePage', () => {
   })
 
   it('scopes the officials lookup by user_id, tenant_id, and confirmed status', async () => {
-    mockUser('user-1', { id: TENANT_ID })
+    mockUser('user-1')
+    mockResolvedTenant()
     const officialsBuilder = chain({ data: [] })
     const serviceFromMock = vi.fn().mockReturnValue(officialsBuilder)
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
@@ -109,7 +127,8 @@ describe('SchedulePage', () => {
   })
 
   it('loads assignments scoped to the official and tenant when a confirmed official exists', async () => {
-    mockUser('user-1', { id: TENANT_ID })
+    mockUser('user-1')
+    mockResolvedTenant()
     const officialsBuilder = chain({ data: [{ id: 'off-1' }] })
     const assignments = [{ id: 'a-1', timeslot_start: '2026-08-12T09:00:00Z' }]
     const assignmentsBuilder = chain({ data: assignments })

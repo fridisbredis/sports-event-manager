@@ -1,17 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import OfficialLayout from './layout'
+import TenantLayout from './layout'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { canViewOfficialSurfaces } from '@/lib/auth/tenant'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
-import { BottomTabBar } from './_components/bottom-tab-bar'
+import { SidebarNav } from './_components/sidebar-nav'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  createSupabaseServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
-  canViewOfficialSurfaces: vi.fn(),
+  hasAdminAccessToTenant: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -23,8 +22,12 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
-vi.mock('./_components/bottom-tab-bar', () => ({
-  BottomTabBar: vi.fn(() => null),
+vi.mock('@/lib/i18n/server', () => ({
+  getServerTranslation: vi.fn(async () => (key: string) => key),
+}))
+
+vi.mock('./_components/sidebar-nav', () => ({
+  SidebarNav: vi.fn(() => null),
 }))
 
 vi.mock('@/lib/theme/tenant-theme-style', () => ({
@@ -36,7 +39,6 @@ function chain(result: unknown) {
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
   builder.single = vi.fn(() => Promise.resolve(result))
-  builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   return builder
 }
 
@@ -72,48 +74,43 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('OfficialLayout', () => {
+describe('TenantLayout', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     mockUser(null, null)
 
-    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
-      'NEXT_REDIRECT'
-    )
+    await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
     expect(redirect).toHaveBeenCalledWith('/login')
-    expect(canViewOfficialSurfaces).not.toHaveBeenCalled()
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
   })
 
   it('calls notFound when the tenant slug does not resolve', async () => {
     mockUser('user-1', null)
 
-    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
-      'NEXT_NOT_FOUND'
-    )
+    await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
     // The tenant must resolve before the guard runs — the guard needs its id.
-    expect(canViewOfficialSurfaces).not.toHaveBeenCalled()
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the user may not view official surfaces', async () => {
-    mockUser('user-1', { id: TENANT_ID, slug: 'viadal', color_palette: null })
-    vi.mocked(canViewOfficialSurfaces).mockResolvedValue(false)
+  // Only a tenant_admin of this tenant or a system_admin may pass.
+  it('calls notFound when the user has no admin access to this tenant', async () => {
+    mockUser('user-1', { id: TENANT_ID, color_palette: null })
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
 
-    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
-      'NEXT_NOT_FOUND'
-    )
-    expect(canViewOfficialSurfaces).toHaveBeenCalledWith('user-1', TENANT_ID)
+    await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
   })
 
-  it('renders children and BottomTabBar when the user may view official surfaces', async () => {
-    mockUser('user-1', { id: TENANT_ID, slug: 'viadal', color_palette: { primary: '#000' } })
-    vi.mocked(canViewOfficialSurfaces).mockResolvedValue(true)
+  it('renders children and SidebarNav when the user has admin access', async () => {
+    mockUser('user-1', { id: TENANT_ID, color_palette: { primary: '#000' } })
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
 
-    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
+    const result = await TenantLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
-    expect(canViewOfficialSurfaces).toHaveBeenCalledWith('user-1', TENANT_ID)
+    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
 
-    const tabBar = findByType(result, BottomTabBar)
-    expect(tabBar).not.toBeNull()
-    expect(tabBar!.props).toEqual({ tenantSlug: 'viadal' })
+    const nav = findByType(result, SidebarNav)
+    expect(nav).not.toBeNull()
+    expect(nav!.props.tenantSlug).toBe('viadal')
 
     const flat = JSON.stringify(result)
     expect(flat).toContain('CHILD_CONTENT')

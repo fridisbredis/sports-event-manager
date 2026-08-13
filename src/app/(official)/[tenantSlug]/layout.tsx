@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { canViewOfficialSurfaces } from '@/lib/auth/tenant'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
@@ -26,15 +27,10 @@ export default async function OfficialLayout({ children, params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
-
-  if (!roleRow) notFound()
+  // This layout is the only authorization gate for every screen beneath it —
+  // none of the official pages guard themselves. Only an official or
+  // tenant_admin of this tenant, or a system_admin, may pass.
+  if (!(await canViewOfficialSurfaces(user.id, tenant.id))) notFound()
 
   return (
     <>

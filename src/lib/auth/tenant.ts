@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import type { User } from '@supabase/supabase-js'
+
+const tenantIdSchema = z.string().uuid()
 
 export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 
@@ -78,17 +81,83 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
-// system_admin access is global — no per-tenant row required.
+type RoleRow = { role: TenantRole; tenant_id: string }
+
+type AccessContext = { roleRows: RoleRow[]; tenantIsActive: boolean }
+
+// Loads everything an authorization decision for a single tenant needs: every
+// role row the caller holds (across all tenants, so the global system_admin
+// bypass can be evaluated) and whether the target tenant is active. Keep both
+// queries on `.eq()` — supabase-js encodes those values, so a crafted tenantId
+// has no filter text to inject into. `.or()` takes a raw filter string and
+// would reopen that hole.
+async function fetchAccessContext(userId: string, tenantId: string): Promise<AccessContext | null> {
+  const service = createSupabaseServiceClient()
+
+  const [roleResult, tenantResult] = await Promise.all([
+    service.from('user_roles').select('role, tenant_id').eq('user_id', userId),
+    service.from('tenants').select('is_active').eq('id', tenantId).maybeSingle(),
+  ])
+
+  if (roleResult.error) {
+    console.error('Failed to fetch user roles:', roleResult.error)
+    return null
+  }
+
+  if (tenantResult.error) {
+    console.error('Failed to fetch tenant status:', tenantResult.error)
+    return null
+  }
+
+  return {
+    roleRows: (roleResult.data ?? []) as RoleRow[],
+    tenantIsActive: tenantResult.data?.is_active ?? false,
+  }
+}
+
+function isGlobalSystemAdmin(roleRows: RoleRow[]): boolean {
+  return roleRows.some((row) => row.role === 'system_admin')
+}
+
+function hasTenantScopedRole(
+  roleRows: RoleRow[],
+  tenantId: string,
+  allowedRoles: readonly TenantRole[]
+): boolean {
+  return roleRows.some((row) => row.tenant_id === tenantId && allowedRoles.includes(row.role))
+}
+
+// system_admin access is global — no per-tenant row required. A suspended
+// (is_active = false) tenant stays administrable by a global system_admin so
+// it can be reactivated, but a tenant-scoped tenant_admin loses access.
 export async function hasAdminAccessToTenant(userId: string, tenantId: string): Promise<boolean> {
-  const service = await createSupabaseServiceClient()
-  const { data } = await service
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .or(`and(tenant_id.eq.${tenantId},role.in.(tenant_admin,system_admin)),role.eq.system_admin`)
-    .limit(1)
-    .maybeSingle()
-  return !!data
+  if (!tenantIdSchema.safeParse(tenantId).success) return false
+
+  const context = await fetchAccessContext(userId, tenantId)
+  if (!context) return false
+
+  if (isGlobalSystemAdmin(context.roleRows)) return true
+  if (!context.tenantIsActive) return false
+
+  return hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])
+}
+
+// Official surfaces — the mobile screens under (official)/[tenantSlug] — are
+// visible to officials, tenant admins and system admins. Named for the surface
+// rather than the role because three roles pass; "isOfficial" would read as a
+// role check and invite the wrong call site.
+// system_admin access is global — no per-tenant row required, same as
+// hasAdminAccessToTenant, including the is_active exemption.
+export async function canViewOfficialSurfaces(userId: string, tenantId: string): Promise<boolean> {
+  if (!tenantIdSchema.safeParse(tenantId).success) return false
+
+  const context = await fetchAccessContext(userId, tenantId)
+  if (!context) return false
+
+  if (isGlobalSystemAdmin(context.roleRows)) return true
+  if (!context.tenantIsActive) return false
+
+  return hasTenantScopedRole(context.roleRows, tenantId, ['official', 'tenant_admin'])
 }
 
 export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {
@@ -101,15 +170,23 @@ export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
 
-  const service = await createSupabaseServiceClient()
-  const { data: roleRow } = await service
+  const service = createSupabaseServiceClient()
+  // user_roles is unique per (user_id, tenant_id), not per role, so a
+  // system_admin can legally hold a row in more than one tenant. Fetch the
+  // full set rather than a single row so that case authorizes instead of
+  // erroring out via maybeSingle().
+  const { data: roleRows, error } = await service
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
     .eq('role', 'system_admin')
-    .maybeSingle()
 
-  if (!roleRow) {
+  if (error) {
+    console.error('Failed to fetch user role:', error)
+    return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
+  }
+
+  if (!roleRows || roleRows.length === 0) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
 
@@ -128,29 +205,98 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
 
-  // Use service client to look up role — bypasses RLS, which is fine
-  // because we're using user.id from the verified session, not from input.
-  // system_admin access is global — no per-tenant row required, same as hasAdminAccessToTenant.
-  const service = await createSupabaseServiceClient()
-  const { data: roleRows, error } = await service
-    .from('user_roles')
-    .select('role, tenant_id')
-    .eq('user_id', user.id)
-    .or(`and(tenant_id.eq.${tenantId},role.in.(tenant_admin,system_admin)),role.eq.system_admin`)
-
-  if (error) {
-    console.error('Failed to fetch user role:', error)
-    return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
-  }
-
-  if (!roleRows || roleRows.length === 0) {
-    // User has no admin role in this tenant and isn't a system_admin —
-    // could be a malicious cross-tenant attempt or just a stale UI. Either way, 403 is correct.
+  if (!tenantIdSchema.safeParse(tenantId).success) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
 
-  const tenantRow = roleRows.find((r) => r.tenant_id === tenantId)
-  const role = (tenantRow?.role ?? roleRows[0].role) as TenantRole
+  // Use service client to look up role — bypasses RLS, which is fine
+  // because we're using user.id from the verified session, not from input.
+  // system_admin access is global — no per-tenant row required, same as hasAdminAccessToTenant.
+  const service = createSupabaseServiceClient()
+  const [roleResult, tenantResult] = await Promise.all([
+    service.from('user_roles').select('role, tenant_id').eq('user_id', user.id),
+    service.from('tenants').select('is_active').eq('id', tenantId).maybeSingle(),
+  ])
 
-  return { user, role }
+  if (roleResult.error) {
+    console.error('Failed to fetch user role:', roleResult.error)
+    return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
+  }
+
+  if (tenantResult.error) {
+    console.error('Failed to fetch tenant status:', tenantResult.error)
+    return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
+  }
+
+  const roleRows = (roleResult.data ?? []) as RoleRow[]
+
+  if (isGlobalSystemAdmin(roleRows)) {
+    return { user, role: 'system_admin' }
+  }
+
+  const tenantScopedAdminRow = roleRows.find(
+    (r) => r.tenant_id === tenantId && r.role === 'tenant_admin'
+  )
+
+  if (!tenantResult.data?.is_active || !tenantScopedAdminRow) {
+    // No admin role in this active tenant and not a system_admin — could be a
+    // malicious cross-tenant attempt, a suspended tenant, or a stale UI.
+    // Either way, 403 is correct.
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+
+  return { user, role: tenantScopedAdminRow.role }
+}
+
+export type ResolvedTenant = {
+  id: string
+  slug: string
+  color_palette: string
+  is_active: boolean
+}
+
+async function resolveTenantBySlug(tenantSlug: string): Promise<ResolvedTenant | null> {
+  const service = createSupabaseServiceClient()
+  const { data, error } = await service
+    .from('tenants')
+    .select('id, slug, color_palette, is_active')
+    .eq('slug', tenantSlug)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Failed to resolve tenant by slug:', error)
+    return null
+  }
+
+  return data
+}
+
+// Resolves a tenant slug to its row only once the caller has passed the admin
+// access check for that tenant, so a page cannot read the tenant without also
+// being gated by it. Returns null on a missing tenant or a failed check —
+// callers should treat that as notFound().
+export async function resolveTenantForAdmin(
+  tenantSlug: string,
+  userId: string
+): Promise<ResolvedTenant | null> {
+  const tenant = await resolveTenantBySlug(tenantSlug)
+  if (!tenant) return null
+
+  if (!(await hasAdminAccessToTenant(userId, tenant.id))) return null
+
+  return tenant
+}
+
+// Same guarded-resolve pattern as resolveTenantForAdmin, gated by
+// canViewOfficialSurfaces instead.
+export async function resolveTenantForOfficial(
+  tenantSlug: string,
+  userId: string
+): Promise<ResolvedTenant | null> {
+  const tenant = await resolveTenantBySlug(tenantSlug)
+  if (!tenant) return null
+
+  if (!(await canViewOfficialSurfaces(userId, tenant.id))) return null
+
+  return tenant
 }
