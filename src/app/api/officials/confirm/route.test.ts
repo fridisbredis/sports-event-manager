@@ -33,7 +33,8 @@ function mockServiceClient({
   tenantResult?: unknown
 }) {
   const rpc = vi.fn().mockResolvedValue(rpcResult)
-  const fromMock = tenantResult !== undefined ? vi.fn().mockReturnValue(chain(tenantResult)) : vi.fn()
+  const fromMock =
+    tenantResult !== undefined ? vi.fn().mockReturnValue(chain(tenantResult)) : vi.fn()
   vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
   return { rpc, fromMock }
 }
@@ -124,7 +125,9 @@ describe('POST /api/officials/confirm', () => {
 
   it('returns 403 when the RPC reports a phone mismatch', async () => {
     mockServerClient({ id: 'user-1', phone: '+46709999999' })
-    const { rpc } = mockServiceClient({ rpcResult: { data: null, error: { message: 'phone_mismatch' } } })
+    const { rpc } = mockServiceClient({
+      rpcResult: { data: null, error: { message: 'phone_mismatch' } },
+    })
 
     const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
     const body = await res.json()

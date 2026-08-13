@@ -117,13 +117,16 @@ describe('confirmOfficialInvite', () => {
     tenantResult?: unknown
   }) {
     const rpc = vi.fn().mockResolvedValue(rpcResult)
-    const fromMock = tenantResult !== undefined ? vi.fn().mockReturnValue(chain(tenantResult)) : vi.fn()
+    const fromMock =
+      tenantResult !== undefined ? vi.fn().mockReturnValue(chain(tenantResult)) : vi.fn()
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
     return { rpc, fromMock }
   }
 
   it('returns null when the RPC reports no matching invited official', async () => {
-    const { rpc } = mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'not_found' } } })
+    const { rpc } = mockServiceClientWithRpc({
+      rpcResult: { data: null, error: { message: 'not_found' } },
+    })
 
     expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
     expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
