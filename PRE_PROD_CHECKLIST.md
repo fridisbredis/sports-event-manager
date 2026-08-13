@@ -61,6 +61,7 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 - [ ] Tune `min-replicas` and `max-replicas` for prod (consider 2 minimum for redundancy)
 - [ ] Enable Supabase connection pooling (Supavisor) if "too many connections" errors appear
 - [ ] Configure container app autoscaling rules based on HTTP traffic
+- [ ] Add index on `officials.user_id` (or composite `(user_id, tenant_id)`) — `canViewOfficialSurfaces` queries this combination on every official-surface page load; only `tenant_id` is indexed today. Low-priority at current volume, needed before scaling to many real tenants.
 
 ### Error handling
 

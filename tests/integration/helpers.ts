@@ -82,6 +82,21 @@ export async function createUserWithRole(tenantId: string, role: TenantRole) {
     .insert({ user_id: userData.user.id, tenant_id: tenantId, role })
   if (roleError) throw roleError
 
+  // canViewOfficialSurfaces additionally requires a confirmed `officials` row
+  // for the 'official' role — a user_roles row alone is not enough (see
+  // src/lib/auth/tenant.ts). Without this, every 'official' fixture created
+  // here would be denied access as if still invited.
+  if (role === 'official') {
+    const { error: officialError } = await admin.from('officials').insert({
+      tenant_id: tenantId,
+      user_id: userData.user.id,
+      name: 'Test Official',
+      phone: `+46701${Math.floor(Math.random() * 1_000_000)}`,
+      invite_status: 'confirmed',
+    })
+    if (officialError) throw officialError
+  }
+
   const existing = createdUserIdsByTenant.get(tenantId) ?? []
   existing.push(userData.user.id)
   createdUserIdsByTenant.set(tenantId, existing)
@@ -92,7 +107,10 @@ export async function createUserWithRole(tenantId: string, role: TenantRole) {
 // Logs in as the given phone via the local test OTP (see supabase/config.toml
 // [auth.sms.test_otp]) and returns an anon-key client carrying that user's
 // real session — this is the client RLS actually sees.
-export async function signInAsClient(phone: string, otp: string): Promise<SupabaseClient<Database>> {
+export async function signInAsClient(
+  phone: string,
+  otp: string
+): Promise<SupabaseClient<Database>> {
   const client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY)
   const { error } = await client.auth.verifyOtp({ phone, token: otp, type: 'sms' })
   if (error) throw error
@@ -106,11 +124,18 @@ export async function createOfficialLinkedToUser(
   tenantId: string,
   userId: string,
   name: string,
+  inviteStatus: 'invited' | 'confirmed' | 'removed' = 'confirmed'
 ) {
   const admin = serviceClient()
   const { data, error } = await admin
     .from('officials')
-    .insert({ tenant_id: tenantId, user_id: userId, name, phone: `+46701${Math.floor(Math.random() * 1_000_000)}` })
+    .insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      name,
+      phone: `+46701${Math.floor(Math.random() * 1_000_000)}`,
+      invite_status: inviteStatus,
+    })
     .select()
     .single()
   if (error) throw error
@@ -122,12 +147,17 @@ export async function createOfficialLinkedToUser(
 export async function createParticipantLinkedToUser(
   tenantId: string,
   userId: string,
-  name: string,
+  name: string
 ) {
   const admin = serviceClient()
   const { data, error } = await admin
     .from('participants')
-    .insert({ tenant_id: tenantId, user_id: userId, name, phone: `+46702${Math.floor(Math.random() * 1_000_000)}` })
+    .insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      name,
+      phone: `+46702${Math.floor(Math.random() * 1_000_000)}`,
+    })
     .select()
     .single()
   if (error) throw error

@@ -14,19 +14,20 @@ Testtelefon (SMS-OTP bypass): `46768109304`, kod `000000`.
 
 Bakgrund: layouten var enda spärren; de fem official-sidorna läste data utan egen guard. Den nya guarden, `canViewOfficialSurfaces` (`src/lib/auth/tenant.ts`), tillåter **explicit** både `official` OCH `tenant_admin` (plus global system_admin) — designen är att en tenant_admin ska kunna se officials-vyerna, t.ex. för felsökning. Det som ska blockeras är roller **utan** någon av dessa två roller i tenanten: alltså participant, eller en användare utan `user_roles`-rad i den tenanten alls, eller en tenant_admin/official-roll som hör till en **annan** tenant.
 
-- [ ] **tenant_admin ska INTE testas som "fel roll"** — det är avsedd åtkomst. Verifiera istället att tenant*admin \_kan* nå alla fem sidorna (regressionstest, inte säkerhetstest).
-- [ ] Eftersom participant-inloggning saknas (se anteckning ovan), testa "fel roll" genom att logga in som **tenant_admin/official i Tenant A** och försöka nå official-URL:er för **Tenant B** (en annan tenant du inte har någon roll i). Detta är den enda praktiskt körbara varianten av "obehörig användare" tills participant-login finns.
-- [ ] Försök navigera direkt till varje official-URL för Tenant B (inte via UI-länkar, skriv URL:en manuellt):
+- [x] **tenant_admin ska INTE testas som "fel roll"** — det är avsedd åtkomst. Verifiera istället att tenant*admin \_kan* nå alla fem sidorna (regressionstest, inte säkerhetstest). — Testat 2026-08-13: tenant_admin i Testklubben kommer åt official-sidorna som förväntat.
+- [x] Eftersom participant-inloggning saknas (se anteckning ovan), testa "fel roll" genom att logga in som **tenant_admin/official i Tenant A** och försöka nå official-URL:er för **Tenant B** (en annan tenant du inte har någon roll i). Detta är den enda praktiskt körbara varianten av "obehörig användare" tills participant-login finns. — Testat 2026-08-13.
+- [x] Försök navigera direkt till varje official-URL för Tenant B (inte via UI-länkar, skriv URL:en manuellt):
   - HOME-01 (official-hem)
   - INFO-01
   - MYSCH-01
   - ANN-01 (official-vy)
   - ACCT-01
-- [ ] Förväntat: nekad åtkomst / redirect på **varje** sida, inte bara den första.
-- [ ] Logga in som **official** i samma tenant, verifiera att samma fem sidor fungerar normalt (ingen regression).
-- [ ] Logga in som **tenant_admin** i samma tenant, verifiera att samma fem sidor OCKSÅ fungerar normalt (avsedd åtkomst, inte en läcka).
-- [ ] Testa en **suspenderad tenant** (`is_active = false`): system_admin ska fortfarande kunna administrera den; tenant_admin/official i den tenanten ska nekas.
-- [ ] Testa en användare som är `system_admin` i **flera tenants** — verifiera inloggning/åtkomst fungerar utan 403 (regression som nämns i commit 9e37827).
+- [x] Förväntat: nekad åtkomst / redirect på **varje** sida, inte bara den första. — Testat 2026-08-13: 404 på samtliga fem.
+- [x] Logga in som **official** i samma tenant, verifiera att samma fem sidor fungerar normalt (ingen regression). — Testat 2026-08-13 (official i Eddos).
+- [x] Logga in som **tenant_admin** i samma tenant, verifiera att samma fem sidor OCKSÅ fungerar normalt (avsedd åtkomst, inte en läcka). — Testat 2026-08-13 (tenant_admin i Testklubben).
+- [x] Testa en **suspenderad tenant** (`is_active = false`): system_admin ska fortfarande kunna administrera den; tenant_admin/official i den tenanten ska nekas. — Testat 2026-08-13 mot Testklubben: tenant_admin och official fick 404 på både dashboard och officials-sidorna medan suspenderad; system_admin (tillfällig roll i annan tenant) kom åt Testklubben ändå och kunde reaktivera den via "Activate"-knappen; åtkomst återställdes korrekt för tenant_admin/official efteråt.
+- [x] Testa en användare som är `system_admin` i **flera tenants** — verifiera inloggning/åtkomst fungerar utan 403 (regression som nämns i commit 9e37827). — Testat 2026-08-13: system_admin-rad tillagd i en tenant utöver den befintliga tenant_admin-rollen i Testklubben (olika tenant_id, unique constraint är per (user_id, tenant_id)); inloggning/åtkomst fungerade utan 403.
+- [x] Testa unconfirmed official-fixen: satt `invite_status` till `invited` för en official (Eddos) och verifierat nekad åtkomst till official-sidorna tills `confirmed` igen. — Testat 2026-08-13.
 - [ ] Note: fullständig verifiering av "participant kan inte nå official-sidor" kräver participant-inloggning, som inte finns än. Lägg till detta testfall i planen när participant-login byggs.
 
 ## 2. SEC-02 — tenantId-injektion i guards
