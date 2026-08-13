@@ -2,8 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+
+const tenantIdSchema = z.string().uuid()
 
 export interface AssignmentInput {
   official_id: string
@@ -43,14 +46,21 @@ export async function saveAssignments(
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(tenantId)
+  if (!parsedTenantId.success) {
+    console.error('saveAssignments: invalid tenantId', tenantId)
+    return { error: 'Not authorized' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   if (deletions.length > 0) {
     const { error } = await supabase
       .from('assignments')
       .delete()
       .in('id', deletions)
-      .eq('tenant_id', tenantId)
+      .eq('tenant_id', parsedTenantId.data)
 
     if (error) return { error: error.message }
   }
@@ -61,7 +71,7 @@ export async function saveAssignments(
         .from('assignments')
         .update({ status })
         .eq('id', id)
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', parsedTenantId.data)
       if (error) return { error: error.message }
     }
   }
@@ -82,7 +92,7 @@ export async function saveAssignments(
         .from('assignments')
         .select('workstation_id, timeslot_start, slot_index')
         .in('workstation_id', wsIds)
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', parsedTenantId.data)
 
       for (const row of existing ?? []) {
         if (row.slot_index === null) continue
@@ -130,7 +140,7 @@ export async function saveAssignments(
       }
 
       rows.push({
-        tenant_id: tenantId,
+        tenant_id: parsedTenantId.data,
         official_id: a.official_id,
         workstation_id: a.workstation_id,
         timeslot_start: a.timeslot_start,

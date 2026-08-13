@@ -2,8 +2,11 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+
+const tenantIdSchema = z.string().uuid()
 
 export interface WindowInput {
   window_start: string
@@ -49,7 +52,14 @@ export async function createWorkstation(
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
+  if (!parsedTenantId.success) {
+    console.error('createWorkstation: invalid tenantId', input.tenantId)
+    return { error: 'Not authorized' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
   if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
@@ -59,7 +69,7 @@ export async function createWorkstation(
   const { data: ws, error: wsError } = await supabase
     .from('workstations')
     .insert({
-      tenant_id: input.tenantId,
+      tenant_id: parsedTenantId.data,
       event_id: input.eventId,
       stage_id: input.stageId,
       name: input.name.trim(),
@@ -128,7 +138,14 @@ export async function updateWorkstation(
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
+  if (!parsedTenantId.success) {
+    console.error('updateWorkstation: invalid tenantId', input.tenantId)
+    return { error: 'Not authorized' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
   if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
@@ -145,7 +162,7 @@ export async function updateWorkstation(
       recurring: input.recurring,
     })
     .eq('id', input.workstationId)
-    .eq('tenant_id', input.tenantId)
+    .eq('tenant_id', parsedTenantId.data)
 
   if (wsError) return { error: wsError.message }
 
@@ -211,13 +228,20 @@ export async function deleteWorkstation(
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
+  if (!parsedTenantId.success) {
+    console.error('deleteWorkstation: invalid tenantId', input.tenantId)
+    return { error: 'Not authorized' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   const { error } = await supabase
     .from('workstations')
     .delete()
     .eq('id', input.workstationId)
-    .eq('tenant_id', input.tenantId)
+    .eq('tenant_id', parsedTenantId.data)
 
   if (error) return { error: error.message }
 

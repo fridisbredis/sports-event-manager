@@ -2,8 +2,11 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+
+const tenantIdSchema = z.string().uuid()
 
 export interface PublishEventInput {
   tenantSlug: string
@@ -23,13 +26,20 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+  const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
+  if (!parsedTenantId.success) {
+    console.error('publishEvent: invalid tenantId', input.tenantId)
+    return { error: 'Not authorized' }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: 'Not authorized' }
 
   const { data: ev } = await supabase
     .from('events')
     .select('name, status')
     .eq('id', input.eventId)
-    .eq('tenant_id', input.tenantId)
+    .eq('tenant_id', parsedTenantId.data)
     .single()
 
   if (!ev) return { error: 'Event not found.' }
