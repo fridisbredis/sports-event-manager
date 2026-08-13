@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { getUserRoles } from '@/lib/auth/tenant'
+import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 import AdminAccountForm from './_components/admin-account-form'
 
@@ -17,11 +17,6 @@ export default async function AdminAccountPage({ params }: Props) {
 
   if (!user) redirect('/login')
 
-  const roles = await getUserRoles(user.id)
-  const isSystemAdmin = roles.some((r) => r.role === 'system_admin')
-  const tenantRole = roles.find((r) => r.tenantSlug === tenantSlug)
-  if (!tenantRole && !isSystemAdmin) notFound()
-
   const service = await createSupabaseServiceClient()
 
   const { data: tenant } = await service
@@ -31,6 +26,9 @@ export default async function AdminAccountPage({ params }: Props) {
     .single()
 
   if (!tenant) notFound()
+
+  // Only a tenant_admin of this tenant or a system_admin may pass.
+  if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
   const { data: official } = await service
     .from('officials')
