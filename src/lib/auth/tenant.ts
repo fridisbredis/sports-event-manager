@@ -53,29 +53,22 @@ export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | 
 export async function confirmOfficialInvite(userId: string, phone: string): Promise<string | null> {
   const service = await createSupabaseServiceClient()
 
-  const { data: official } = await service
-    .from('officials')
-    .select('id, tenant_id, tenants(slug)')
-    .eq('phone', phone)
-    .eq('invite_status', 'invited')
-    .is('invite_token', null)
-    .maybeSingle()
+  // SEC-04/F-SEC-11: confirm_official_invite_by_phone (migration 0018) does
+  // the lookup, the atomic status-guarded update, and the user_roles insert
+  // in one transaction, so concurrent logins for the same invited phone
+  // can't both succeed.
+  const { data, error } = await service.rpc('confirm_official_invite_by_phone', {
+    p_user_id: userId,
+    p_user_phone: phone,
+  })
 
-  if (!official) return null
+  if (error) return null
 
-  const tenantSlug = (official.tenants as { slug: string } | null)?.slug
-  if (!tenantSlug) return null
+  const tenantId = (data as unknown as { tenant_id: string }).tenant_id
 
-  await service
-    .from('officials')
-    .update({ user_id: userId, invite_status: 'confirmed', invite_token: null })
-    .eq('id', official.id)
+  const { data: tenant } = await service.from('tenants').select('slug').eq('id', tenantId).maybeSingle()
 
-  await service
-    .from('user_roles')
-    .insert({ user_id: userId, tenant_id: official.tenant_id, role: 'official' })
-
-  return tenantSlug
+  return tenant?.slug ?? null
 }
 
 type AuthSuccess = { user: User; role: TenantRole }

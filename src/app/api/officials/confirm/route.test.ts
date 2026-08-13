@@ -10,7 +10,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'update', 'upsert']) {
+  for (const method of ['select', 'eq']) {
     builder[method] = vi.fn(() => builder)
   }
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
@@ -19,10 +19,23 @@ function chain(result: unknown) {
   return builder
 }
 
-function mockServerClient(user: { id: string } | null) {
+function mockServerClient(user: { id: string; phone?: string } | null) {
   const getUser = vi.fn().mockResolvedValue({ data: { user } })
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ auth: { getUser } } as never)
   return getUser
+}
+
+function mockServiceClient({
+  rpcResult,
+  tenantResult,
+}: {
+  rpcResult: { data: unknown; error: { message: string } | null }
+  tenantResult?: unknown
+}) {
+  const rpc = vi.fn().mockResolvedValue(rpcResult)
+  const fromMock = tenantResult !== undefined ? vi.fn().mockReturnValue(chain(tenantResult)) : vi.fn()
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
+  return { rpc, fromMock }
 }
 
 function makeRequest(body: unknown, headers?: Record<string, string>) {
@@ -35,15 +48,7 @@ function makeRequest(body: unknown, headers?: Record<string, string>) {
 
 const TOKEN = '22222222-2222-2222-2222-222222222222'
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const OFFICIAL_ID = '33333333-3333-3333-3333-333333333333'
-
-function futureIso() {
-  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-}
-
-function pastIso() {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-}
+const PHONE = '+46701234567'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -66,10 +71,20 @@ describe('POST /api/officials/confirm', () => {
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
+  it('returns 403 when the authenticated user has no verified phone', async () => {
+    mockServerClient({ id: 'user-1' })
+
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(403)
+    expect(body.code).toBe('phone_mismatch')
+    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+  })
+
   it('authenticates via the Authorization bearer token when present', async () => {
     const getUser = mockServerClient(null)
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockServiceClient({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
     await POST(makeRequest({ token: TOKEN, name: 'Anna' }, { Authorization: 'Bearer abc123' }))
 
@@ -78,18 +93,16 @@ describe('POST /api/officials/confirm', () => {
 
   it('falls back to the cookie session when there is no Authorization header', async () => {
     const getUser = mockServerClient(null)
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockServiceClient({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
     await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
 
     expect(getUser).toHaveBeenCalledWith()
   })
 
-  it('returns 404 when no official matches the invite token', async () => {
-    mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  it('returns 404 when the RPC reports the invite as not found', async () => {
+    mockServerClient({ id: 'user-1', phone: PHONE })
+    mockServiceClient({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
     const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
     const body = await res.json()
@@ -98,129 +111,83 @@ describe('POST /api/officials/confirm', () => {
     expect(body.code).toBe('not_found')
   })
 
-  it('returns 404 when the invite is not in the invited state', async () => {
-    mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(
-      chain({
-        data: {
-          id: OFFICIAL_ID,
-          tenant_id: TENANT_ID,
-          invite_status: 'confirmed',
-          invite_token_expires_at: futureIso(),
-        },
-      })
-    )
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  it('returns 404 when the RPC reports the invite token as expired', async () => {
+    mockServerClient({ id: 'user-1', phone: PHONE })
+    mockServiceClient({ rpcResult: { data: null, error: { message: 'expired' } } })
 
     const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const body = await res.json()
 
     expect(res.status).toBe(404)
+    expect(body.code).toBe('not_found')
   })
 
-  it('returns 404 when the invite has no expiry set', async () => {
-    mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(
-      chain({
-        data: {
-          id: OFFICIAL_ID,
-          tenant_id: TENANT_ID,
-          invite_status: 'invited',
-          invite_token_expires_at: null,
-        },
-      })
-    )
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  it('returns 403 when the RPC reports a phone mismatch', async () => {
+    mockServerClient({ id: 'user-1', phone: '+46709999999' })
+    const { rpc } = mockServiceClient({ rpcResult: { data: null, error: { message: 'phone_mismatch' } } })
 
     const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const body = await res.json()
 
-    expect(res.status).toBe(404)
-  })
-
-  it('returns 404 when the invite token has expired', async () => {
-    mockServerClient({ id: 'user-1' })
-    const fromMock = vi.fn().mockReturnValueOnce(
-      chain({
-        data: {
-          id: OFFICIAL_ID,
-          tenant_id: TENANT_ID,
-          invite_status: 'invited',
-          invite_token_expires_at: pastIso(),
-        },
-      })
-    )
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
-
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
-
-    expect(res.status).toBe(404)
-  })
-
-  it('confirms the official, upserts the official role, and returns the tenant slug', async () => {
-    mockServerClient({ id: 'user-1' })
-
-    const officialSelectBuilder = chain({
-      data: {
-        id: OFFICIAL_ID,
-        tenant_id: TENANT_ID,
-        invite_status: 'invited',
-        invite_token_expires_at: futureIso(),
-      },
+    expect(res.status).toBe(403)
+    expect(body.code).toBe('phone_mismatch')
+    expect(rpc).toHaveBeenCalledWith('confirm_official_invite', {
+      p_token: TOKEN,
+      p_user_id: 'user-1',
+      p_user_phone: '+46709999999',
+      p_name: 'Anna',
     })
-    const tenantBuilder = chain({ data: { slug: 'viadal' } })
-    const officialUpdateBuilder = chain({ data: null, error: null })
-    const userRolesBuilder = chain({ data: null, error: null })
+  })
 
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(officialSelectBuilder)
-      .mockReturnValueOnce(tenantBuilder)
-      .mockReturnValueOnce(officialUpdateBuilder)
-      .mockReturnValueOnce(userRolesBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  it('returns 409 when the RPC reports the invite as already confirmed (concurrent attempt)', async () => {
+    // Simulates the loser of the row lock in confirm_official_invite: a second,
+    // concurrent request for the same invite_token arrives after the first has
+    // already flipped invite_status to 'confirmed'.
+    mockServerClient({ id: 'user-2', phone: PHONE })
+    mockServiceClient({ rpcResult: { data: null, error: { message: 'already_confirmed' } } })
+
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.code).toBe('already_confirmed')
+  })
+
+  it('returns 500 for an unrecognized RPC error', async () => {
+    mockServerClient({ id: 'user-1', phone: PHONE })
+    mockServiceClient({ rpcResult: { data: null, error: { message: 'boom' } } })
+
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+
+    expect(res.status).toBe(500)
+  })
+
+  it('confirms the official via RPC with the matching phone and returns the tenant slug', async () => {
+    mockServerClient({ id: 'user-1', phone: PHONE })
+    const { rpc } = mockServiceClient({
+      rpcResult: { data: { tenant_id: TENANT_ID }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
 
     const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
     const body = await res.json()
 
     expect(res.status).toBe(200)
     expect(body).toEqual({ ok: true, tenantSlug: 'viadal' })
-
-    expect(officialUpdateBuilder.update).toHaveBeenCalledWith({
-      user_id: 'user-1',
-      invite_status: 'confirmed',
-      invite_token: null,
-      invite_token_expires_at: null,
-      name: 'Anna',
+    expect(rpc).toHaveBeenCalledWith('confirm_official_invite', {
+      p_token: TOKEN,
+      p_user_id: 'user-1',
+      p_user_phone: PHONE,
+      p_name: 'Anna',
     })
-    expect(officialUpdateBuilder.eq).toHaveBeenCalledWith('id', OFFICIAL_ID)
-
-    expect(userRolesBuilder.upsert).toHaveBeenCalledWith(
-      { user_id: 'user-1', tenant_id: TENANT_ID, role: 'official' },
-      { onConflict: 'user_id,tenant_id' }
-    )
   })
 
   it('returns tenantSlug undefined when the tenant lookup finds nothing', async () => {
-    mockServerClient({ id: 'user-1' })
-
-    const officialSelectBuilder = chain({
-      data: {
-        id: OFFICIAL_ID,
-        tenant_id: TENANT_ID,
-        invite_status: 'invited',
-        invite_token_expires_at: futureIso(),
-      },
+    mockServerClient({ id: 'user-1', phone: PHONE })
+    mockServiceClient({
+      rpcResult: { data: { tenant_id: TENANT_ID }, error: null },
+      tenantResult: { data: null },
     })
-    const tenantBuilder = chain({ data: null })
-    const officialUpdateBuilder = chain({ data: null, error: null })
-    const userRolesBuilder = chain({ data: null, error: null })
-
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(officialSelectBuilder)
-      .mockReturnValueOnce(tenantBuilder)
-      .mockReturnValueOnce(officialUpdateBuilder)
-      .mockReturnValueOnce(userRolesBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
     const body = await res.json()

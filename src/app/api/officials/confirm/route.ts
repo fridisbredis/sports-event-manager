@@ -36,54 +36,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const service = await createSupabaseServiceClient()
-
-  // Validate token again server-side — never trust client state
-  const { data: official } = await service
-    .from('officials')
-    .select('id, tenant_id, invite_status, invite_token_expires_at')
-    .eq('invite_token', token)
-    .maybeSingle()
-
-  if (
-    !official ||
-    official.invite_status !== 'invited' ||
-    !official.invite_token_expires_at ||
-    new Date(official.invite_token_expires_at) <= new Date()
-  ) {
+  if (!user.phone) {
     return NextResponse.json(
-      { error: 'Invite not found or expired', code: 'not_found' },
-      { status: 404 }
+      { error: 'No verified phone on account', code: 'phone_mismatch' },
+      { status: 403 }
     )
   }
+
+  const service = await createSupabaseServiceClient()
+
+  // SEC-04: confirm_official_invite (migration 0017) does the phone-match
+  // check and the whole read-check-update-upsert atomically in one
+  // transaction, so concurrent confirm attempts can't both succeed.
+  const { data, error } = await service.rpc('confirm_official_invite', {
+    p_token: token,
+    p_user_id: user.id,
+    p_user_phone: user.phone,
+    p_name: name,
+  })
+
+  if (error) {
+    switch (error.message) {
+      case 'not_found':
+      case 'expired':
+        return NextResponse.json(
+          { error: 'Invite not found or expired', code: 'not_found' },
+          { status: 404 }
+        )
+      case 'already_confirmed':
+        return NextResponse.json(
+          { error: 'Invite already confirmed', code: 'already_confirmed' },
+          { status: 409 }
+        )
+      case 'phone_mismatch':
+        return NextResponse.json(
+          { error: 'Phone number does not match the invitation', code: 'phone_mismatch' },
+          { status: 403 }
+        )
+      default:
+        return NextResponse.json({ error: 'Unexpected error' }, { status: 500 })
+    }
+  }
+
+  const tenantId = (data as unknown as { tenant_id: string }).tenant_id
 
   const { data: tenant } = await service
     .from('tenants')
     .select('slug')
-    .eq('id', official.tenant_id)
+    .eq('id', tenantId)
     .maybeSingle()
 
-  const tenantSlug = tenant?.slug
-
-  // Confirm: update official, null out token (single-use), create user_roles
-  await service
-    .from('officials')
-    .update({
-      user_id: user.id,
-      invite_status: 'confirmed',
-      invite_token: null,
-      invite_token_expires_at: null,
-      name,
-    })
-    .eq('id', official.id)
-
-  // Upsert in case they somehow already have a role (e.g. from the fallback flow)
-  await service
-    .from('user_roles')
-    .upsert(
-      { user_id: user.id, tenant_id: official.tenant_id, role: 'official' },
-      { onConflict: 'user_id,tenant_id' }
-    )
-
-  return NextResponse.json({ ok: true, tenantSlug })
+  return NextResponse.json({ ok: true, tenantSlug: tenant?.slug })
 }
