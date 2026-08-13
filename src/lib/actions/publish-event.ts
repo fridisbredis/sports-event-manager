@@ -28,7 +28,8 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
 
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
-    console.error('publishEvent: invalid tenantId', input.tenantId)
+    const safeTenantIdForLog = String(input.tenantId).replace(/[\r\n]/g, '')
+    console.error('publishEvent: invalid tenantId', safeTenantIdForLog)
     return { error: 'Not authorized' }
   }
 
