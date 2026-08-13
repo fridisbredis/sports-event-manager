@@ -6,7 +6,13 @@ import {
   type TenantRole,
 } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { createTenant, createUserWithRole, serviceClient, cleanupTenant } from './helpers'
+import {
+  createTenant,
+  createUserWithRole,
+  createOfficialLinkedToUser,
+  serviceClient,
+  cleanupTenant,
+} from './helpers'
 
 // Only the auth boundary (which user is "logged in") is mocked here — there is
 // no Next.js request scope in this harness, so `createSupabaseServerClient`'s
@@ -75,6 +81,7 @@ describe('SEC-02: canViewOfficialSurfaces tenant isolation', () => {
     // this user wrongly passes for tenant A.
     participantAOfficialB = (await createUserWithRole(tenantA.id, 'participant')).userId
     await addRoleInTenant(participantAOfficialB, tenantB.id, 'official')
+    await createOfficialLinkedToUser(tenantB.id, participantAOfficialB, 'Test Official B')
   })
 
   afterAll(async () => {
