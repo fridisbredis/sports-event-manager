@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialLayout from './layout'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { canViewOfficialSurfaces } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/auth/tenant', () => ({
+  canViewOfficialSurfaces: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -75,7 +80,7 @@ describe('OfficialLayout', () => {
       'NEXT_REDIRECT'
     )
     expect(redirect).toHaveBeenCalledWith('/login')
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(canViewOfficialSurfaces).not.toHaveBeenCalled()
   })
 
   it('calls notFound when the tenant slug does not resolve', async () => {
@@ -84,31 +89,27 @@ describe('OfficialLayout', () => {
     await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
       'NEXT_NOT_FOUND'
     )
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    // The tenant must resolve before the guard runs — the guard needs its id.
+    expect(canViewOfficialSurfaces).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the user has no user_roles row for this tenant', async () => {
+  it('calls notFound when the user may not view official surfaces', async () => {
     mockUser('user-1', { id: TENANT_ID, slug: 'viadal', color_palette: null })
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({
-      from: vi.fn().mockReturnValue(chain({ data: null })),
-    } as never)
+    vi.mocked(canViewOfficialSurfaces).mockResolvedValue(false)
 
     await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
       'NEXT_NOT_FOUND'
     )
+    expect(canViewOfficialSurfaces).toHaveBeenCalledWith('user-1', TENANT_ID)
   })
 
-  it('renders children and BottomTabBar when a role row exists for this tenant', async () => {
+  it('renders children and BottomTabBar when the user may view official surfaces', async () => {
     mockUser('user-1', { id: TENANT_ID, slug: 'viadal', color_palette: { primary: '#000' } })
-    const roleBuilder = chain({ data: { role: 'official' } })
-    const serviceFromMock = vi.fn().mockReturnValue(roleBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
+    vi.mocked(canViewOfficialSurfaces).mockResolvedValue(true)
 
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
-    expect(serviceFromMock).toHaveBeenCalledWith('user_roles')
-    expect(roleBuilder.eq).toHaveBeenCalledWith('user_id', 'user-1')
-    expect(roleBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(canViewOfficialSurfaces).toHaveBeenCalledWith('user-1', TENANT_ID)
 
     const tabBar = findByType(result, BottomTabBar)
     expect(tabBar).not.toBeNull()

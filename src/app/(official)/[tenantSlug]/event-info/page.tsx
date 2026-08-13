@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
@@ -40,11 +41,7 @@ export default async function EventInfoPage({ params }: Props) {
 
   if (!user) redirect('/login')
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('slug', tenantSlug)
-    .single()
+  const tenant = await resolveTenantForOfficial(tenantSlug, user.id)
 
   if (!tenant) notFound()
 
