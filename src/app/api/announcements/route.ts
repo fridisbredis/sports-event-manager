@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     .from(table)
     .select('phone')
     .eq('tenant_id', tenantId)
+    .eq('sms_opt_out', false)
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch recipients' }, { status: 500 })

@@ -377,6 +377,7 @@ export type Database = {
           name: string
           phone: string
           race_results_url: string | null
+          sms_opt_out: boolean
           tenant_id: string
           user_id: string | null
         }
@@ -388,6 +389,7 @@ export type Database = {
           name: string
           phone: string
           race_results_url?: string | null
+          sms_opt_out?: boolean
           tenant_id: string
           user_id?: string | null
         }
@@ -399,6 +401,7 @@ export type Database = {
           name?: string
           phone?: string
           race_results_url?: string | null
+          sms_opt_out?: boolean
           tenant_id?: string
           user_id?: string | null
         }

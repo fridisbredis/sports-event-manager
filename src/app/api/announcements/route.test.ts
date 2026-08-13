@@ -89,6 +89,7 @@ describe('POST /api/announcements', () => {
 
     expect(fromMock).toHaveBeenNthCalledWith(1, 'officials')
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
   })
 
   it('queries the participants table for the participants channel', async () => {
@@ -206,6 +207,67 @@ describe('POST /api/announcements', () => {
     const responseBody = await res.json()
 
     expect(responseBody).toEqual({ sent: 0, failed: 0 })
+  })
+
+  it('honours sms_opt_out for officials: filters the query and never sends to opted-out numbers', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    // Simulates the DB-level filter: only non-opted-out officials come back.
+    const recipientsBuilder = chain({
+      data: [{ phone: '0701111111' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(fromMock).toHaveBeenNthCalledWith(1, 'officials')
+    expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
+    expect(responseBody).toEqual({ sent: 1, failed: 0 })
+    expect(messagesCreate).toHaveBeenCalledTimes(1)
+    expect(messagesCreate).toHaveBeenCalledWith({
+      body: 'Hej!',
+      from: '+15550001111',
+      to: '0701111111',
+    })
+    // The opted-out number must never appear as a send target.
+    expect(messagesCreate).not.toHaveBeenCalledWith(expect.objectContaining({ to: '0709999999' }))
+  })
+
+  it('honours sms_opt_out for participants: filters the query and never sends to opted-out numbers', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '0702222222' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' })
+    )
+    const responseBody = await res.json()
+
+    expect(fromMock).toHaveBeenNthCalledWith(1, 'participants')
+    expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
+    expect(responseBody).toEqual({ sent: 1, failed: 0 })
+    expect(messagesCreate).toHaveBeenCalledTimes(1)
+    expect(messagesCreate).not.toHaveBeenCalledWith(expect.objectContaining({ to: '0708888888' }))
   })
 
   it('counts partial sms failures without failing the whole request', async () => {
