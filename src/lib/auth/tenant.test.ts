@@ -109,49 +109,62 @@ describe('resolvePostLoginRedirect', () => {
 })
 
 describe('confirmOfficialInvite', () => {
-  it('returns null when no matching invited official is found', async () => {
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  function mockServiceClientWithRpc({
+    rpcResult,
+    tenantResult,
+  }: {
+    rpcResult: { data: unknown; error: { message: string } | null }
+    tenantResult?: unknown
+  }) {
+    const rpc = vi.fn().mockResolvedValue(rpcResult)
+    const fromMock =
+      tenantResult !== undefined ? vi.fn().mockReturnValue(chain(tenantResult)) : vi.fn()
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
+    return { rpc, fromMock }
+  }
 
-    expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
-    expect(fromMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns null and does not confirm when the official has no tenant slug', async () => {
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chain({ data: { id: 'off-1', tenant_id: TENANT_ID, tenants: null } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
-
-    expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
-    expect(fromMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('confirms the official, assigns the role, and returns the tenant slug', async () => {
-    const selectBuilder = chain({
-      data: { id: 'off-1', tenant_id: TENANT_ID, tenants: { slug: 'viadal' } },
+  it('returns null when the RPC reports no matching invited official', async () => {
+    const { rpc } = mockServiceClientWithRpc({
+      rpcResult: { data: null, error: { message: 'not_found' } },
     })
-    const updateBuilder = chain({ data: null, error: null })
-    const insertBuilder = chain({ data: null, error: null })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(selectBuilder)
-      .mockReturnValueOnce(updateBuilder)
-      .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
+    expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
+      p_user_id: 'user-1',
+      p_user_phone: '0701234567',
+    })
+  })
+
+  it('returns null when the RPC reports the invite as already confirmed (concurrent attempt)', async () => {
+    // Simulates the loser of the row lock in confirm_official_invite_by_phone: a second,
+    // concurrent login for the same invited phone arrives after the first has already
+    // flipped invite_status to 'confirmed'.
+    mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'already_confirmed' } } })
+
+    expect(await confirmOfficialInvite('user-2', '0701234567')).toBeNull()
+  })
+
+  it('returns null and does not confirm when the tenant lookup finds no slug', async () => {
+    mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID }, error: null },
+      tenantResult: { data: null },
+    })
+
+    expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
+  })
+
+  it('confirms the official via RPC, assigns the role, and returns the tenant slug', async () => {
+    const { rpc } = mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
 
     const tenantSlug = await confirmOfficialInvite('user-1', '0701234567')
 
     expect(tenantSlug).toBe('viadal')
-    expect(updateBuilder.update).toHaveBeenCalledWith({
-      user_id: 'user-1',
-      invite_status: 'confirmed',
-      invite_token: null,
-    })
-    expect(insertBuilder.insert).toHaveBeenCalledWith({
-      user_id: 'user-1',
-      tenant_id: TENANT_ID,
-      role: 'official',
+    expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
+      p_user_id: 'user-1',
+      p_user_phone: '0701234567',
     })
   })
 })

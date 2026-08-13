@@ -601,6 +601,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirm_official_invite: {
+        Args: {
+          p_name: string
+          p_token: string
+          p_user_id: string
+          p_user_phone: string
+        }
+        Returns: Json
+      }
+      confirm_official_invite_by_phone: {
+        Args: { p_user_id: string; p_user_phone: string }
+        Returns: Json
+      }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       is_system_admin: { Args: never; Returns: boolean }
       sync_event_stages: {
