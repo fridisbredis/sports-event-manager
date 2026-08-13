@@ -281,13 +281,46 @@ describe('canViewOfficialSurfaces', () => {
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
 
-  it('allows an official in their own active tenant', async () => {
+  it('allows a confirmed official in their own active tenant', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
       tenants: { data: { is_active: true }, error: null },
+      officials: { data: { invite_status: 'confirmed' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('denies an official who has not been confirmed yet', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+      officials: { data: { invite_status: 'invited' }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('denies an official role with no matching officials row', async () => {
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+      officials: { data: null, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('fails closed and logs when the officials lookup errors', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientByTable({
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      tenants: { data: { is_active: true }, error: null },
+      officials: { data: null, error: { message: 'boom' } },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+    expect(consoleSpy).toHaveBeenCalled()
   })
 
   it('allows a tenant_admin in their own active tenant', async () => {
@@ -578,6 +611,7 @@ describe('resolveTenantForOfficial', () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      officials: { data: { invite_status: 'confirmed' }, error: null },
     })
 
     expect(await resolveTenantForOfficial('viadal', 'user-1')).toEqual({

@@ -148,6 +148,9 @@ export async function hasAdminAccessToTenant(userId: string, tenantId: string): 
 // role check and invite the wrong call site.
 // system_admin access is global — no per-tenant row required, same as
 // hasAdminAccessToTenant, including the is_active exemption.
+// Per docs/flows/officials-management-registration.md, an official only gains
+// sign-in and access to these screens once Confirmed — Invited is SMS-link-only.
+// tenant_admin/system_admin have no officials row and are exempt from this check.
 export async function canViewOfficialSurfaces(userId: string, tenantId: string): Promise<boolean> {
   if (!tenantIdSchema.safeParse(tenantId).success) return false
 
@@ -157,7 +160,24 @@ export async function canViewOfficialSurfaces(userId: string, tenantId: string):
   if (isGlobalSystemAdmin(context.roleRows)) return true
   if (!context.tenantIsActive) return false
 
-  return hasTenantScopedRole(context.roleRows, tenantId, ['official', 'tenant_admin'])
+  if (hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])) return true
+
+  if (!hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return false
+
+  const service = createSupabaseServiceClient()
+  const { data: official, error } = await service
+    .from('officials')
+    .select('invite_status')
+    .eq('user_id', userId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Failed to fetch official invite status:', error)
+    return false
+  }
+
+  return official?.invite_status === 'confirmed'
 }
 
 export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {
