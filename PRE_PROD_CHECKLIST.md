@@ -20,7 +20,7 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 - [ ] System admin view: create/deactivate tenants, toggle feature flags per tenant (SYS-01, SYS-02)
 - [ ] Tenant admin flows: event configuration, officials management, announcements (EVT-01/02, WS-01/02, OFF-01, SCHED-01, COMM-01)
 - [ ] Official view: assignments (HOME-01, INFO-01, MYSCH-01, ANN-01)
-- [ ] Participant view: event info, schedule, Race Results link, personal view with bib/category (flows not yet written)
+- [ ] Participant view: event info, schedule, Race Results link, personal view with bib/category (flows not yet written) — include an `sms_opt_out` toggle (schema + announcement filtering already done in SEC-05, migration 0019)
 - [ ] Personal account settings for all roles: phone, name, notification opt-out toggle (ACCT-01)
 - [ ] Announcement publishing UI with two channels (officials, participants) (COMM-01)
 - [ ] Replace all hardcoded UI strings with `i18next` translation keys (English-only in v1, but no hardcoded strings — non-negotiable architectural requirement)
