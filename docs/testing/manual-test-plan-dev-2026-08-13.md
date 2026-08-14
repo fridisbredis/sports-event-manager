@@ -32,9 +32,13 @@ Bakgrund: layouten var enda spärren; de fem official-sidorna läste data utan e
 
 ## 2. SEC-02 — tenantId-injektion i guards
 
-- [ ] I ett server action-anrop (t.ex. publicera event, redigera scheman/workstations), försök skicka ett malformat `tenantId` (t.ex. via devtools-nätverksflik, ändra payload till en icke-UUID-sträng eller en OR-injektionssträng).
-- [ ] Förväntat: request avvisas direkt (valideringsfel), inte ett 500 eller — värre — genomsläpp till fel tenants data.
-- [ ] Verifiera normalflödet fortfarande funkar: publicera ett event, redigera ett schema, redigera en workstation — allt som tenant_admin i din egen tenant.
+- [x] I ett server action-anrop (publicera event, redigera scheman, redigera workstations), försök skicka ett malformat `tenantId` via devtools-nätverksflik → Copy as fetch → manipulerad payload. Testat lokalt (localhost:3000) 2026-08-14, tenant_admin i Testklubben:
+  - `saveAssignments` (SCHED, `/testklubben/admin/scheduling`) med `tenantId: "not-a-uuid"` → HTTP 200 (RSC-transport), body `{"error":"Not authorized"}`. Kontrolltest med korrekt tenantId gick igenom till affärslogiken (nådde slot-konflikt-check).
+  - `saveEvent` (EVT, `/testklubben/admin/event`) med `tenantId: "not-a-uuid"` → samma resultat, `{"error":"Not authorized"}`. Denna action saknar en egen lokal `tenantIdSchema.safeParse()` i actionfilen (till skillnad från övriga), men fångas ändå av UUID-checken inne i `hasAdminAccessToTenant`.
+  - `updateWorkstation` (WS, `/testklubben/admin/workstations/<id>`) testad med både `tenantId: "not-a-uuid"` och OR-injektionssträngen `tenantId: "' OR '1'='1"` → båda gav samma resultat, `{"error":"Not authorized"}`.
+- [x] Förväntat uppfyllt: ingen 500, inget genomslag till databas/RPC eller fel tenants data. HTTP 200 i svaret är förväntad Next.js Server Actions-transportkonvention (fel signaleras i body, inte statuskod) — inte en läcka.
+- [x] Verifiera normalflödet fortfarande funkar: publicera ett event, redigera ett schema, redigera en workstation — allt som tenant_admin i din egen tenant. — Testat 2026-08-14: samtliga tre flöden fungerar normalt i UI efter injektionstesterna, ingen regression.
+- [ ] Detta test kördes mot localhost, inte dev-deploy. Enligt avsnitt 6 nedan bör guard-logiken bete sig identiskt i dev/prod (ingen kod-skillnad), men note:a om ni vill köra om mot dev-URL:en för fullständig spårbarhet.
 
 ## 3. SEC-04 — telefonnummer måste faktiskt tillhöra personen (official invite)
 
