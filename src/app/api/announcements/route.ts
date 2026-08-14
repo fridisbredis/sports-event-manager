@@ -26,22 +26,26 @@ export async function POST(request: NextRequest) {
 
   // ...rest of the handler unchanged (fetch recipients, insert announcement, send SMS)
   const service = await createSupabaseServiceClient()
-  const table = channel === 'officials' ? 'officials' : 'participants'
-  let recipientsQuery = service
-    .from(table)
-    .select('phone')
-    .eq('tenant_id', tenantId)
-    .eq('sms_opt_out', false)
 
   // Officials keep their row (and phone number) after being removed, so the
-  // channel must also exclude anyone who isn't a confirmed official —
-  // otherwise a removed official (or a re-invited one on the same number)
-  // still receives announcement SMS. Participants have no such status.
-  if (channel === 'officials') {
-    recipientsQuery = recipientsQuery.eq('invite_status', 'confirmed')
-  }
-
-  const { data: recipients, error } = await recipientsQuery
+  // officials channel must also exclude anyone who isn't a confirmed
+  // official — otherwise a removed official (or a re-invited one on the
+  // same number) still receives announcement SMS. Participants have no
+  // such status. Branching on `channel` (rather than a shared `table`
+  // variable) keeps each query's column types scoped to its own table.
+  const { data: recipients, error } =
+    channel === 'officials'
+      ? await service
+          .from('officials')
+          .select('phone')
+          .eq('tenant_id', tenantId)
+          .eq('sms_opt_out', false)
+          .eq('invite_status', 'confirmed')
+      : await service
+          .from('participants')
+          .select('phone')
+          .eq('tenant_id', tenantId)
+          .eq('sms_opt_out', false)
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch recipients' }, { status: 500 })
