@@ -90,6 +90,55 @@ describe('POST /api/announcements', () => {
     expect(fromMock).toHaveBeenNthCalledWith(1, 'officials')
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
+    expect(recipientsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
+  })
+
+  it('excludes non-confirmed officials (e.g. removed) even when sms_opt_out is false', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    // Simulates the DB-level filter: only confirmed officials come back,
+    // even though a removed official row with the same phone still exists
+    // in the table with sms_opt_out=false.
+    const recipientsBuilder = chain({
+      data: [{ phone: '0701111111' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(recipientsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
+    expect(responseBody).toEqual({ sent: 1, failed: 0 })
+    expect(messagesCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not filter participants by invite_status (no such column)', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '0702222222' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
+
+    expect(recipientsBuilder.eq).not.toHaveBeenCalledWith('invite_status', 'confirmed')
   })
 
   it('queries the participants table for the participants channel', async () => {
