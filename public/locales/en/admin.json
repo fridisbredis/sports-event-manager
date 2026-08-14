@@ -189,7 +189,9 @@
     "emptyHint": "Add officials and send them an SMS invite to join.",
     "youLabel": "Event admin",
     "removeError": "Couldn't remove {{name}}. Try again.",
-    "resendError": "Couldn't resend the invite. Try again."
+    "resendError": "Couldn't resend the invite. Try again.",
+    "addedSmsFailed": "{{name}} was added, but the invite SMS could not be sent. Use Re-send invite to try again.",
+    "duplicatePhone": "This mobile number already belongs to another official. Each official needs their own number."
   },
   "scheduling": {
     "title": "Scheduling",

@@ -57,11 +57,20 @@ export default function OfficialsList({
         body: JSON.stringify({ tenantId, name: name.trim(), phone: phone.trim() }),
       })
       if (res.ok) {
-        const { official } = await res.json()
+        const { official, smsSent } = await res.json()
         setOfficials((prev) => [...prev, official])
         setName('')
         setPhone('')
         setAddModalOpen(false)
+        // The official exists either way — only the invite SMS can have failed here.
+        if (smsSent === false) {
+          toastError(t('officials.addedSmsFailed', { name: official.name }))
+        }
+      } else if (res.status === 409) {
+        // Same number as an active official in this tenant. Names may repeat, numbers may not.
+        const message = t('officials.duplicatePhone')
+        setAddError(message)
+        toastError(message)
       } else if (res.status === 401) {
         const message = 'Session expired — please refresh the page and try again.'
         setAddError(message)
