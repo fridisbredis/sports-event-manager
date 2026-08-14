@@ -27,11 +27,21 @@ export async function POST(request: NextRequest) {
   // ...rest of the handler unchanged (fetch recipients, insert announcement, send SMS)
   const service = await createSupabaseServiceClient()
   const table = channel === 'officials' ? 'officials' : 'participants'
-  const { data: recipients, error } = await service
+  let recipientsQuery = service
     .from(table)
     .select('phone')
     .eq('tenant_id', tenantId)
     .eq('sms_opt_out', false)
+
+  // Officials keep their row (and phone number) after being removed, so the
+  // channel must also exclude anyone who isn't a confirmed official —
+  // otherwise a removed official (or a re-invited one on the same number)
+  // still receives announcement SMS. Participants have no such status.
+  if (channel === 'officials') {
+    recipientsQuery = recipientsQuery.eq('invite_status', 'confirmed')
+  }
+
+  const { data: recipients, error } = await recipientsQuery
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch recipients' }, { status: 500 })
