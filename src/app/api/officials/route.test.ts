@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -24,9 +25,27 @@ function chain(result: unknown) {
   builder.update = vi.fn(() => builder)
   builder.upsert = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
+  builder.neq = vi.fn(() => builder)
+  builder.limit = vi.fn(() => builder)
   builder.single = vi.fn(() => Promise.resolve(result))
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   return builder
+}
+
+/** No active official already holds the submitted phone number. */
+const noDuplicate = () => chain({ data: null })
+
+/**
+ * Every successful POST queries `officials` three times in order: the duplicate-phone
+ * lookup, the insert, then `tenants` for the SMS body. Tests pass the builders for
+ * everything after the duplicate check, which defaults to "no duplicate found".
+ */
+function mockService(...afterDuplicateCheck: unknown[]) {
+  const fromMock = vi.fn()
+  fromMock.mockReturnValueOnce(noDuplicate())
+  afterDuplicateCheck.forEach((builder) => fromMock.mockReturnValueOnce(builder))
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  return fromMock
 }
 
 function makeRequest(body: unknown) {
@@ -34,6 +53,13 @@ function makeRequest(body: unknown) {
     method: 'POST',
     body: JSON.stringify(body),
   })
+}
+
+function asAdmin() {
+  vi.mocked(requireTenantAdmin).mockResolvedValue({
+    user: { id: 'admin-1' },
+    role: 'tenant_admin',
+  } as never)
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
@@ -67,16 +93,11 @@ describe('POST /api/officials', () => {
   })
 
   it('validates tenantId via requireTenantAdmin before creating the invite', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({
-      user: { id: 'admin-1' },
-      role: 'tenant_admin',
-    } as never)
-    const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(
-      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null })
+    asAdmin()
+    mockService(
+      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+      chain({ data: { name: 'Viadal 2026' } })
     )
-    fromMock.mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
 
@@ -84,10 +105,7 @@ describe('POST /api/officials', () => {
   })
 
   it('normalizes the phone, inserts the official, and sends the invite SMS with the confirmation text', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({
-      user: { id: 'admin-1' },
-      role: 'tenant_admin',
-    } as never)
+    asAdmin()
 
     const official = {
       id: 'off-1',
@@ -99,10 +117,7 @@ describe('POST /api/officials', () => {
     }
 
     const officialsBuilder = chain({ data: official, error: null })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
-    const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockService(officialsBuilder, chain({ data: { name: 'Viadal 2026' } }))
 
     const res = await POST(
       makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '070-123 45 67' })
@@ -130,17 +145,9 @@ describe('POST /api/officials', () => {
   })
 
   it('falls back to "an event" in the confirmation text when the tenant has no name', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({
-      user: { id: 'admin-1' },
-      role: 'tenant_admin',
-    } as never)
-
+    asAdmin()
     const official = { id: 'off-1', name: 'Bo', phone: '0709998877', invite_token: 'tok-xyz' }
-    const fromMock = vi.fn()
-    fromMock
-      .mockReturnValueOnce(chain({ data: official, error: null }))
-      .mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockService(chain({ data: official, error: null }), chain({ data: null }))
 
     await POST(makeRequest({ tenantId: TENANT_ID, name: 'Bo', phone: '0709998877' }))
 
@@ -151,13 +158,113 @@ describe('POST /api/officials', () => {
     )
   })
 
-  it('returns 500 and never sends sms when the insert fails', async () => {
-    vi.mocked(requireTenantAdmin).mockResolvedValue({
-      user: { id: 'admin-1' },
-      role: 'tenant_admin',
-    } as never)
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
+  it('rejects a phone number already held by an active official, without inserting or sending', async () => {
+    asAdmin()
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(chain({ data: { id: 'existing-official' } }))
+      .mockReturnValueOnce(insertBuilder)
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.code).toBe('duplicate_phone')
+    expect(insertBuilder.insert).not.toHaveBeenCalled()
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('returns 409 rather than 500 when the unique index rejects a concurrent insert', async () => {
+    asAdmin()
+    // Two requests can both pass the duplicate lookup; the index is the real guarantee.
+    mockService(chain({ data: null, error: { code: '23505', message: 'duplicate key value' } }))
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.code).toBe('duplicate_phone')
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('allows a repeated name as long as the phone number differs', async () => {
+    asAdmin()
+    const officialsBuilder = chain({
+      data: { id: 'off-2', name: 'Anna', phone: '0709998877', invite_token: 'tok-2' },
+      error: null,
+    })
+    mockService(officialsBuilder, chain({ data: { name: 'Viadal 2026' } }))
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0709998877' }))
+
+    expect(res.status).toBe(200)
+    expect(officialsBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Anna', phone: '0709998877' })
+    )
+  })
+
+  it('keeps the created official and reports smsSent false when the invite SMS throws', async () => {
+    asAdmin()
+
+    const official = {
+      id: 'off-1',
+      tenant_id: TENANT_ID,
+      name: 'Anna',
+      phone: '0701234567',
+      invite_status: 'invited',
+      invite_token: 'tok-abc',
+    }
+    mockService(chain({ data: official, error: null }), chain({ data: { name: 'Viadal 2026' } }))
+    messagesCreate.mockRejectedValueOnce(Object.assign(new Error('twilio down'), { code: 21211 }))
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const body = await res.json()
+
+    // Not a 500 — the row exists, so telling the admin it failed makes them retry
+    // and create a duplicate. Resend is the recovery path.
+    expect(res.status).toBe(200)
+    expect(body.official).toEqual(official)
+    expect(body.smsSent).toBe(false)
+  })
+
+  it('keeps the created official when the twilio client constructor itself throws', async () => {
+    asAdmin()
+
+    const official = { id: 'off-1', name: 'Anna', phone: '0701234567', invite_token: 'tok-abc' }
+    mockService(chain({ data: official, error: null }), chain({ data: { name: 'Viadal 2026' } }))
+
+    // twilio() validates the account SID synchronously and throws before any request
+    // is made when it is set to a non-AC value — the real localhost failure mode.
+    vi.mocked(twilio).mockImplementationOnce(() => {
+      throw new Error('accountSid must start with AC')
+    })
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.official).toEqual(official)
+    expect(body.smsSent).toBe(false)
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('reports smsSent true when the invite SMS is delivered', async () => {
+    asAdmin()
+    mockService(
+      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+      chain({ data: { name: 'Viadal 2026' } })
+    )
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+
+    expect(await res.json()).toMatchObject({ smsSent: true })
+  })
+
+  it('returns 500 and never sends sms when the insert fails', async () => {
+    asAdmin()
+    mockService(chain({ data: null, error: { message: 'boom' } }))
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
 
