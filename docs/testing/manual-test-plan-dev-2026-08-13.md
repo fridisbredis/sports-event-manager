@@ -42,10 +42,10 @@ Bakgrund: layouten var enda spärren; de fem official-sidorna läste data utan e
 
 ## 3. SEC-04 — telefonnummer måste faktiskt tillhöra personen (official invite)
 
-- [ ] Skapa en ny official-invite med ett telefonnummer.
-- [ ] Bekräfta inbjudan (`/officials/confirm`-flödet) med **testtelefonnumret som faktiskt fick SMS:et**. Förväntat: fungerar, official kopplas till rätt user.
-- [ ] Försök bekräfta samma inbjudan igen, eller med ett **annat** telefonnummer än det som bjöds in. Förväntat: nekas — kan inte kapa någon annans invite.
-- [ ] Verifiera RPC-flödet end-to-end (två nya migrations: 0017 confirm_official_invite_rpc, 0018 confirm_official_invite_by_phone_rpc) — dvs. att en official verkligen hamnar med rätt `user_id` kopplad efter bekräftelse, inte bara att UI:t säger OK.
+- [x] Skapa en ny official-invite med ett telefonnummer. — Testat 2026-08-13: HTTP 200, raden skapad med `invite_status = 'invited'`, och SMS levererat till ett riktigt nummer från dev-avsändaren +46728101619 (alltså inte via OTP-testnumret, se avsnitt 6).
+- [x] Bekräfta inbjudan (`/officials/confirm`-flödet) med **testtelefonnumret som faktiskt fick SMS:et**. Förväntat: fungerar, official kopplas till rätt user. — Testat 2026-08-13: HTTP 200. `user_id` satt, `invite_token` nullad, och exakt en ny `user_roles`-rad med rollen `official` i rätt tenant. Telefonen hade noll roller innan, så rollen kan bara ha kommit från inbjudan.
+- [x] Försök bekräfta samma inbjudan igen, eller med ett **annat** telefonnummer än det som bjöds in. Förväntat: nekas — kan inte kapa någon annans invite. — Testat 2026-08-13: återanvänd länk visar "invalid or expired"-skärmen; bekräftelseförsök från ett **annat** inloggat nummer gav 403 `phone_mismatch` och lämnade raden orörd (fortfarande `invited`, `user_id` NULL, namnet oförändrat).
+- [ ] Verifiera RPC-flödet end-to-end (två nya migrations: 0017 confirm_official_invite_rpc, 0018 confirm_official_invite_by_phone_rpc) — dvs. att en official verkligen hamnar med rätt `user_id` kopplad efter bekräftelse, inte bara att UI:t säger OK. — Delvis 2026-08-13: **0017 verifierad** end-to-end mot databasen. **0018 är inte verifierad** — den vägen kräver rader med `invite_status = 'invited'` och `invite_token IS NULL`, ett tillstånd ingen applikationsväg skapar, så den kan bara testas med handplanterade rader. Lämnas ikryssad-fri tills det görs.
 
 ## 4. SEC-05 — sms_opt_out respekteras vid annonser
 
