@@ -35,6 +35,27 @@
 -- dependent assignments first.
 --
 -- Run on BOTH dev and prod Supabase projects.
+--
+-- ORDERING — deploy the code BEFORE creating this index, not after:
+--   The POST /api/officials route translates a unique violation (SQLSTATE
+--   23505) into a 409 "An official with this phone number already exists".
+--   That handler shipped with this migration. If the index exists while an
+--   older build is running, the same duplicate surfaces as an unhandled 500.
+--   The route also pre-checks for duplicates before inserting, so deploying
+--   the code without the index is a safe intermediate state; the reverse is
+--   not. Code first, index second.
+--
+-- Verify after running:
+--
+--   select indexname from pg_indexes
+--   where tablename = 'officials' and indexname like '%phone%';
+--
+--   Expect officials_tenant_phone_active_uniq. "Success. No rows returned"
+--   from the CREATE is normal DDL output and is not by itself confirmation.
+--
+-- Applied:
+--   dev  (lhflutwvwvzawzbcuwup) — 2026-08-17, zero duplicates found, verified
+--   prod — NOT YET APPLIED
 -- ---------------------------------------------------------------------------
 
 create unique index if not exists officials_tenant_phone_active_uniq
