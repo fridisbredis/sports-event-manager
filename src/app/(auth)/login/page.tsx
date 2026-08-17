@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
-import { Button, Input, Select, SelectItem } from '@heroui/react'
+import { Button, SelectItem } from '@heroui/react'
+import { Input, Select } from '@/components/ui/form-fields'
 import { toastError } from '@/lib/toast'
 import {
   normalizePhoneToE164,

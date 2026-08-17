@@ -148,9 +148,9 @@ export default function StageList({ stages, onChange }: Props) {
 
   return (
     <>
-      <div className="rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
+      <div className="overflow-hidden rounded-large">
         {/* Header row */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             {t('eventConfig.stagesLabel')}
             <span className="text-red-400">*</span>

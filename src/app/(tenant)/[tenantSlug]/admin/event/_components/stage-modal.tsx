@@ -1,16 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Button,
-  Input,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  DateRangePicker,
-} from '@heroui/react'
+import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Input, DateRangePicker } from '@/components/ui/form-fields'
 import { CalendarDateTime, type DateValue } from '@internationalized/date'
 import type { RangeValue } from '@react-types/shared'
 import type { StageInput } from '../actions'
@@ -100,6 +92,7 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
       }}
       size="md"
       scrollBehavior="inside"
+      classNames={{ base: 'bg-gray-50' }}
     >
       <ModalContent>
         {(onModalClose) => (

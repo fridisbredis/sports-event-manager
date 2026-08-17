@@ -2,15 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { useTranslation } from '@/lib/i18n/client'
-import {
-  Button,
-  Textarea,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from '@heroui/react'
+import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Textarea } from '@/components/ui/form-fields'
+import { AppCard } from '@/components/ui/app-card'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
 
@@ -63,6 +57,7 @@ function AnnouncementGuardDialog({
       onOpenChange={(isOpen) => {
         if (!isOpen) onCancel()
       }}
+      classNames={{ base: 'bg-gray-50' }}
     >
       <ModalContent>
         {(onClose) => (
@@ -205,7 +200,7 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
         </div>
 
         {/* New announcement card */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 mb-6">
+        <AppCard className="mb-6" bodyClassName="p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
             {t('communication.newAnnouncement')}
           </p>
@@ -214,7 +209,6 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
             onValueChange={setDraft}
             placeholder={t('communication.announcementPlaceholder')}
             minRows={4}
-            classNames={{ inputWrapper: 'shadow-none' }}
           />
           <div className="flex items-center justify-between mt-3">
             <span className="text-xs text-default-400">{t('communication.smsNote')}</span>
@@ -228,7 +222,7 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
               {publishing ? t('communication.publishing') : t('communication.publish')}
             </Button>
           </div>
-        </div>
+        </AppCard>
 
         {/* Timeline */}
         <div>
@@ -237,7 +231,7 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
           </p>
 
           {filtered.length === 0 ? (
-            <div className="rounded-xl border border-gray-200 bg-white flex flex-col items-center justify-center py-16 gap-3">
+            <AppCard bodyClassName="flex flex-col items-center justify-center py-16 gap-3">
               <div className="w-12 h-12 rounded-lg border-2 border-gray-200 flex items-center justify-center">
                 <svg
                   className="w-6 h-6 text-gray-300"
@@ -261,16 +255,16 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
                   {t('communication.noAnnouncementsHint')}
                 </p>
               </div>
-            </div>
+            </AppCard>
           ) : (
-            <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
+            <AppCard bodyClassName="p-0 divide-y divide-gray-100">
               {filtered.map((a) => (
                 <div key={a.id} className="px-5 py-4">
                   <p className="text-sm text-gray-900 leading-snug">{a.body}</p>
                   <p className="text-xs text-default-400 mt-1">{formatDate(a.published_at)}</p>
                 </div>
               ))}
-            </div>
+            </AppCard>
           )}
         </div>
       </div>

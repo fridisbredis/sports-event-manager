@@ -15,10 +15,10 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Input,
-  Select,
   SelectItem,
 } from '@heroui/react'
+import { Input, Select } from '@/components/ui/form-fields'
+import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError, extractErrorMessage } from '@/lib/toast'
@@ -161,7 +161,7 @@ export default function OfficialsList({
       </div>
 
       {visibleOfficials.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-20 text-center">
+        <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
           <svg
             className="mb-4 h-12 w-12 text-gray-300"
             viewBox="0 0 48 48"
@@ -178,7 +178,7 @@ export default function OfficialsList({
           <Button color="primary" onPress={() => setAddModalOpen(true)}>
             {t('officials.add')}
           </Button>
-        </div>
+        </AppCard>
       ) : (
         <Table isStriped aria-label={t('officials.title')}>
           <TableHeader>
@@ -243,7 +243,11 @@ export default function OfficialsList({
         </Table>
       )}
 
-      <Modal isOpen={addModalOpen} onOpenChange={(isOpen) => !isOpen && closeAddModal()}>
+      <Modal
+        isOpen={addModalOpen}
+        onOpenChange={(isOpen) => !isOpen && closeAddModal()}
+        classNames={{ base: 'bg-gray-50' }}
+      >
         <ModalContent>
           <ModalHeader>{t('officials.addTitle')}</ModalHeader>
           <ModalBody>

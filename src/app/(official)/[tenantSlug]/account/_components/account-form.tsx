@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button, Input, Switch } from '@heroui/react'
+import { Button, Switch } from '@heroui/react'
+import { Input } from '@/components/ui/form-fields'
+import { AppCard } from '@/components/ui/app-card'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
@@ -120,28 +123,25 @@ export default function AccountForm({
             value={name}
             onValueChange={handleNameChange}
             description={t('account.editHint')}
-            variant="bordered"
             labelPlacement="outside"
           />
         </div>
 
         {/* Phone field */}
         <div className="mb-8">
-          <Input
-            label={t('account.phoneLabel')}
-            value={formatPhoneForDisplay(phone)}
-            isReadOnly
-            description={t('account.readOnlyHint')}
-            variant="bordered"
-            labelPlacement="outside"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            {t('account.phoneLabel')}
+          </label>
+          <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
+            {formatPhoneForDisplay(phone)}
+          </div>
         </div>
 
         {/* Notifications section */}
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
           {t('account.notificationsHeading')}
         </p>
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 mb-8">
+        <AppCard className="mb-8" bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-gray-900">{t('account.smsUpdatesLabel')}</p>
@@ -154,7 +154,7 @@ export default function AccountForm({
               aria-label={t('account.smsUpdatesLabel')}
             />
           </div>
-        </div>
+        </AppCard>
 
         {/* Schedule section — conditional */}
         {assignmentCount > 0 && (
@@ -164,7 +164,7 @@ export default function AccountForm({
             </p>
             <Link
               href={`/${tenantSlug}/schedule`}
-              className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-4 mb-8 hover:bg-gray-50 transition-colors"
+              className={`flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 mb-8 hover:bg-gray-50 transition-colors`}
             >
               <div className="w-8 h-8 rounded-lg border-2 border-gray-300 shrink-0" />
               <div className="flex-1 min-w-0">
@@ -196,7 +196,7 @@ export default function AccountForm({
             isLoading={saveState === 'saving'}
             onPress={handleSave}
             fullWidth
-            className="mt-3 rounded-xl py-3 text-sm font-semibold"
+            className="mt-3 rounded-large py-3 text-sm font-semibold"
           >
             {saveLabel}
           </Button>

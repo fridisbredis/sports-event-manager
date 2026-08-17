@@ -1,15 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Input,
-} from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { Input } from '@/components/ui/form-fields'
 import { createTenant } from '../actions'
 import { toSlug } from '../_utils'
 import { toastError } from '@/lib/toast'
@@ -42,7 +35,11 @@ export function CreateTenantModal({ open, onClose }: Props) {
   }
 
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Modal
+      isOpen={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      classNames={{ base: 'bg-gray-50' }}
+    >
       <ModalContent>
         <ModalHeader>Create tenant</ModalHeader>
         <ModalBody>

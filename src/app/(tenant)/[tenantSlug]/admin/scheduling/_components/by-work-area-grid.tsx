@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { Button, Skeleton } from '@heroui/react'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, shortName } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot } from './grid-helpers'
@@ -80,7 +81,7 @@ export function ByWorkAreaGrid({
 
   if (stageWorkstations.length === 0) {
     return (
-      <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
+      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-gray-500`}>
         {t('scheduling.noWorkAreas')}
       </div>
     )
@@ -89,7 +90,9 @@ export function ByWorkAreaGrid({
   const hasOutOfWindow = stageWorkstations.some((ws) => ws.workstation_operating_windows.length > 0)
 
   return (
-    <div className="scheduling-scroll-container border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh]">
+    <div
+      className={`scheduling-scroll-container ${CARD_SURFACE} overflow-x-auto overflow-y-auto max-h-[70vh]`}
+    >
       {hasOutOfWindow && (
         <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
