@@ -1,3 +1,5 @@
+'use client'
+
 import { Card, CardBody, type CardProps } from '@heroui/react'
 
 // A thin wrapper around HeroUI's Card/CardBody so every "white panel on the
