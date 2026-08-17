@@ -4,8 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
-import { Button, Input } from '@heroui/react'
+import { Button, Input, Select, SelectItem } from '@heroui/react'
 import { toastError } from '@/lib/toast'
+import {
+  normalizePhoneToE164,
+  isValidPhoneForCountry,
+  guessPhoneCountryFromLocale,
+  PHONE_COUNTRIES,
+} from '@/lib/phone'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,8 +20,14 @@ export default function LoginPage() {
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState(() =>
+    guessPhoneCountryFromLocale(typeof navigator === 'undefined' ? undefined : navigator.language)
+  )
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
+  const [normalizedPhone, setNormalizedPhone] = useState('')
+
+  const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
 
   async function request(fn: () => Promise<{ error: { message: string } | null }>) {
     setLoading(true)
@@ -28,11 +40,20 @@ export default function LoginPage() {
   }
 
   async function sendOtp() {
-    if (await request(() => supabase.auth.signInWithOtp({ phone }))) setStep('otp')
+    const e164Phone = normalizePhoneToE164(phone, phoneCountry)
+    if (!e164Phone) return
+    if (await request(() => supabase.auth.signInWithOtp({ phone: e164Phone }))) {
+      setNormalizedPhone(e164Phone)
+      setStep('otp')
+    }
   }
 
   async function verifyOtp() {
-    if (await request(() => supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })))
+    if (
+      await request(() =>
+        supabase.auth.verifyOtp({ phone: normalizedPhone, token: otp, type: 'sms' })
+      )
+    )
       router.push('/')
   }
 
@@ -45,22 +66,43 @@ export default function LoginPage() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault()
-            if (!loading && phone) sendOtp()
+            if (!loading && phoneIsValid) sendOtp()
           }}
         >
-          <Input
-            type="tel"
-            label={t('signIn.phoneLabel')}
-            placeholder={t('signIn.phonePlaceholder')}
-            value={phone}
-            onValueChange={setPhone}
-          />
+          <div className="flex gap-2">
+            <Select
+              label={t('signIn.phoneCountry')}
+              className="w-56"
+              selectedKeys={[phoneCountry]}
+              onSelectionChange={(keys) => {
+                const next = Array.from(keys)[0] as string
+                setPhoneCountry(next as typeof phoneCountry)
+              }}
+            >
+              {PHONE_COUNTRIES.map((c) => (
+                <SelectItem key={c.code} textValue={c.label}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </Select>
+            <Input
+              type="tel"
+              label={t('signIn.phoneLabel')}
+              placeholder={t('signIn.phonePlaceholder')}
+              value={phone}
+              onValueChange={setPhone}
+              isInvalid={phone.trim() !== '' && !phoneIsValid}
+              errorMessage={
+                phone.trim() !== '' && !phoneIsValid ? t('signIn.invalidPhone') : undefined
+              }
+            />
+          </div>
           <Button
             type="submit"
             color="primary"
             className="w-full"
             isLoading={loading}
-            isDisabled={loading || !phone}
+            isDisabled={loading || !phoneIsValid}
           >
             {loading ? t('signIn.requestingCode') : t('signIn.requestCodeButton')}
           </Button>
@@ -73,7 +115,9 @@ export default function LoginPage() {
             if (!loading && otp.length === 6) verifyOtp()
           }}
         >
-          <p className="text-sm text-default-500">{t('signIn.codeSentTo', { phone })}</p>
+          <p className="text-sm text-default-500">
+            {t('signIn.codeSentTo', { phone: normalizedPhone })}
+          </p>
           <Input
             type="text"
             inputMode="numeric"
@@ -95,7 +139,7 @@ export default function LoginPage() {
             type="button"
             variant="light"
             onPress={() => setStep('phone')}
-            className="text-sm"
+            className="w-full text-sm"
           >
             {t('signIn.changeNumber')}
           </Button>

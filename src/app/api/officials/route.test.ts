@@ -85,7 +85,9 @@ describe('POST /api/officials', () => {
     const errorResponse = { status: 403 }
     vi.mocked(requireTenantAdmin).mockResolvedValue({ error: errorResponse } as never)
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
 
     expect(res).toBe(errorResponse)
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
@@ -99,7 +101,9 @@ describe('POST /api/officials', () => {
       chain({ data: { name: 'Viadal 2026' } })
     )
 
-    await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
 
     expect(requireTenantAdmin).toHaveBeenCalledWith(TENANT_ID)
   })
@@ -120,7 +124,12 @@ describe('POST /api/officials', () => {
     mockService(officialsBuilder, chain({ data: { name: 'Viadal 2026' } }))
 
     const res = await POST(
-      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '070-123 45 67' })
+      makeRequest({
+        tenantId: TENANT_ID,
+        name: 'Anna',
+        phone: '070-123 45 67',
+        phoneCountry: 'SE',
+      })
     )
     const body = await res.json()
 
@@ -131,7 +140,7 @@ describe('POST /api/officials', () => {
       expect.objectContaining({
         tenant_id: TENANT_ID,
         name: 'Anna',
-        phone: '0701234567',
+        phone: '46701234567',
         invite_status: 'invited',
       })
     )
@@ -140,7 +149,7 @@ describe('POST /api/officials', () => {
     expect(messagesCreate).toHaveBeenCalledWith({
       body: 'Hi Anna, you have been invited as an official for Viadal 2026. Confirm your availability here: https://app.example.com/invite/tok-abc',
       from: '+15550001111',
-      to: '0701234567',
+      to: '46701234567',
     })
   })
 
@@ -149,7 +158,9 @@ describe('POST /api/officials', () => {
     const official = { id: 'off-1', name: 'Bo', phone: '0709998877', invite_token: 'tok-xyz' }
     mockService(chain({ data: official, error: null }), chain({ data: null }))
 
-    await POST(makeRequest({ tenantId: TENANT_ID, name: 'Bo', phone: '0709998877' }))
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Bo', phone: '0709998877', phoneCountry: 'SE' })
+    )
 
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -167,7 +178,9 @@ describe('POST /api/officials', () => {
       .mockReturnValueOnce(insertBuilder)
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
     const body = await res.json()
 
     expect(res.status).toBe(409)
@@ -181,7 +194,9 @@ describe('POST /api/officials', () => {
     // Two requests can both pass the duplicate lookup; the index is the real guarantee.
     mockService(chain({ data: null, error: { code: '23505', message: 'duplicate key value' } }))
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
     const body = await res.json()
 
     expect(res.status).toBe(409)
@@ -197,11 +212,13 @@ describe('POST /api/officials', () => {
     })
     mockService(officialsBuilder, chain({ data: { name: 'Viadal 2026' } }))
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0709998877' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0709998877', phoneCountry: 'SE' })
+    )
 
     expect(res.status).toBe(200)
     expect(officialsBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Anna', phone: '0709998877' })
+      expect.objectContaining({ name: 'Anna', phone: '46709998877' })
     )
   })
 
@@ -219,7 +236,9 @@ describe('POST /api/officials', () => {
     mockService(chain({ data: official, error: null }), chain({ data: { name: 'Viadal 2026' } }))
     messagesCreate.mockRejectedValueOnce(Object.assign(new Error('twilio down'), { code: 21211 }))
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
     const body = await res.json()
 
     // Not a 500 — the row exists, so telling the admin it failed makes them retry
@@ -241,7 +260,9 @@ describe('POST /api/officials', () => {
       throw new Error('accountSid must start with AC')
     })
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -257,7 +278,9 @@ describe('POST /api/officials', () => {
       chain({ data: { name: 'Viadal 2026' } })
     )
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
 
     expect(await res.json()).toMatchObject({ smsSent: true })
   })
@@ -266,7 +289,9 @@ describe('POST /api/officials', () => {
     asAdmin()
     mockService(chain({ data: null, error: { message: 'boom' } }))
 
-    const res = await POST(makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567' }))
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
 
     expect(res.status).toBe(500)
     expect(messagesCreate).not.toHaveBeenCalled()

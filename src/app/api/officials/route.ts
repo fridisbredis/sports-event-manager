@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
+import { normalizePhoneToE164, PHONE_COUNTRIES } from '@/lib/phone'
 import twilio from 'twilio'
 import { z } from 'zod'
+
+const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
 const inviteSchema = z.object({
   tenantId: z.string().uuid(),
   name: z.string().min(1),
-  phone: z.string().min(8),
+  phone: z.string().min(1),
+  phoneCountry: z.enum(PHONE_COUNTRY_CODES as [string, ...string[]]),
 })
-
-// Strip spaces/dashes so the phone stored matches Supabase's E.164 user.phone
-function normalizePhone(phone: string): string {
-  return phone.replace(/[\s\-\(\)]/g, '')
-}
 
 export async function POST(request: NextRequest) {
   const json = await request.json()
@@ -22,8 +21,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { tenantId, name } = parsed.data
-  const phone = normalizePhone(parsed.data.phone)
+  const { tenantId, name, phoneCountry } = parsed.data
+  const phone = normalizePhoneToE164(
+    parsed.data.phone,
+    phoneCountry as (typeof PHONE_COUNTRY_CODES)[number]
+  )
+  if (!phone) {
+    return NextResponse.json(
+      { error: 'Invalid phone number for the selected country', code: 'invalid_phone' },
+      { status: 400 }
+    )
+  }
 
   const auth = await requireTenantAdmin(tenantId)
   if ('error' in auth) return auth.error
