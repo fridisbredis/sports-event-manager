@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import { toastError } from '@/lib/toast'
+import { formatPhoneForDisplay } from '@/lib/phone'
 
 interface AdminAccountFormProps {
   name: string
@@ -103,7 +104,9 @@ export default function AdminAccountForm({
             Mobile number (read-only)
           </label>
           <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <span className="flex-1 text-sm text-gray-500">{phone ? `+${phone}` : '—'}</span>
+            <span className="flex-1 text-sm text-gray-500">
+              {phone ? formatPhoneForDisplay(phone) : '—'}
+            </span>
             <span className="text-xs font-medium text-gray-400 shrink-0">Read only</span>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import { toastError } from '@/lib/toast'
+import { formatPhoneForDisplay } from '@/lib/phone'
 
 interface AccountFormProps {
   name: string
@@ -128,7 +129,7 @@ export default function AccountForm({
         <div className="mb-8">
           <Input
             label={t('account.phoneLabel')}
-            value={phone}
+            value={formatPhoneForDisplay(phone)}
             isReadOnly
             description={t('account.readOnlyHint')}
             variant="bordered"

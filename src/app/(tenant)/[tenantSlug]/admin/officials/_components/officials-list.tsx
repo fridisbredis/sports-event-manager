@@ -16,10 +16,18 @@ import {
   ModalBody,
   ModalFooter,
   Input,
+  Select,
+  SelectItem,
 } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError, extractErrorMessage } from '@/lib/toast'
+import {
+  isValidPhoneForCountry,
+  PHONE_COUNTRIES,
+  DEFAULT_PHONE_COUNTRY,
+  formatPhoneForDisplay,
+} from '@/lib/phone'
 import type { Official } from '@/types/app'
 
 interface Props {
@@ -45,22 +53,31 @@ export default function OfficialsList({
   // Form state
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY)
+
+  const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
 
   async function handleAdd() {
-    if (!name.trim() || !phone.trim() || pending) return
+    if (!name.trim() || !phoneIsValid || pending) return
     setPending(true)
     setAddError(null)
     try {
       const res = await fetch('/api/officials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, name: name.trim(), phone: phone.trim() }),
+        body: JSON.stringify({
+          tenantId,
+          name: name.trim(),
+          phone: phone.trim(),
+          phoneCountry,
+        }),
       })
       if (res.ok) {
         const { official, smsSent } = await res.json()
         setOfficials((prev) => [...prev, official])
         setName('')
         setPhone('')
+        setPhoneCountry(DEFAULT_PHONE_COUNTRY)
         setAddModalOpen(false)
         // The official exists either way — only the invite SMS can have failed here.
         if (smsSent === false) {
@@ -69,6 +86,10 @@ export default function OfficialsList({
       } else if (res.status === 409) {
         // Same number as an active official in this tenant. Names may repeat, numbers may not.
         const message = t('officials.duplicatePhone')
+        setAddError(message)
+        toastError(message)
+      } else if (res.status === 400) {
+        const message = t('officials.invalidPhone')
         setAddError(message)
         toastError(message)
       } else if (res.status === 401) {
@@ -126,6 +147,7 @@ export default function OfficialsList({
     setAddModalOpen(false)
     setName('')
     setPhone('')
+    setPhoneCountry(DEFAULT_PHONE_COUNTRY)
     setAddError(null)
   }
 
@@ -177,7 +199,9 @@ export default function OfficialsList({
                       ? `${official.name} — ${t('officials.youLabel')}`
                       : official.name}
                   </TableCell>
-                  <TableCell className="text-gray-500">{official.phone}</TableCell>
+                  <TableCell className="text-gray-500">
+                    {formatPhoneForDisplay(official.phone)}
+                  </TableCell>
                   <TableCell>
                     <Chip
                       size="sm"
@@ -230,17 +254,41 @@ export default function OfficialsList({
               placeholder={t('officials.namePlaceholder')}
               autoFocus
             />
-            <Input
-              label={t('officials.phone')}
-              type="tel"
-              value={phone}
-              onValueChange={setPhone}
-              placeholder="+46 70 000 00 00"
-              description={t('officials.phoneHint')}
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              isInvalid={!!addError}
-              errorMessage={addError}
-            />
+            <div className="flex gap-2">
+              <Select
+                label={t('officials.phoneCountry')}
+                className="w-56"
+                selectedKeys={[phoneCountry]}
+                onSelectionChange={(keys) => {
+                  const next = Array.from(keys)[0] as string
+                  setPhoneCountry(next as typeof phoneCountry)
+                  setAddError(null)
+                }}
+              >
+                {PHONE_COUNTRIES.map((c) => (
+                  <SelectItem key={c.code} textValue={c.label}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </Select>
+              <Input
+                label={t('officials.phone')}
+                type="tel"
+                value={phone}
+                onValueChange={(value) => {
+                  setPhone(value)
+                  setAddError(null)
+                }}
+                placeholder={t('officials.phonePlaceholder')}
+                description={t('officials.phoneHint')}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                isInvalid={!!addError || (phone.trim() !== '' && !phoneIsValid)}
+                errorMessage={
+                  addError ??
+                  (phone.trim() !== '' && !phoneIsValid ? t('officials.invalidPhone') : undefined)
+                }
+              />
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={closeAddModal}>
@@ -248,7 +296,7 @@ export default function OfficialsList({
             </Button>
             <Button
               color="primary"
-              isDisabled={!name.trim() || !phone.trim()}
+              isDisabled={!name.trim() || !phoneIsValid}
               isLoading={pending}
               onPress={handleAdd}
             >

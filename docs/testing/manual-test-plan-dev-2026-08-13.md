@@ -102,3 +102,19 @@ Dev-testning ovan verifierar **logiken**. Den verifierar INTE följande, som ski
 
 - Prod kör mot ett annat Container App/miljö men samma kodbas — inga kända kod-skillnader förutom env-variabler, så SEC-02-guard-logiken (auth-checks, tenantId-validering) bör bete sig identiskt. Den delen av testplanen (avsnitt 1–2) är alltså representativ för prod redan via dev-test.
 - Dubbelkolla inte bara att appen fungerar, utan att **prod-migrationerna körs i rätt ordning före** prod-deployen av koden — annars pekar koden på ett schema som inte finns än (t.ex. SEC-05:s `sms_opt_out`-filter på participants-tabellen som kräver migration 0019).
+
+## 7. Telefonnummer-validering per land (officials-invite + inloggning)
+
+Bakgrund: tidigare validerades telefonnummer bara med `min(8)` tecken, ingen formatkontroll. Ett brittiskt nummer med 11 siffror såg ut som ett fel (svenska nummer är 10 siffror), vilket avslöjade att valideringen inte var landsmedveten. Ny lösning: `src/lib/phone.ts` med `libphonenumber-js`, en landsväljare (SE/NO/DK/FI/GB, Sverige förvalt) i både OFF-01:s "Lägg till official"-formulär och inloggningssidan, och normalisering till E.164 utan `+` (samma format som `auth.users.phone`) innan lagring — kritiskt för att inte bryta SEC-04:s telefonnummer-matchning.
+
+- [ ] OFF-01: lägg till en official med ett **svenskt** nummer i nationellt format (`070...`, utan landskod). Förväntat: godkänns, lagras och SMS skickas som vanligt.
+- [ ] OFF-01: byt landsväljaren till **Norge**, **Danmark** och **Finland** i tur och ordning, ange ett giltigt nummer för respektive land i nationellt format. Förväntat: godkänns för alla fyra länder.
+- [ ] OFF-01: byt landsväljaren till **United Kingdom**, ange ett giltigt brittiskt mobilnummer (`07...`, 11 siffror nationellt). Förväntat: godkänns — detta var det ursprungliga buggfallet, ska inte längre flaggas som fel längd.
+- [ ] OFF-01: ange ett nummer som är **för kort eller har fel format** för det valda landet (t.ex. ett danskt nummer medan Sverige är valt). Förväntat: fältet visar ett valideringsfel direkt i UI (`invalidPhone`), submit-knappen är avstängd, ingen POST skickas.
+- [ ] OFF-01: försök skicka ett tekniskt giltigt men fel-format-nummer direkt mot `/api/officials` (förbigå UI:t, t.ex. via devtools). Förväntat: `400` med `code: "invalid_phone"`, ingen rad skapad.
+- [ ] OFF-01: regression — dubblett-telefonnummer-kollen (migration 0020, se avsnitt 5) ska fortfarande ge `409 duplicate_phone` efter normalisering, inte bara på den råa inmatade strängen.
+- [ ] Officials-tabellen: verifiera att befintliga rader med olika lagringsformat (med och utan `+`, t.ex. Supabase-testnumret `+46768109304` jämfört med ett nyare `46767230714`) nu visas **konsekvent formaterade** (`+46 76 810 93 04`) i tabellen, admin-account-sidan och official-account-sidan — detta är bara en visningsändring, verifiera i databasen att det **lagrade** värdet är oförändrat.
+- [ ] Inloggningssidan: verifiera att landsväljaren har rätt förval baserat på webbläsarens språk (t.ex. svensk webbläsare → Sverige förvalt), och att man kan byta land manuellt innan man begär kod.
+- [ ] Inloggningssidan: begär en OTP-kod med ett nummer skrivet i nationellt format (`070...` med Sverige valt). Förväntat: fungerar identiskt med att skriva `+4670...` sedan tidigare — normaliseringen sker innan `signInWithOtp` anropas.
+- [ ] Inloggningssidan: verifiera att "Code sent to"-texten visar det normaliserade E.164-numret, inte den råa inmatningen.
+- [ ] Regression: SEC-04:s hela invite-bekräftelse-flöde (avsnitt 3) ska fortfarande fungera för en official som bjudits in via den nya landsväljaren — dvs. att normaliseringen verkligen producerar samma sträng som `auth.users.phone` så `confirm_official_invite`-RPC:erna inte ger `phone_mismatch` på ett giltigt försök.
