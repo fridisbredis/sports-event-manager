@@ -67,11 +67,13 @@ Fix: la till `.eq('invite_status', 'confirmed')` på officials-frågan (gäller 
 
 ## 5. Allmän regressionsrunda (låg risk, men rör kärnflöden)
 
-- [ ] Logga in som tenant_admin: bekräfta att EVT-01/EVT-02, WS-01/WS-02, OFF-01, SCHED-01, COMM-01 laddar och fungerar som innan.
-- [ ] Logga in som system_admin (SYS-01/SYS-02 om byggda): åtkomst till flera tenants fungerar.
-- [ ] SMS-OTP-inloggning (testnumret) fungerar fortfarande end-to-end.
+- [x] Logga in som tenant_admin: bekräfta att EVT-01/EVT-02, WS-01/WS-02, OFF-01, SCHED-01, COMM-01 laddar och fungerar som innan. — Testat 2026-08-17 mot dev-URL:en: samtliga sju admin-skärmar laddar och fungerar (spara event, skapa workstation, lägga till official, tilldela slot, skicka announcement). Se begränsningsnoten nedan om rollisolering. Bonus: verifierade även migration 0020 end-to-end i OFF-01 — försök att lägga till en official med ett telefonnummer som redan finns aktivt stoppades med 409 ("An official with this phone number already exists"), inte 500; efter att den befintliga officialen tagits bort (soft delete, `invite_status = 'removed'`) gick samma nummer att återanvända. Det är precis vad det partiella indexet är designat för.
+- [x] Logga in som system_admin (SYS-01/SYS-02 om byggda): åtkomst till flera tenants fungerar. — Testat 2026-08-17: inloggning landar på `/admin` (system_admin vinner över tenant_admin i post-login-routingen, `src/lib/auth/tenant.ts:17`); tenantlistan visar samtliga tenants. Tre tenants där kontot saknar `user_roles`-rad identifierades via SQL och `/admin/<tenantId>` laddade för alla tre — global åtkomst fungerar, ingen 403.
+- [x] SMS-OTP-inloggning (testnumret) fungerar fortfarande end-to-end. — Testat 2026-08-17: upprepade inloggningar med `46768109304` / `000000` fungerar. **Obs:** testnumret går via Supabase Test Phone Numbers och aldrig genom Twilio, så detta verifierar OTP-flödet, inte faktisk SMS-leverans — se avsnitt 6.
 
----
+**Navigationsgap upptäckt 2026-08-17 (produktfråga, inte bugg):** som system_admin finns ingen länk från SYS-02 in i en tenants admin-ytor — SYS-02 visar bara aktivering och tier. Skärmarna är åtkomliga (`hasAdminAccessToTenant` i `src/app/(tenant)/[tenantSlug]/admin/layout.tsx:32` släpper igenom global system_admin), men bara genom att skriva URL:en manuellt. Om en system_admin ska kunna felsöka en tenant behöver det en länk. Tas upp med Peter.
+
+**Begränsning i tenant_admin-testet (2026-08-17):** testkontot (`46768109304`) håller både `tenant_admin` i Testklubben och den `system_admin`-rad som lades till 2026-08-13 (se avsnitt 1, rad om flera tenants). system_admin ger global åtkomst till alla tenant-ytor, så genomklickningen i punkt 1 verifierar att skärmarna **laddar och fungerar**, men isolerar inte tenant_admin-behörigheten — en guard-regression som felaktigt nekar tenant_admin skulle maskeras av system_admin-rollen. Raden behölls medvetet (borttagning valdes bort). Kör om punkt 1 med ett konto utan system_admin-rad när ett sådant finns, eller efter att participant/official-testkonton byggts ut.
 
 ## Om något fallerar
 
@@ -91,7 +93,11 @@ Dev-testning ovan verifierar **logiken**. Den verifierar INTE följande, som ski
 
 ### Databas / migrationer
 
-- Dev och prod är **separata Supabase-projekt** (dev: `lhflutwvwvzawzbcuwup`, prod: i Stockholm). Migrationerna 0017, 0018, 0019 är redan körda mot prod, så schemat är i synk — detta är inte en blockare för release.
+- Dev och prod är **separata Supabase-projekt** (dev: `lhflutwvwvzawzbcuwup`, prod: i Stockholm). Migrationerna 0017, 0018, 0019 är redan körda mot prod.
+- **Uppdatering 2026-08-17 — schemat är INTE längre i synk.** Migration 0020 (`officials_unique_active_phone`, partiellt unique-index på `(tenant_id, phone)` för icke-borttagna officials) är körd mot dev men **inte mot prod**. Den måste köras manuellt i prod-projektets SQL Editor — inget i pipelinen gör det åt er.
+  - **Ordning: deploya koden FÖRST, kör indexet efter.** `POST /api/officials` översätter unique-violation (`23505`) till ett 409-svar; den handlern ingår i samma PR som migrationen. Med indexet på plats mot en äldre build blir samma dubblett ett ohanterat 500 för admin. Koden har dessutom en egen förhandskontroll, så kod-utan-index är ett säkert mellanläge — tvärtom är det inte.
+  - Kör dubblettkollen innan (indexet vägrar skapas om aktiva dubbletter finns): `select tenant_id, phone, count(*) from public.officials where invite_status <> 'removed' group by tenant_id, phone having count(*) > 1;`. Dev hade noll; prod är otestat och har riktig data.
+  - Verifiera efteråt med `select indexname from pg_indexes where tablename = 'officials' and indexname like '%phone%';` — "Success. No rows returned" från CREATE är normal DDL-output, inte en bekräftelse.
 - Ändå värt en snabb koll innan release: verifiera i Supabase prod-projektets Table Editor/SQL Editor att `sms_opt_out` faktiskt finns på både `officials` och `participants`, och att RPC:erna `confirm_official_invite_rpc`/`confirm_official_invite_by_phone_rpc` existerar — bara för att bekräfta att "körd migration" också betyder "rätt version av migrationen", inte bara att en tidigare variant kördes.
 
 ### Övrigt
