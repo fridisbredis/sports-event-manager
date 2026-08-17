@@ -146,9 +146,16 @@ describe('POST /api/officials/[id]/resend', () => {
     expect(res.status).toBe(200)
     expect(body).toEqual({ ok: true })
 
-    expect(officialsUpdateBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({ invite_token_expires_at: expect.any(String) })
-    )
+    // A fresh token, not the existing one: resend has to revoke the previous link rather
+    // than grant it another expiry window, since it is the only rotation an admin has.
+    expect(officialsUpdateBuilder.update).toHaveBeenCalledWith({
+      invite_token: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      ),
+      invite_token_expires_at: expect.any(String),
+    })
+    expect(officialsUpdateBuilder.eq).toHaveBeenCalledWith('id', 'off-1')
+    expect(officialsUpdateBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
 
     expect(messagesCreate).toHaveBeenCalledTimes(1)
     expect(messagesCreate).toHaveBeenCalledWith({

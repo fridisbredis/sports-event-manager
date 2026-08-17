@@ -116,11 +116,17 @@ export default async function OfficialHomePage({ params }: Props) {
   const service = await createSupabaseServiceClient()
 
   const [{ data: official }, { data: event }] = await Promise.all([
+    // Confirmed rows only, newest first: a re-invited official also has the old
+    // soft-deleted row on this (user_id, tenant_id), and maybeSingle() errors on the
+    // pair — which would blank the greeting name for a legitimate official.
     service
       .from('officials')
       .select('name')
       .eq('user_id', user.id)
       .eq('tenant_id', tenant.id)
+      .eq('invite_status', 'confirmed')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle(),
     service.from('events').select('name').eq('tenant_id', tenant.id).maybeSingle(),
   ])

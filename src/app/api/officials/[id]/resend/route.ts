@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import twilio from 'twilio'
@@ -40,12 +41,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   }
 
-  // Regenerate token + expiry to invalidate the old link
+  // Regenerate the token as well as the expiry, so the old link is genuinely revoked
+  // rather than extended: resend is the only tool an admin has when a link has gone to
+  // the wrong number or leaked, and reusing the token would hand that URL another seven
+  // days instead of retiring it. Scoped to tenant_id as well as id — the id is a
+  // server-side PK and the select above already verified the tenant, but every other
+  // write in this codebase carries both, and a single unscoped filter is what an
+  // audit has to stop and reason about.
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   const { data: updated } = await service
     .from('officials')
-    .update({ invite_token_expires_at: tokenExpiresAt })
+    .update({ invite_token: randomUUID(), invite_token_expires_at: tokenExpiresAt })
     .eq('id', id)
+    .eq('tenant_id', parsed.data.tenantId)
     .select('invite_token')
     .single()
 

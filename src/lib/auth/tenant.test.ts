@@ -285,20 +285,44 @@ describe('canViewOfficialSurfaces', () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
       tenants: { data: { is_active: true }, error: null },
-      officials: { data: { invite_status: 'confirmed' }, error: null },
+      officials: { data: { id: 'off-1' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
   })
 
+  // invite_status is filtered in the query rather than compared afterwards, so an
+  // official who is only 'invited' (or whose row has since been 'removed') is simply
+  // absent from the result set.
   it('denies an official who has not been confirmed yet', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
       tenants: { data: { is_active: true }, error: null },
-      officials: { data: { invite_status: 'invited' }, error: null },
+      officials: { data: null, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
+  })
+
+  // Removal is a soft delete, so a re-invited official holds both a 'removed' row and a
+  // 'confirmed' row for one (user_id, tenant_id) — legal under 0020, whose index
+  // excludes removed rows. Asking for "the" row would make maybeSingle() error on the
+  // pair and this guard would deny a legitimately confirmed official.
+  it('asks for a confirmed row and takes the first, so a re-invited official is not locked out', async () => {
+    const officialsBuilder = chain({ data: { id: 'off-2' }, error: null })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'officials') return officialsBuilder
+        if (table === 'user_roles') {
+          return chain({ data: [{ role: 'official', tenant_id: TENANT_ID }], error: null })
+        }
+        return chain({ data: { is_active: true }, error: null })
+      }),
+    } as never)
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
+    expect(officialsBuilder.limit).toHaveBeenCalledWith(1)
   })
 
   it('denies an official role with no matching officials row', async () => {

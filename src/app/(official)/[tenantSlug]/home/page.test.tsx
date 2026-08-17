@@ -29,6 +29,8 @@ function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
+  builder.order = vi.fn(() => builder)
+  builder.limit = vi.fn(() => builder)
   builder.single = vi.fn(() => Promise.resolve(result))
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   return builder

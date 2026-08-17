@@ -52,11 +52,19 @@ export async function PATCH(request: NextRequest) {
 
   const { tenantId, name, smsOptOut } = parsed.data
 
+  // invite_status must be filtered here, not just for row-count safety: without it an
+  // UPDATE matching a re-invited official's old soft-deleted row writes the new name
+  // and sms_opt_out into that dead row as well, and .single() then errors on the two
+  // returned rows and reports a failure for an update that partly succeeded. Only a
+  // confirmed row is editable, and there can be at most one per (user_id, tenant_id) —
+  // user_id is set at confirm time, and confirmation requires the phone to match the
+  // caller's verified auth phone, so one user cannot confirm two rows in one tenant.
   const { data: official, error } = await service
     .from('officials')
     .update({ name, sms_opt_out: smsOptOut })
     .eq('user_id', user.id)
     .eq('tenant_id', tenantId)
+    .eq('invite_status', 'confirmed')
     .select('id')
     .single()
 

@@ -36,6 +36,7 @@ function makeParams(id: string) {
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const OFFICIAL_ID = 'off-1'
+const USER_ID = '22222222-2222-2222-2222-222222222222'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -130,8 +131,99 @@ describe('DELETE /api/officials/[id]', () => {
     expect(assignmentsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
 
     expect(fromMock).toHaveBeenNthCalledWith(3, 'officials')
-    expect(updateBuilder.update).toHaveBeenCalledWith({ invite_status: 'removed' })
+    // Every live handle on the row is dropped with the status: user_id, so a later
+    // re-invite cannot produce two rows sharing (user_id, tenant_id), and the invite
+    // token, so the removed official's old link stops being a valid bearer secret.
+    expect(updateBuilder.update).toHaveBeenCalledWith({
+      invite_status: 'removed',
+      user_id: null,
+      invite_token: null,
+      invite_token_expires_at: null,
+    })
     expect(updateBuilder.eq).toHaveBeenCalledWith('id', OFFICIAL_ID)
     expect(updateBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+  })
+
+  // Soft-deleting the officials row is not enough: resolvePostLoginRedirect reads
+  // user_roles alone, so a surviving 'official' row keeps redirecting that phone into
+  // this tenant permanently, however many later invites are issued elsewhere.
+  it('revokes the official user_roles row for the tenant when the official had a user', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const selectBuilder = chain({
+      data: { id: OFFICIAL_ID, tenant_id: TENANT_ID, user_id: USER_ID },
+    })
+    const assignmentsBuilder = chain({ data: null, error: null })
+    const updateBuilder = chain({ data: null, error: null })
+    const rolesBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(selectBuilder)
+      .mockReturnValueOnce(assignmentsBuilder)
+      .mockReturnValueOnce(updateBuilder)
+      .mockReturnValueOnce(rolesBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(res.status).toBe(200)
+    expect(fromMock).toHaveBeenNthCalledWith(4, 'user_roles')
+    expect(rolesBuilder.delete).toHaveBeenCalled()
+    expect(rolesBuilder.eq).toHaveBeenCalledWith('user_id', USER_ID)
+    expect(rolesBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    // user_roles is unique per (user_id, tenant_id), not per role — a tenant_admin who
+    // also has an officials row holds a single tenant_admin row here, so an unscoped
+    // delete would revoke their admin access.
+    expect(rolesBuilder.eq).toHaveBeenCalledWith('role', 'official')
+  })
+
+  it('does not touch user_roles when the official was never linked to a user', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const selectBuilder = chain({
+      data: { id: OFFICIAL_ID, tenant_id: TENANT_ID, user_id: null },
+    })
+    const assignmentsBuilder = chain({ data: null, error: null })
+    const updateBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(selectBuilder)
+      .mockReturnValueOnce(assignmentsBuilder)
+      .mockReturnValueOnce(updateBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(res.status).toBe(200)
+    expect(fromMock).toHaveBeenCalledTimes(3)
+    expect(fromMock).not.toHaveBeenCalledWith('user_roles')
+  })
+
+  it('returns 500 when the role revocation fails, so the caller retries', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const selectBuilder = chain({
+      data: { id: OFFICIAL_ID, tenant_id: TENANT_ID, user_id: USER_ID },
+    })
+    const assignmentsBuilder = chain({ data: null, error: null })
+    const updateBuilder = chain({ data: null, error: null })
+    const rolesBuilder = chain({ data: null, error: { message: 'boom' } })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(selectBuilder)
+      .mockReturnValueOnce(assignmentsBuilder)
+      .mockReturnValueOnce(updateBuilder)
+      .mockReturnValueOnce(rolesBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(res.status).toBe(500)
   })
 })
