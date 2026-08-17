@@ -164,12 +164,21 @@ export async function canViewOfficialSurfaces(userId: string, tenantId: string):
 
   if (!hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return false
 
+  // Ask for a confirmed row and take the first, rather than asking for "the" row:
+  // removal is a soft delete, so a re-invited official has both a 'removed' row and a
+  // 'confirmed' row for this (user_id, tenant_id). maybeSingle() alone treats that
+  // second row as an error, and this guard reads any error as deny — locking a
+  // legitimately confirmed official out of every official surface. limit(1) makes the
+  // two-row shape unrepresentable instead of relying on it never occurring, so the
+  // guard cannot fail closed on a data shape 0020 permits by design.
   const service = createSupabaseServiceClient()
   const { data: official, error } = await service
     .from('officials')
-    .select('invite_status')
+    .select('id')
     .eq('user_id', userId)
     .eq('tenant_id', tenantId)
+    .eq('invite_status', 'confirmed')
+    .limit(1)
     .maybeSingle()
 
   if (error) {
@@ -177,7 +186,7 @@ export async function canViewOfficialSurfaces(userId: string, tenantId: string):
     return false
   }
 
-  return official?.invite_status === 'confirmed'
+  return official !== null
 }
 
 export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {

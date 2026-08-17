@@ -30,11 +30,18 @@ export default async function AdminAccountPage({ params }: Props) {
   // Only a tenant_admin of this tenant or a system_admin may pass.
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
+  // Confirmed rows only, newest first — same reason as the official-facing account
+  // page: a removed row and a re-confirmed row can both carry this
+  // (user_id, tenant_id), and maybeSingle() errors on the pair. Must match the filter
+  // in PATCH /api/account, or the form would edit a row the page never showed.
   const { data: official } = await service
     .from('officials')
     .select('id, name, phone, sms_opt_out')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant.id)
+    .eq('invite_status', 'confirmed')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (!official) {

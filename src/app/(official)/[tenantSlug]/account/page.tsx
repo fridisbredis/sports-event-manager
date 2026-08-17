@@ -25,11 +25,18 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   const service = await createSupabaseServiceClient()
 
+  // Confirmed rows only, newest first: a re-invited official also has the old
+  // soft-deleted ('removed') row on this (user_id, tenant_id), and maybeSingle() would
+  // error on the pair and send a real official to notFound(). user_id is only ever set
+  // at confirm time, so this filter excludes exactly the removed rows.
   const { data: official } = await service
     .from('officials')
     .select('id, name, phone, sms_opt_out')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant.id)
+    .eq('invite_status', 'confirmed')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (!official) notFound()
