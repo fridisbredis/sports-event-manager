@@ -88,7 +88,7 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 - [ ] Design behaviour when a user has roles in multiple tenants (tenant switcher UI?)
 - [ ] Decide: can a user be both `official` and `participant` in the same tenant?
 - [ ] Soft delete vs hard delete for tenants and events — historical data preservation strategy
-- [ ] Decide how `system_admin` is represented in `user_roles` (currently `tenant_id` is NOT NULL — needs either a row per tenant or a designated "system tenant")
+- [x] Decide how `system_admin` is represented in `user_roles` — resolved: `tenant_id` is now nullable (migration 0021), null for `system_admin` rows, required for all other roles
 
 ### Backup and disaster recovery
 

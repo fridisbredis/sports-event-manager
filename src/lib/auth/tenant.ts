@@ -9,7 +9,7 @@ export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'partici
 
 export type UserRoleWithTenant = {
   role: TenantRole
-  tenant_id: string
+  tenant_id: string | null
   tenantSlug: string
 }
 
@@ -81,7 +81,7 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 type AuthSuccess = { user: User; role: TenantRole }
 type AuthFailure = { error: NextResponse }
 
-type RoleRow = { role: TenantRole; tenant_id: string }
+type RoleRow = { role: TenantRole; tenant_id: string | null }
 
 type AccessContext = { roleRows: RoleRow[]; tenantIsActive: boolean }
 

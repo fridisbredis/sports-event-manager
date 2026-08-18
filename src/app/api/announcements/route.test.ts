@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -36,12 +37,21 @@ function makeRequest(body: unknown) {
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
+// Registered by the tests that stub console.error, and always undone in afterEach: an
+// assertion that fails mid-test must not leave console stubbed for every test after it.
+let restoreConsoleError: (() => void) | undefined
+
 beforeEach(() => {
   vi.clearAllMocks()
   process.env.TWILIO_ACCOUNT_SID = 'AC_test'
   process.env.TWILIO_AUTH_TOKEN = 'token_test'
   process.env.TWILIO_PHONE_NUMBER = '+15550001111'
   messagesCreate.mockResolvedValue({})
+})
+
+afterEach(() => {
+  restoreConsoleError?.()
+  restoreConsoleError = undefined
 })
 
 describe('POST /api/announcements', () => {
@@ -375,5 +385,112 @@ describe('POST /api/announcements', () => {
       from: '+15550001111',
       to: '+46703333333',
     })
+  })
+
+  it('returns a controlled 500 instead of escaping the handler when twilio() throws synchronously', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '46701111111' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    vi.mocked(twilio).mockImplementationOnce(() => {
+      throw new Error('accountSid must start with AC')
+    })
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(responseBody).toEqual({ error: 'SMS is not configured' })
+    expect(messagesCreate).not.toHaveBeenCalled()
+
+    // The announcement row stays: it was written with sms_sent: false, which is exactly
+    // what happened. Rolling it back is deliberately out of scope here.
+    expect(insertBuilder.insert).toHaveBeenCalled()
+  })
+
+  it('returns 500 and sends nothing when TWILIO_PHONE_NUMBER is unset', async () => {
+    delete process.env.TWILIO_PHONE_NUMBER
+
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '46701111111' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(responseBody).toEqual({ error: 'SMS is not configured' })
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('logs each failed send with the twilio code only, never the raw error or the number', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '46701111111' }, { phone: '46702222222' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    // A real Twilio rejection quotes the destination number back in its message, which is
+    // exactly why the raw error must never reach the log.
+    messagesCreate.mockImplementation(({ to }: { to: string }) =>
+      to === '+46702222222'
+        ? Promise.reject(
+            Object.assign(new Error('Invalid To number: +46702222222'), { code: 21211 })
+          )
+        : Promise.resolve({})
+    )
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(responseBody).toEqual({ sent: 1, failed: 1 })
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+    const loggedMessage = consoleErrorSpy.mock.calls[0][0] as string
+    expect(loggedMessage).toContain(TENANT_ID)
+    expect(loggedMessage).toContain('21211')
+    expect(loggedMessage).not.toContain('46702222222')
+    expect(loggedMessage).not.toContain('Invalid To number')
   })
 })
