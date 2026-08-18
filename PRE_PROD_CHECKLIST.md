@@ -78,9 +78,10 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 
 ### Testing
 
-- [ ] Smoke tests for auth flow (phone OTP login end-to-end)
-- [ ] Multi-tenant isolation test: sign in as tenant A, attempt to read tenant B's data → RLS must block
+- [x] Smoke tests for auth flow (phone OTP login end-to-end) — `tests/integration/auth-smoke.test.ts`, run via `npm run test:integration`
+- [x] Multi-tenant isolation test: sign in as tenant A, attempt to read tenant B's data → RLS must block — covered across `tests/integration/tenant-isolation-*.test.ts` (official access, announcements, events, participants, officials, assignments); 49 tests passing as of 2026-08-18
 - [ ] Seed script for dev database with realistic test data
+- [ ] Wire `npm run test:integration` into CI (currently local-only, requires a local Supabase/GoTrue instance)
 
 ### Multi-tenant edge cases
 
