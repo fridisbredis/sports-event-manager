@@ -13,6 +13,9 @@ export type Workstation = DbTables['workstations']['Row']
 export type WorkstationOperatingWindow = DbTables['workstation_operating_windows']['Row']
 export type WorkstationTodo = DbTables['workstation_todos']['Row']
 export type Official = DbTables['officials']['Row']
+// Client-safe projection: excludes invite_token and invite_token_expires_at,
+// which are single-use bearer credentials that must never reach the browser (F-SEC-06).
+export type OfficialListItem = Omit<Official, 'invite_token' | 'invite_token_expires_at'>
 export type Participant = DbTables['participants']['Row']
 export type Assignment = DbTables['assignments']['Row']
 export type Announcement = DbTables['announcements']['Row']

@@ -134,7 +134,10 @@ describe('POST /api/officials', () => {
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.official).toEqual(official)
+    // invite_token must never reach the client (F-SEC-06) — it's still used
+    // server-side to build the SMS invite URL below.
+    const { invite_token: _token, ...expectedOfficial } = official
+    expect(body.official).toEqual(expectedOfficial)
 
     expect(officialsBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -151,6 +154,28 @@ describe('POST /api/officials', () => {
       from: '+15550001111',
       to: '+46701234567',
     })
+  })
+
+  it('never includes invite_token or invite_token_expires_at in the response body (F-SEC-06)', async () => {
+    asAdmin()
+    const official = {
+      id: 'off-1',
+      tenant_id: TENANT_ID,
+      name: 'Anna',
+      phone: '0701234567',
+      invite_status: 'invited',
+      invite_token: 'tok-abc',
+      invite_token_expires_at: '2026-08-25T00:00:00.000Z',
+    }
+    mockService(chain({ data: official, error: null }), chain({ data: { name: 'Viadal 2026' } }))
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+    const body = await res.json()
+
+    expect(body.official).not.toHaveProperty('invite_token')
+    expect(body.official).not.toHaveProperty('invite_token_expires_at')
   })
 
   it('falls back to "an event" in the confirmation text when the tenant has no name', async () => {
@@ -244,7 +269,8 @@ describe('POST /api/officials', () => {
     // Not a 500 — the row exists, so telling the admin it failed makes them retry
     // and create a duplicate. Resend is the recovery path.
     expect(res.status).toBe(200)
-    expect(body.official).toEqual(official)
+    const { invite_token: _token, ...expectedOfficial } = official
+    expect(body.official).toEqual(expectedOfficial)
     expect(body.smsSent).toBe(false)
   })
 
@@ -266,7 +292,8 @@ describe('POST /api/officials', () => {
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.official).toEqual(official)
+    const { invite_token: _token2, ...expectedOfficial } = official
+    expect(body.official).toEqual(expectedOfficial)
     expect(body.smsSent).toBe(false)
     expect(messagesCreate).not.toHaveBeenCalled()
   })
