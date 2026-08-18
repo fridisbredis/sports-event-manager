@@ -30,7 +30,11 @@ export function EventHeaderCard({ name, eventType, logoUrl, description }: Props
           <div className="min-w-0 pt-0.5">
             <p className="text-lg font-bold text-gray-900 leading-snug">{name}</p>
             {eventType ? (
-              <Chip size="sm" color="primary" variant="flat" className="mt-1.5 capitalize">
+              <Chip
+                size="sm"
+                variant="flat"
+                className="mt-1.5 capitalize bg-primary/15 text-primary"
+              >
                 {eventType}
               </Chip>
             ) : null}
