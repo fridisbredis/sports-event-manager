@@ -28,12 +28,12 @@ import {
   DEFAULT_PHONE_COUNTRY,
   formatPhoneForDisplay,
 } from '@/lib/phone'
-import type { Official } from '@/types/app'
+import type { OfficialListItem } from '@/types/app'
 
 interface Props {
   tenantSlug: string
   tenantId: string
-  officials: Official[]
+  officials: OfficialListItem[]
   currentUserId: string
 }
 
@@ -43,9 +43,9 @@ export default function OfficialsList({
   currentUserId,
 }: Props) {
   const { t } = useTranslation('admin')
-  const [officials, setOfficials] = useState<Official[]>(initialOfficials)
+  const [officials, setOfficials] = useState<OfficialListItem[]>(initialOfficials)
   const [addModalOpen, setAddModalOpen] = useState(false)
-  const [removeTarget, setRemoveTarget] = useState<Official | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<OfficialListItem | null>(null)
   const [pending, setPending] = useState(false)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
@@ -125,7 +125,7 @@ export default function OfficialsList({
     }
   }
 
-  async function handleResend(official: Official) {
+  async function handleResend(official: OfficialListItem) {
     setResendingId(official.id)
     try {
       const res = await fetch(`/api/officials/${official.id}/resend`, {

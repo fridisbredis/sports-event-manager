@@ -11,6 +11,11 @@ const publishSchema = z.object({
   body: z.string().min(1).max(1600),
 })
 
+// PERF-02's proposed baseline caps a single announcement audience at 500
+// recipients. The limit is enforced here, not just assumed, so the recipient
+// query can never grow unbounded with tenant size (F-SEC-04/PERF-06).
+const MAX_ANNOUNCEMENT_RECIPIENTS = 500
+
 export async function POST(request: NextRequest) {
   // Validate body first so we have tenantId for the auth check
   const json = await request.json()
@@ -42,14 +47,26 @@ export async function POST(request: NextRequest) {
           .eq('tenant_id', tenantId)
           .eq('sms_opt_out', false)
           .eq('invite_status', 'confirmed')
+          .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
       : await service
           .from('participants')
           .select('phone')
           .eq('tenant_id', tenantId)
           .eq('sms_opt_out', false)
+          .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch recipients' }, { status: 500 })
+  }
+
+  if (recipients && recipients.length === MAX_ANNOUNCEMENT_RECIPIENTS) {
+    try {
+      console.error(
+        `Announcement recipient count hit the ${MAX_ANNOUNCEMENT_RECIPIENTS} cap for tenant ${tenantId} on channel ${channel} — some recipients were silently excluded`
+      )
+    } catch {
+      // Logging must never be able to change the response - see the send loop below.
+    }
   }
 
   await service.from('announcements').insert({
