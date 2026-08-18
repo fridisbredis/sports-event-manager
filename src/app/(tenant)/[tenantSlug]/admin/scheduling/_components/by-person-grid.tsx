@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Button, ScrollShadow, Skeleton } from '@heroui/react'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
@@ -72,14 +73,16 @@ export function ByPersonGrid({
 
   if (officials.length === 0) {
     return (
-      <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
+      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-gray-500`}>
         {t('scheduling.noConfirmedOfficials')}
       </div>
     )
   }
 
   return (
-    <div className="scheduling-scroll-container border border-gray-200 rounded-md bg-white overflow-x-auto overflow-y-auto max-h-[70vh] relative">
+    <div
+      className={`scheduling-scroll-container ${CARD_SURFACE} overflow-x-auto overflow-y-auto max-h-[70vh] relative`}
+    >
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr>

@@ -12,6 +12,7 @@ import {
   TableCell,
   Chip,
 } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'
 
@@ -49,7 +50,7 @@ export function TenantList({ tenants }: Props) {
         </div>
 
         {tenants.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-20 text-center">
+          <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
             <svg
               className="mb-4 h-12 w-12 text-gray-300"
               viewBox="0 0 48 48"
@@ -66,7 +67,7 @@ export function TenantList({ tenants }: Props) {
             <Button color="primary" onPress={() => setModalOpen(true)}>
               Create tenant
             </Button>
-          </div>
+          </AppCard>
         ) : (
           <Table isStriped aria-label="Tenants">
             <TableHeader>

@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 import { useEffect, useState } from 'react'
 
 type Todo = { id: string; instruction_text: string; position: number }
@@ -72,7 +73,7 @@ function groupByDay(assignments: AssignmentRow[]) {
 function EmptyState({ strings }: { strings: Strings }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-      <div className="w-20 h-20 rounded-xl border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
+      <div className="w-20 h-20 rounded-large border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -107,12 +108,12 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
                   <span className="w-12 shrink-0 text-sm font-medium text-gray-500 pt-3">
                     {formatTime(a.timeslot_start)}
                   </span>
-                  <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                  <AppCard className="flex-1 min-w-0" bodyClassName="px-4 py-3">
                     <p className="text-sm font-semibold text-gray-900">{ws?.name ?? '—'}</p>
                     {ws?.description ? (
                       <p className="text-xs text-gray-500 mt-0.5">{ws.description}</p>
                     ) : null}
-                  </div>
+                  </AppCard>
                 </div>
               )
             })}
@@ -217,7 +218,7 @@ export function ScheduleView({ assignments, strings }: Props) {
       </div>
 
       {/* View toggle */}
-      <div className="flex rounded-xl border border-gray-200 overflow-hidden mb-6">
+      <div className="flex rounded-large border border-gray-200 overflow-hidden mb-6">
         <Button
           onClick={() => handleViewChange('time')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${

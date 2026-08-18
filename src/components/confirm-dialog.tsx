@@ -24,7 +24,12 @@ export default function ConfirmDialog({
   destructive = false,
 }: ConfirmDialogProps) {
   return (
-    <Modal isOpen={open} onOpenChange={(isOpen) => !isOpen && onCancel()} size="sm">
+    <Modal
+      isOpen={open}
+      onOpenChange={(isOpen) => !isOpen && onCancel()}
+      size="sm"
+      classNames={{ base: 'bg-gray-50' }}
+    >
       <ModalContent>
         <ModalHeader className="text-sm">{title}</ModalHeader>
         <ModalBody>

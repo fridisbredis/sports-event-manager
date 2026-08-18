@@ -18,7 +18,7 @@ export function TodosEditor({ todos, todoRefs, onAddTodo, onRemoveTodo, onUpdate
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
         {t('workstations.todosLabel')}
       </h2>
-      <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
         <div className="divide-y divide-gray-100">
           {todos.map((todo, i) => (
             <div key={i} className="flex items-center gap-3 px-3 py-2.5">
@@ -41,7 +41,12 @@ export function TodosEditor({ todos, todoRefs, onAddTodo, onRemoveTodo, onUpdate
                   }
                 }}
                 placeholder={t('workstations.todoPlaceholder')}
-                className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                classNames={{
+                  base: 'flex-1',
+                  inputWrapper:
+                    '!bg-transparent data-[hover=true]:!bg-transparent group-data-[focus=true]:!bg-transparent shadow-none px-2 py-0',
+                  input: 'text-sm text-gray-900 placeholder:text-gray-400',
+                }}
               />
               <Button
                 variant="light"

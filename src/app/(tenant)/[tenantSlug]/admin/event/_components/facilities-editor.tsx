@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react'
-import { Input, Chip } from '@heroui/react'
+import { Chip } from '@heroui/react'
+import { Input } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 import type { LabelInput } from '../actions'
 

@@ -1,4 +1,5 @@
-import { Select, SelectItem } from '@heroui/react'
+import { SelectItem } from '@heroui/react'
+import { Select } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {

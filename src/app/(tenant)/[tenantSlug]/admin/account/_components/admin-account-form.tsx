@@ -5,6 +5,8 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
+import { Input } from '@/components/ui/form-fields'
+import { AppCard } from '@/components/ui/app-card'
 
 interface AdminAccountFormProps {
   name: string
@@ -78,38 +80,30 @@ export default function AdminAccountForm({
       </div>
 
       <div className="max-w-lg">
-        <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-xl font-semibold text-gray-500">{initials || '?'}</span>
+        <AppCard>
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+              <span className="text-xl font-semibold text-gray-500">{initials || '?'}</span>
+            </div>
           </div>
-        </div>
 
-        <div className="mb-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-            Name (editable)
-          </label>
-          <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-            <input
-              type="text"
+          <div className="mb-8">
+            <Input
+              label="Name"
+              description="Editable"
               value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="flex-1 text-sm text-gray-900 bg-transparent outline-none"
+              onValueChange={handleNameChange}
+              labelPlacement="outside"
             />
-            <span className="text-xs font-medium text-gray-400 shrink-0">Edit</span>
           </div>
-        </div>
 
-        <div className="mb-8">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1.5">
-            Mobile number (read-only)
-          </label>
-          <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <span className="flex-1 text-sm text-gray-500">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Mobile number</label>
+            <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
               {phone ? formatPhoneForDisplay(phone) : '—'}
-            </span>
-            <span className="text-xs font-medium text-gray-400 shrink-0">Read only</span>
+            </div>
           </div>
-        </div>
+        </AppCard>
       </div>
 
       <UnsavedChangesDialog {...dialogProps} />

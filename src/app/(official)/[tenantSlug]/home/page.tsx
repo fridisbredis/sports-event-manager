@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -84,9 +85,9 @@ function NavCard({
   return (
     <Link
       href={href}
-      className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-4 hover:bg-gray-50 transition-colors"
+      className={`flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 hover:bg-gray-50 transition-colors`}
     >
-      <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+      <div className="w-12 h-12 rounded-large bg-primary/10 text-primary flex items-center justify-center shrink-0">
         <Icon />
       </div>
       <div className="flex-1 min-w-0">

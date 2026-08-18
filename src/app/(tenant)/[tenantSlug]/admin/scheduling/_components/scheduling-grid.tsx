@@ -13,8 +13,8 @@ import {
   ModalHeader,
   ModalBody,
   ScrollShadow,
-  Input,
 } from '@heroui/react'
+import { Input } from '@/components/ui/form-fields'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
@@ -1058,6 +1058,7 @@ export function SchedulingGrid({
                   setWsSlotModalSearch('')
                 }
               }}
+              classNames={{ base: 'bg-gray-50' }}
             >
               <ModalContent>
                 {() => (

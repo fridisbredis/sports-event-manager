@@ -13,6 +13,7 @@ import {
   TableRow,
   TableCell,
 } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface OperatingWindow {
@@ -206,7 +207,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
     return (
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('workstations.title')}</h1>
-        <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-20 text-center">
+        <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
           <svg
             className="mb-4 h-12 w-12 text-gray-300"
             viewBox="0 0 48 48"
@@ -223,7 +224,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
           <Button variant="bordered" onPress={() => router.push(`/${tenantSlug}/admin/event`)}>
             {t('workstations.goToEventConfig')}
           </Button>
-        </div>
+        </AppCard>
       </div>
     )
   }

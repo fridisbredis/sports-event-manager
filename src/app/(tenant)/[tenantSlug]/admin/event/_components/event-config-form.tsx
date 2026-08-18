@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { Button, Input, Textarea, Chip } from '@heroui/react'
+import { Button, Chip, Card, CardBody } from '@heroui/react'
+import { Input, Textarea } from '@/components/ui/form-fields'
 import {
   saveEvent,
   uploadEventLogo,
@@ -247,93 +248,95 @@ export default function EventConfigForm({
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-[2fr_3fr] gap-10">
+      <div className="grid grid-cols-[2fr_3fr] gap-5">
         {/* Left: Identity */}
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
             {t('eventConfig.identity')}
           </h2>
-          <div className="space-y-4">
-            <LogoUploadField
-              logoUrl={logoUrl}
-              logoError={logoError}
-              isUploading={isUploading}
-              uploadError={uploadError}
-              fileInputRef={fileInputRef}
-              onFileChange={handleLogoFileChange}
-              onImageError={() => setLogoError(true)}
-              onRemove={() => {
-                setLogoUrl('')
-                setLogoError(false)
-                setSaveSuccess(false)
-                markDirty()
-              }}
-            />
+          <Card>
+            <CardBody className="p-6 space-y-4">
+              <LogoUploadField
+                logoUrl={logoUrl}
+                logoError={logoError}
+                isUploading={isUploading}
+                uploadError={uploadError}
+                fileInputRef={fileInputRef}
+                onFileChange={handleLogoFileChange}
+                onImageError={() => setLogoError(true)}
+                onRemove={() => {
+                  setLogoUrl('')
+                  setLogoError(false)
+                  setSaveSuccess(false)
+                  markDirty()
+                }}
+              />
 
-            <ColorPalettePicker
-              colorPalette={colorPalette}
-              isSavingPalette={isSavingPalette}
-              paletteError={paletteError}
-              onSelect={handleColorPaletteSelect}
-            />
+              <ColorPalettePicker
+                colorPalette={colorPalette}
+                isSavingPalette={isSavingPalette}
+                paletteError={paletteError}
+                onSelect={handleColorPaletteSelect}
+              />
 
-            <Input
-              label={t('eventConfig.eventName')}
-              isRequired
-              value={name}
-              onValueChange={(val) => {
-                setName(val)
-                setSaveSuccess(false)
-                markDirty()
-                if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
-              }}
-              placeholder={t('eventConfig.eventNamePlaceholder')}
-              isInvalid={!!errors.name}
-              errorMessage={errors.name}
-            />
+              <Input
+                label={t('eventConfig.eventName')}
+                isRequired
+                value={name}
+                onValueChange={(val) => {
+                  setName(val)
+                  setSaveSuccess(false)
+                  markDirty()
+                  if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
+                }}
+                placeholder={t('eventConfig.eventNamePlaceholder')}
+                isInvalid={!!errors.name}
+                errorMessage={errors.name}
+              />
 
-            <Input
-              label={t('eventConfig.type')}
-              value={eventType}
-              onValueChange={(val) => {
-                setEventType(val)
-                setSaveSuccess(false)
-                markDirty()
-              }}
-              placeholder={t('eventConfig.typePlaceholder')}
-            />
+              <Input
+                label={t('eventConfig.type')}
+                value={eventType}
+                onValueChange={(val) => {
+                  setEventType(val)
+                  setSaveSuccess(false)
+                  markDirty()
+                }}
+                placeholder={t('eventConfig.typePlaceholder')}
+              />
 
-            <Textarea
-              label={t('eventConfig.description')}
-              value={description}
-              onValueChange={(val) => {
-                setDescription(val)
-                setSaveSuccess(false)
-                markDirty()
-              }}
-              minRows={4}
-              placeholder={t('eventConfig.descriptionPlaceholder')}
-            />
+              <Textarea
+                label={t('eventConfig.description')}
+                value={description}
+                onValueChange={(val) => {
+                  setDescription(val)
+                  setSaveSuccess(false)
+                  markDirty()
+                }}
+                minRows={4}
+                placeholder={t('eventConfig.descriptionPlaceholder')}
+              />
 
-            <DatesAndGranularitySection
-              isPublished={isPublished}
-              dateRangeLabel={derivedDateRange(stages)}
-              granularity={granularity}
-              onGranularityChange={(minutes) => {
-                setGranularity(minutes)
-                setSaveSuccess(false)
-                markDirty()
-              }}
-            />
+              <DatesAndGranularitySection
+                isPublished={isPublished}
+                dateRangeLabel={derivedDateRange(stages)}
+                granularity={granularity}
+                onGranularityChange={(minutes) => {
+                  setGranularity(minutes)
+                  setSaveSuccess(false)
+                  markDirty()
+                }}
+              />
 
-            <FacilitiesEditor
-              facilities={facilities}
-              facilityInput={facilityInput}
-              onFacilityInputChange={setFacilityInput}
-              onKeyDown={handleFacilityKeyDown}
-              onRemoveFacility={removeFacility}
-            />
-          </div>
+              <FacilitiesEditor
+                facilities={facilities}
+                facilityInput={facilityInput}
+                onFacilityInputChange={setFacilityInput}
+                onKeyDown={handleFacilityKeyDown}
+                onRemoveFacility={removeFacility}
+              />
+            </CardBody>
+          </Card>
         </section>
 
         {/* Right: Schedule & Setup */}
@@ -341,18 +344,20 @@ export default function EventConfigForm({
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
             {t('eventConfig.scheduleSetup')}
           </h2>
-          <div className="space-y-4">
-            {/* Stages */}
-            <StageList
-              stages={stages}
-              onChange={(updated) => {
-                setStages(updated)
-                setSaveSuccess(false)
-                markDirty()
-              }}
-            />
-            {errors.stages && <p className="text-xs text-red-500">{errors.stages}</p>}
-          </div>
+          <Card>
+            <CardBody className="p-0">
+              {/* Stages */}
+              <StageList
+                stages={stages}
+                onChange={(updated) => {
+                  setStages(updated)
+                  setSaveSuccess(false)
+                  markDirty()
+                }}
+              />
+              {errors.stages && <p className="text-xs text-red-500 px-6 pb-4">{errors.stages}</p>}
+            </CardBody>
+          </Card>
         </section>
       </div>
     </div>

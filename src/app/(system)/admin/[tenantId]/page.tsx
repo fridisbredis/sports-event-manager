@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
 
 interface Props {
@@ -33,13 +34,13 @@ export default async function TenantDetailPage({ params }: Props) {
 
       <h1 className="text-2xl font-semibold text-gray-900 mb-8">{tenant.name}</h1>
 
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <AppCard bodyClassName="p-0 overflow-hidden">
         <TenantDetail
           tenantId={tenant.id}
           isActive={tenant.is_active}
           tier={tenant.tier as 'standard' | 'premium' | 'professional'}
         />
-      </div>
+      </AppCard>
     </div>
   )
 }
