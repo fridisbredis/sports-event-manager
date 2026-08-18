@@ -165,7 +165,7 @@ tenants
 user_roles  — join table connecting Supabase Auth users to tenants
   id (uuid, PK)
   user_id (uuid) — references auth.users(id)
-  tenant_id (uuid) — references tenants(id)
+  tenant_id (uuid, nullable) — references tenants(id); null only for system_admin rows
   role (text) — 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 
 events
@@ -191,7 +191,7 @@ announcements
   body, sms_sent, published_at, created_at
 ```
 
-**Open question:** How is `system_admin` represented in `user_roles`? `tenant_id` is NOT NULL, so either there's a row per tenant or a designated "system tenant." Confirm before building system admin features.
+**Resolved (migration 0021):** `system_admin` is a global role — `tenant_id` is nullable and set to `null` for `system_admin` rows. A check constraint requires `tenant_id` for every other role. `is_system_admin()` and the app-level auth helpers in `src/lib/auth/tenant.ts` already ignored `tenant_id` for this role, so no RLS or app-code behavior changed.
 
 ---
 
