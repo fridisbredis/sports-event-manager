@@ -50,6 +50,19 @@ const SEED_PHONES = {
   officialRemoved: '+46709900004',
 } as const
 
+// SEED_PHONES keeps the '+' because auth.admin.createUser() wants canonical E.164, but
+// officials.phone must match auth.users.phone byte-for-byte: the SEC-04 confirm RPCs
+// (0017/0018) compare them with exact string equality, and 0020's partial unique index
+// treats '+46…' and '46…' as different strings. The values above are already E.164, so
+// only the leading '+' has to go — this is the same shape normalizePhoneToE164 stores.
+const storedPhone = (phone: string) => phone.replace(/^\+/, '')
+
+// The app sets a 7-day window when it creates an invite (officials/route.ts). 0017 raises
+// 'expired' when this column is NULL — and that check runs *before* the phone check, so an
+// invited row without it is unconfirmable whatever the phone format is. The column has no
+// database default (0010), so the seed has to set it explicitly.
+const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
 async function upsertAuthUser(phone: string) {
   const { data: existing } = await admin.auth.admin.listUsers()
   const found = existing.users.find((u) => u.phone === phone.replace('+', ''))
@@ -179,8 +192,9 @@ async function main() {
   const { error: invitedError } = await admin.from('officials').insert({
     tenant_id: tenant.id,
     name: 'Seed Official Invited',
-    phone: SEED_PHONES.officialInvited,
+    phone: storedPhone(SEED_PHONES.officialInvited),
     invite_status: 'invited',
+    invite_token_expires_at: inviteExpiresAt,
   })
   if (invitedError) throw invitedError
   console.log(`  official (invited, not yet confirmed): ${SEED_PHONES.officialInvited}`)

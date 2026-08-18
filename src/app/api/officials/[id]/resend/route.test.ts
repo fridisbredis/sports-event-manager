@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
@@ -41,6 +41,10 @@ function makeParams(id: string) {
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
+// Registered by the tests that stub console.error, and always undone in afterEach: an
+// assertion that fails mid-test must not leave console stubbed for every test after it.
+let restoreConsoleError: (() => void) | undefined
+
 describe('POST /api/officials/[id]/resend', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -48,6 +52,11 @@ describe('POST /api/officials/[id]/resend', () => {
     process.env.TWILIO_ACCOUNT_SID = 'AC_test'
     process.env.TWILIO_AUTH_TOKEN = 'token_test'
     process.env.TWILIO_PHONE_NUMBER = '+15550001111'
+  })
+
+  afterEach(() => {
+    restoreConsoleError?.()
+    restoreConsoleError = undefined
   })
 
   it('returns 400 for invalid input without checking auth or sending sms', async () => {
@@ -253,7 +262,11 @@ describe('POST /api/officials/[id]/resend', () => {
     consoleErrorSpy.mockRestore()
   })
 
-  it('returns 502 rather than escaping the handler when twilio() itself throws synchronously', async () => {
+  // A non-AC TWILIO_ACCOUNT_SID is our own deployment being misconfigured, not Twilio
+  // rejecting anything, so it must not borrow the send path's 502: that status reads as
+  // transient and invites a retry, and every retry of this route rotates the invite token
+  // again. 500 plus an untouched token is the honest answer.
+  it('returns 500 and never rotates the invite token when twilio() throws synchronously', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
@@ -275,11 +288,53 @@ describe('POST /api/officials/[id]/resend', () => {
       throw new Error('accountSid must start with AC')
     })
 
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
     const body = await res.json()
 
-    expect(res.status).toBe(502)
-    expect(body).toEqual({ error: 'Failed to send invite SMS' })
+    expect(res.status).toBe(500)
+    expect(body).toEqual({ error: 'SMS is not configured' })
     expect(messagesCreate).not.toHaveBeenCalled()
+    expect(officialsUpdateBuilder.update).not.toHaveBeenCalled()
+  })
+
+  it('returns 500 and never rotates the invite token when TWILIO_PHONE_NUMBER is unset', async () => {
+    delete process.env.TWILIO_PHONE_NUMBER
+
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+    const body = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(body).toEqual({ error: 'SMS is not configured' })
+    expect(messagesCreate).not.toHaveBeenCalled()
+
+    // The existing invite link is still valid: there is no point spending the official's
+    // only working link on a send that was structurally impossible.
+    expect(officialsUpdateBuilder.update).not.toHaveBeenCalled()
+    expect(officialsUpdateBuilder.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ invite_token: expect.anything() })
+    )
   })
 })
