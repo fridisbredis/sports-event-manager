@@ -108,7 +108,7 @@ Example: `feat(EVT-01): scaffold event dashboard`
 - Dev Messaging Service: Swedish number +46728101619
 - Prod Messaging Service: Swedish number +46766900096
 - Dev login can be tested via Supabase Test Phone Numbers — number `46768109304` with fixed OTP code `000000` (dev Supabase project `lhflutwvwvzawzbcuwup`), bypasses Twilio entirely
-- Prod login was previously tested via Supabase Test Phone Numbers (Frida's own number with a fixed OTP code) before a real sender was assigned — remove that test phone entry before real users hit prod, if not already done
+- Prod login has always used the real Twilio sender — no Supabase Test Phone Number entry was ever added to prod (confirmed 2026-08-18; the earlier note claiming otherwise was incorrect)
 
 ### GitHub Secrets
 
