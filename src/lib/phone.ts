@@ -1,12 +1,14 @@
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js'
 
 // Countries offered in the invite form's country picker.
+// GB is deliberately excluded: Twilio error 21612 ("From" number not permitted to
+// send to that destination) blocks delivery from our Swedish sender, and fixing it
+// requires UK sender registration with Twilio, not a code or Geo Permissions change.
 export const PHONE_COUNTRIES = [
   { code: 'SE' as const, dialCode: '46', flag: '🇸🇪', label: '🇸🇪 SE (+46)' },
   { code: 'NO' as const, dialCode: '47', flag: '🇳🇴', label: '🇳🇴 NO (+47)' },
   { code: 'DK' as const, dialCode: '45', flag: '🇩🇰', label: '🇩🇰 DK (+45)' },
   { code: 'FI' as const, dialCode: '358', flag: '🇫🇮', label: '🇫🇮 FI (+358)' },
-  { code: 'GB' as const, dialCode: '44', flag: '🇬🇧', label: '🇬🇧 GB (+44)' },
 ]
 
 export const DEFAULT_PHONE_COUNTRY: CountryCode = 'SE'
@@ -47,7 +49,6 @@ const LOCALE_REGION_TO_COUNTRY: Record<string, CountryCode> = {
   NO: 'NO',
   DK: 'DK',
   FI: 'FI',
-  GB: 'GB',
 }
 
 // Best-effort guess from the browser's language tag (e.g. "sv-SE") — no geolocation
