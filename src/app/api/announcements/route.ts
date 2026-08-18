@@ -60,19 +60,78 @@ export async function POST(request: NextRequest) {
     published_at: new Date().toISOString(),
   })
 
-  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  // The sender number and the client are resolved before any send, and a fault in either
+  // is our own configuration rather than a provider rejection, so both answer a
+  // controlled 500 with a client-safe message - the same shape the resend route uses.
+  // Without this guard twilio() throws synchronously on an unset or non-AC
+  // TWILIO_ACCOUNT_SID and escapes the handler entirely, leaving the admin with an
+  // unhandled 500 and no way to tell whether any of the announcement went out.
+  //
+  // The announcements row inserted above is deliberately left in place on this path. It
+  // was written with sms_sent: false, which is exactly what happened: the announcement is
+  // published and no SMS was sent. Rolling it back would need a transaction the rest of
+  // this handler does not have.
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER
+  if (!fromNumber) {
+    try {
+      console.error(
+        `Announcement SMS blocked for tenant ${tenantId}: TWILIO_PHONE_NUMBER is not set`
+      )
+    } catch {
+      // Logging must never be able to change the response - see the send loop below.
+    }
+    return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
+  }
+
+  let client: ReturnType<typeof twilio>
+  try {
+    client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  } catch {
+    // The caught error is never logged: the Twilio constructor quotes the offending
+    // credential back in its own message.
+    try {
+      console.error(
+        `Announcement SMS blocked for tenant ${tenantId}: Twilio client could not be constructed`
+      )
+    } catch {
+      // Logging must never be able to change the response - see the send loop below.
+    }
+    return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
+  }
 
   const results = await Promise.allSettled(
     (recipients ?? []).map(({ phone }) =>
       client.messages.create({
         body,
-        from: process.env.TWILIO_PHONE_NUMBER!,
+        from: fromNumber,
         to: toTwilioE164(phone),
       })
     )
   )
 
-  const failed = results.filter((r) => r.status === 'rejected').length
+  // Count and log in one pass. Each rejection is recorded with Twilio's numeric code
+  // only - never the raw error and never the number, because a Twilio rejection quotes
+  // the destination back in its message ("Invalid To number: +46..."). Recipients are
+  // identified by their position in the batch, which is enough to line a failure up
+  // against the send order without putting PII in the log.
+  //
+  // The try wraps each log rather than the whole loop: console patching by editor
+  // extensions can throw, and a throw that aborted the loop would leave `failed`
+  // undercounted and report a partial send as a clean one.
+  let failed = 0
+  for (const [index, result] of results.entries()) {
+    if (result.status !== 'rejected') continue
+
+    failed += 1
+    const code = (result.reason as { code?: unknown } | null)?.code
+    try {
+      console.error(
+        `Announcement SMS failed for tenant ${tenantId} on channel ${channel}, recipient #${index} (twilio code: ${code ?? 'none'})`
+      )
+    } catch {
+      // Logging must never be able to change the response.
+    }
+  }
 
   return NextResponse.json({
     sent: results.length - failed,
