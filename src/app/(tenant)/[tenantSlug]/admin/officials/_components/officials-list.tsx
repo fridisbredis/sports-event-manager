@@ -134,7 +134,15 @@ export default function OfficialsList({
         body: JSON.stringify({ tenantId }),
       })
       if (!res.ok) {
-        toastError(t('officials.resendError'))
+        // A 500 is one of the route's own configuration guards, which run before the token
+        // is rotated: the official's existing invite link still works and clicking resend
+        // again cannot help. Anything else (in practice the 502 from a rejected send) means
+        // the token was already rotated, so the old link is dead and no new one arrived.
+        toastError(
+          res.status === 500
+            ? t('officials.resendConfigError')
+            : t('officials.resendError', { name: official.name })
+        )
       }
     } finally {
       setResendingId(null)
