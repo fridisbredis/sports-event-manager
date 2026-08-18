@@ -149,7 +149,7 @@ describe('POST /api/officials', () => {
     expect(messagesCreate).toHaveBeenCalledWith({
       body: 'Hi Anna, you have been invited as an official for Viadal 2026. Confirm your availability here: https://app.example.com/invite/tok-abc',
       from: '+15550001111',
-      to: '46701234567',
+      to: '+46701234567',
     })
   })
 

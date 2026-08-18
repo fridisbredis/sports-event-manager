@@ -102,7 +102,7 @@ describe('POST /api/announcements', () => {
     // even though a removed official row with the same phone still exists
     // in the table with sms_opt_out=false.
     const recipientsBuilder = chain({
-      data: [{ phone: '0701111111' }],
+      data: [{ phone: '46701111111' }],
       error: null,
     })
     const insertBuilder = chain({ data: null, error: null })
@@ -126,7 +126,7 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({
-      data: [{ phone: '0702222222' }],
+      data: [{ phone: '46702222222' }],
       error: null,
     })
     const insertBuilder = chain({ data: null, error: null })
@@ -180,7 +180,7 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({
-      data: [{ phone: '0701111111' }, { phone: '0702222222' }],
+      data: [{ phone: '46701111111' }, { phone: '46702222222' }],
       error: null,
     })
     const insertBuilder = chain({ data: null, error: null })
@@ -209,12 +209,12 @@ describe('POST /api/announcements', () => {
     expect(messagesCreate).toHaveBeenCalledWith({
       body: 'Hej!',
       from: '+15550001111',
-      to: '0701111111',
+      to: '+46701111111',
     })
     expect(messagesCreate).toHaveBeenCalledWith({
       body: 'Hej!',
       from: '+15550001111',
-      to: '0702222222',
+      to: '+46702222222',
     })
   })
 
@@ -265,7 +265,7 @@ describe('POST /api/announcements', () => {
     } as never)
     // Simulates the DB-level filter: only non-opted-out officials come back.
     const recipientsBuilder = chain({
-      data: [{ phone: '0701111111' }],
+      data: [{ phone: '46701111111' }],
       error: null,
     })
     const insertBuilder = chain({ data: null, error: null })
@@ -285,10 +285,10 @@ describe('POST /api/announcements', () => {
     expect(messagesCreate).toHaveBeenCalledWith({
       body: 'Hej!',
       from: '+15550001111',
-      to: '0701111111',
+      to: '+46701111111',
     })
     // The opted-out number must never appear as a send target.
-    expect(messagesCreate).not.toHaveBeenCalledWith(expect.objectContaining({ to: '0709999999' }))
+    expect(messagesCreate).not.toHaveBeenCalledWith(expect.objectContaining({ to: '+46709999999' }))
   })
 
   it('honours sms_opt_out for participants: filters the query and never sends to opted-out numbers', async () => {
@@ -297,7 +297,7 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({
-      data: [{ phone: '0702222222' }],
+      data: [{ phone: '46702222222' }],
       error: null,
     })
     const insertBuilder = chain({ data: null, error: null })
@@ -316,7 +316,7 @@ describe('POST /api/announcements', () => {
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
     expect(responseBody).toEqual({ sent: 1, failed: 0 })
     expect(messagesCreate).toHaveBeenCalledTimes(1)
-    expect(messagesCreate).not.toHaveBeenCalledWith(expect.objectContaining({ to: '0708888888' }))
+    expect(messagesCreate).not.toHaveBeenCalledWith(expect.objectContaining({ to: '+46708888888' }))
   })
 
   it('counts partial sms failures without failing the whole request', async () => {
@@ -325,7 +325,7 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({
-      data: [{ phone: '0701111111' }, { phone: '0702222222' }, { phone: '0703333333' }],
+      data: [{ phone: '46701111111' }, { phone: '46702222222' }, { phone: '46703333333' }],
       error: null,
     })
     const insertBuilder = chain({ data: null, error: null })
@@ -336,7 +336,7 @@ describe('POST /api/announcements', () => {
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     messagesCreate.mockImplementation(({ to }: { to: string }) =>
-      to === '0702222222' ? Promise.reject(new Error('invalid number')) : Promise.resolve({})
+      to === '+46702222222' ? Promise.reject(new Error('invalid number')) : Promise.resolve({})
     )
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -344,5 +344,36 @@ describe('POST /api/announcements', () => {
 
     expect(res.status).toBe(200)
     expect(responseBody).toEqual({ sent: 2, failed: 1 })
+  })
+
+  it('does not double-prefix a recipient phone that already has a leading +', async () => {
+    // Legacy officials.phone rows (pre-normalization-migration) can already carry a
+    // leading '+'. toTwilioE164 must pass those through unchanged rather than producing
+    // the nonsense '++...'.
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '+46703333333' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(responseBody).toEqual({ sent: 1, failed: 0 })
+    expect(messagesCreate).toHaveBeenCalledWith({
+      body: 'Hej!',
+      from: '+15550001111',
+      to: '+46703333333',
+    })
   })
 })

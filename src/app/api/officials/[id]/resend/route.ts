@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
+import { toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
 import { z } from 'zod'
 
@@ -69,12 +70,45 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${updated.invite_token}`
 
-  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  await client.messages.create({
-    body: `Hi ${official.name}, you have been invited as an official for ${tenant?.name ?? 'an event'}. Confirm your availability here: ${inviteUrl}`,
-    from: process.env.TWILIO_PHONE_NUMBER!,
-    to: official.phone,
-  })
+  // The token above has already been regenerated and the old link revoked - that cannot
+  // be rolled back here even if the send below fails, because the whole point of the
+  // rotation is that the old token is gone. The SMS body carries the new token, so the
+  // only recovery available to the admin is to hit resend again, which is exactly what
+  // returning an error status (rather than a 200) invites them to do.
+  //
+  // The client is constructed inside the try on purpose: twilio() throws synchronously
+  // when TWILIO_ACCOUNT_SID is set to a non-AC value, so building it outside would
+  // escape this handler entirely and still surface as a 500.
+  try {
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+    await client.messages.create({
+      body: `Hi ${official.name}, you have been invited as an official for ${tenant?.name ?? 'an event'}. Confirm your availability here: ${inviteUrl}`,
+      from: process.env.TWILIO_PHONE_NUMBER!,
+      to: toTwilioE164(official.phone),
+    })
+  } catch (err) {
+    // Log the DB-generated id and Twilio's numeric code only - never the raw error,
+    // which can echo the submitted phone number back into the logs.
+    //
+    // One pre-formatted string, and never an undefined argument: console patching by
+    // editor extensions can throw on those, and a throw here would escape this catch
+    // and turn a handled SMS failure into an unhandled 500.
+    const code = (err as { code?: unknown } | null)?.code
+    try {
+      console.error(
+        `Invite SMS resend failed for official ${official.id} (twilio code: ${code ?? 'none'})`
+      )
+    } catch {
+      // A throw here would escape the outer catch. Logging must never be able to
+      // change the response.
+    }
+
+    // Unlike create, a failed resend carries no duplicate-row hazard: retrying just
+    // regenerates the token again and tries the send again. So this returns an error
+    // status instead of the create route's 200-with-flag, and 502 rather than the 500
+    // above - this is an upstream provider rejection, not a fault in our own handler.
+    return NextResponse.json({ error: 'Failed to send invite SMS' }, { status: 502 })
+  }
 
   return NextResponse.json({ ok: true })
 }

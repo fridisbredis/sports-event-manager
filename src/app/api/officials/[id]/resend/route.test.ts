@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -74,7 +75,7 @@ describe('POST /api/officials/[id]/resend', () => {
       role: 'tenant_admin',
     } as never)
     const officialsBuilder = chain({
-      data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' },
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const fromMock = vi.fn()
     fromMock
@@ -111,7 +112,7 @@ describe('POST /api/officials/[id]/resend', () => {
     } as never)
     const fromMock = vi.fn().mockReturnValueOnce(
       chain({
-        data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'confirmed' },
+        data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'confirmed' },
       })
     )
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
@@ -129,7 +130,7 @@ describe('POST /api/officials/[id]/resend', () => {
     } as never)
 
     const officialsSelectBuilder = chain({
-      data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' },
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
     const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
@@ -161,7 +162,7 @@ describe('POST /api/officials/[id]/resend', () => {
     expect(messagesCreate).toHaveBeenCalledWith({
       body: 'Hi Anna, you have been invited as an official for Viadal 2026. Confirm your availability here: https://app.example.com/invite/tok-new',
       from: '+15550001111',
-      to: '0701234567',
+      to: '+46701234567',
     })
   })
 
@@ -174,7 +175,7 @@ describe('POST /api/officials/[id]/resend', () => {
     fromMock
       .mockReturnValueOnce(
         chain({
-          data: { id: 'off-1', name: 'Anna', phone: '0701234567', invite_status: 'invited' },
+          data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
         })
       )
       .mockReturnValueOnce(chain({ data: null }))
@@ -183,6 +184,102 @@ describe('POST /api/officials/[id]/resend', () => {
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
     expect(res.status).toBe(500)
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('returns 502 when the Twilio send rejects, after the token has already been refreshed', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    messagesCreate.mockRejectedValueOnce(new Error('send failed'))
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+    const body = await res.json()
+
+    expect(res.status).toBe(502)
+    expect(body).toEqual({ error: 'Failed to send invite SMS' })
+    expect(messagesCreate).toHaveBeenCalledTimes(1)
+    expect(officialsUpdateBuilder.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('never logs the raw Twilio error or the recipient phone number', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const twilioError = Object.assign(new Error('Invalid To number: +46701234567'), {
+      code: 21211,
+    })
+    messagesCreate.mockRejectedValueOnce(twilioError)
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(res.status).toBe(502)
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+    const loggedMessage = consoleErrorSpy.mock.calls[0][0] as string
+    expect(loggedMessage).toContain('off-1')
+    expect(loggedMessage).toContain('21211')
+    expect(loggedMessage).not.toContain('46701234567')
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('returns 502 rather than escaping the handler when twilio() itself throws synchronously', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    vi.mocked(twilio).mockImplementationOnce(() => {
+      throw new Error('accountSid must start with AC')
+    })
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+    const body = await res.json()
+
+    expect(res.status).toBe(502)
+    expect(body).toEqual({ error: 'Failed to send invite SMS' })
     expect(messagesCreate).not.toHaveBeenCalled()
   })
 })
