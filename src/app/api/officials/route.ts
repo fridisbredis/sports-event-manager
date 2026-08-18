@@ -124,5 +124,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ official, smsSent })
+  const {
+    invite_token: _inviteToken,
+    invite_token_expires_at: _inviteTokenExpiresAt,
+    ...officialForClient
+  } = official
+
+  return NextResponse.json({ official: officialForClient, smsSent })
 }

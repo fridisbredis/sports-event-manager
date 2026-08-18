@@ -23,6 +23,7 @@ function chain(result: unknown) {
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
   builder.insert = vi.fn(() => builder)
+  builder.limit = vi.fn(() => builder)
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
   return builder
@@ -101,6 +102,30 @@ describe('POST /api/announcements', () => {
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
+    expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
+  })
+
+  it('caps the recipient query at 500 and logs when the cap is hit (F-SEC-04)', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipients = Array.from({ length: 500 }, (_, i) => ({ phone: `+4670000${i}` }))
+    const recipientsBuilder = chain({ data: recipients, error: null })
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('hit the 500 cap'))
   })
 
   it('excludes non-confirmed officials (e.g. removed) even when sms_opt_out is false', async () => {
@@ -167,6 +192,7 @@ describe('POST /api/announcements', () => {
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
 
     expect(fromMock).toHaveBeenNthCalledWith(1, 'participants')
+    expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
   })
 
   it('returns 500 and skips insert/sms when the recipients fetch fails', async () => {
