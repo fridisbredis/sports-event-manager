@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { normalizePhoneToE164, PHONE_COUNTRIES } from '@/lib/phone'
+import { normalizePhoneToE164, PHONE_COUNTRIES, toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
 import { z } from 'zod'
 
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     await client.messages.create({
       body: `Hi ${name}, you have been invited as an official for ${tenant?.name ?? 'an event'}. Confirm your availability here: ${inviteUrl}`,
       from: process.env.TWILIO_PHONE_NUMBER!,
-      to: phone,
+      to: toTwilioE164(phone),
     })
   } catch (err) {
     smsSent = false

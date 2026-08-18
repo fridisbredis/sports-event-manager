@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
+import { toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
 import { z } from 'zod'
 
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       client.messages.create({
         body,
         from: process.env.TWILIO_PHONE_NUMBER!,
-        to: phone,
+        to: toTwilioE164(phone),
       })
     )
   )

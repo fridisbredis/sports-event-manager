@@ -25,11 +25,19 @@ export function isValidPhoneForCountry(rawPhone: string, country: CountryCode): 
   return normalizePhoneToE164(rawPhone, country) !== null
 }
 
+// Outbound SMS goes through our own Twilio client, which requires E.164 *with* the
+// leading '+'. Stored values omit it (see normalizePhoneToE164) and legacy rows are
+// inconsistent, so tolerate both on the way out. This is the only place the '+' is
+// added back — never write this value to the DB or pass it to an SEC-04 RPC.
+export function toTwilioE164(storedPhone: string): string {
+  return storedPhone.startsWith('+') ? storedPhone : `+${storedPhone}`
+}
+
 // Numbers stored in officials.phone/user.phone are E.164 but inconsistently missing
 // their leading '+' (Supabase test numbers keep it, our own normalization strips it).
 // Display-only — never write this formatted value back to the DB or an SEC-04 RPC.
 export function formatPhoneForDisplay(storedPhone: string): string {
-  const withPlus = storedPhone.startsWith('+') ? storedPhone : `+${storedPhone}`
+  const withPlus = toTwilioE164(storedPhone)
   const parsed = parsePhoneNumberFromString(withPlus)
   return parsed ? parsed.formatInternational() : storedPhone
 }
