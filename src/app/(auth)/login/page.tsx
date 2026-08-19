@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
@@ -14,6 +14,8 @@ import {
   PHONE_COUNTRIES,
 } from '@/lib/phone'
 
+const RESEND_COOLDOWN_SECONDS = 30
+
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
@@ -26,9 +28,17 @@ export default function LoginPage() {
   )
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
   const [normalizedPhone, setNormalizedPhone] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
+
+  useEffect(() => {
+    if (resendCooldown === 0) return
+    const timer = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
 
   async function request(fn: () => Promise<{ error: { message: string } | null }>) {
     setLoading(true)
@@ -46,7 +56,21 @@ export default function LoginPage() {
     if (await request(() => supabase.auth.signInWithOtp({ phone: e164Phone }))) {
       setNormalizedPhone(e164Phone)
       setStep('otp')
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
     }
+  }
+
+  async function resendOtp() {
+    if (resendCooldown > 0 || resending) return
+    setResending(true)
+    const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone })
+    setResending(false)
+    if (error) {
+      toastError(error.message)
+      return
+    }
+    setOtp('')
+    setResendCooldown(RESEND_COOLDOWN_SECONDS)
   }
 
   async function verifyOtp() {
@@ -135,6 +159,18 @@ export default function LoginPage() {
             isDisabled={loading || otp.length !== 6}
           >
             {loading ? t('signIn.verifying') : t('signIn.verifyButton')}
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            onPress={resendOtp}
+            isLoading={resending}
+            isDisabled={resending || resendCooldown > 0}
+            className="w-full text-sm"
+          >
+            {resendCooldown > 0
+              ? t('signIn.resendCodeCooldown', { seconds: resendCooldown })
+              : t('signIn.resendCodeButton')}
           </Button>
           <Button
             type="button"
