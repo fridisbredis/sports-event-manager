@@ -35,6 +35,15 @@ function chain(result: unknown) {
 /** No active official already holds the submitted phone number. */
 const noDuplicate = () => chain({ data: null })
 
+const createUser = vi.fn()
+const deleteUser = vi.fn()
+const rpc = vi.fn()
+
+/** Default: auth.admin.createUser succeeds with a fresh auth.users id. */
+function freshAuthUser(userId = 'auth-user-1') {
+  createUser.mockResolvedValue({ data: { user: { id: userId } }, error: null })
+}
+
 /**
  * Every successful POST queries `officials` three times in order: the duplicate-phone
  * lookup, the insert, then `tenants` for the SMS body. Tests pass the builders for
@@ -44,7 +53,12 @@ function mockService(...afterDuplicateCheck: unknown[]) {
   const fromMock = vi.fn()
   fromMock.mockReturnValueOnce(noDuplicate())
   afterDuplicateCheck.forEach((builder) => fromMock.mockReturnValueOnce(builder))
-  vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+  freshAuthUser()
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({
+    from: fromMock,
+    auth: { admin: { createUser, deleteUser } },
+    rpc,
+  } as never)
   return fromMock
 }
 
