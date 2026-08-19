@@ -5,47 +5,32 @@ För kollega som testmanuellt. Syfte: verifiera att inloggning med riktigt telef
 **Prod-URL:** https://app.viadalevent.se
 **Prod SMS-avsändare:** +46766900096 (om SMS:et kommer från ett annat nummer, stanna och rapportera)
 
+**Status 2026-08-19:** Alla punkter testade av Frida. 1–3 OK, inklusive nya "skicka ny kod"-knappen (se nedan). Punkt 4 (bakåtknapp efter utloggning) är en känd bugg — se not under punkten.
+
 ---
 
 ## 1. Inloggning — official
 
-- [ ] Gå till https://app.viadalevent.se, ange ditt riktiga telefonnummer (svenskt, nationellt format `07...` går bra)
-- [ ] Bekräfta att SMS kommer inom rimlig tid (under en minut) från **+46766900096**
-- [ ] Ange koden, verifiera att du loggas in och hamnar på rätt startsida för official-rollen (HOME-01)
-- [ ] Kontrollera att "Code sent to"-texten visar ditt nummer i normaliserat format (utan mellanslag, utan `+`), oavsett hur du skrev in det
+- [x] Gå till https://app.viadalevent.se, ange ditt riktiga telefonnummer (svenskt, nationellt format `07...` går bra)
+- [x] Bekräfta att SMS kommer inom rimlig tid (under en minut) från **+46766900096**
+- [x] Ange koden, verifiera att du loggas in och hamnar på rätt startsida för official-rollen (HOME-01)
+- [x] Kontrollera att "Code sent to"-texten visar ditt nummer i normaliserat format (utan mellanslag, utan `+`), oavsett hur du skrev in det
 
 ## 2. Inloggning — tenant admin
 
-- [ ] Logga ut, logga in igen med ett konto som har tenant_admin-roll
-- [ ] Verifiera att du hamnar på admin-dashboarden, inte official-vyn
+- [x] Logga ut, logga in igen med ett konto som har tenant_admin-roll
+- [x] Verifiera att du hamnar på admin-dashboarden, inte official-vyn
 
 ## 3. Fel-fall
 
-- [ ] Ange fel OTP-kod → tydligt felmeddelande, ingen inloggning
-- [ ] Begär ny kod ("skicka igen") → ny SMS kommer, gamla koden slutar fungera
+- [x] Ange fel OTP-kod → tydligt felmeddelande, ingen inloggning
+- [x] Begär ny kod ("skicka igen") → ny SMS kommer, gamla koden slutar fungera (knappen fanns inte tidigare, tillagd 2026-08-19)
 
 ## 4. Session
 
-- [ ] Ladda om sidan efter inloggning → fortfarande inloggad
-- [ ] Logga ut → skickas till inloggningssidan
-- [ ] Tryck "bakåt" efter utloggningen, klicka sedan på något i vyn → du ska
-      skickas till inloggningssidan. Se den kända avvikelsen nedan innan du
-      rapporterar något här.
-
-> **Känt fel, rapportera inte som nytt:** när du trycker "bakåt" direkt efter
-> utloggning visas den inloggade vyn igen, med innehåll. Den är död — så fort du
-> klickar på något skickas du till inloggningssidan, och inga nya uppgifter kan
-> hämtas. Det är webbläsarens historik som visar en gammal bild, inte att du
-> fortfarande är inloggad. Felet är känt sedan 2026-08-19 och ska rättas.
->
-> Vad vi däremot vill veta: om du efter "bakåt" faktiskt kan **använda** vyn —
-> klicka dig vidare, ladda ny data, spara något, eller se innehåll som
-> uppdateras. Då är det ett nytt och allvarligare fel. **Rapportera direkt till
-> Frida.**
->
-> Praktisk följd: **stäng fliken när du är klar med testet.** Så länge fliken är
-> öppen kan den gamla bilden nås med "bakåt". Extra viktigt om du testar på en
-> dator som någon annan använder.
+- [x] Ladda om sidan efter inloggning → fortfarande inloggad
+- [ ] Logga ut → skickas till inloggningssidan, kan inte navigera tillbaka till inloggad vy med "bakåt"-knappen
+  - **KÄND BUGG (öppen 2026-08-19):** klickar man bakåt i browsern efter utloggning visas/loggas man in igen. Ett tidigare fixförsök (no-store-header + pageshow-reload) löste inte problemet och skrotades. En kollega tittar på det nu — inte klart för prod-signoff förrän detta är löst.
 
 ## 5. Om något strular
 
