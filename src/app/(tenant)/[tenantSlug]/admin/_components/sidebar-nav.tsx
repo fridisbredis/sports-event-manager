@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   CalendarDays,
@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { LogoutButton } from '@/components/logout-button'
 
 interface Props {
   tenantSlug: string
@@ -28,7 +28,6 @@ const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
 export function SidebarNav({ tenantSlug, adminLabel }: Props) {
   const pathname = usePathname()
-  const router = useRouter()
   const { t } = useTranslation('admin')
   const [collapsed, setCollapsed] = useState(false)
 
@@ -46,12 +45,6 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
       localStorage.setItem(COLLAPSE_STORAGE_KEY, String(next))
       return next
     })
-  }
-
-  async function handleLogout() {
-    const supabase = createSupabaseBrowserClient()
-    await supabase.auth.signOut()
-    router.push('/login')
   }
 
   const navItems: { segment: string; label: string; icon: LucideIcon }[] = [
@@ -119,8 +112,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
         </nav>
         <div className="border-t border-gray-100 py-2">
           {navLink('admin/account', t('navigation.account'), UserCircle)}
-          <button
-            onClick={handleLogout}
+          <LogoutButton
             title={collapsed ? 'Log out' : undefined}
             className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
               collapsed ? 'justify-center px-0' : ''
@@ -128,7 +120,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
           >
             <LogOut className="size-4 shrink-0" strokeWidth={2} />
             {!collapsed && 'Log out'}
-          </button>
+          </LogoutButton>
         </div>
       </div>
     </aside>

@@ -6,7 +6,9 @@
   "errors": {
     "notAuthorized": "You are not authorized to access this",
     "noAccess": "Your account is not linked to any organization. Please contact your administrator.",
-    "notFound": "Not found"
+    "notFound": "Not found",
+    "numberUsed": "Number used: {{phone}}",
+    "tryDifferentNumber": "Try a different number"
   },
   "notFoundPage": {
     "eyebrow": "No result",

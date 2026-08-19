@@ -27,11 +27,30 @@ För kollega som testmanuellt. Syfte: verifiera att inloggning med riktigt telef
 ## 4. Session
 
 - [ ] Ladda om sidan efter inloggning → fortfarande inloggad
-- [ ] Logga ut → skickas till inloggningssidan, kan inte navigera tillbaka till inloggad vy med "bakåt"-knappen
+- [ ] Logga ut → skickas till inloggningssidan
+- [ ] Tryck "bakåt" efter utloggningen, klicka sedan på något i vyn → du ska
+      skickas till inloggningssidan. Se den kända avvikelsen nedan innan du
+      rapporterar något här.
+
+> **Känt fel, rapportera inte som nytt:** när du trycker "bakåt" direkt efter
+> utloggning visas den inloggade vyn igen, med innehåll. Den är död — så fort du
+> klickar på något skickas du till inloggningssidan, och inga nya uppgifter kan
+> hämtas. Det är webbläsarens historik som visar en gammal bild, inte att du
+> fortfarande är inloggad. Felet är känt sedan 2026-08-19 och ska rättas.
+>
+> Vad vi däremot vill veta: om du efter "bakåt" faktiskt kan **använda** vyn —
+> klicka dig vidare, ladda ny data, spara något, eller se innehåll som
+> uppdateras. Då är det ett nytt och allvarligare fel. **Rapportera direkt till
+> Frida.**
+>
+> Praktisk följd: **stäng fliken när du är klar med testet.** Så länge fliken är
+> öppen kan den gamla bilden nås med "bakåt". Extra viktigt om du testar på en
+> dator som någon annan använder.
 
 ## 5. Om något strular
 
 Notera exakt:
+
 - Vilket telefonnummer (de sista siffrorna räcker, behöver inte hela numret)
 - Vilken roll du försökte logga in som
 - Exakt felmeddelande / vad som hände istället för förväntat
@@ -39,4 +58,4 @@ Notera exakt:
 
 ---
 
-**Känd bakgrundsrisk (ej relaterad till ditt test, men bra att veta):** ett fåtal äldre official-rader i prod har telefonnummer lagrade i ett annat format internt, vilket kan ge problem specifikt vid *invite-bekräftelse* för de kontona (inte vanlig inloggning). Berör inte OTP-inloggningsflödet du testar här.
+**Känd bakgrundsrisk (ej relaterad till ditt test, men bra att veta):** ett fåtal äldre official-rader i prod har telefonnummer lagrade i ett annat format internt, vilket kan ge problem specifikt vid _invite-bekräftelse_ för de kontona (inte vanlig inloggning). Berör inte OTP-inloggningsflödet du testar här.

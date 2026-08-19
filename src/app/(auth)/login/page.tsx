@@ -14,6 +14,15 @@ import {
   PHONE_COUNTRIES,
 } from '@/lib/phone'
 
+// GoTrue error codes → translation keys. `otp_expired` covers both a mistyped
+// and an expired code — GoTrue does not distinguish them, so the message must
+// work for both cases.
+const AUTH_ERROR_KEYS: Record<string, string> = {
+  otp_expired: 'signIn.invalidCode',
+  over_sms_send_rate_limit: 'signIn.tooManyRequests',
+  over_request_rate_limit: 'signIn.tooManyRequests',
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
@@ -30,12 +39,15 @@ export default function LoginPage() {
 
   const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
 
-  async function request(fn: () => Promise<{ error: { message: string } | null }>) {
+  async function request(fn: () => Promise<{ error: { message: string; code?: string } | null }>) {
     setLoading(true)
     const { error } = await fn()
     setLoading(false)
     if (error) {
-      toastError(error.message)
+      // Keep the provider's own text for debugging, but never show it to the
+      // user — it is untranslated and worded for developers.
+      console.error('[auth]', error.code, error.message)
+      toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
     }
     return !error
   }
