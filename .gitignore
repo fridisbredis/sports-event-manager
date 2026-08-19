@@ -36,6 +36,7 @@ DEVELOPMENT.md
 
 # Personal Claude context — not committed
 CLAUDE.md
+AGENTS.md
 .claude/*
 !.claude/CLAUDE.md
 !.claude/commands/
