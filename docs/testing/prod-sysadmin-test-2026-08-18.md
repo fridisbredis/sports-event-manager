@@ -72,7 +72,7 @@ order by es.position;
 
 - [x] Omladdning av `/admin` → fortfarande inloggad
 - [x] "Log out" i sidomenyn → hamnar på `/login`
-- [ ] Bakåtknapp efter logout → kommer inte in i `/admin` igen —
+- [x] Bakåtknapp efter logout → kommer inte in i `/admin` igen —
       **FALLERAT 2026-08-19, se F-06.** Vyn återställs cachad; först vid en
       klickning sker ett serveranrop som skickar till `/login`, och därefter går
       det att trycka bakåt igen och se vyn på nytt.
