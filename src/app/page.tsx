@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getUserRoles, resolvePostLoginRedirect, confirmOfficialInvite } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { formatPhoneForDisplay } from '@/lib/phone'
+import { LogoutButton } from '@/components/logout-button'
 
 export default async function RootPage() {
   const supabase = await createSupabaseServerClient()
@@ -27,6 +29,20 @@ export default async function RootPage() {
     <main className="max-w-md mx-auto mt-20 p-6">
       <h1 className="text-xl font-semibold">{t('errors.notAuthorized')}</h1>
       <p className="mt-2 text-sm text-gray-600">{t('errors.noAccess')}</p>
+      {/* Deliberately no "signed in" wording: the user has no access, so
+          telling them they have a session is confusing and leaks more than
+          it helps. The digits are the useful part. */}
+      {user.phone && (
+        <p className="mt-4 text-sm text-gray-500">
+          {t('errors.numberUsed', { phone: formatPhoneForDisplay(user.phone) })}
+        </p>
+      )}
+      {/* Same shared logout control the admin sidebars use. This gives up the
+          no-JS form fallback, but the sidebars already require JS, so it's
+          consistent. */}
+      <LogoutButton className="mt-6 text-sm text-blue-600 hover:underline">
+        {t('errors.tryDifferentNumber')}
+      </LogoutButton>
     </main>
   )
 }

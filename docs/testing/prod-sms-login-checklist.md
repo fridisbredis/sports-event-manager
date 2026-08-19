@@ -35,6 +35,7 @@ För kollega som testmanuellt. Syfte: verifiera att inloggning med riktigt telef
 ## 5. Om något strular
 
 Notera exakt:
+
 - Vilket telefonnummer (de sista siffrorna räcker, behöver inte hela numret)
 - Vilken roll du försökte logga in som
 - Exakt felmeddelande / vad som hände istället för förväntat
@@ -42,4 +43,4 @@ Notera exakt:
 
 ---
 
-**Känd bakgrundsrisk (ej relaterad till ditt test, men bra att veta):** ett fåtal äldre official-rader i prod har telefonnummer lagrade i ett annat format internt, vilket kan ge problem specifikt vid *invite-bekräftelse* för de kontona (inte vanlig inloggning). Berör inte OTP-inloggningsflödet du testar här.
+**Känd bakgrundsrisk (ej relaterad till ditt test, men bra att veta):** ett fåtal äldre official-rader i prod har telefonnummer lagrade i ett annat format internt, vilket kan ge problem specifikt vid _invite-bekräftelse_ för de kontona (inte vanlig inloggning). Berör inte OTP-inloggningsflödet du testar här.
