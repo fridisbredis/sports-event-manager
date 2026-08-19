@@ -60,10 +60,40 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // The auth.users row is created here, at invite time, rather than lazily via
+  // signInWithOtp's default shouldCreateUser:true when the invitee later logs in.
+  // That lets "Allow new users to sign up" stay disabled in Supabase Auth settings —
+  // otherwise any phone number could self-register just by requesting an OTP.
+  const { data: created, error: createUserError } = await service.auth.admin.createUser({
+    phone,
+    phone_confirm: true,
+  })
+
+  let officialUserId: string
+  if (createUserError) {
+    // phone_exists: the number already has an auth.users row (e.g. official at another
+    // tenant, or a tenant admin). Reuse that account rather than failing the invite.
+    if (createUserError.code === 'phone_exists') {
+      const { data: existingUserId, error: lookupError } = await service.rpc(
+        'get_user_id_by_phone',
+        { p_phone: phone }
+      )
+      if (lookupError || !existingUserId) {
+        return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
+      }
+      officialUserId = existingUserId
+    } else {
+      return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
+    }
+  } else {
+    officialUserId = created.user.id
+  }
+
   const { data: official, error } = await service
     .from('officials')
     .insert({
       tenant_id: tenantId,
+      user_id: officialUserId,
       name,
       phone,
       invite_status: 'invited',
@@ -75,6 +105,9 @@ export async function POST(request: NextRequest) {
   // Two concurrent requests can both pass the check above; the unique index is the
   // real guarantee, so translate its violation into the same 409 rather than a 500.
   if (error?.code === '23505') {
+    // Only clean up the auth user if we just created it — not if it was an existing
+    // account we reused (phone_exists branch above), which must survive this request.
+    if (!createUserError) await service.auth.admin.deleteUser(officialUserId)
     return NextResponse.json(
       { error: 'An official with this phone number already exists', code: 'duplicate_phone' },
       { status: 409 }
@@ -82,6 +115,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (error || !official) {
+    if (!createUserError) await service.auth.admin.deleteUser(officialUserId)
     return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
   }
 
