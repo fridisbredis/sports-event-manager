@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
+
+const RESEND_COOLDOWN_SECONDS = 30
 
 type Step = 'fill-form' | 'verify-otp' | 'confirming' | 'success' | 'invalid'
 
@@ -24,6 +26,16 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   const [available, setAvailable] = useState(false)
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const interval = setInterval(() => {
+      setResendCooldown((s) => Math.max(0, s - 1))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [resendCooldown])
 
   async function handleConfirmAvailability() {
     if (!available || !initialPhone) return
@@ -33,8 +45,22 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
     if (error) {
       toastError(error.message)
     } else {
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
       setStep('verify-otp')
     }
+  }
+
+  async function handleResendOtp() {
+    if (!initialPhone || resendCooldown > 0 || resending) return
+    setResending(true)
+    const { error } = await supabase.auth.signInWithOtp({ phone: initialPhone })
+    setResending(false)
+    if (error) {
+      toastError(error.message)
+      return
+    }
+    setOtp('')
+    setResendCooldown(RESEND_COOLDOWN_SECONDS)
   }
 
   async function handleVerifyOtp() {
@@ -147,6 +173,16 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
               placeholder="000000"
             />
           </div>
+          <button
+            type="button"
+            onClick={handleResendOtp}
+            disabled={resending || resendCooldown > 0}
+            className="mt-3 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+          >
+            {resendCooldown > 0
+              ? t('signIn.resendCodeCooldown', { seconds: resendCooldown })
+              : t('signIn.resendCodeButton')}
+          </button>
         </div>
         <div className="pb-8 shrink-0">
           <button
