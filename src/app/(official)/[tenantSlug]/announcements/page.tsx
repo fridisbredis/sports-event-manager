@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { AnnouncementCard } from './_components/announcement-card'
@@ -56,9 +56,7 @@ export default async function AnnouncementsPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: announcements } = await service
+  const { data: announcements } = await supabase
     .from('announcements')
     .select('id, body, published_at')
     .eq('tenant_id', tenant.id)

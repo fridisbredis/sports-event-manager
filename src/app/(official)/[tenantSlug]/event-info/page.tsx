@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { EventHeaderCard } from './_components/event-header-card'
@@ -45,20 +45,18 @@ export default async function EventInfoPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-
   const [{ data: event }, { data: stages }, { data: facilities }] = await Promise.all([
-    service
+    supabase
       .from('events')
       .select('name, event_type, description, logo_url, status')
       .eq('tenant_id', tenant.id)
       .maybeSingle(),
-    service
+    supabase
       .from('event_stages')
       .select('id, name, stage_type, start_time, end_time, venue, position')
       .eq('tenant_id', tenant.id)
       .order('position'),
-    service
+    supabase
       .from('event_facilities')
       .select('id, label, position')
       .eq('tenant_id', tenant.id)

@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialAccountPage from './page'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  createSupabaseServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -62,11 +61,12 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockUser(userId: string | null) {
+function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
     },
+    from: fromMock,
   } as never)
 }
 
@@ -85,41 +85,41 @@ beforeEach(() => {
 
 describe('OfficialAccountPage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    mockUser(null)
+    const fromMock = vi.fn()
+    mockUser(null, fromMock)
 
     await expect(OfficialAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
     expect(resolveTenantForOfficial).not.toHaveBeenCalled()
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('calls notFound when resolveTenantForOfficial denies access or the tenant is missing', async () => {
-    mockUser('user-1')
+    const fromMock = vi.fn()
+    mockUser('user-1', fromMock)
     vi.mocked(resolveTenantForOfficial).mockResolvedValue(null)
 
     await expect(OfficialAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(resolveTenantForOfficial).toHaveBeenCalledWith('viadal', 'user-1')
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('calls notFound when no official row matches this user and tenant', async () => {
-    mockUser('user-1')
     mockResolvedTenant()
     const fromMock = vi.fn()
     fromMock.mockReturnValueOnce(chain({ data: null })) // officials
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockUser('user-1', fromMock)
 
     await expect(OfficialAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
   })
 
   it('scopes the officials lookup by user_id and tenant_id', async () => {
-    mockUser('user-1')
     mockResolvedTenant()
     const officialsBuilder = chain({
       data: { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: false },
     })
     const fromMock = vi.fn()
     fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(chain({ count: 2 }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockUser('user-1', fromMock)
 
     await OfficialAccountPage({ params: PARAMS })
 
@@ -128,12 +128,11 @@ describe('OfficialAccountPage', () => {
   })
 
   it('renders AccountForm with the official row and assignment count', async () => {
-    mockUser('user-1')
     mockResolvedTenant()
     const official = { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: true }
     const fromMock = vi.fn()
     fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(chain({ count: 5 }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockUser('user-1', fromMock)
 
     const result = await OfficialAccountPage({ params: PARAMS })
 
@@ -151,14 +150,13 @@ describe('OfficialAccountPage', () => {
   })
 
   it('defaults assignmentCount to 0 when the count is null', async () => {
-    mockUser('user-1')
     mockResolvedTenant()
     const official = { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: false }
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(chain({ data: official }))
       .mockReturnValueOnce(chain({ count: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    mockUser('user-1', fromMock)
 
     const result = await OfficialAccountPage({ params: PARAMS })
 

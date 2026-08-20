@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialHomePage from './page'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  createSupabaseServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -39,11 +38,12 @@ function chain(result: unknown) {
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockUser(userId: string | null) {
+function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
     },
+    from: fromMock,
   } as never)
 }
 
@@ -53,11 +53,12 @@ beforeEach(() => {
 
 describe('OfficialHomePage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    mockUser(null)
+    const fromMock = vi.fn()
+    mockUser(null, fromMock)
 
     await expect(OfficialHomePage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
     expect(resolveTenantForOfficial).not.toHaveBeenCalled()
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('calls notFound when resolveTenantForOfficial denies access or the tenant is missing', async () => {
@@ -69,7 +70,6 @@ describe('OfficialHomePage', () => {
   })
 
   it('scopes the officials lookup by user_id and tenant_id, and events by tenant_id only', async () => {
-    mockUser('user-1')
     vi.mocked(resolveTenantForOfficial).mockResolvedValue({
       id: TENANT_ID,
       slug: 'viadal',
@@ -78,29 +78,27 @@ describe('OfficialHomePage', () => {
     })
     const officialsBuilder = chain({ data: { name: 'Anna' } })
     const eventsBuilder = chain({ data: { name: 'Viadal 2026' } })
-    const serviceFromMock = vi.fn()
-    serviceFromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(eventsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
+    const fromMock = vi.fn()
+    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(eventsBuilder)
+    mockUser('user-1', fromMock)
 
     await OfficialHomePage({ params: PARAMS })
 
-    expect(serviceFromMock).toHaveBeenCalledWith('officials')
+    expect(fromMock).toHaveBeenCalledWith('officials')
     expect(officialsBuilder.eq).toHaveBeenCalledWith('user_id', 'user-1')
     expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
-    expect(serviceFromMock).toHaveBeenCalledWith('events')
+    expect(fromMock).toHaveBeenCalledWith('events')
     expect(eventsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
   })
 
   it('renders successfully when neither an official nor an event is found', async () => {
-    mockUser('user-1')
     vi.mocked(resolveTenantForOfficial).mockResolvedValue({
       id: TENANT_ID,
       slug: 'viadal',
       color_palette: 'default',
       is_active: true,
     })
-    const serviceFromMock = vi.fn().mockReturnValue(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
+    mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
 
     const result = await OfficialHomePage({ params: PARAMS })
 

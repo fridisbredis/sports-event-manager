@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { ScheduleView, type AssignmentRow } from './_components/schedule-view'
@@ -23,9 +23,7 @@ export default async function SchedulePage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: officialsRows } = await service
+  const { data: officialsRows } = await supabase
     .from('officials')
     .select('id')
     .eq('user_id', user.id)
@@ -38,7 +36,7 @@ export default async function SchedulePage({ params }: Props) {
   let assignments: AssignmentRow[] = []
 
   if (official) {
-    const { data } = await service
+    const { data } = await supabase
       .from('assignments')
       .select(
         `

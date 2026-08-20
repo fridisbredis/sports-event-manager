@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TenantDetailPage from './page'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TenantDetail } from './_components/tenant-detail'
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServiceClient: vi.fn(),
+  createSupabaseServerClient: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -51,7 +51,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 describe('TenantDetailPage', () => {
   it('calls notFound and renders nothing when the tenant does not exist', async () => {
     const fromMock = vi.fn().mockReturnValue(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await expect(
       TenantDetailPage({ params: Promise.resolve({ tenantId: TENANT_ID }) })
@@ -64,7 +64,7 @@ describe('TenantDetailPage', () => {
     const tenant = { id: TENANT_ID, name: 'Viadal', is_active: true, tier: 'premium' }
     const tenantsBuilder = chain({ data: tenant })
     const fromMock = vi.fn().mockReturnValue(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const result = await TenantDetailPage({ params: Promise.resolve({ tenantId: TENANT_ID }) })
 

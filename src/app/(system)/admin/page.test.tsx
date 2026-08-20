@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SystemAdminPage from './page'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServiceClient: vi.fn(),
+  createSupabaseServerClient: vi.fn(),
 }))
 
 vi.mock('./_components/tenant-list', () => ({
@@ -28,7 +28,7 @@ describe('SystemAdminPage', () => {
     ]
     const tenantsBuilder = chain({ data: tenants })
     const fromMock = vi.fn().mockReturnValue(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const result = await SystemAdminPage()
 
@@ -41,7 +41,7 @@ describe('SystemAdminPage', () => {
   it('passes an empty array when the query returns no data', async () => {
     const tenantsBuilder = chain({ data: null })
     const fromMock = vi.fn().mockReturnValue(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const result = await SystemAdminPage()
 

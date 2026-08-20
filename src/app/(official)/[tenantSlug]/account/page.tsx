@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
 
@@ -23,13 +23,11 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-
   // Confirmed rows only, newest first: a re-invited official also has the old
   // soft-deleted ('removed') row on this (user_id, tenant_id), and maybeSingle() would
   // error on the pair and send a real official to notFound(). user_id is only ever set
   // at confirm time, so this filter excludes exactly the removed rows.
-  const { data: official } = await service
+  const { data: official } = await supabase
     .from('officials')
     .select('id, name, phone, sms_opt_out')
     .eq('user_id', user.id)
@@ -41,7 +39,7 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   if (!official) notFound()
 
-  const { count: assignmentCount } = await service
+  const { count: assignmentCount } = await supabase
     .from('assignments')
     .select('id', { count: 'exact', head: true })
     .eq('official_id', official.id)
