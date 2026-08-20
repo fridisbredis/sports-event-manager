@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { normalizePhoneToE164, PHONE_COUNTRIES, toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireTenantAdmin(tenantId)
   if ('error' in auth) return auth.error
 
-  const service = await createSupabaseServiceClient()
+  const supabase = await createSupabaseServerClient()
 
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   // what invite confirmation binds against (0017/0018). Checked here as well as by the
   // partial unique index from 0020 so the rule still holds if a database is behind on
   // migrations; the index is what makes it race-proof, handled below.
-  const { data: duplicate } = await service
+  const { data: duplicate } = await supabase
     .from('officials')
     .select('id')
     .eq('tenant_id', tenantId)
@@ -59,6 +59,10 @@ export async function POST(request: NextRequest) {
       { status: 409 }
     )
   }
+
+  // auth.admin.* has no RLS-based equivalent — stays on the service client
+  // (row #15 in docs/security/service-role-audit.md).
+  const service = await createSupabaseServiceClient()
 
   // The auth.users row is created here, at invite time, rather than lazily via
   // signInWithOtp's default shouldCreateUser:true when the invitee later logs in.
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
     officialUserId = created.user.id
   }
 
-  const { data: official, error } = await service
+  const { data: official, error } = await supabase
     .from('officials')
     .insert({
       tenant_id: tenantId,
@@ -119,7 +123,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
   }
 
-  const { data: tenant } = await service.from('tenants').select('name').eq('id', tenantId).single()
+  const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${official.invite_token}`
 

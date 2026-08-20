@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -10,7 +10,7 @@ vi.mock('@/lib/auth/tenant', () => ({
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServiceClient: vi.fn(),
+  createSupabaseServerClient: vi.fn(),
 }))
 
 const messagesCreate = vi.fn()
@@ -74,7 +74,7 @@ describe('POST /api/officials/[id]/resend', () => {
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
     expect(res).toBe(errorResponse)
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
     expect(messagesCreate).not.toHaveBeenCalled()
   })
 
@@ -91,7 +91,7 @@ describe('POST /api/officials/[id]/resend', () => {
       .mockReturnValueOnce(officialsBuilder)
       .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
       .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
@@ -106,7 +106,7 @@ describe('POST /api/officials/[id]/resend', () => {
       role: 'tenant_admin',
     } as never)
     const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
@@ -124,7 +124,7 @@ describe('POST /api/officials/[id]/resend', () => {
         data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'confirmed' },
       })
     )
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
@@ -148,7 +148,7 @@ describe('POST /api/officials/[id]/resend', () => {
       .mockReturnValueOnce(officialsSelectBuilder)
       .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
     const body = await res.json()
@@ -188,7 +188,7 @@ describe('POST /api/officials/[id]/resend', () => {
         })
       )
       .mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
@@ -212,7 +212,7 @@ describe('POST /api/officials/[id]/resend', () => {
       .mockReturnValueOnce(officialsSelectBuilder)
       .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     messagesCreate.mockRejectedValueOnce(new Error('send failed'))
 
@@ -241,7 +241,7 @@ describe('POST /api/officials/[id]/resend', () => {
       .mockReturnValueOnce(officialsSelectBuilder)
       .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const twilioError = Object.assign(new Error('Invalid To number: +46701234567'), {
       code: 21211,
@@ -282,7 +282,7 @@ describe('POST /api/officials/[id]/resend', () => {
       .mockReturnValueOnce(officialsSelectBuilder)
       .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     vi.mocked(twilio).mockImplementationOnce(() => {
       throw new Error('accountSid must start with AC')
@@ -318,7 +318,7 @@ describe('POST /api/officials/[id]/resend', () => {
       .mockReturnValueOnce(officialsSelectBuilder)
       .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     restoreConsoleError = () => consoleErrorSpy.mockRestore()

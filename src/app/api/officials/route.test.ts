@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -10,6 +10,7 @@ vi.mock('@/lib/auth/tenant', () => ({
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
 }))
 
@@ -45,17 +46,21 @@ function freshAuthUser(userId = 'auth-user-1') {
 }
 
 /**
- * Every successful POST queries `officials` three times in order: the duplicate-phone
- * lookup, the insert, then `tenants` for the SMS body. Tests pass the builders for
- * everything after the duplicate check, which defaults to "no duplicate found".
+ * Every successful POST queries the session client's `officials`/`tenants`
+ * three times in order: the duplicate-phone lookup, the officials insert,
+ * then `tenants` for the SMS body. auth.admin.createUser and the
+ * get_user_id_by_phone RPC have no RLS equivalent, so they stay on the
+ * service client — see row #15 in docs/security/service-role-audit.md.
+ * Tests pass the builders for everything after the duplicate check, which
+ * defaults to "no duplicate found".
  */
 function mockService(...afterDuplicateCheck: unknown[]) {
   const fromMock = vi.fn()
   fromMock.mockReturnValueOnce(noDuplicate())
   afterDuplicateCheck.forEach((builder) => fromMock.mockReturnValueOnce(builder))
   freshAuthUser()
-  vi.mocked(createSupabaseServiceClient).mockReturnValue({
-    from: fromMock,
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+  vi.mocked(createSupabaseServiceClient).mockResolvedValue({
     auth: { admin: { createUser, deleteUser } },
     rpc,
   } as never)
@@ -104,6 +109,7 @@ describe('POST /api/officials', () => {
     )
 
     expect(res).toBe(errorResponse)
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
     expect(messagesCreate).not.toHaveBeenCalled()
   })
@@ -215,7 +221,7 @@ describe('POST /api/officials', () => {
     fromMock
       .mockReturnValueOnce(chain({ data: { id: 'existing-official' } }))
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(
       makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })

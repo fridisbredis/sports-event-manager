@@ -20,13 +20,19 @@ const setTenantTierSchema = z.object({
   tier: z.enum(['standard', 'premium', 'professional']),
 })
 
-async function assertSystemAdmin(): Promise<{ error?: string }> {
+type SystemAdminCheck =
+  | { ok: false; error: string }
+  | { ok: true; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> }
+
+async function assertSystemAdmin(): Promise<SystemAdminCheck> {
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Bootstrap lookup: determines the role RLS itself would gate on, so RLS
+  // can't be used here. See row #1 in docs/security/service-role-audit.md.
   const service = await createSupabaseServiceClient()
   const { data } = await service
     .from('user_roles')
@@ -36,13 +42,14 @@ async function assertSystemAdmin(): Promise<{ error?: string }> {
     .limit(1)
     .maybeSingle()
 
-  if (!data) return { error: 'Forbidden' }
-  return {}
+  if (!data) return { ok: false, error: 'Forbidden' }
+  return { ok: true, supabase }
 }
 
 export async function createTenant(name: string): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
-  if (check.error) return check
+  if (!check.ok) return { error: check.error }
+  const { supabase } = check
 
   const parsed = createTenantSchema.safeParse({ name })
   if (!parsed.success) return { error: 'Invalid name' }
@@ -50,9 +57,7 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   const slug = toSlug(parsed.data.name)
   if (!slug) return { error: 'Invalid name' }
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: tenant, error: tenantError } = await service
+  const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .insert({
       name: parsed.data.name,
@@ -69,7 +74,7 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
     return { error: 'Failed to create tenant' }
   }
 
-  const { data: event, error: eventError } = await service
+  const { data: event, error: eventError } = await supabase
     .from('events')
     .insert({
       tenant_id: tenant.id,
@@ -83,7 +88,7 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
 
   if (eventError || !event) return { error: 'Failed to create event' }
 
-  const { error: stagesError } = await service.from('event_stages').insert([
+  const { error: stagesError } = await supabase.from('event_stages').insert([
     {
       event_id: event.id,
       tenant_id: tenant.id,
@@ -121,13 +126,13 @@ export async function setTenantActive(
   isActive: boolean
 ): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
-  if (check.error) return check
+  if (!check.ok) return { error: check.error }
+  const { supabase } = check
 
   const parsed = setTenantActiveSchema.safeParse({ tenantId, isActive })
   if (!parsed.success) return { error: 'Invalid request' }
 
-  const service = await createSupabaseServiceClient()
-  const { error } = await service
+  const { error } = await supabase
     .from('tenants')
     .update({ is_active: parsed.data.isActive })
     .eq('id', parsed.data.tenantId)
@@ -144,13 +149,13 @@ export async function setTenantTier(
   tier: 'standard' | 'premium' | 'professional'
 ): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
-  if (check.error) return check
+  if (!check.ok) return { error: check.error }
+  const { supabase } = check
 
   const parsed = setTenantTierSchema.safeParse({ tenantId, tier })
   if (!parsed.success) return { error: 'Invalid request' }
 
-  const service = await createSupabaseServiceClient()
-  const { error } = await service
+  const { error } = await supabase
     .from('tenants')
     .update({ tier: parsed.data.tier })
     .eq('id', parsed.data.tenantId)
