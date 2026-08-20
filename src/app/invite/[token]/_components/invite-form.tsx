@@ -177,7 +177,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             type="button"
             onClick={handleResendOtp}
             disabled={resending || resendCooldown > 0}
-            className="mt-3 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+            className="mt-3 block w-full text-center text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
           >
             {resendCooldown > 0
               ? t('signIn.resendCodeCooldown', { seconds: resendCooldown })
