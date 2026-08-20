@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import CommunicationPage from './page'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { CommunicationPanel } from './_components/communication-panel'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  createSupabaseServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -54,13 +53,18 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockServerClient(userId: string | null, tenant: unknown) {
+function mockServerClient(userId: string | null, tenant: unknown, announcementsResult?: unknown) {
+  const fromMock = vi.fn((table: string) => {
+    if (table === 'announcements') return chain(announcementsResult ?? { data: null })
+    return chain({ data: tenant })
+  })
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
     },
-    from: vi.fn().mockReturnValue(chain({ data: tenant })),
+    from: fromMock,
   } as never)
+  return fromMock
 }
 
 beforeEach(() => {
@@ -84,17 +88,20 @@ describe('CommunicationPage', () => {
   })
 
   it('loads announcements for the tenant and passes them to CommunicationPanel', async () => {
-    mockServerClient('user-1', { id: TENANT_ID, name: 'Viadal', slug: 'viadal' })
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-
     const announcements = [{ id: 'ann-1', channel: 'officials', body: 'hej' }]
-    const announcementsBuilder = chain({ data: announcements })
-    const serviceFromMock = vi.fn().mockReturnValue(announcementsBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
+    const fromMock = mockServerClient(
+      'user-1',
+      { id: TENANT_ID, name: 'Viadal', slug: 'viadal' },
+      { data: announcements }
+    )
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
 
     const result = await CommunicationPage({ params: PARAMS })
 
-    expect(serviceFromMock).toHaveBeenCalledWith('announcements')
+    expect(fromMock).toHaveBeenCalledWith('announcements')
+    const announcementsBuilder = fromMock.mock.results.find(
+      (r, i) => fromMock.mock.calls[i][0] === 'announcements'
+    )!.value
     expect(announcementsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
 
     const panel = findByType(result, CommunicationPanel)
@@ -103,10 +110,8 @@ describe('CommunicationPage', () => {
   })
 
   it('passes an empty announcements array when the query returns no data', async () => {
-    mockServerClient('user-1', { id: TENANT_ID, name: 'Viadal', slug: 'viadal' })
+    mockServerClient('user-1', { id: TENANT_ID, name: 'Viadal', slug: 'viadal' }, { data: null })
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const serviceFromMock = vi.fn().mockReturnValue(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
 
     const result = await CommunicationPage({ params: PARAMS })
 

@@ -31,12 +31,18 @@ function chain(result: unknown) {
   return builder
 }
 
-function mockAuthedSystemAdmin(fromMock: ReturnType<typeof vi.fn>) {
+// assertSystemAdmin's role lookup goes through createSupabaseServiceClient
+// (bootstrap lookup — see the comment in actions.ts); every write after
+// that check passes goes through createSupabaseServerClient (RLS-enforced),
+// so the two clients need independent from() mocks.
+function mockAuthedSystemAdmin(serverFromMock: ReturnType<typeof vi.fn>) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'admin-1' } } }) },
+    from: serverFromMock,
   } as never)
-  // First from() call inside assertSystemAdmin resolves the role check.
-  fromMock.mockReturnValueOnce(chain({ data: { role: 'system_admin' } }))
+  vi.mocked(createSupabaseServiceClient).mockResolvedValue({
+    from: vi.fn().mockReturnValueOnce(chain({ data: { role: 'system_admin' } })),
+  } as never)
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
@@ -57,16 +63,19 @@ describe('assertSystemAdmin gate (shared by all actions)', () => {
   })
 
   it('returns Forbidden and never touches tenants when the user is not a system_admin', async () => {
+    const serverFromMock = vi.fn()
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+      from: serverFromMock,
     } as never)
-    const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    const serviceFromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
+    vi.mocked(createSupabaseServiceClient).mockResolvedValue({ from: serviceFromMock } as never)
 
     const result = await createTenant('Viadal 2026')
 
     expect(result).toEqual({ error: 'Forbidden' })
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(serviceFromMock).toHaveBeenCalledTimes(1)
+    expect(serverFromMock).not.toHaveBeenCalled()
   })
 })
 
@@ -74,13 +83,12 @@ describe('createTenant', () => {
   it('rejects a blank name without querying tenants', async () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await createTenant('   ')
 
     expect(result).toEqual({ error: 'Invalid name' })
-    // Only the assertSystemAdmin role lookup happened — no tenant insert.
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    // assertSystemAdmin's role lookup goes through the service client, not this one.
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('creates the tenant, default event, and default stages, then revalidates /admin', async () => {
@@ -90,16 +98,15 @@ describe('createTenant', () => {
       .mockReturnValueOnce(chain({ data: { id: 'tenant-1' }, error: null })) // tenants insert
       .mockReturnValueOnce(chain({ data: { id: 'event-1' }, error: null })) // events insert
       .mockReturnValueOnce(chain({ error: null })) // event_stages insert
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await createTenant('  Viadal 2026  ')
 
     expect(result).toEqual({})
-    const tenantsBuilder = fromMock.mock.results[1].value
+    const tenantsBuilder = fromMock.mock.results[0].value
     expect(tenantsBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Viadal 2026', slug: 'viadal-2026', is_active: true })
     )
-    const eventsBuilder = fromMock.mock.results[2].value
+    const eventsBuilder = fromMock.mock.results[1].value
     expect(eventsBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ tenant_id: 'tenant-1', name: 'Viadal 2026' })
     )
@@ -110,7 +117,6 @@ describe('createTenant', () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
     fromMock.mockReturnValueOnce(chain({ data: null, error: { code: '23505' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await createTenant('Viadal 2026')
 
@@ -123,12 +129,11 @@ describe('setTenantActive', () => {
   it('rejects a non-uuid tenantId without writing to tenants', async () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantActive('not-a-uuid', true)
 
     expect(result).toEqual({ error: 'Invalid request' })
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('updates is_active and revalidates both admin paths', async () => {
@@ -136,7 +141,6 @@ describe('setTenantActive', () => {
     mockAuthedSystemAdmin(fromMock)
     const updateBuilder = chain({ error: null })
     fromMock.mockReturnValueOnce(updateBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantActive(TENANT_ID, false)
 
@@ -151,7 +155,6 @@ describe('setTenantActive', () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
     fromMock.mockReturnValueOnce(chain({ error: { message: 'db is down' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantActive(TENANT_ID, true)
 
@@ -164,23 +167,21 @@ describe('setTenantTier', () => {
   it('rejects an invalid tier value without writing to tenants', async () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantTier(TENANT_ID, 'enterprise' as never)
 
     expect(result).toEqual({ error: 'Invalid request' })
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('rejects a non-uuid tenantId', async () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantTier('not-a-uuid', 'premium')
 
     expect(result).toEqual({ error: 'Invalid request' })
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('updates the tier and revalidates the tenant detail path', async () => {
@@ -188,7 +189,6 @@ describe('setTenantTier', () => {
     mockAuthedSystemAdmin(fromMock)
     const updateBuilder = chain({ error: null })
     fromMock.mockReturnValueOnce(updateBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantTier(TENANT_ID, 'premium')
 
@@ -202,7 +202,6 @@ describe('setTenantTier', () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
     fromMock.mockReturnValueOnce(chain({ error: { message: 'db is down' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
 
     const result = await setTenantTier(TENANT_ID, 'premium')
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   if ('error' in auth) return auth.error
 
   // ...rest of the handler unchanged (fetch recipients, insert announcement, send SMS)
-  const service = await createSupabaseServiceClient()
+  const supabase = await createSupabaseServerClient()
 
   // Officials keep their row (and phone number) after being removed, so the
   // officials channel must also exclude anyone who isn't a confirmed
@@ -41,14 +41,14 @@ export async function POST(request: NextRequest) {
   // variable) keeps each query's column types scoped to its own table.
   const { data: recipients, error } =
     channel === 'officials'
-      ? await service
+      ? await supabase
           .from('officials')
           .select('phone')
           .eq('tenant_id', tenantId)
           .eq('sms_opt_out', false)
           .eq('invite_status', 'confirmed')
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
-      : await service
+      : await supabase
           .from('participants')
           .select('phone')
           .eq('tenant_id', tenantId)
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  await service.from('announcements').insert({
+  await supabase.from('announcements').insert({
     tenant_id: tenantId,
     channel,
     body,

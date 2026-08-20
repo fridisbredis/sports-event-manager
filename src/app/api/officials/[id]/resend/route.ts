@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
@@ -22,9 +22,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const auth = await requireTenantAdmin(parsed.data.tenantId)
   if ('error' in auth) return auth.error
 
-  const service = await createSupabaseServiceClient()
+  const supabase = await createSupabaseServerClient()
 
-  const { data: official } = await service
+  const { data: official } = await supabase
     .from('officials')
     .select('id, name, phone, invite_status')
     .eq('id', id)
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // write in this codebase carries both, and a single unscoped filter is what an
   // audit has to stop and reason about.
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: updated } = await service
+  const { data: updated } = await supabase
     .from('officials')
     .update({ invite_token: randomUUID(), invite_token_expires_at: tokenExpiresAt })
     .eq('id', id)
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Failed to refresh invite token' }, { status: 500 })
   }
 
-  const { data: tenant } = await service
+  const { data: tenant } = await supabase
     .from('tenants')
     .select('name')
     .eq('id', parsed.data.tenantId)

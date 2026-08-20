@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -10,7 +10,7 @@ vi.mock('@/lib/auth/tenant', () => ({
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServiceClient: vi.fn(),
+  createSupabaseServerClient: vi.fn(),
 }))
 
 const messagesCreate = vi.fn()
@@ -79,7 +79,7 @@ describe('POST /api/announcements', () => {
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
     expect(res).toBe(errorResponse)
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
     expect(messagesCreate).not.toHaveBeenCalled()
   })
 
@@ -94,7 +94,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
@@ -117,7 +117,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     restoreConsoleError = () => consoleErrorSpy.mockRestore()
@@ -145,7 +145,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
     const responseBody = await res.json()
@@ -169,7 +169,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
 
@@ -187,7 +187,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
 
@@ -201,7 +201,7 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const fromMock = vi.fn().mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
@@ -224,7 +224,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
     const responseBody = await res.json()
@@ -265,7 +265,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
     const responseBody = await res.json()
@@ -286,7 +286,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
     const responseBody = await res.json()
@@ -309,7 +309,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
     const responseBody = await res.json()
@@ -341,7 +341,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(
       makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' })
@@ -369,7 +369,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     messagesCreate.mockImplementation(({ to }: { to: string }) =>
       to === '+46702222222' ? Promise.reject(new Error('invalid number')) : Promise.resolve({})
@@ -399,7 +399,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
     const responseBody = await res.json()
@@ -427,7 +427,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     vi.mocked(twilio).mockImplementationOnce(() => {
       throw new Error('accountSid must start with AC')
@@ -464,7 +464,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     restoreConsoleError = () => consoleErrorSpy.mockRestore()
@@ -491,7 +491,7 @@ describe('POST /api/announcements', () => {
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     // A real Twilio rejection quotes the destination number back in its message, which is
     // exactly why the raw error must never reach the log.

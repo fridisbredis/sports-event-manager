@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import EventInfoPage from './page'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  createSupabaseServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -40,11 +39,12 @@ function chain(result: unknown) {
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockUser(userId: string | null) {
+function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
     },
+    from: fromMock,
   } as never)
 }
 
@@ -63,11 +63,12 @@ beforeEach(() => {
 
 describe('EventInfoPage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    mockUser(null)
+    const fromMock = vi.fn()
+    mockUser(null, fromMock)
 
     await expect(EventInfoPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
     expect(resolveTenantForOfficial).not.toHaveBeenCalled()
-    expect(createSupabaseServiceClient).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('calls notFound when resolveTenantForOfficial denies access or the tenant is missing', async () => {
@@ -79,33 +80,30 @@ describe('EventInfoPage', () => {
   })
 
   it('scopes events, event_stages, and event_facilities queries by tenant_id', async () => {
-    mockUser('user-1')
     mockResolvedTenant()
     const eventBuilder = chain({ data: { name: 'Viadal 2026' } })
     const stagesBuilder = chain({ data: [] })
     const facilitiesBuilder = chain({ data: [] })
-    const serviceFromMock = vi.fn()
-    serviceFromMock
+    const fromMock = vi.fn()
+    fromMock
       .mockReturnValueOnce(eventBuilder)
       .mockReturnValueOnce(stagesBuilder)
       .mockReturnValueOnce(facilitiesBuilder)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
+    mockUser('user-1', fromMock)
 
     await EventInfoPage({ params: PARAMS })
 
-    expect(serviceFromMock).toHaveBeenCalledWith('events')
+    expect(fromMock).toHaveBeenCalledWith('events')
     expect(eventBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
-    expect(serviceFromMock).toHaveBeenCalledWith('event_stages')
+    expect(fromMock).toHaveBeenCalledWith('event_stages')
     expect(stagesBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
-    expect(serviceFromMock).toHaveBeenCalledWith('event_facilities')
+    expect(fromMock).toHaveBeenCalledWith('event_facilities')
     expect(facilitiesBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
   })
 
   it('renders successfully with empty stages and facilities lists', async () => {
-    mockUser('user-1')
     mockResolvedTenant()
-    const serviceFromMock = vi.fn().mockReturnValue(chain({ data: null }))
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: serviceFromMock } as never)
+    mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
 
     const result = await EventInfoPage({ params: PARAMS })
 

@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { CommunicationPanel } from './_components/communication-panel'
 
@@ -27,9 +27,7 @@ export default async function CommunicationPage({ params }: Props) {
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: announcements } = await service
+  const { data: announcements } = await supabase
     .from('announcements')
     .select('id, tenant_id, channel, body, sms_sent, published_at, created_at')
     .eq('tenant_id', tenant.id)

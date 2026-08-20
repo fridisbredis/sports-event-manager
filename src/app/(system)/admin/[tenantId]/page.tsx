@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
 
@@ -10,9 +10,9 @@ interface Props {
 
 export default async function TenantDetailPage({ params }: Props) {
   const { tenantId } = await params
-  const service = await createSupabaseServiceClient()
+  const supabase = await createSupabaseServerClient()
 
-  const { data: tenant } = await service
+  const { data: tenant } = await supabase
     .from('tenants')
     .select('id, name, is_active, tier')
     .eq('id', tenantId)

@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 import AdminAccountForm from './_components/admin-account-form'
@@ -17,9 +17,7 @@ export default async function AdminAccountPage({ params }: Props) {
 
   if (!user) redirect('/login')
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: tenant } = await service
+  const { data: tenant } = await supabase
     .from('tenants')
     .select('id')
     .eq('slug', tenantSlug)
@@ -34,7 +32,7 @@ export default async function AdminAccountPage({ params }: Props) {
   // page: a removed row and a re-confirmed row can both carry this
   // (user_id, tenant_id), and maybeSingle() errors on the pair. Must match the filter
   // in PATCH /api/account, or the form would edit a row the page never showed.
-  const { data: official } = await service
+  const { data: official } = await supabase
     .from('officials')
     .select('id, name, phone, sms_opt_out')
     .eq('user_id', user.id)
@@ -54,7 +52,7 @@ export default async function AdminAccountPage({ params }: Props) {
     )
   }
 
-  const { count: assignmentCount } = await service
+  const { count: assignmentCount } = await supabase
     .from('assignments')
     .select('id', { count: 'exact', head: true })
     .eq('official_id', official.id)

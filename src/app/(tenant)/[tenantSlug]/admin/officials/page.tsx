@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import OfficialsList from './_components/officials-list'
 
@@ -27,9 +27,7 @@ export default async function OfficialsPage({ params }: Props) {
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const service = await createSupabaseServiceClient()
-
-  const { data: officials } = await service
+  const { data: officials } = await supabase
     .from('officials')
     .select('id, name, phone, invite_status, user_id, created_at, tenant_id, sms_opt_out')
     .eq('tenant_id', tenant.id)

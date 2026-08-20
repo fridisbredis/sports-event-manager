@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveTenantForOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
@@ -114,13 +114,11 @@ export default async function OfficialHomePage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const service = await createSupabaseServiceClient()
-
   const [{ data: official }, { data: event }] = await Promise.all([
     // Confirmed rows only, newest first: a re-invited official also has the old
     // soft-deleted row on this (user_id, tenant_id), and maybeSingle() errors on the
     // pair — which would blank the greeting name for a legitimate official.
-    service
+    supabase
       .from('officials')
       .select('name')
       .eq('user_id', user.id)
@@ -129,7 +127,7 @@ export default async function OfficialHomePage({ params }: Props) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    service.from('events').select('name').eq('tenant_id', tenant.id).maybeSingle(),
+    supabase.from('events').select('name').eq('tenant_id', tenant.id).maybeSingle(),
   ])
 
   const name = official?.name ?? ''
