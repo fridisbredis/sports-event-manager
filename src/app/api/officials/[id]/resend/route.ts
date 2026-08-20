@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { toTwilioE164 } from '@/lib/phone'
+import { stripE164Plus, toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
 import { z } from 'zod'
+import {
+  checkInviteRateLimit,
+  releaseInviteRateLimit,
+  type RateLimitResult,
+} from '@/lib/rate-limit'
 
 const resendSchema = z.object({
   tenantId: z.string().uuid(),
@@ -34,6 +39,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!official) {
     return NextResponse.json({ error: 'Official not found' }, { status: 404 })
   }
+
+  // Canonicalized once so it matches the key create used (route.ts) — the rate-limit
+  // key is a plain string with no normalization of its own (see rate-limit.ts).
+  const rateLimitPhone = stripE164Plus(official.phone)
 
   if (official.invite_status !== 'invited') {
     return NextResponse.json(
@@ -77,6 +86,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
   }
 
+  let rateLimit: RateLimitResult
+  try {
+    rateLimit = await checkInviteRateLimit(parsed.data.tenantId, rateLimitPhone, auth.user.id)
+  } catch (err) {
+    // Log the DB-generated id and the underlying DB error message only — never the raw
+    // phone number, which the rate limit keys embed.
+    //
+    // One pre-formatted string, and never an undefined argument: console patching by
+    // editor extensions can throw on those, and a throw here would escape this catch
+    // and turn a handled rate-limit failure back into an unhandled 500.
+    const cause =
+      err instanceof Error ? (err.cause as { message?: unknown } | undefined)?.message : undefined
+    try {
+      console.error(
+        `Invite rate limit check failed for official ${official.id} (cause: ${cause ?? 'unknown'})`
+      )
+    } catch {
+      // Logging must never be able to change the response - see the send catch below.
+    }
+    return NextResponse.json({ error: 'Rate limit check failed' }, { status: 503 })
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many invite attempts' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    )
+  }
+
   // Regenerate the token as well as the expiry, so the old link is genuinely revoked
   // rather than extended: resend is the only tool an admin has when a link has gone to
   // the wrong number or leaked, and reusing the token would hand that URL another seven
@@ -94,6 +131,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .single()
 
   if (!updated?.invite_token) {
+    await releaseInviteRateLimit(parsed.data.tenantId, rateLimitPhone)
     return NextResponse.json({ error: 'Failed to refresh invite token' }, { status: 500 })
   }
 
@@ -146,6 +184,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // here: everything still reaching this catch is a rejection from Twilio, because the
     // two configuration faults that used to land in it - a non-AC account SID and an
     // unset sender number - are now answered with a 500 before the token is touched.
+    await releaseInviteRateLimit(parsed.data.tenantId, rateLimitPhone)
     return NextResponse.json({ error: 'Failed to send invite SMS' }, { status: 502 })
   }
 

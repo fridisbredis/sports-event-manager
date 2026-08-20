@@ -72,17 +72,28 @@ configuration, Twilio account, or production traffic.
 
 ### 2. Performance efficiency and capacity
 
-The following workload is a **proposed baseline** for acceptance testing. It
-must be replaced with numbers agreed with the product owner before release.
-**Note:** as proposed, this baseline is internally inconsistent — 500 officials
-and a 500-recipient announcement audience, but 1,000 concurrent read-only
-sessions. The read-session figure needs deriving from expected participant
-volume rather than asserted, because PERF-01 through PERF-04 all depend on it.
+**Note (2026-08-20):** the workload below replaces an earlier baseline (500
+officials, 100 work areas, 50,000 assignments, 20 concurrent admin sessions,
+1,000 concurrent read-only sessions, a 500-recipient audience) that had no
+basis in real event data — it was invented by an earlier session and written
+down as if it were agreed. This is an adjustment to correct that assumption,
+not a bug fix; nothing in the system was wrong, the document was.
 
-- One six-day event with 500 officials, 100 work areas, and 50,000 assignments.
-- 20 concurrent tenant-admin sessions editing or viewing schedules.
-- 1,000 concurrent read-only official/participant sessions during an event.
-- An announcement audience of 500 recipients.
+Two figures below are confirmed from the completed Viadal event. The
+remaining three are **placeholders awaiting real figures from the product
+owner** — rough estimates for sanity-checking only, not an agreed baseline.
+PERF-01 through PERF-04 still depend on these numbers; this section is not
+resolved until the placeholders are replaced.
+
+- One event with **20 officials** and **5 concurrent tenant-admin sessions**
+  (confirmed: ~3 admins worked the event; padded to 5 for headroom, e.g.
+  multiple sessions per admin).
+- **Placeholder — ~10-15 work areas** and **placeholder — ~200-400
+  assignments**. Estimated from typical race-event structure, not from
+  Viadal data. Needs a real figure from the product owner.
+- **Placeholder — concurrent read-only official/participant sessions, and
+  the announcement audience (participant count): unknown, no estimate
+  given.** Both depend on participant volume, which has no data point yet.
 
 | ID      | Requirement                                                                 | Proposed acceptance criterion                                                                                                                                                                                                                                                                                                                            | Verification                                                                                  | Priority |
 | ------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------- |
