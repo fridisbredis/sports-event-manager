@@ -23,7 +23,9 @@ function chain(result: unknown) {
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
   builder.insert = vi.fn(() => builder)
+  builder.update = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
+  builder.single = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
   return builder
@@ -89,11 +91,12 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({ data: [], error: null })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -112,11 +115,12 @@ describe('POST /api/announcements', () => {
     } as never)
     const recipients = Array.from({ length: 500 }, (_, i) => ({ phone: `+4670000${i}` }))
     const recipientsBuilder = chain({ data: recipients, error: null })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -140,11 +144,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -164,11 +169,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46702222222' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
@@ -182,11 +188,12 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({ data: [], error: null })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
@@ -219,11 +226,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }, { phone: '46702222222' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -254,17 +262,100 @@ describe('POST /api/announcements', () => {
     })
   })
 
+  it('updates sms_sent to true once at least one send succeeds (F-SEC-04)', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '46701111111' }, { phone: '46702222222' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const updateBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(updateBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    messagesCreate.mockImplementation(({ to }: { to: string }) =>
+      to === '+46702222222' ? Promise.reject(new Error('invalid number')) : Promise.resolve({})
+    )
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(fromMock).toHaveBeenNthCalledWith(3, 'announcements')
+    expect(updateBuilder.update).toHaveBeenCalledWith({ sms_sent: true })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('id', 'ann-1')
+  })
+
+  it('updates sms_sent to false when every send fails (F-SEC-04)', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '46701111111' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const updateBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(updateBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    messagesCreate.mockRejectedValue(new Error('invalid number'))
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ sms_sent: false })
+  })
+
+  it('returns 500 and never sends sms when the announcement insert fails (F-SEC-04)', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({ data: [{ phone: '46701111111' }], error: null })
+    const insertBuilder = chain({ data: null, error: { message: 'insert boom' } })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const responseBody = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(responseBody).toEqual({ error: 'Failed to publish announcement' })
+    expect(messagesCreate).not.toHaveBeenCalled()
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('insert boom'))
+  })
+
   it('does not send any sms and reports 0/0 when there are no recipients', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({ data: [], error: null })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -281,11 +372,12 @@ describe('POST /api/announcements', () => {
       role: 'tenant_admin',
     } as never)
     const recipientsBuilder = chain({ data: null, error: null })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -304,11 +396,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -336,11 +429,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46702222222' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(
@@ -364,11 +458,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }, { phone: '46702222222' }, { phone: '46703333333' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     messagesCreate.mockImplementation(({ to }: { to: string }) =>
@@ -394,11 +489,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '+46703333333' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
@@ -422,7 +518,7 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
@@ -459,7 +555,7 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
@@ -486,11 +582,12 @@ describe('POST /api/announcements', () => {
       data: [{ phone: '46701111111' }, { phone: '46702222222' }],
       error: null,
     })
-    const insertBuilder = chain({ data: null, error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     // A real Twilio rejection quotes the destination number back in its message, which is
