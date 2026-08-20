@@ -186,6 +186,8 @@
     "removeConfirmTitle": "Remove official?",
     "removeConfirmBody": "Removing {{name}} also frees any work-area assignments they hold. This can't be undone.",
     "removeConfirm": "Are you sure? This will free any assignments for this official.",
+    "resendConfirmTitle": "Re-send invite?",
+    "resendConfirmBody": "If {{name}} already opened their invite link and has a code, re-sending invalidates it. They'll need to use the new SMS instead.",
     "inviteSent": "Invite sent to {{name}}",
     "added": "Official added",
     "empty": "No officials yet",

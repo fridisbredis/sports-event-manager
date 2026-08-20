@@ -46,6 +46,7 @@ export default function OfficialsList({
   const [officials, setOfficials] = useState<OfficialListItem[]>(initialOfficials)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<OfficialListItem | null>(null)
+  const [resendTarget, setResendTarget] = useState<OfficialListItem | null>(null)
   const [pending, setPending] = useState(false)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
@@ -126,6 +127,7 @@ export default function OfficialsList({
   }
 
   async function handleResend(official: OfficialListItem) {
+    setResendTarget(null)
     setResendingId(official.id)
     try {
       const res = await fetch(`/api/officials/${official.id}/resend`, {
@@ -229,7 +231,7 @@ export default function OfficialsList({
                             size="sm"
                             variant="bordered"
                             isLoading={isResending}
-                            onPress={() => handleResend(official)}
+                            onPress={() => setResendTarget(official)}
                           >
                             {t('officials.resendInvite')}
                           </Button>
@@ -327,6 +329,16 @@ export default function OfficialsList({
         destructive
         onCancel={() => setRemoveTarget(null)}
         onConfirm={handleRemove}
+      />
+
+      <ConfirmDialog
+        open={resendTarget !== null}
+        title={t('officials.resendConfirmTitle')}
+        body={t('officials.resendConfirmBody', { name: resendTarget?.name ?? '' })}
+        cancelLabel={t('officials.cancel')}
+        confirmLabel={t('officials.resendInvite')}
+        onCancel={() => setResendTarget(null)}
+        onConfirm={() => resendTarget && handleResend(resendTarget)}
       />
     </div>
   )
