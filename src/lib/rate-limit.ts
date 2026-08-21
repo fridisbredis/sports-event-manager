@@ -1,9 +1,20 @@
+import { createHash } from 'crypto'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 
 const PHONE_LIMIT = { limit: 3, windowSeconds: 3600 }
 const ADMIN_LIMIT = { limit: 100, windowSeconds: 3600 }
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number }
+
+// Canonicalizes a phone number (strips all non-digit characters) and hashes it,
+// so the rate-limit key never stores the raw phone number as a DB primary key
+// (GDPR retention concern) and so callers that pass differently-formatted
+// representations of the same number still land on the same bucket.
+function phoneRateLimitKey(tenantId: string, phone: string): string {
+  const canonical = phone.replace(/\D/g, '')
+  const hash = createHash('sha256').update(canonical).digest('hex')
+  return `invite:phone:${tenantId}:${hash}`
+}
 
 async function hit(key: string, limit: number, windowSeconds: number): Promise<RateLimitResult> {
   const supabase = createSupabaseServiceClient()
@@ -22,7 +33,7 @@ export async function checkInviteRateLimit(
   phone: string,
   userId: string
 ): Promise<RateLimitResult> {
-  const phoneKey = `invite:phone:${tenantId}:${phone}`
+  const phoneKey = phoneRateLimitKey(tenantId, phone)
   const adminKey = `invite:admin:${userId}`
 
   // Phone checked first (narrower limit) and short-circuits on reject, so the
@@ -35,20 +46,25 @@ export async function checkInviteRateLimit(
   return hit(adminKey, ADMIN_LIMIT.limit, ADMIN_LIMIT.windowSeconds)
 }
 
+function redactPhone(message: string, phone: string): string {
+  return message.split(phone).join('[redacted]')
+}
+
 export async function releaseInviteRateLimit(tenantId: string, phone: string): Promise<void> {
   try {
     const supabase = createSupabaseServiceClient()
     const { error } = await supabase.rpc('release_rate_limit', {
-      p_key: `invite:phone:${tenantId}:${phone}`,
+      p_key: phoneRateLimitKey(tenantId, phone),
     })
     if (error) {
       console.error(
-        `Invite rate limit release failed for tenant ${tenantId} (cause: ${error.message})`
+        `Invite rate limit release failed for tenant ${tenantId} (cause: ${redactPhone(error.message, phone)})`
       )
     }
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
     console.error(
-      `Invite rate limit release threw for tenant ${tenantId} (cause: ${err instanceof Error ? err.message : String(err)})`
+      `Invite rate limit release threw for tenant ${tenantId} (cause: ${redactPhone(message, phone)})`
     )
   }
   // Best-effort: a failed release self-heals when the phone key's window expires.

@@ -202,6 +202,7 @@
     "addRateLimited_one": "Too many invite attempts. Try again in {{minutes}} minute.",
     "addRateLimited_other": "Too many invite attempts. Try again in {{minutes}} minutes.",
     "addServiceUnavailable": "Nothing was sent. Try again in a moment.",
+    "addUnexpectedError": "Something went wrong. Try again, or contact support if it keeps happening.",
     "sessionExpired": "Session expired — please refresh the page and try again."
   },
   "scheduling": {

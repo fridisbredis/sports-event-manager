@@ -110,7 +110,11 @@ export default function OfficialsList({
         toastError(t('officials.addServiceUnavailable'))
       } else {
         const body = await res.json().catch(() => ({}))
-        const message = extractErrorMessage(body, `Error ${res.status}`)
+        console.error(
+          'Unexpected /api/officials error response:',
+          extractErrorMessage(body, `Error ${res.status}`)
+        )
+        const message = t('officials.addUnexpectedError')
         setAddError(message)
         toastError(message)
       }
