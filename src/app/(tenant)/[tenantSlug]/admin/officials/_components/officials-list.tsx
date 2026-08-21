@@ -142,6 +142,8 @@ export default function OfficialsList({
   }
 
   async function handleResend(official: OfficialListItem) {
+    // TEMP DIAGNOSTIC — remove after CI investigation
+    console.log('[diag] handleResend called with official.id =', official.id)
     setResendingId(official.id)
     try {
       const res = await fetch(`/api/officials/${official.id}/resend`, {
