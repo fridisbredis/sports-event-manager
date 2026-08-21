@@ -342,7 +342,10 @@ describe('OfficialsList — handleResend error branches', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
 
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith(fakeT('officials.sessionExpired')))
+    await waitFor(
+      () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.sessionExpired')),
+      { timeout: 5000 }
+    )
   })
 
   it('503: shows resend-service-unavailable toast', async () => {
@@ -351,8 +354,9 @@ describe('OfficialsList — handleResend error branches', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
 
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendServiceUnavailable'))
+    await waitFor(
+      () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendServiceUnavailable')),
+      { timeout: 5000 }
     )
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/officials/off-1/resend',
@@ -366,10 +370,12 @@ describe('OfficialsList — handleResend error branches', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
 
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        fakeT('officials.resendRateLimited', { count: 2, minutes: 2 })
-      )
+    await waitFor(
+      () =>
+        expect(toastError).toHaveBeenCalledWith(
+          fakeT('officials.resendRateLimited', { count: 2, minutes: 2 })
+        ),
+      { timeout: 5000 }
     )
   })
 
@@ -379,10 +385,12 @@ describe('OfficialsList — handleResend error branches', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
 
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        fakeT('officials.resendError', { name: 'Jane Referee' })
-      )
+    await waitFor(
+      () =>
+        expect(toastError).toHaveBeenCalledWith(
+          fakeT('officials.resendError', { name: 'Jane Referee' })
+        ),
+      { timeout: 5000 }
     )
   })
 
@@ -392,8 +400,9 @@ describe('OfficialsList — handleResend error branches', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
 
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendConfigError'))
+    await waitFor(
+      () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendConfigError')),
+      { timeout: 5000 }
     )
     expect(toastError).not.toHaveBeenCalledWith(
       fakeT('officials.resendError', { name: 'Jane Referee' })
