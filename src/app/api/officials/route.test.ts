@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
+import type { Database } from '@/types/database'
 import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -12,6 +15,11 @@ vi.mock('@/lib/auth/tenant', () => ({
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkInviteRateLimit: vi.fn(),
+  releaseInviteRateLimit: vi.fn(),
 }))
 
 const messagesCreate = vi.fn()
@@ -60,10 +68,10 @@ function mockService(...afterDuplicateCheck: unknown[]) {
   afterDuplicateCheck.forEach((builder) => fromMock.mockReturnValueOnce(builder))
   freshAuthUser()
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
-  vi.mocked(createSupabaseServiceClient).mockResolvedValue({
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({
     auth: { admin: { createUser, deleteUser } },
     rpc,
-  } as never)
+  } as unknown as SupabaseClient<Database>)
   return fromMock
 }
 
@@ -90,6 +98,8 @@ describe('POST /api/officials', () => {
     process.env.TWILIO_ACCOUNT_SID = 'AC_test'
     process.env.TWILIO_AUTH_TOKEN = 'token_test'
     process.env.TWILIO_PHONE_NUMBER = '+15550001111'
+    vi.mocked(checkInviteRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    vi.mocked(releaseInviteRateLimit).mockResolvedValue(undefined)
   })
 
   it('returns 400 for invalid input without checking auth or sending sms', async () => {
@@ -232,6 +242,7 @@ describe('POST /api/officials', () => {
     expect(body.code).toBe('duplicate_phone')
     expect(insertBuilder.insert).not.toHaveBeenCalled()
     expect(messagesCreate).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
   })
 
   it('returns 409 rather than 500 when the unique index rejects a concurrent insert', async () => {
@@ -247,6 +258,7 @@ describe('POST /api/officials', () => {
     expect(res.status).toBe(409)
     expect(body.code).toBe('duplicate_phone')
     expect(messagesCreate).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
   })
 
   it('allows a repeated name as long as the phone number differs', async () => {
@@ -342,5 +354,118 @@ describe('POST /api/officials', () => {
 
     expect(res.status).toBe(500)
     expect(messagesCreate).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('returns 500 and releases the rate limit when the phone_exists lookup fails', async () => {
+    asAdmin()
+    const fromMock = vi.fn()
+    fromMock.mockReturnValueOnce(noDuplicate())
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    createUser.mockResolvedValue({
+      data: null,
+      error: { code: 'phone_exists', message: 'phone already registered' },
+    })
+    rpc.mockResolvedValue({ data: null, error: { message: 'rpc failed' } })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      auth: { admin: { createUser, deleteUser } },
+      rpc,
+    } as unknown as SupabaseClient<Database>)
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(res.status).toBe(500)
+    expect(messagesCreate).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('returns 500 and releases the rate limit when createUser fails for a reason other than phone_exists', async () => {
+    asAdmin()
+    const fromMock = vi.fn()
+    fromMock.mockReturnValueOnce(noDuplicate())
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    createUser.mockResolvedValue({
+      data: null,
+      error: { code: 'unexpected_failure', message: 'boom' },
+    })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      auth: { admin: { createUser, deleteUser } },
+      rpc,
+    } as unknown as SupabaseClient<Database>)
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(res.status).toBe(500)
+    expect(messagesCreate).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('returns 429 with Retry-After when the invite rate limit is exceeded', async () => {
+    asAdmin()
+    vi.mocked(checkInviteRateLimit).mockResolvedValue({ allowed: false, retryAfterSeconds: 42 })
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBe('42')
+    expect(body.error).toBe('Too many invite attempts')
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('returns 503 when the rate limit check throws', async () => {
+    asAdmin()
+    vi.mocked(checkInviteRateLimit).mockRejectedValue(new Error('db down'))
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(body.error).toBe('Rate limit check failed')
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('releases the invite rate limit when the invite SMS throws', async () => {
+    asAdmin()
+    const official = {
+      id: 'off-1',
+      tenant_id: TENANT_ID,
+      name: 'Anna',
+      phone: '0701234567',
+      invite_status: 'invited',
+      invite_token: 'tok-abc',
+    }
+    mockService(chain({ data: official, error: null }), chain({ data: { name: 'Viadal 2026' } }))
+    messagesCreate.mockRejectedValueOnce(Object.assign(new Error('twilio down'), { code: 21211 }))
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('does not release the invite rate limit on the happy path', async () => {
+    asAdmin()
+    mockService(
+      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+      chain({ data: { name: 'Viadal 2026' } })
+    )
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(releaseInviteRateLimit).not.toHaveBeenCalled()
   })
 })

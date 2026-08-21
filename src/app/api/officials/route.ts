@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { normalizePhoneToE164, PHONE_COUNTRIES, toTwilioE164 } from '@/lib/phone'
+import { normalizePhoneToE164, PHONE_COUNTRIES, stripE164Plus, toTwilioE164 } from '@/lib/phone'
 import twilio from 'twilio'
 import { z } from 'zod'
+import {
+  checkInviteRateLimit,
+  releaseInviteRateLimit,
+  type RateLimitResult,
+} from '@/lib/rate-limit'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
@@ -36,6 +41,34 @@ export async function POST(request: NextRequest) {
   const auth = await requireTenantAdmin(tenantId)
   if ('error' in auth) return auth.error
 
+  let rateLimit: RateLimitResult
+  try {
+    rateLimit = await checkInviteRateLimit(tenantId, stripE164Plus(phone), auth.user.id)
+  } catch (err) {
+    // Log the tenant id and the underlying DB error message only — never the raw
+    // phone number, which the rate limit keys embed.
+    //
+    // One pre-formatted string, and never an undefined argument: console patching by
+    // editor extensions can throw on those, and a throw here would escape this catch
+    // and turn a handled rate-limit failure back into an unhandled 500.
+    const cause =
+      err instanceof Error ? (err.cause as { message?: unknown } | undefined)?.message : undefined
+    try {
+      console.error(
+        `Invite rate limit check failed for tenant ${tenantId} (cause: ${cause ?? 'unknown'})`
+      )
+    } catch {
+      // Logging must never be able to change the response - see the send catch below.
+    }
+    return NextResponse.json({ error: 'Rate limit check failed' }, { status: 503 })
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many invite attempts' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    )
+  }
+
   const supabase = await createSupabaseServerClient()
 
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -54,6 +87,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
 
   if (duplicate) {
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     return NextResponse.json(
       { error: 'An official with this phone number already exists', code: 'duplicate_phone' },
       { status: 409 }
@@ -62,7 +96,7 @@ export async function POST(request: NextRequest) {
 
   // auth.admin.* has no RLS-based equivalent — stays on the service client
   // (row #15 in docs/security/service-role-audit.md).
-  const service = await createSupabaseServiceClient()
+  const service = createSupabaseServiceClient()
 
   // The auth.users row is created here, at invite time, rather than lazily via
   // signInWithOtp's default shouldCreateUser:true when the invitee later logs in.
@@ -83,10 +117,12 @@ export async function POST(request: NextRequest) {
         { p_phone: phone }
       )
       if (lookupError || !existingUserId) {
+        await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
         return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
       }
       officialUserId = existingUserId
     } else {
+      await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
       return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
     }
   } else {
@@ -112,6 +148,7 @@ export async function POST(request: NextRequest) {
     // Only clean up the auth user if we just created it — not if it was an existing
     // account we reused (phone_exists branch above), which must survive this request.
     if (!createUserError) await service.auth.admin.deleteUser(officialUserId)
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     return NextResponse.json(
       { error: 'An official with this phone number already exists', code: 'duplicate_phone' },
       { status: 409 }
@@ -120,6 +157,7 @@ export async function POST(request: NextRequest) {
 
   if (error || !official) {
     if (!createUserError) await service.auth.admin.deleteUser(officialUserId)
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
   }
 
@@ -144,6 +182,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     smsSent = false
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     // Log the DB-generated id and Twilio's numeric code only — never the raw error,
     // which can echo the submitted phone number back into the logs.
     //

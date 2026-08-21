@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
 import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -11,6 +12,11 @@ vi.mock('@/lib/auth/tenant', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkInviteRateLimit: vi.fn(),
+  releaseInviteRateLimit: vi.fn(),
 }))
 
 const messagesCreate = vi.fn()
@@ -52,6 +58,8 @@ describe('POST /api/officials/[id]/resend', () => {
     process.env.TWILIO_ACCOUNT_SID = 'AC_test'
     process.env.TWILIO_AUTH_TOKEN = 'token_test'
     process.env.TWILIO_PHONE_NUMBER = '+15550001111'
+    vi.mocked(checkInviteRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    vi.mocked(releaseInviteRateLimit).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -194,6 +202,29 @@ describe('POST /api/officials/[id]/resend', () => {
 
     expect(res.status).toBe(500)
     expect(messagesCreate).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('releases the invite rate limit with a canonicalized phone (no leading +) when the token refresh fails', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'off-1', name: 'Anna', phone: '+46701234567', invite_status: 'invited' },
+        })
+      )
+      .mockReturnValueOnce(chain({ data: null }))
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(res.status).toBe(500)
+    expect(checkInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567', 'admin-1')
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
   })
 
   it('returns 502 when the Twilio send rejects, after the token has already been refreshed', async () => {
@@ -336,5 +367,96 @@ describe('POST /api/officials/[id]/resend', () => {
     expect(officialsUpdateBuilder.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ invite_token: expect.anything() })
     )
+  })
+
+  it('returns 429 with Retry-After when the invite rate limit is exceeded, without rotating the token', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const fromMock = vi.fn().mockReturnValueOnce(officialsSelectBuilder)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(checkInviteRateLimit).mockResolvedValue({ allowed: false, retryAfterSeconds: 17 })
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+    const body = await res.json()
+
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBe('17')
+    expect(body.error).toBe('Too many invite attempts')
+    expect(messagesCreate).not.toHaveBeenCalled()
+    // Only the officials select ran — the rate limit gate sits before token rotation.
+    expect(fromMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns 503 when the rate limit check throws', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const fromMock = vi.fn().mockReturnValueOnce(officialsSelectBuilder)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+    vi.mocked(checkInviteRateLimit).mockRejectedValue(new Error('db down'))
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(body.error).toBe('Rate limit check failed')
+    expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  it('releases the invite rate limit when the resend Twilio send rejects', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+
+    messagesCreate.mockRejectedValueOnce(new Error('send failed'))
+
+    await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('does not release the invite rate limit on the happy path', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(releaseInviteRateLimit).not.toHaveBeenCalled()
   })
 })

@@ -9,6 +9,9 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     globals: true,
     exclude: ['**/node_modules/**', 'tests/integration/**'],
+    pool: 'threads',
+    maxWorkers: 2,
+    minWorkers: 1,
   },
   resolve: {
     alias: {

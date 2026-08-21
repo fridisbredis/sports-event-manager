@@ -27,6 +27,14 @@ export function isValidPhoneForCountry(rawPhone: string, country: CountryCode): 
   return normalizePhoneToE164(rawPhone, country) !== null
 }
 
+// Canonical form for rate-limit keys (see rate-limit.ts), which are plain strings with
+// no normalization of their own — callers must agree on one shape or the same number
+// keys two different rows. Stored phones can inconsistently carry a leading '+'; this
+// always strips it, matching normalizePhoneToE164's output.
+export function stripE164Plus(phone: string): string {
+  return phone.startsWith('+') ? phone.slice(1) : phone
+}
+
 // Outbound SMS goes through our own Twilio client, which requires E.164 *with* the
 // leading '+'. Stored values omit it (see normalizePhoneToE164) and legacy rows are
 // inconsistent, so tolerate both on the way out. This is the only place the '+' is

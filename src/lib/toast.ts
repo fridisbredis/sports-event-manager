@@ -23,3 +23,14 @@ export function extractErrorMessage(body: unknown, fallback: string): string {
   }
   return fallback
 }
+
+/**
+ * Parses a 429 response's Retry-After header (seconds) into a whole number
+ * of minutes, rounded up. Falls back to 60 seconds if the header is missing
+ * or not a positive number.
+ */
+export function parseRetryAfterMinutes(res: Response): number {
+  const parsed = Number(res.headers.get('Retry-After'))
+  const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 60
+  return Math.ceil(seconds / 60)
+}

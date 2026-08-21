@@ -195,9 +195,18 @@
     "youLabel": "Event admin",
     "removeError": "Couldn't remove {{name}}. Try again.",
     "resendError": "Couldn't re-send the invite to {{name}}. The SMS didn't go out and their previous invite link no longer works, so re-send once SMS is available again.",
-    "resendConfigError": "SMS isn't configured, so nothing was sent. The existing invite link still works — this needs an administrator to fix rather than another try.",
+    "resendConfigError": "Nothing was sent. This needs an administrator to fix — trying again won't help.",
+    "resendServiceUnavailable": "Nothing was sent, but the official's existing invite link still works. Try again in a moment.",
+    "resendRateLimited_one": "Too many resend attempts. The invite link is untouched — try again in {{minutes}} minute.",
+    "resendRateLimited_other": "Too many resend attempts. The invite link is untouched — try again in {{minutes}} minutes.",
+    "resendOfficialUnavailable": "This invite is no longer available. Refresh the list and try again.",
     "addedSmsFailed": "{{name}} was added, but the invite SMS could not be sent. Use Re-send invite to try again.",
-    "duplicatePhone": "This mobile number already belongs to another official. Each official needs their own number."
+    "duplicatePhone": "This mobile number already belongs to another official. Each official needs their own number.",
+    "addRateLimited_one": "Too many invite attempts. Try again in {{minutes}} minute.",
+    "addRateLimited_other": "Too many invite attempts. Try again in {{minutes}} minutes.",
+    "addServiceUnavailable": "Nothing was sent. Try again in a moment.",
+    "addUnexpectedError": "Something went wrong. Try again, or contact support if it keeps happening.",
+    "sessionExpired": "Session expired — please refresh the page and try again."
   },
   "scheduling": {
     "title": "Scheduling",

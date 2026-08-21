@@ -418,6 +418,24 @@ export type Database = {
           },
         ]
       }
+      rate_limit_hits: {
+        Row: {
+          expire: string
+          key: string
+          points: number
+        }
+        Insert: {
+          expire: string
+          key: string
+          points: number
+        }
+        Update: {
+          expire?: string
+          key?: string
+          points?: number
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           color_palette: string
@@ -607,6 +625,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: { p_duration_seconds: number; p_key: string; p_limit: number }
+        Returns: {
+          allowed: boolean
+          retry_after_ms: number
+        }[]
+      }
       confirm_official_invite: {
         Args: {
           p_name: string
@@ -623,6 +648,7 @@ export type Database = {
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       is_system_admin: { Args: never; Returns: boolean }
+      release_rate_limit: { Args: { p_key: string }; Returns: undefined }
       remove_official: {
         Args: { p_official_id: string; p_tenant_id: string }
         Returns: Json

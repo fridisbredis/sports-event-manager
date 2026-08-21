@@ -21,7 +21,7 @@ import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
-import { toastError, extractErrorMessage } from '@/lib/toast'
+import { toastError, extractErrorMessage, parseRetryAfterMinutes } from '@/lib/toast'
 import {
   isValidPhoneForCountry,
   PHONE_COUNTRIES,
@@ -94,12 +94,26 @@ export default function OfficialsList({
         setAddError(message)
         toastError(message)
       } else if (res.status === 401) {
-        const message = 'Session expired — please refresh the page and try again.'
+        const message = t('officials.sessionExpired')
         setAddError(message)
         toastError(message)
+      } else if (res.status === 429) {
+        // Tenant-level invite-attempt ceiling — not a problem with the phone number
+        // itself, so this must not populate addError (which drives the phone field's
+        // invalid state).
+        const minutes = parseRetryAfterMinutes(res)
+        toastError(t('officials.addRateLimited', { count: minutes, minutes }))
+      } else if (res.status === 503) {
+        // The rate-limit check itself failed (DB unavailable) — transient, not a
+        // problem with the phone number, so this must not populate addError.
+        toastError(t('officials.addServiceUnavailable'))
       } else {
         const body = await res.json().catch(() => ({}))
-        const message = extractErrorMessage(body, `Error ${res.status}`)
+        console.error(
+          'Unexpected /api/officials error response:',
+          extractErrorMessage(body, `Error ${res.status}`)
+        )
+        const message = t('officials.addUnexpectedError')
         setAddError(message)
         toastError(message)
       }
@@ -135,16 +149,24 @@ export default function OfficialsList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId }),
       })
-      if (!res.ok) {
-        // A 500 is one of the route's own configuration guards, which run before the token
-        // is rotated: the official's existing invite link still works and clicking resend
-        // again cannot help. Anything else (in practice the 502 from a rejected send) means
-        // the token was already rotated, so the old link is dead and no new one arrived.
-        toastError(
-          res.status === 500
-            ? t('officials.resendConfigError')
-            : t('officials.resendError', { name: official.name })
-        )
+      if (res.status === 502) {
+        // Only a 502 (SMS send rejected) happens after the token is rotated, so the
+        // official's old invite link is genuinely dead and no new one arrived.
+        toastError(t('officials.resendError', { name: official.name }))
+      } else if (res.status === 429) {
+        // Rate limited before rotation — the existing invite link still works.
+        const minutes = parseRetryAfterMinutes(res)
+        toastError(t('officials.resendRateLimited', { count: minutes, minutes }))
+      } else if (res.status === 401) {
+        toastError(t('officials.sessionExpired'))
+      } else if (res.status === 503) {
+        // The rate-limit check itself failed (DB unavailable) before rotation — the
+        // official's existing invite link still works and this is transient.
+        toastError(t('officials.resendServiceUnavailable'))
+      } else if (res.status === 400 || res.status === 404) {
+        toastError(t('officials.resendOfficialUnavailable'))
+      } else if (!res.ok) {
+        toastError(t('officials.resendConfigError'))
       }
     } finally {
       setResendingId(null)
