@@ -336,74 +336,37 @@ describe('OfficialsList — handleResend error branches', () => {
     )
   }
 
+  // Clicking the row's "resendInvite" button only opens the confirm dialog
+  // (see officials-list.tsx's resendTarget state); the dialog's own
+  // "resendInvite"-labeled confirm button is what actually triggers
+  // handleResend, so both clicks are needed to reach the fetch call.
+  function clickResendAndConfirm() {
+    const [rowButton] = screen.getAllByRole('button', { name: 'officials.resendInvite' })
+    fireEvent.click(rowButton)
+
+    const confirmButton = screen
+      .getAllByRole('button', { name: 'officials.resendInvite' })
+      .find((button) => button !== rowButton)
+    fireEvent.click(confirmButton!)
+  }
+
   it('401: shows session-expired toast', async () => {
     fetchMock.mockResolvedValueOnce(makeResponse(401))
     renderList()
 
-    // TEMP DIAGNOSTICS — remove after CI investigation
-    const resendButtons = screen.getAllByRole('button', { name: 'officials.resendInvite' })
-    console.log('[diag] resendButtons.length =', resendButtons.length)
-    console.log('[diag] button tagName =', resendButtons[0].tagName)
-    console.log('[diag] button outerHTML =', resendButtons[0].outerHTML)
-    console.log('[diag] global.fetch === fetchMock =', global.fetch === (fetchMock as unknown))
-    console.log('[diag] fetchMock calls before click =', fetchMock.mock.calls.length)
-    console.log(
-      '[diag] button.ownerDocument === global.document =',
-      resendButtons[0].ownerDocument === global.document
-    )
-    console.log(
-      '[diag] button.isConnected =',
-      resendButtons[0].isConnected,
-      'body.contains(button) =',
-      document.body.contains(resendButtons[0])
-    )
-    const reactPropsKey = Object.keys(resendButtons[0]).find((k) =>
-      k.startsWith('__reactProps$')
-    )
-    console.log(
-      '[diag] react internal props key found =',
-      reactPropsKey,
-      'onClick typeof =',
-      reactPropsKey
-        ? typeof (resendButtons[0] as unknown as Record<string, { onClick?: unknown }>)[
-            reactPropsKey
-          ]?.onClick
-        : 'n/a'
-    )
-    resendButtons[0].addEventListener('click', () =>
-      console.log('[diag] native click listener fired')
-    )
-    fireEvent.click(resendButtons[0])
-    console.log('[diag] fetchMock calls after click =', fetchMock.mock.calls.length)
-    console.log(
-      '[diag] toastError calls right after click =',
-      (toastError as unknown as { mock: { calls: unknown[] } }).mock.calls.length
-    )
-    if (fetchMock.mock.calls.length > 0) {
-      const pending = fetchMock.mock.results[0]
-      console.log('[diag] fetch mock result type =', pending?.type)
-      Promise.resolve(pending?.value).then(
-        (v) => console.log('[diag] fetch promise resolved with status =', (v as Response)?.status),
-        (e) => console.log('[diag] fetch promise rejected with =', e)
-      )
-    }
-    // END TEMP DIAGNOSTICS
+    clickResendAndConfirm()
 
-    await waitFor(
-      () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.sessionExpired')),
-      { timeout: 5000 }
-    )
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(fakeT('officials.sessionExpired')))
   })
 
   it('503: shows resend-service-unavailable toast', async () => {
     fetchMock.mockResolvedValueOnce(makeResponse(503))
     renderList()
 
-    fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
+    clickResendAndConfirm()
 
-    await waitFor(
-      () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendServiceUnavailable')),
-      { timeout: 5000 }
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendServiceUnavailable'))
     )
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/officials/off-1/resend',
@@ -415,14 +378,12 @@ describe('OfficialsList — handleResend error branches', () => {
     fetchMock.mockResolvedValueOnce(makeResponse(429, { retryAfter: '90' }))
     renderList()
 
-    fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
+    clickResendAndConfirm()
 
-    await waitFor(
-      () =>
-        expect(toastError).toHaveBeenCalledWith(
-          fakeT('officials.resendRateLimited', { count: 2, minutes: 2 })
-        ),
-      { timeout: 5000 }
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        fakeT('officials.resendRateLimited', { count: 2, minutes: 2 })
+      )
     )
   })
 
@@ -430,14 +391,12 @@ describe('OfficialsList — handleResend error branches', () => {
     fetchMock.mockResolvedValueOnce(makeResponse(502))
     renderList()
 
-    fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
+    clickResendAndConfirm()
 
-    await waitFor(
-      () =>
-        expect(toastError).toHaveBeenCalledWith(
-          fakeT('officials.resendError', { name: 'Jane Referee' })
-        ),
-      { timeout: 5000 }
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        fakeT('officials.resendError', { name: 'Jane Referee' })
+      )
     )
   })
 
@@ -445,11 +404,10 @@ describe('OfficialsList — handleResend error branches', () => {
     fetchMock.mockResolvedValueOnce(makeResponse(500))
     renderList()
 
-    fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
+    clickResendAndConfirm()
 
-    await waitFor(
-      () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendConfigError')),
-      { timeout: 5000 }
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendConfigError'))
     )
     expect(toastError).not.toHaveBeenCalledWith(
       fakeT('officials.resendError', { name: 'Jane Referee' })

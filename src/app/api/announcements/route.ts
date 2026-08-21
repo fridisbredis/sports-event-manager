@@ -69,13 +69,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  await supabase.from('announcements').insert({
-    tenant_id: tenantId,
-    channel,
-    body,
-    sms_sent: false,
-    published_at: new Date().toISOString(),
-  })
+  const { data: announcement, error: insertError } = await supabase
+    .from('announcements')
+    .insert({
+      tenant_id: tenantId,
+      channel,
+      body,
+      sms_sent: false,
+      published_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single()
+
+  if (insertError || !announcement) {
+    console.error(`Failed to record announcement for tenant ${tenantId}: ${insertError?.message}`)
+    return NextResponse.json({ error: 'Failed to publish announcement' }, { status: 500 })
+  }
 
   // The sender number and the client are resolved before any send, and a fault in either
   // is our own configuration rather than a provider rejection, so both answer a
@@ -150,8 +159,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    sent: results.length - failed,
-    failed,
-  })
+  const sent = results.length - failed
+  const { error: updateError } = await supabase
+    .from('announcements')
+    .update({ sms_sent: sent > 0 })
+    .eq('id', announcement.id)
+
+  if (updateError) {
+    console.error(
+      `Failed to record delivery outcome for announcement ${announcement.id} (tenant ${tenantId}): ${updateError.message}`
+    )
+  }
+
+  return NextResponse.json({ sent, failed })
 }
