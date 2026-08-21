@@ -21,7 +21,7 @@ import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
-import { toastError, extractErrorMessage } from '@/lib/toast'
+import { toastError, extractErrorMessage, parseRetryAfterMinutes } from '@/lib/toast'
 import {
   isValidPhoneForCountry,
   PHONE_COUNTRIES,
@@ -101,9 +101,7 @@ export default function OfficialsList({
         // Tenant-level invite-attempt ceiling — not a problem with the phone number
         // itself, so this must not populate addError (which drives the phone field's
         // invalid state).
-        const parsed = Number(res.headers.get('Retry-After'))
-        const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 60
-        const minutes = Math.ceil(seconds / 60)
+        const minutes = parseRetryAfterMinutes(res)
         toastError(t('officials.addRateLimited', { count: minutes, minutes }))
       } else if (res.status === 503) {
         // The rate-limit check itself failed (DB unavailable) — transient, not a
@@ -157,9 +155,7 @@ export default function OfficialsList({
         toastError(t('officials.resendError', { name: official.name }))
       } else if (res.status === 429) {
         // Rate limited before rotation — the existing invite link still works.
-        const parsed = Number(res.headers.get('Retry-After'))
-        const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : 60
-        const minutes = Math.ceil(seconds / 60)
+        const minutes = parseRetryAfterMinutes(res)
         toastError(t('officials.resendRateLimited', { count: minutes, minutes }))
       } else if (res.status === 401) {
         toastError(t('officials.sessionExpired'))
