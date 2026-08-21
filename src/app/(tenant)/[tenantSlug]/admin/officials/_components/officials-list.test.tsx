@@ -343,10 +343,19 @@ describe('OfficialsList — handleResend error branches', () => {
     // TEMP DIAGNOSTICS — remove after CI investigation
     const resendButtons = screen.getAllByRole('button', { name: 'officials.resendInvite' })
     console.log('[diag] resendButtons.length =', resendButtons.length)
+    console.log('[diag] button tagName =', resendButtons[0].tagName)
+    console.log('[diag] button outerHTML =', resendButtons[0].outerHTML)
+    console.log('[diag] global.fetch === fetchMock =', global.fetch === (fetchMock as unknown))
     console.log('[diag] fetchMock calls before click =', fetchMock.mock.calls.length)
+    resendButtons[0].addEventListener('click', () =>
+      console.log('[diag] native click listener fired')
+    )
     fireEvent.click(resendButtons[0])
     console.log('[diag] fetchMock calls after click =', fetchMock.mock.calls.length)
-    console.log('[diag] toastError calls right after click =', toastError.mock.calls.length)
+    console.log(
+      '[diag] toastError calls right after click =',
+      (toastError as unknown as { mock: { calls: unknown[] } }).mock.calls.length
+    )
     if (fetchMock.mock.calls.length > 0) {
       const pending = fetchMock.mock.results[0]
       console.log('[diag] fetch mock result type =', pending?.type)
