@@ -350,6 +350,17 @@ describe('OfficialsList — handleResend error branches', () => {
     fireEvent.click(confirmButton!)
   }
 
+  it('400: shows official-unavailable toast', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse(400))
+    renderList()
+
+    clickResendAndConfirm()
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(fakeT('officials.resendOfficialUnavailable'))
+    )
+  })
+
   it('401: shows session-expired toast', async () => {
     fetchMock.mockResolvedValueOnce(makeResponse(401))
     renderList()

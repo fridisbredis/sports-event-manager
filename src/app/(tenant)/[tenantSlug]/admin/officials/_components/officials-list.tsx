@@ -167,10 +167,9 @@ export default function OfficialsList({
         // The rate-limit check itself failed (DB unavailable) before rotation — the
         // official's existing invite link still works and this is transient.
         toastError(t('officials.resendServiceUnavailable'))
+      } else if (res.status === 400 || res.status === 404) {
+        toastError(t('officials.resendOfficialUnavailable'))
       } else if (!res.ok) {
-        // Every other non-ok status (400/404/500) is one of the route's own guards,
-        // which run before the token is rotated, but cannot succeed on retry — an
-        // administrator needs to fix the underlying issue.
         toastError(t('officials.resendConfigError'))
       }
     } finally {

@@ -199,6 +199,7 @@
     "resendServiceUnavailable": "Nothing was sent, but the official's existing invite link still works. Try again in a moment.",
     "resendRateLimited_one": "Too many resend attempts. The invite link is untouched — try again in {{minutes}} minute.",
     "resendRateLimited_other": "Too many resend attempts. The invite link is untouched — try again in {{minutes}} minutes.",
+    "resendOfficialUnavailable": "This invite is no longer available. Refresh the list and try again.",
     "addedSmsFailed": "{{name}} was added, but the invite SMS could not be sent. Use Re-send invite to try again.",
     "duplicatePhone": "This mobile number already belongs to another official. Each official needs their own number.",
     "addRateLimited_one": "Too many invite attempts. Try again in {{minutes}} minute.",
