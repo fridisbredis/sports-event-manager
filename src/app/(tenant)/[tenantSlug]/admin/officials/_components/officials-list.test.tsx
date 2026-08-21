@@ -347,6 +347,29 @@ describe('OfficialsList — handleResend error branches', () => {
     console.log('[diag] button outerHTML =', resendButtons[0].outerHTML)
     console.log('[diag] global.fetch === fetchMock =', global.fetch === (fetchMock as unknown))
     console.log('[diag] fetchMock calls before click =', fetchMock.mock.calls.length)
+    console.log(
+      '[diag] button.ownerDocument === global.document =',
+      resendButtons[0].ownerDocument === global.document
+    )
+    console.log(
+      '[diag] button.isConnected =',
+      resendButtons[0].isConnected,
+      'body.contains(button) =',
+      document.body.contains(resendButtons[0])
+    )
+    const reactPropsKey = Object.keys(resendButtons[0]).find((k) =>
+      k.startsWith('__reactProps$')
+    )
+    console.log(
+      '[diag] react internal props key found =',
+      reactPropsKey,
+      'onClick typeof =',
+      reactPropsKey
+        ? typeof (resendButtons[0] as unknown as Record<string, { onClick?: unknown }>)[
+            reactPropsKey
+          ]?.onClick
+        : 'n/a'
+    )
     resendButtons[0].addEventListener('click', () =>
       console.log('[diag] native click listener fired')
     )
