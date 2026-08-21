@@ -36,8 +36,22 @@ export async function checkInviteRateLimit(
 }
 
 export async function releaseInviteRateLimit(tenantId: string, phone: string): Promise<void> {
-  const supabase = createSupabaseServiceClient()
-  await supabase.rpc('release_rate_limit', { p_key: `invite:phone:${tenantId}:${phone}` })
+  try {
+    const supabase = createSupabaseServiceClient()
+    const { error } = await supabase.rpc('release_rate_limit', {
+      p_key: `invite:phone:${tenantId}:${phone}`,
+    })
+    if (error) {
+      console.error(
+        `Invite rate limit release failed for tenant ${tenantId} (cause: ${error.message})`
+      )
+    }
+  } catch (err) {
+    console.error(
+      `Invite rate limit release threw for tenant ${tenantId} (cause: ${err instanceof Error ? err.message : String(err)})`
+    )
+  }
+  // Best-effort: a failed release self-heals when the phone key's window expires.
   // The admin key is intentionally never released here: it is a 100/hour abuse-volume
   // ceiling that must charge on every attempt, not just successes. Refunding it on
   // failure would let an admin submit unlimited unsendable numbers for free.
