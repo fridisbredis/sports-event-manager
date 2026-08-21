@@ -340,7 +340,22 @@ describe('OfficialsList — handleResend error branches', () => {
     fetchMock.mockResolvedValueOnce(makeResponse(401))
     renderList()
 
-    fireEvent.click(screen.getByRole('button', { name: 'officials.resendInvite' }))
+    // TEMP DIAGNOSTICS — remove after CI investigation
+    const resendButtons = screen.getAllByRole('button', { name: 'officials.resendInvite' })
+    console.log('[diag] resendButtons.length =', resendButtons.length)
+    console.log('[diag] fetchMock calls before click =', fetchMock.mock.calls.length)
+    fireEvent.click(resendButtons[0])
+    console.log('[diag] fetchMock calls after click =', fetchMock.mock.calls.length)
+    console.log('[diag] toastError calls right after click =', toastError.mock.calls.length)
+    if (fetchMock.mock.calls.length > 0) {
+      const pending = fetchMock.mock.results[0]
+      console.log('[diag] fetch mock result type =', pending?.type)
+      Promise.resolve(pending?.value).then(
+        (v) => console.log('[diag] fetch promise resolved with status =', (v as Response)?.status),
+        (e) => console.log('[diag] fetch promise rejected with =', e)
+      )
+    }
+    // END TEMP DIAGNOSTICS
 
     await waitFor(
       () => expect(toastError).toHaveBeenCalledWith(fakeT('officials.sessionExpired')),
