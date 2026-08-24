@@ -1,53 +1,41 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { getCurrentStage } from '@/lib/scheduling/grid-logic'
+import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import { SchedulingGrid } from './_components/scheduling-grid'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
+  searchParams: Promise<{ day?: string }>
 }
 
-// PostgREST caps unbounded selects at its configured max-rows (1000 by
-// default) — a single .select() silently truncates once a tenant accumulates
-// more assignments than that, dropping rows with no error. Page through
-// explicitly so the grid always sees the full set regardless of event size.
-const ASSIGNMENTS_PAGE_SIZE = 1000
-
-async function fetchAllAssignments(
+// Assignments are scoped to a single calendar day (UTC) rather than fetched for
+// the whole tenant — a tenant running many events can accumulate far more than
+// PostgREST's 1000-row default max, which previously required manual pagination.
+// The grid only ever shows one day at a time, so the server only needs to send that.
+export async function fetchAssignmentsForDay(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  tenantId: string
+  tenantId: string,
+  day: string
 ) {
-  const rows: {
-    id: string
-    official_id: string
-    workstation_id: string | null
-    timeslot_start: string
-    timeslot_end: string
-    status: string
-    slot_index: number | null
-  }[] = []
+  const dayStart = new Date(`${day}T00:00:00.000Z`)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
 
-  let from = 0
-  for (;;) {
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status, slot_index')
-      .eq('tenant_id', tenantId)
-      .order('id', { ascending: true })
-      .range(from, from + ASSIGNMENTS_PAGE_SIZE - 1)
+  const { data, error } = await supabase
+    .from('assignments')
+    .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status, slot_index')
+    .eq('tenant_id', tenantId)
+    .gte('timeslot_start', dayStart.toISOString())
+    .lt('timeslot_start', dayEnd.toISOString())
+    .order('id', { ascending: true })
 
-    if (error) throw error
-    if (!data || data.length === 0) break
-
-    rows.push(...data)
-    if (data.length < ASSIGNMENTS_PAGE_SIZE) break
-    from += ASSIGNMENTS_PAGE_SIZE
-  }
-
-  return rows
+  if (error) throw error
+  return data ?? []
 }
 
-export default async function SchedulingPage({ params }: Props) {
+export default async function SchedulingPage({ params, searchParams }: Props) {
   const { tenantSlug } = await params
 
   const supabase = await createSupabaseServerClient()
@@ -75,33 +63,40 @@ export default async function SchedulingPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: stages }, { data: workstations }, { data: officials }, assignments] =
-    await Promise.all([
-      supabase
-        .from('event_stages')
-        .select('id, name, stage_type, stage_date, start_time, end_time')
-        .eq('event_id', event.id)
-        .eq('tenant_id', tenant.id)
-        .order('position', { ascending: true }),
+  const [{ data: stages }, { data: workstations }, { data: officials }] = await Promise.all([
+    supabase
+      .from('event_stages')
+      .select('id, name, stage_type, stage_date, start_time, end_time')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true }),
 
-      supabase
-        .from('workstations')
-        .select(
-          'id, name, capacity_ceiling, stage_id, workstation_operating_windows(id, window_start, window_end)'
-        )
-        .eq('event_id', event.id)
-        .eq('tenant_id', tenant.id)
-        .order('created_at', { ascending: true }),
+    supabase
+      .from('workstations')
+      .select(
+        'id, name, capacity_ceiling, stage_id, workstation_operating_windows(id, window_start, window_end)'
+      )
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: true }),
 
-      supabase
-        .from('officials')
-        .select('id, name, invite_status')
-        .eq('tenant_id', tenant.id)
-        .eq('invite_status', 'confirmed')
-        .order('name', { ascending: true }),
+    supabase
+      .from('officials')
+      .select('id, name, invite_status')
+      .eq('tenant_id', tenant.id)
+      .eq('invite_status', 'confirmed')
+      .order('name', { ascending: true }),
+  ])
 
-      fetchAllAssignments(supabase, tenant.id),
-    ])
+  const { day } = await searchParams
+  const defaultStage = getCurrentStage(stages ?? []) ?? (stages ?? [])[0]
+  const defaultDays = defaultStage ? getAllocableDays(defaultStage) : []
+  const today = new Date().toISOString().slice(0, 10)
+  const selectedDay = day ?? (defaultDays.includes(today) ? today : defaultDays[0])
+
+  const assignments = selectedDay
+    ? await fetchAssignmentsForDay(supabase, tenant.id, selectedDay)
+    : []
 
   return (
     <div className="px-8 py-8">
@@ -114,6 +109,7 @@ export default async function SchedulingPage({ params }: Props) {
         workstations={workstations ?? []}
         officials={officials ?? []}
         initialAssignments={assignments}
+        initialSelectedDay={selectedDay ?? ''}
       />
     </div>
   )
