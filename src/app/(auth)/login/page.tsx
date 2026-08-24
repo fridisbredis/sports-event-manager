@@ -21,6 +21,7 @@ const AUTH_ERROR_KEYS: Record<string, string> = {
   otp_expired: 'signIn.invalidCode',
   over_sms_send_rate_limit: 'signIn.tooManyRequests',
   over_request_rate_limit: 'signIn.tooManyRequests',
+  signup_disabled: 'signIn.notRegistered',
 }
 
 const RESEND_COOLDOWN_SECONDS = 30
@@ -78,7 +79,8 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone })
     setResending(false)
     if (error) {
-      toastError(error.message)
+      console.error('[auth]', error.code, error.message)
+      toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
       return
     }
     setOtp('')
