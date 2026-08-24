@@ -61,6 +61,7 @@ interface Props {
   workstations: WorkstationData[]
   officials: OfficialData[]
   initialAssignments: AssignmentData[]
+  initialSelectedDay: string
 }
 
 type View = 'by-person' | 'by-work-area'
@@ -89,6 +90,7 @@ export function SchedulingGrid({
   workstations,
   officials,
   initialAssignments,
+  initialSelectedDay,
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
@@ -96,13 +98,16 @@ export function SchedulingGrid({
     () => getCurrentStage(stages)?.id ?? stages[0]?.id ?? ''
   )
   const [view, setView] = useState<View>('by-person')
-  const [selectedDay, setSelectedDay] = useState<string>(() => {
-    const stage = getCurrentStage(stages) ?? stages[0]
-    if (!stage) return ''
-    const days = getAllocableDays(stage)
-    const today = new Date().toISOString().slice(0, 10)
-    return days.includes(today) ? today : (days[0] ?? '')
-  })
+  const [selectedDay, setSelectedDay] = useState<string>(initialSelectedDay)
+
+  // The assignments the server sent are scoped to `initialSelectedDay` — when the
+  // user picks a different day, push it into the URL so the server re-fetches
+  // that day's assignments instead of the client trying to slice a broader set
+  // it never received.
+  function changeDay(day: string) {
+    setSelectedDay(day)
+    router.push(`?day=${day}`, { scroll: false })
+  }
   const [assignments, setAssignments] = useState<LocalAssignment[]>(() =>
     toLocalAssignmentsFromInitial(initialAssignments)
   )
@@ -693,7 +698,7 @@ export function SchedulingGrid({
                 setSelectedStageId(id)
                 setPickerCell(null)
                 setCellActionCell(null)
-                setSelectedDay(getAllocableDays(stage)[0] ?? '')
+                changeDay(getAllocableDays(stage)[0] ?? '')
               }
             }}
           >
@@ -709,7 +714,7 @@ export function SchedulingGrid({
               isIconOnly
               variant="bordered"
               size="sm"
-              onPress={() => setSelectedDay(availableDays[dayIndex - 1])}
+              onPress={() => changeDay(availableDays[dayIndex - 1])}
               isDisabled={dayIndex <= 0}
               aria-label={t('scheduling.prevDay')}
             >
@@ -729,7 +734,7 @@ export function SchedulingGrid({
               isIconOnly
               variant="bordered"
               size="sm"
-              onPress={() => setSelectedDay(availableDays[dayIndex + 1])}
+              onPress={() => changeDay(availableDays[dayIndex + 1])}
               isDisabled={dayIndex >= availableDays.length - 1}
               aria-label={t('scheduling.nextDay')}
             >
