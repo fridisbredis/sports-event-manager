@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { logger } from '@/lib/logger'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -29,7 +30,7 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
     const safeTenantIdForLog = String(input.tenantId).replace(/[\r\n]/g, '')
-    console.error('publishEvent: invalid tenantId', safeTenantIdForLog)
+    logger.warn('publishEvent: invalid tenantId', { tenantId: safeTenantIdForLog })
     return { error: 'Not authorized' }
   }
 

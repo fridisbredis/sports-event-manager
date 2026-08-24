@@ -56,8 +56,8 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 
 ### Performance and operations
 
-- [ ] Pipe Next.js logs into Azure Log Analytics (structured logging)
-- [ ] Add a `/api/health` endpoint for Container Apps liveness/readiness probes
+- [x] Pipe Next.js logs into Azure Log Analytics (structured logging) — `src/lib/logger.ts`, 2026-08-24. Container stdout already ships to `ContainerAppConsoleLogs_CL`, no new infra needed.
+- [x] Add a `/api/health` endpoint for Container Apps liveness/readiness probes — 2026-08-24, wired into the Dockerfile's `HEALTHCHECK`. Not yet wired into an Azure Container App probe config (separate from the Docker-level check).
 - [ ] Tune `min-replicas` and `max-replicas` for prod (consider 2 minimum for redundancy)
 - [ ] Enable Supabase connection pooling (Supavisor) if "too many connections" errors appear
 - [ ] Configure container app autoscaling rules based on HTTP traffic
@@ -65,7 +65,7 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 
 ### Error handling
 
-- [ ] Add Sentry (or equivalent) for production error tracking
+- [ ] Add Sentry (or equivalent) for production error tracking — code and CI wiring done 2026-08-24 (`@sentry/nextjs`, `logger.error` reports automatically), but pending Frida creating the actual Sentry account/project and adding the `SENTRY_DSN`/`SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN` secrets to GitHub — no events will be captured until that's done.
 - [ ] Replace `setError` with toast notifications in UI
 - [ ] Handle partial failures in announcement SMS sending (e.g. 3 of 200 failed → how does the admin see this?)
 - [ ] Add retry logic for transient Twilio failures

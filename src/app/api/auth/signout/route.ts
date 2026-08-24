@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 // POST, not GET: signing out is a side effect, and a GET endpoint can be
 // triggered by anything that merely follows a URL — a next/link prefetch, a
@@ -9,7 +10,7 @@ export async function POST() {
   try {
     const supabase = await createSupabaseServerClient()
     const { error } = await supabase.auth.signOut()
-    if (error) console.error('signOut error:', error)
+    if (error) logger.error('signOut error', error)
 
     // Delete every sb-* cookie unconditionally, regardless of whether the
     // provider call above succeeded — this is the whole point of routing

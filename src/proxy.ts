@@ -30,6 +30,10 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  if (pathname === '/api/health') {
+    return supabaseResponse
+  }
+
   if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {
     // For API routes, return 401 JSON instead of redirecting to login HTML
     if (pathname.startsWith('/api/')) {

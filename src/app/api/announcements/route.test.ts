@@ -123,13 +123,13 @@ describe('POST /api/announcements', () => {
       .mockReturnValueOnce(chain({ data: null, error: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    restoreConsoleError = () => consoleWarnSpy.mockRestore()
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
     expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('hit the 500 cap'))
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('hit the cap'))
   })
 
   it('excludes non-confirmed officials (e.g. removed) even when sms_opt_out is false', async () => {
@@ -342,6 +342,9 @@ describe('POST /api/announcements', () => {
     expect(responseBody).toEqual({ error: 'Failed to publish announcement' })
     expect(messagesCreate).not.toHaveBeenCalled()
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('insert boom'))
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to record announcement')
+    )
   })
 
   it('does not send any sms and reports 0/0 when there are no recipients', async () => {

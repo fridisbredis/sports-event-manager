@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 import type { User } from '@supabase/supabase-js'
 
 const tenantIdSchema = z.string().uuid()
@@ -100,12 +101,12 @@ async function fetchAccessContext(userId: string, tenantId: string): Promise<Acc
   ])
 
   if (roleResult.error) {
-    console.error('Failed to fetch user roles:', roleResult.error)
+    logger.error('Failed to fetch user roles', roleResult.error)
     return null
   }
 
   if (tenantResult.error) {
-    console.error('Failed to fetch tenant status:', tenantResult.error)
+    logger.error('Failed to fetch tenant status', tenantResult.error)
     return null
   }
 
@@ -182,7 +183,7 @@ export async function canViewOfficialSurfaces(userId: string, tenantId: string):
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch official invite status:', error)
+    logger.error('Failed to fetch official invite status', error)
     return false
   }
 
@@ -211,7 +212,7 @@ export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure
     .eq('role', 'system_admin')
 
   if (error) {
-    console.error('Failed to fetch user role:', error)
+    logger.error('Failed to fetch user role', error)
     return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
   }
 
@@ -248,12 +249,12 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
   ])
 
   if (roleResult.error) {
-    console.error('Failed to fetch user role:', roleResult.error)
+    logger.error('Failed to fetch user role', roleResult.error)
     return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
   }
 
   if (tenantResult.error) {
-    console.error('Failed to fetch tenant status:', tenantResult.error)
+    logger.error('Failed to fetch tenant status', tenantResult.error)
     return { error: NextResponse.json({ error: 'Internal error' }, { status: 500 }) }
   }
 
@@ -293,7 +294,7 @@ async function resolveTenantBySlug(tenantSlug: string): Promise<ResolvedTenant |
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to resolve tenant by slug:', error)
+    logger.error('Failed to resolve tenant by slug', error)
     return null
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { normalizePhoneToE164, PHONE_COUNTRIES, stripE164Plus, toTwilioE164 } from '@/lib/phone'
+import { logger } from '@/lib/logger'
 import twilio from 'twilio'
 import { z } from 'zod'
 import {
@@ -54,9 +55,10 @@ export async function POST(request: NextRequest) {
     const cause =
       err instanceof Error ? (err.cause as { message?: unknown } | undefined)?.message : undefined
     try {
-      console.error(
-        `Invite rate limit check failed for tenant ${tenantId} (cause: ${cause ?? 'unknown'})`
-      )
+      logger.error('Invite rate limit check failed', undefined, {
+        tenantId,
+        cause: cause ?? 'unknown',
+      })
     } catch {
       // Logging must never be able to change the response - see the send catch below.
     }
@@ -191,9 +193,10 @@ export async function POST(request: NextRequest) {
     // and turn a handled SMS failure back into a 500.
     const code = (err as { code?: unknown } | null)?.code
     try {
-      console.error(
-        `Invite SMS failed for official ${official.id} (twilio code: ${code ?? 'none'})`
-      )
+      logger.error('Invite SMS failed', undefined, {
+        officialId: official.id,
+        twilioCode: code ?? 'none',
+      })
     } catch {
       // A throw here would escape the outer catch and turn a handled SMS failure back
       // into a 500. Editor extensions that patch console can throw; logging must never

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { logger } from '@/lib/logger'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -54,7 +55,7 @@ export async function createWorkstation(
 
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
-    console.error('createWorkstation: invalid tenantId', input.tenantId)
+    logger.warn('createWorkstation: invalid tenantId', { tenantId: input.tenantId })
     return { error: 'Not authorized' }
   }
 
@@ -140,7 +141,7 @@ export async function updateWorkstation(
 
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
-    console.error('updateWorkstation: invalid tenantId', input.tenantId)
+    logger.warn('updateWorkstation: invalid tenantId', { tenantId: input.tenantId })
     return { error: 'Not authorized' }
   }
 
@@ -230,7 +231,7 @@ export async function deleteWorkstation(
 
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
-    console.error('deleteWorkstation: invalid tenantId', input.tenantId)
+    logger.warn('deleteWorkstation: invalid tenantId', { tenantId: input.tenantId })
     return { error: 'Not authorized' }
   }
 
