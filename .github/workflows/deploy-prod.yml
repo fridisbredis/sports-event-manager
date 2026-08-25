@@ -62,4 +62,5 @@ jobs:
               "TWILIO_ACCOUNT_SID=${{ secrets.PROD_TWILIO_ACCOUNT_SID }}" \
               "TWILIO_AUTH_TOKEN=${{ secrets.PROD_TWILIO_AUTH_TOKEN }}" \
               "TWILIO_PHONE_NUMBER=${{ secrets.PROD_TWILIO_PHONE_NUMBER }}" \
-              "NEXT_PUBLIC_APP_URL=${{ secrets.PROD_APP_URL }}"
+              "NEXT_PUBLIC_APP_URL=${{ secrets.PROD_APP_URL }}" \
+              "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}"
