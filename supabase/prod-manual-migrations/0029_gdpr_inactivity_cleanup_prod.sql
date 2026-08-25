@@ -4,12 +4,15 @@
 --
 -- Identical to 0029_gdpr_inactivity_cleanup.sql (dev), except the
 -- gdpr-warning-sms-trigger cron job points at the prod app URL instead of
--- dev's. This file exists separately (not applied via the normal numbered
--- migration sequence) because the two Supabase projects
--- (sports-event-manager dev vs sports-event-manager-prod) are entirely
--- separate databases with no shared migration history — see CLAUDE.md's
--- "run the migration on both dev and prod" instruction. Apply this to the
--- PROD project only, after 0028 has also been applied there.
+-- dev's. This file lives in supabase/prod-manual-migrations/ (NOT
+-- supabase/migrations/) so it is never auto-applied by `supabase db reset`
+-- or CI's "Start local Supabase stack" step — both files sharing version
+-- 0029 caused a schema_migrations_pkey collision when this lived alongside
+-- the dev migration. The two Supabase projects (sports-event-manager dev vs
+-- sports-event-manager-prod) are entirely separate databases with no shared
+-- migration history — see CLAUDE.md's "run the migration on both dev and
+-- prod" instruction. Apply this to the PROD project only, via the Supabase
+-- SQL editor or MCP, after 0028 has also been applied there.
 --
 -- Before running this file:
 --   1. Generate a NEW random value for prod — do not reuse dev's CRON_SECRET.
