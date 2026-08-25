@@ -1,9 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SystemAdminPage from './page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { requireSystemAdmin } from '@/lib/auth/tenant'
+import { notFound } from 'next/navigation'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}))
+
+vi.mock('@/lib/auth/tenant', () => ({
+  requireSystemAdmin: vi.fn(),
+}))
+
+vi.mock('next/navigation', () => ({
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
 }))
 
 vi.mock('./_components/tenant-list', () => ({
@@ -19,9 +31,18 @@ function chain(result: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(requireSystemAdmin).mockResolvedValue({ user: { id: 'user-1' } } as never)
 })
 
 describe('SystemAdminPage', () => {
+  it('calls notFound when the caller is not a system admin', async () => {
+    vi.mocked(requireSystemAdmin).mockResolvedValue({ error: {} } as never)
+
+    await expect(SystemAdminPage()).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(notFound).toHaveBeenCalled()
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
+  })
+
   it('queries tenants ordered by newest first and passes them to TenantList', async () => {
     const tenants = [
       { id: 't-1', name: 'Viadal', slug: 'viadal', is_active: true, tier: 'standard' },
