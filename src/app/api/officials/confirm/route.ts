@@ -5,6 +5,7 @@ import { z } from 'zod'
 const confirmSchema = z.object({
   token: z.string().uuid(),
   name: z.string().min(1),
+  privacyAccepted: z.literal(true),
 })
 
 export async function POST(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  const { token, name } = parsed.data
+  const { token, name, privacyAccepted } = parsed.data
 
   // User must be authenticated (OTP verified) before we confirm the invite.
   // Accept Bearer token from the Authorization header (set by the invite form
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     p_user_id: user.id,
     p_user_phone: user.phone,
     p_name: name,
+    p_privacy_accepted: privacyAccepted,
   })
 
   if (error) {
@@ -72,6 +74,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Phone number does not match the invitation', code: 'phone_mismatch' },
           { status: 403 }
+        )
+      case 'privacy_not_accepted':
+        return NextResponse.json(
+          { error: 'Privacy policy must be accepted', code: 'privacy_not_accepted' },
+          { status: 400 }
         )
       default:
         return NextResponse.json({ error: 'Unexpected error' }, { status: 500 })

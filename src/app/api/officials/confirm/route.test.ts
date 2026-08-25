@@ -57,7 +57,14 @@ beforeEach(() => {
 
 describe('POST /api/officials/confirm', () => {
   it('returns 400 for an invalid token or missing name', async () => {
-    const res = await POST(makeRequest({ token: 'not-a-uuid', name: '' }))
+    const res = await POST(makeRequest({ token: 'not-a-uuid', name: '', privacyAccepted: true }))
+
+    expect(res.status).toBe(400)
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when privacyAccepted is false or missing', async () => {
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: false }))
 
     expect(res.status).toBe(400)
     expect(createSupabaseServerClient).not.toHaveBeenCalled()
@@ -66,7 +73,7 @@ describe('POST /api/officials/confirm', () => {
   it('returns 401 when there is no authenticated user', async () => {
     mockServerClient(null)
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
 
     expect(res.status).toBe(401)
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
@@ -75,7 +82,7 @@ describe('POST /api/officials/confirm', () => {
   it('returns 403 when the authenticated user has no verified phone', async () => {
     mockServerClient({ id: 'user-1' })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(403)
@@ -87,7 +94,12 @@ describe('POST /api/officials/confirm', () => {
     const getUser = mockServerClient(null)
     mockServiceClient({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
-    await POST(makeRequest({ token: TOKEN, name: 'Anna' }, { Authorization: 'Bearer abc123' }))
+    await POST(
+      makeRequest(
+        { token: TOKEN, name: 'Anna', privacyAccepted: true },
+        { Authorization: 'Bearer abc123' }
+      )
+    )
 
     expect(getUser).toHaveBeenCalledWith('abc123')
   })
@@ -96,7 +108,7 @@ describe('POST /api/officials/confirm', () => {
     const getUser = mockServerClient(null)
     mockServiceClient({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
-    await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
 
     expect(getUser).toHaveBeenCalledWith()
   })
@@ -105,7 +117,7 @@ describe('POST /api/officials/confirm', () => {
     mockServerClient({ id: 'user-1', phone: PHONE })
     mockServiceClient({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(404)
@@ -116,7 +128,7 @@ describe('POST /api/officials/confirm', () => {
     mockServerClient({ id: 'user-1', phone: PHONE })
     mockServiceClient({ rpcResult: { data: null, error: { message: 'expired' } } })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(404)
@@ -129,7 +141,7 @@ describe('POST /api/officials/confirm', () => {
       rpcResult: { data: null, error: { message: 'phone_mismatch' } },
     })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(403)
@@ -139,6 +151,7 @@ describe('POST /api/officials/confirm', () => {
       p_user_id: 'user-1',
       p_user_phone: '+46709999999',
       p_name: 'Anna',
+      p_privacy_accepted: true,
     })
   })
 
@@ -149,7 +162,7 @@ describe('POST /api/officials/confirm', () => {
     mockServerClient({ id: 'user-2', phone: PHONE })
     mockServiceClient({ rpcResult: { data: null, error: { message: 'already_confirmed' } } })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(409)
@@ -160,7 +173,7 @@ describe('POST /api/officials/confirm', () => {
     mockServerClient({ id: 'user-1', phone: PHONE })
     mockServiceClient({ rpcResult: { data: null, error: { message: 'boom' } } })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
 
     expect(res.status).toBe(500)
   })
@@ -172,7 +185,7 @@ describe('POST /api/officials/confirm', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -182,6 +195,7 @@ describe('POST /api/officials/confirm', () => {
       p_user_id: 'user-1',
       p_user_phone: PHONE,
       p_name: 'Anna',
+      p_privacy_accepted: true,
     })
   })
 
@@ -192,7 +206,7 @@ describe('POST /api/officials/confirm', () => {
       tenantResult: { data: null },
     })
 
-    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna' }))
+    const res = await POST(makeRequest({ token: TOKEN, name: 'Anna', privacyAccepted: true }))
     const body = await res.json()
 
     expect(res.status).toBe(200)

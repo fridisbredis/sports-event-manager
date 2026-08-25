@@ -69,4 +69,5 @@ jobs:
               "TWILIO_PHONE_NUMBER=${{ secrets.PROD_TWILIO_PHONE_NUMBER }}" \
               "NEXT_PUBLIC_APP_URL=${{ secrets.PROD_APP_URL }}" \
               "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" \
-              "SENTRY_ENVIRONMENT=production"
+              "SENTRY_ENVIRONMENT=production" \
+              "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}"
