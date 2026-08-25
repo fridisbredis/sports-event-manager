@@ -91,6 +91,7 @@ Example: `feat(EVT-01): scaffold event dashboard`
 - Supabase project ref: `lhflutwvwvzawzbcuwup` (the `wvw` letter pattern is correct — three letters: w, v, w)
 - Supabase URL: `https://lhflutwvwvzawzbcuwup.supabase.co`
 - Twilio subaccount: `sports-event-manager` (SID in 1Password)
+- Sentry project: `viadal-event-dev` in org `extrapreneur` — https://extrapreneur.sentry.io/projects/viadal-event-dev/ (added 2026-08-25, REL-02)
 
 ### Prod environment
 
@@ -103,6 +104,7 @@ Example: `feat(EVT-01): scaffold event dashboard`
 - Twilio: separate Messaging Service "Sports Event Manager Prod" in the same subaccount as dev
 - **Important:** `minReplicas: 1` is required (default `null`/0 causes startup probe failures, see Lessons Learned)
 - **Custom domain:** `https://app.viadalevent.se` — configured on the prod Container App via a managed certificate on the shared `kanban-env` environment. This is now the primary prod URL; the Azure-generated URL above still works as a fallback.
+- Sentry project: `viadal-event-prod` in org `extrapreneur` — https://extrapreneur.sentry.io/projects/viadal-event-prod/ (added 2026-08-25, REL-02)
 
 ### Twilio sender setup (MVP-phase)
 
