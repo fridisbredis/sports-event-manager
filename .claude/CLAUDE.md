@@ -10,9 +10,10 @@ Multi-tenant sports event web platform. Each tenant is a sports organization or 
 
 **Stakeholders:**
 
-- **Frida Bredberg** — IT consultant at Extrapreneur AB, sole developer on this project
+- **Frida Bredberg** — IT consultant at Extrapreneur AB, developer on this project
 - **Peter Thorn** — project manager / customer
 - **Deadline:** Viadal 2026
+- As of 2026-08, three people work on this codebase in parallel (previously solo) — see "Workflow" below for how work is now coordinated.
 
 **Repo:** github.com/fridisbredis/sports-event-manager
 
@@ -274,7 +275,8 @@ UX decisions and wireframes are located in `/Docs/`
 
 ### Workflow
 
-- Branch + PR for non-trivial changes, even when working solo (helps with traceability)
+- **Task tracking:** Trello board at https://trello.com/b/7uISlZyI/sports-event-manager is the source of truth for who's working on what — used now that three people work on this codebase in parallel. Reference the Trello card in branch names/commits where it clarifies scope, similar to how screen IDs (EVT-01, SEC-09, etc.) are already used.
+- Branch + PR for non-trivial changes (helps with traceability, and is now required with three people working in parallel to avoid conflicting changes)
 - Commit messages: imperative mood, scope first if applicable ("auth: add requireTenantAdmin helper")
 - Push tags (`v*`) only when intentionally cutting a release for prod
 
