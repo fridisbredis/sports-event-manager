@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
 
@@ -10,8 +11,11 @@ interface Props {
 
 export default async function TenantDetailPage({ params }: Props) {
   const { tenantId } = await params
-  const supabase = await createSupabaseServerClient()
 
+  const auth = await requireSystemAdmin()
+  if ('error' in auth) notFound()
+
+  const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')
     .select('id, name, is_active, tier')
