@@ -24,6 +24,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   const [step, setStep] = useState<Step>(initialPhone ? 'fill-form' : 'invalid')
   const [name, setName] = useState(initialName ?? '')
   const [available, setAvailable] = useState(false)
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
@@ -38,7 +39,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   }, [resendCooldown])
 
   async function handleConfirmAvailability() {
-    if (!available || !initialPhone) return
+    if (!available || !privacyAccepted || !initialPhone) return
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({ phone: initialPhone })
     setLoading(false)
@@ -88,7 +89,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
         'Content-Type': 'application/json',
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: JSON.stringify({ token, name: name.trim() }),
+      body: JSON.stringify({ token, name: name.trim(), privacyAccepted }),
     })
     setLoading(false)
     if (res.ok) {
@@ -283,13 +284,53 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             </svg>
             {t('confirmation.notificationsInfo')}
           </p>
+
+          <button
+            type="button"
+            onClick={() => setPrivacyAccepted((v) => !v)}
+            className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-sm text-left transition-colors ${
+              privacyAccepted
+                ? 'border-gray-900 bg-gray-50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}
+          >
+            <div
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                privacyAccepted ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
+              }`}
+            >
+              {privacyAccepted && (
+                <svg
+                  className="h-2.5 w-2.5 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="text-gray-700">
+              {t('confirmation.privacyCheckPrefix')}{' '}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="underline hover:text-gray-900"
+              >
+                {t('confirmation.privacyCheckLinkText')}
+              </a>
+            </span>
+          </button>
         </div>
       </div>
 
       <div className="pb-8 pt-6 shrink-0">
         <button
           onClick={handleConfirmAvailability}
-          disabled={!available || !name.trim() || loading}
+          disabled={!available || !privacyAccepted || !name.trim() || loading}
           className="w-full rounded-xl bg-gray-900 py-4 text-sm font-semibold text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
         >
           {loading ? t('confirmation.confirming') : t('confirmation.confirmButton')}

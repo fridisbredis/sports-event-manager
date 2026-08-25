@@ -30,6 +30,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Cron routes are called by pg_cron/pg_net (migration 0029), never by a
+  // browser — they have no Supabase session cookie and authenticate via
+  // CRON_SECRET inside the route handler itself instead.
+  if (pathname.startsWith('/api/cron/')) {
+    return supabaseResponse
+  }
+
   if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {
     // For API routes, return 401 JSON instead of redirecting to login HTML
     if (pathname.startsWith('/api/')) {

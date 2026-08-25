@@ -15,7 +15,12 @@ export type WorkstationTodo = DbTables['workstation_todos']['Row']
 export type Official = DbTables['officials']['Row']
 // Client-safe projection: excludes invite_token and invite_token_expires_at,
 // which are single-use bearer credentials that must never reach the browser (F-SEC-06).
-export type OfficialListItem = Omit<Official, 'invite_token' | 'invite_token_expires_at'>
+// Also excludes privacy_accepted_at/gdpr_warning_sent_at (SEC-09) — internal GDPR
+// bookkeeping the admin officials list has no use for.
+export type OfficialListItem = Omit<
+  Official,
+  'invite_token' | 'invite_token_expires_at' | 'privacy_accepted_at' | 'gdpr_warning_sent_at'
+>
 export type Participant = DbTables['participants']['Row']
 export type Assignment = DbTables['assignments']['Row']
 export type Announcement = DbTables['announcements']['Row']

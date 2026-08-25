@@ -327,36 +327,42 @@ export type Database = {
       officials: {
         Row: {
           created_at: string
+          gdpr_warning_sent_at: string | null
           id: string
           invite_status: string
           invite_token: string | null
           invite_token_expires_at: string | null
           name: string
           phone: string
+          privacy_accepted_at: string | null
           sms_opt_out: boolean
           tenant_id: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
+          gdpr_warning_sent_at?: string | null
           id?: string
           invite_status?: string
           invite_token?: string | null
           invite_token_expires_at?: string | null
           name: string
           phone: string
+          privacy_accepted_at?: string | null
           sms_opt_out?: boolean
           tenant_id: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
+          gdpr_warning_sent_at?: string | null
           id?: string
           invite_status?: string
           invite_token?: string | null
           invite_token_expires_at?: string | null
           name?: string
           phone?: string
+          privacy_accepted_at?: string | null
           sms_opt_out?: boolean
           tenant_id?: string
           user_id?: string | null
@@ -376,9 +382,11 @@ export type Database = {
           bib: string | null
           category: string | null
           created_at: string
+          gdpr_warning_sent_at: string | null
           id: string
           name: string
           phone: string
+          privacy_accepted_at: string | null
           race_results_url: string | null
           sms_opt_out: boolean
           tenant_id: string
@@ -388,9 +396,11 @@ export type Database = {
           bib?: string | null
           category?: string | null
           created_at?: string
+          gdpr_warning_sent_at?: string | null
           id?: string
           name: string
           phone: string
+          privacy_accepted_at?: string | null
           race_results_url?: string | null
           sms_opt_out?: boolean
           tenant_id: string
@@ -400,9 +410,11 @@ export type Database = {
           bib?: string | null
           category?: string | null
           created_at?: string
+          gdpr_warning_sent_at?: string | null
           id?: string
           name?: string
           phone?: string
+          privacy_accepted_at?: string | null
           race_results_url?: string | null
           sms_opt_out?: boolean
           tenant_id?: string
@@ -625,6 +637,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      anonymize_inactive_users: { Args: never; Returns: undefined }
       check_rate_limit: {
         Args: { p_duration_seconds: number; p_key: string; p_limit: number }
         Returns: {
@@ -635,6 +648,7 @@ export type Database = {
       confirm_official_invite: {
         Args: {
           p_name: string
+          p_privacy_accepted: boolean
           p_token: string
           p_user_id: string
           p_user_phone: string
@@ -645,6 +659,7 @@ export type Database = {
         Args: { p_user_id: string; p_user_phone: string }
         Returns: Json
       }
+      get_last_sign_in_at: { Args: { p_user_id: string }; Returns: string }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       is_system_admin: { Args: never; Returns: boolean }
