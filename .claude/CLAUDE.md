@@ -10,9 +10,10 @@ Multi-tenant sports event web platform. Each tenant is a sports organization or 
 
 **Stakeholders:**
 
-- **Frida Bredberg** — IT consultant at Extrapreneur AB, sole developer on this project
+- **Frida Bredberg** — IT consultant at Extrapreneur AB, developer on this project
 - **Peter Thorn** — project manager / customer
 - **Deadline:** Viadal 2026
+- As of 2026-08, three people work on this codebase in parallel (previously solo) — see "Workflow" below for how work is now coordinated.
 
 **Repo:** github.com/fridisbredis/sports-event-manager
 
@@ -197,6 +198,19 @@ announcements
 
 ---
 
+### How to apply migrations
+
+1. `supabase migration new <descriptive_name>` — creates the file under `supabase/migrations/` with a timestamp prefix
+2. Write the SQL, then test locally: `supabase db reset` (replays all migrations against the local Docker stack)
+3. Apply to dev: `supabase link --project-ref lhflutwvwvzawzbcuwup` then `supabase db push`
+4. Apply to prod: `supabase link --project-ref rauvaxuypujbeintnnoe` then `supabase db push`
+
+**Don't use the MCP `apply_migration` tool for normal migrations.** It writes its own ledger row with a `YYYYMMDDHHMMSS` version instead of reusing the migration file's own prefix, which creates an invisible duplicate if the same file is later applied via `db push` (or vice versa) — this caused a multi-hour cleanup on 2026-08-25 (mismatched `schema_migrations` history broke `supabase db pull` on both dev and prod). MCP/manual SQL execution is still fine for one-off inspection, verification queries, and the intentionally-manual files in `supabase/prod-manual-migrations/` (see below) — just not for applying a numbered migration file.
+
+If `supabase db pull` ever reports a migration history mismatch pointing at a version that doesn't correspond to a real file, don't guess — inspect `supabase_migrations.schema_migrations` directly (via SQL) to see what the row actually contains before repairing or deleting it. `migration repair --status reverted` and a direct `delete from supabase_migrations.schema_migrations where version = '...'` may both be needed; `supabase migrations fetch` can help resync the CLI's view but will overwrite local migration file formatting as a side effect — discard those file changes (`git checkout -- supabase/migrations/`) unless you actually intended to regenerate them from the remote schema.
+
+---
+
 ### After any DB migration
 
 1. Run `npm run db:types` — regenerates src/types/database.ts
@@ -276,7 +290,8 @@ UX decisions and wireframes are located in `/Docs/`
 
 ### Workflow
 
-- Branch + PR for non-trivial changes, even when working solo (helps with traceability)
+- **Task tracking:** Trello board at https://trello.com/b/7uISlZyI/sports-event-manager is the source of truth for who's working on what — used now that three people work on this codebase in parallel. Reference the Trello card in branch names/commits where it clarifies scope, similar to how screen IDs (EVT-01, SEC-09, etc.) are already used.
+- Branch + PR for non-trivial changes (helps with traceability, and is now required with three people working in parallel to avoid conflicting changes)
 - Commit messages: imperative mood, scope first if applicable ("auth: add requireTenantAdmin helper")
 - Push tags (`v*`) only when intentionally cutting a release for prod
 

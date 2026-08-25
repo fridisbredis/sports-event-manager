@@ -118,15 +118,14 @@ lookup covered by row #1. No code change was needed there.
    `createTenantSchema`, `setTenantActiveSchema`, `setTenantTierSchema` with
    `safeParse` before any service-role write, matching the pattern in
    `api/officials/route.ts` etc.
-1. **Rows #3–4** (`(system)/admin/page.tsx`, `(system)/admin/[tenantId]/page.tsx`) have
+1. ~~**Rows #3–4** (`(system)/admin/page.tsx`, `(system)/admin/[tenantId]/page.tsx`) have
    no explicit auth check of their own — they rely entirely on the ambient
-   `(system)/layout.tsx` check. Not exploitable today, but it violates the "contained
-   at the data-access boundary, independent of route position" bar SEC-03/SEC-02 set.
-   **Owner: SEC-02 workstream (layout/route-position fix).** Unaffected by the
-   2026-08-19 service-role migration: both rows now query through
-   `createSupabaseServerClient()`, so `system_admin_all_tenants` RLS is a second,
-   independent gate underneath the ambient layout check — but the page itself
-   still has no auth call of its own, which is what this item tracks.
+   `(system)/layout.tsx` check.~~ **Fixed 2026-08-25:** both pages now call
+   `requireSystemAdmin()` (`src/lib/auth/tenant.ts:207`) directly and `notFound()` on
+   failure, before doing any data access — the same data-access-boundary pattern
+   `canViewOfficialSurfaces` established for the official surfaces. A file moved out
+   from under `(system)/layout.tsx` now still protects itself. Covered by new test
+   cases in both pages' `page.test.tsx`; full suite (316/316) passing.
 2. ~~**Rows #5–7, #10–14** use the service client for reads that are already gated
    by an explicit role check or ambient layout check just above them. They're not
    unsafe, but they're broader than necessary — the RLS-enforced

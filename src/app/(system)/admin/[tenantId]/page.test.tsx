@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TenantDetailPage from './page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { notFound } from 'next/navigation'
 import { TenantDetail } from './_components/tenant-detail'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}))
+
+vi.mock('@/lib/auth/tenant', () => ({
+  requireSystemAdmin: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -30,6 +35,7 @@ const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(requireSystemAdmin).mockResolvedValue({ user: { id: 'user-1' } } as never)
 })
 
 function findByType(node: unknown, target: unknown): { props: Record<string, unknown> } | null {
@@ -49,6 +55,17 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 }
 
 describe('TenantDetailPage', () => {
+  it('calls notFound and does not query when the caller is not a system admin', async () => {
+    vi.mocked(requireSystemAdmin).mockResolvedValue({ error: {} } as never)
+
+    await expect(
+      TenantDetailPage({ params: Promise.resolve({ tenantId: TENANT_ID }) })
+    ).rejects.toThrow('NEXT_NOT_FOUND')
+
+    expect(notFound).toHaveBeenCalled()
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
+  })
+
   it('calls notFound and renders nothing when the tenant does not exist', async () => {
     const fromMock = vi.fn().mockReturnValue(chain({ data: null }))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
