@@ -85,6 +85,24 @@ owner** — rough estimates for sanity-checking only, not an agreed baseline.
 PERF-01 through PERF-04 still depend on these numbers; this section is not
 resolved until the placeholders are replaced.
 
+**Acceptance method confirmed by the product owner (Peter Thorn, 2026-08-25):**
+performance is judged relative to an unloaded baseline, not against a fixed
+absolute threshold. For each test case (e.g. "switch view", "save schedule",
+"send bulk SMS"):
+
+1. Measure response time against an **unloaded instance** (no concurrent
+   traffic) — this is that test case's baseline. Example given: "switch view"
+   = 15 ms unloaded.
+2. Measure the same test case with **50 simulated concurrent users**.
+3. Express the loaded figure as a percentage of baseline. Example given: 95
+   ms loaded = 633% of the 15 ms baseline.
+
+The acceptable ceiling for that percentage (i.e. what counts as a pass) was
+not stated in the example and still needs to be confirmed with Peter before
+this replaces the fixed "p95 ≤ 2s" criteria below. Until then, treat the
+absolute figures in PERF-01/PERF-02 as provisional and expect them to be
+rewritten as "≤ N% of unloaded baseline" once the ceiling is agreed.
+
 - One event with **20 officials** and **5 concurrent tenant-admin sessions**
   (confirmed: ~3 admins worked the event; padded to 5 for headroom, e.g.
   multiple sessions per admin).
@@ -260,6 +278,12 @@ itself.
   sessions vs. 500 officials / 500-recipient audience), which PERF-01 through
   PERF-04 all hang off. Needs deriving from expected participant volume, not
   asserting.
+- The acceptable ceiling for the relative-baseline method Peter confirmed
+  2026-08-25 (see §2 above): he gave a worked example (95 ms loaded vs. 15 ms
+  unloaded = 633%) but not what percentage counts as a pass, or whether the
+  ceiling is uniform across test cases. Asked via Slack 2026-08-25, awaiting
+  reply. PERF-01/PERF-02's fixed "p95 ≤ 2s" criteria stay provisional until
+  this is answered.
 
 ## Evidence references
 
