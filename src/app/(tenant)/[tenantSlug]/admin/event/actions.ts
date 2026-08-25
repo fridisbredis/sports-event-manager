@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
+import { logger } from '@/lib/logger'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -168,7 +169,7 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
 
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
-    console.error('uploadEventLogo: invalid tenantId', tenantId)
+    logger.warn('uploadEventLogo: invalid tenantId', { tenantId })
     return { error: 'Missing tenant or event ID' }
   }
 
@@ -212,7 +213,7 @@ export async function updateTenantColorPalette(
 
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
-    console.error('updateTenantColorPalette: invalid tenantId', tenantId)
+    logger.warn('updateTenantColorPalette: invalid tenantId', { tenantId })
     return { error: 'Not authorized' }
   }
 

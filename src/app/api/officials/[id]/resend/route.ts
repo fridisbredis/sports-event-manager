@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { stripE164Plus, toTwilioE164 } from '@/lib/phone'
+import { logger } from '@/lib/logger'
 import twilio from 'twilio'
 import { z } from 'zod'
 import {
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const fromNumber = process.env.TWILIO_PHONE_NUMBER
   if (!fromNumber) {
     try {
-      console.error('Invite SMS resend blocked: TWILIO_PHONE_NUMBER is not set')
+      logger.error('Invite SMS resend blocked: TWILIO_PHONE_NUMBER is not set')
     } catch {
       // Logging must never be able to change the response - see the send catch below.
     }
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // The caught error is never logged: the Twilio constructor quotes the offending
     // credential back in its own message.
     try {
-      console.error('Invite SMS resend blocked: Twilio client could not be constructed')
+      logger.error('Invite SMS resend blocked: Twilio client could not be constructed')
     } catch {
       // Logging must never be able to change the response - see the send catch below.
     }
@@ -99,9 +100,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const cause =
       err instanceof Error ? (err.cause as { message?: unknown } | undefined)?.message : undefined
     try {
-      console.error(
-        `Invite rate limit check failed for official ${official.id} (cause: ${cause ?? 'unknown'})`
-      )
+      logger.error('Invite rate limit check failed', undefined, {
+        officialId: official.id,
+        cause: cause ?? 'unknown',
+      })
     } catch {
       // Logging must never be able to change the response - see the send catch below.
     }
@@ -170,9 +172,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // and turn a handled SMS failure into an unhandled 500.
     const code = (err as { code?: unknown } | null)?.code
     try {
-      console.error(
-        `Invite SMS resend failed for official ${official.id} (twilio code: ${code ?? 'none'})`
-      )
+      logger.error('Invite SMS resend failed', undefined, {
+        officialId: official.id,
+        twilioCode: code ?? 'none',
+      })
     } catch {
       // A throw here would escape the outer catch. Logging must never be able to
       // change the response.

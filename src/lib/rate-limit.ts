@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 const PHONE_LIMIT = { limit: 3, windowSeconds: 3600 }
 const ADMIN_LIMIT = { limit: 100, windowSeconds: 3600 }
@@ -57,15 +58,17 @@ export async function releaseInviteRateLimit(tenantId: string, phone: string): P
       p_key: phoneRateLimitKey(tenantId, phone),
     })
     if (error) {
-      console.error(
-        `Invite rate limit release failed for tenant ${tenantId} (cause: ${redactPhone(error.message, phone)})`
-      )
+      logger.error('Invite rate limit release failed', undefined, {
+        tenantId,
+        cause: redactPhone(error.message, phone),
+      })
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error(
-      `Invite rate limit release threw for tenant ${tenantId} (cause: ${redactPhone(message, phone)})`
-    )
+    logger.error('Invite rate limit release threw', undefined, {
+      tenantId,
+      cause: redactPhone(message, phone),
+    })
   }
   // Best-effort: a failed release self-heals when the phone key's window expires.
   // The admin key is intentionally never released here: it is a 100/hour abuse-volume

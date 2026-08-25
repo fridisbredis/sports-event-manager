@@ -22,6 +22,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError, extractErrorMessage, parseRetryAfterMinutes } from '@/lib/toast'
+import { logger } from '@/lib/logger'
 import {
   isValidPhoneForCountry,
   PHONE_COUNTRIES,
@@ -109,10 +110,10 @@ export default function OfficialsList({
         toastError(t('officials.addServiceUnavailable'))
       } else {
         const body = await res.json().catch(() => ({}))
-        console.error(
-          'Unexpected /api/officials error response:',
-          extractErrorMessage(body, `Error ${res.status}`)
-        )
+        logger.error('Unexpected /api/officials error response', undefined, {
+          status: res.status,
+          message: extractErrorMessage(body, `Error ${res.status}`),
+        })
         const message = t('officials.addUnexpectedError')
         setAddError(message)
         toastError(message)

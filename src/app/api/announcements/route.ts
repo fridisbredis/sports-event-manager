@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { toTwilioE164 } from '@/lib/phone'
+import { logger } from '@/lib/logger'
 import twilio from 'twilio'
 import { z } from 'zod'
 
@@ -61,8 +62,13 @@ export async function POST(request: NextRequest) {
 
   if (recipients && recipients.length === MAX_ANNOUNCEMENT_RECIPIENTS) {
     try {
-      console.error(
-        `Announcement recipient count hit the ${MAX_ANNOUNCEMENT_RECIPIENTS} cap for tenant ${tenantId} on channel ${channel} — some recipients were silently excluded`
+      logger.warn(
+        'Announcement recipient count hit the cap — some recipients were silently excluded',
+        {
+          tenantId,
+          channel,
+          cap: MAX_ANNOUNCEMENT_RECIPIENTS,
+        }
       )
     } catch {
       // Logging must never be able to change the response - see the send loop below.
@@ -82,7 +88,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (insertError || !announcement) {
-    console.error(`Failed to record announcement for tenant ${tenantId}: ${insertError?.message}`)
+    logger.error('Failed to record announcement', insertError, { tenantId })
     return NextResponse.json({ error: 'Failed to publish announcement' }, { status: 500 })
   }
 
@@ -100,9 +106,9 @@ export async function POST(request: NextRequest) {
   const fromNumber = process.env.TWILIO_PHONE_NUMBER
   if (!fromNumber) {
     try {
-      console.error(
-        `Announcement SMS blocked for tenant ${tenantId}: TWILIO_PHONE_NUMBER is not set`
-      )
+      logger.error('Announcement SMS blocked: TWILIO_PHONE_NUMBER is not set', undefined, {
+        tenantId,
+      })
     } catch {
       // Logging must never be able to change the response - see the send loop below.
     }
@@ -116,9 +122,9 @@ export async function POST(request: NextRequest) {
     // The caught error is never logged: the Twilio constructor quotes the offending
     // credential back in its own message.
     try {
-      console.error(
-        `Announcement SMS blocked for tenant ${tenantId}: Twilio client could not be constructed`
-      )
+      logger.error('Announcement SMS blocked: Twilio client could not be constructed', undefined, {
+        tenantId,
+      })
     } catch {
       // Logging must never be able to change the response - see the send loop below.
     }
@@ -151,9 +157,12 @@ export async function POST(request: NextRequest) {
     failed += 1
     const code = (result.reason as { code?: unknown } | null)?.code
     try {
-      console.error(
-        `Announcement SMS failed for tenant ${tenantId} on channel ${channel}, recipient #${index} (twilio code: ${code ?? 'none'})`
-      )
+      logger.error('Announcement SMS failed for recipient', undefined, {
+        tenantId,
+        channel,
+        recipientIndex: index,
+        twilioCode: code ?? 'none',
+      })
     } catch {
       // Logging must never be able to change the response.
     }
@@ -166,9 +175,10 @@ export async function POST(request: NextRequest) {
     .eq('id', announcement.id)
 
   if (updateError) {
-    console.error(
-      `Failed to record delivery outcome for announcement ${announcement.id} (tenant ${tenantId}): ${updateError.message}`
-    )
+    logger.error('Failed to record delivery outcome for announcement', updateError, {
+      tenantId,
+      announcementId: announcement.id,
+    })
   }
 
   return NextResponse.json({ sent, failed })

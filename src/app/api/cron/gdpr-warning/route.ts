@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { toTwilioE164 } from '@/lib/phone'
+import { logger } from '@/lib/logger'
 
 // SEC-09: triggered daily by the gdpr-warning-sms-trigger pg_cron job (migration
 // 0029) via pg_net. Sends the 23-month inactivity warning SMS to officials and
@@ -17,23 +18,15 @@ export async function POST(request: NextRequest) {
 
   const fromNumber = process.env.TWILIO_PHONE_NUMBER
   if (!fromNumber) {
-    try {
-      console.error('GDPR warning SMS blocked: TWILIO_PHONE_NUMBER is not set')
-    } catch {
-      // Logging must never be able to change the response.
-    }
+    logger.error('GDPR warning SMS blocked: TWILIO_PHONE_NUMBER is not set')
     return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
   }
 
   let client: ReturnType<typeof twilio>
   try {
     client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  } catch {
-    try {
-      console.error('GDPR warning SMS blocked: Twilio client could not be constructed')
-    } catch {
-      // Logging must never be able to change the response.
-    }
+  } catch (err) {
+    logger.error('GDPR warning SMS blocked: Twilio client could not be constructed', err)
     return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
   }
 
@@ -84,13 +77,9 @@ export async function POST(request: NextRequest) {
         // Log the DB-generated id and Twilio's numeric code only — never the raw
         // error, which can echo the phone number back into the logs.
         const code = (err as { code?: unknown } | null)?.code
-        try {
-          console.error(
-            `GDPR warning SMS failed for ${table} ${row.id} (twilio code: ${code ?? 'none'})`
-          )
-        } catch {
-          // Logging must never be able to change the response.
-        }
+        logger.error(`GDPR warning SMS failed for ${table} ${row.id}`, undefined, {
+          twilioCode: code ?? 'none',
+        })
         continue
       }
 

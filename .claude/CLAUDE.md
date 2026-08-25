@@ -120,6 +120,8 @@ Example: `feat(EVT-01): scaffold event dashboard`
 
 **Note:** `*_APP_URL` is the Azure Container App URL, `*_SUPABASE_URL` is the Supabase API URL — they are NOT the same thing and have caused confusion in the past. Double-check before pasting. When adding a new dev secret, match the existing (inconsistent) name in `deploy-dev.yml` rather than assuming a `DEV_` prefix.
 
+**Sentry (4) — shared between dev and prod, no `DEV_`/`PROD_` prefix, unlike everything else:** `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`. One Sentry project covers both environments; `SENTRY_ENVIRONMENT` (`development`/`production`, hardcoded per workflow, not a secret) is what tells events apart in the Sentry UI, not a separate DSN. `SENTRY_AUTH_TOKEN` is only used at build time for source-map upload — passed as a Docker `ARG`, never an `ENV`, so it isn't persisted into the pushed image's runtime environment.
+
 ---
 
 ## CI/CD workflows

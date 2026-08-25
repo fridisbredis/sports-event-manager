@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { logger } from '@/lib/logger'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -48,7 +49,7 @@ export async function saveAssignments(
 
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
-    console.error('saveAssignments: invalid tenantId', tenantId)
+    logger.warn('saveAssignments: invalid tenantId', { tenantId })
     return { error: 'Not authorized' }
   }
 

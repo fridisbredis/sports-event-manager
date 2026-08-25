@@ -7,6 +7,7 @@ import { useTranslation } from '@/lib/i18n/client'
 import { Button, SelectItem } from '@heroui/react'
 import { Input, Select } from '@/components/ui/form-fields'
 import { toastError } from '@/lib/toast'
+import { logger } from '@/lib/logger'
 import {
   normalizePhoneToE164,
   isValidPhoneForCountry,
@@ -57,7 +58,10 @@ export default function LoginPage() {
     if (error) {
       // Keep the provider's own text for debugging, but never show it to the
       // user — it is untranslated and worded for developers.
-      console.error('[auth]', error.code, error.message)
+      logger.error('[auth] sign-in request failed', undefined, {
+        code: error.code,
+        message: error.message,
+      })
       toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
     }
     return !error
@@ -79,7 +83,10 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone })
     setResending(false)
     if (error) {
-      console.error('[auth]', error.code, error.message)
+      logger.error('[auth] resend OTP failed', undefined, {
+        code: error.code,
+        message: error.message,
+      })
       toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
       return
     }
