@@ -97,11 +97,11 @@ absolute threshold. For each test case (e.g. "switch view", "save schedule",
 3. Express the loaded figure as a percentage of baseline. Example given: 95
    ms loaded = 633% of the 15 ms baseline.
 
-The acceptable ceiling for that percentage (i.e. what counts as a pass) was
-not stated in the example and still needs to be confirmed with Peter before
-this replaces the fixed "p95 ≤ 2s" criteria below. Until then, treat the
-absolute figures in PERF-01/PERF-02 as provisional and expect them to be
-rewritten as "≤ N% of unloaded baseline" once the ceiling is agreed.
+**Ceiling confirmed by Peter (2026-08-25): 300% of unloaded baseline.** A
+loaded figure at or below 3× the unloaded baseline for that test case passes;
+above it fails. (The worked example above, 633%, is illustrative of the
+calculation only — it would fail against this ceiling.) This replaces the
+fixed "p95 ≤ 2s" criteria below — see PERF-01/PERF-02.
 
 - One event with **20 officials** and **5 concurrent tenant-admin sessions**
   (confirmed: ~3 admins worked the event; padded to 5 for headroom, e.g.
@@ -115,8 +115,8 @@ rewritten as "≤ N% of unloaded baseline" once the ceiling is agreed.
 
 | ID      | Requirement                                                                 | Proposed acceptance criterion                                                                                                                                                                                                                                                                                                                            | Verification                                                                                  | Priority |
 | ------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------- |
-| PERF-01 | Core read paths remain responsive at the agreed baseline.                   | p95 server response time is at most 2 seconds for dashboard, event information, own schedule, and a stage-filtered scheduling view; error rate is below 1%.                                                                                                                                                                                              | Load test against staging with production-like seed data; application and database telemetry. | Must     |
-| PERF-02 | Schedule changes remain correct and responsive under concurrent editing.    | p95 save time is at most 2 seconds; conflicts are reported deterministically; no duplicate workstation/timeslot/slot assignments are persisted. The pre-insert re-read that produces "Someone else just took that slot," and the deliberate over-capacity overflow behaviour documented in migration `0012`, must survive any move to a transaction/RPC. | Concurrent load test and database-constraint tests.                                           | Must     |
+| PERF-01 | Core read paths remain responsive at the agreed baseline.                   | Under 50 simulated concurrent users, p95 server response time for dashboard, event information, own schedule, and a stage-filtered scheduling view is at most 300% of that test case's unloaded-instance baseline; error rate is below 1%.                                                                                                                                                                                              | Load test against staging with production-like seed data, each test case first measured unloaded to establish its baseline; application and database telemetry. | Must     |
+| PERF-02 | Schedule changes remain correct and responsive under concurrent editing.    | Under 50 simulated concurrent users, p95 save time is at most 300% of the unloaded-instance baseline for a schedule save; conflicts are reported deterministically; no duplicate workstation/timeslot/slot assignments are persisted. The pre-insert re-read that produces "Someone else just took that slot," and the deliberate over-capacity overflow behaviour documented in migration `0012`, must survive any move to a transaction/RPC. | Concurrent load test (unloaded baseline measured first) and database-constraint tests.                                           | Must     |
 | PERF-03 | The scheduling UI has a bounded data strategy.                              | The client loads only the selected stage/date/range and virtualises or paginates large grids; it does not require every assignment for an event in browser memory.                                                                                                                                                                                       | Performance test with the baseline dataset; browser profiling.                                | Must     |
 | PERF-04 | Bulk notifications do not tie up the web request or exceed provider limits. | Sending is queued with bounded concurrency, retries, idempotency, and per-recipient delivery status. The publish request acknowledges the queued job rather than synchronously waiting for all SMS requests. The queue must preserve per-recipient isolation (currently provided by `Promise.allSettled`): one bad number must not abort the batch.      | Staging test with a Twilio test double and failure injection.                                 | Must     |
 | PERF-05 | The system can be operated under load.                                      | Health/readiness endpoint, request/error metrics, database metrics, and alerts are available; Azure scale limits are documented and tested. (The logging/error-tracking half of operability moves to REL-02 at `Must` — see that entry.)                                                                                                                 | Staging operational readiness review.                                                         | Should   |
@@ -278,12 +278,9 @@ itself.
   sessions vs. 500 officials / 500-recipient audience), which PERF-01 through
   PERF-04 all hang off. Needs deriving from expected participant volume, not
   asserting.
-- The acceptable ceiling for the relative-baseline method Peter confirmed
-  2026-08-25 (see §2 above): he gave a worked example (95 ms loaded vs. 15 ms
-  unloaded = 633%) but not what percentage counts as a pass, or whether the
-  ceiling is uniform across test cases. Asked via Slack 2026-08-25, awaiting
-  reply. PERF-01/PERF-02's fixed "p95 ≤ 2s" criteria stay provisional until
-  this is answered.
+- ~~The acceptable ceiling for the relative-baseline method~~ **Resolved
+  2026-08-25:** Peter confirmed 300% of unloaded baseline as the ceiling,
+  uniform across test cases. PERF-01/PERF-02 above now state this directly.
 
 ## Evidence references
 
