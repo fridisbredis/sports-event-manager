@@ -11,13 +11,13 @@ import { ASSIGNMENT_STATUSES, type AssignmentStatus } from '@/types/app'
 
 const tenantIdSchema = z.string().uuid()
 
-// Batch ceilings. save_assignments_batch (migration 0030) is the authority —
+// Batch ceilings. save_assignments_batch (migration 0033) is the authority —
 // it enforces the same numbers itself, because it is granted to
 // `authenticated` and can therefore be called directly, bypassing this whole
 // module. These exist so the real client gets "that save is too large" from
 // the Server Action instead of a round trip that ends in a generic RPC error.
 // Keep in sync with c_max_additions / c_max_deletions / c_max_status_updates
-// in 0030; the asymmetry is deliberate and its derivation is documented there.
+// in 0033; the asymmetry is deliberate and its derivation is documented there.
 const MAX_ADDITIONS = 500
 const MAX_DELETIONS = 5000
 const MAX_STATUS_UPDATES = 500
@@ -26,7 +26,7 @@ const MAX_STATUS_UPDATES = 500
 // arguments are entirely client-controlled — so the payload gets the same
 // treatment as tenantId. Two concrete reasons this is not cosmetic:
 //   - a null workstation_id/timeslot would otherwise reach
-//     save_assignments_batch (migration 0030) and build a null occupancy key
+//     save_assignments_batch (migration 0033) and build a null occupancy key
 //   - assignments.official_id references officials(id) with no
 //     tenant-consistency constraint (0001_initial_schema.sql:66), so an
 //     unvalidated official_id can write a row into this tenant pointing at
@@ -34,22 +34,22 @@ const MAX_STATUS_UPDATES = 500
 //   - assignments.workstation_id has the same gap, and the unique constraint
 //     that guards slots (migration 0012) has no tenant_id column — so a
 //     foreign workstation_id lets one tenant occupy another tenant's slot.
-//     Migration 0030 rejects both; these schemas are the first line, not the
+//     Migration 0033 rejects both; these schemas are the first line, not the
 //     only one, since the RPC is callable without going through this action.
 // `datetime({ offset: true })` rather than the Z-only default: the grid sends
 // Date.toISOString() today, but a DB-derived timestamptz arrives as +00:00 and
 // must not be rejected by the validator.
-const additionsSchema = z.array(
-  z.object({
-    official_id: z.string().uuid(),
-    workstation_id: z.string().uuid(),
-    timeslot_start: z.string().datetime({ offset: true }),
-    timeslot_end: z.string().datetime({ offset: true }),
-    // 1-based — the grid builds slots as
-    // Array.from({ length: capacity_ceiling }, (_, i) => i + 1).
-    slot_index: z.number().int().positive().optional(),
-  })
-).max(MAX_ADDITIONS)
+const additionSchema = z.object({
+  official_id: z.string().uuid(),
+  workstation_id: z.string().uuid(),
+  timeslot_start: z.string().datetime({ offset: true }),
+  timeslot_end: z.string().datetime({ offset: true }),
+  // 1-based — the grid builds slots as
+  // Array.from({ length: capacity_ceiling }, (_, i) => i + 1).
+  slot_index: z.number().int().positive().optional(),
+})
+
+const additionsSchema = z.array(additionSchema).max(MAX_ADDITIONS)
 
 const deletionsSchema = z.array(z.string().uuid()).max(MAX_DELETIONS)
 
@@ -98,10 +98,11 @@ const INVALID_REQUEST_ERROR = 'Invalid request'
 // Deliberately distinct from INVALID_REQUEST_ERROR: this save is well-formed,
 // just too big, and the fix is "split it up" rather than "the caller is
 // broken". Collapsing the two costs whoever debugs it real time.
-const BATCH_TOO_LARGE_ERROR = 'Too many assignments in one save. Split the change into smaller saves.'
+const BATCH_TOO_LARGE_ERROR =
+  'Too many assignments in one save. Split the change into smaller saves.'
 
 // Custom errcodes raised by save_assignments_batch
-// (supabase/migrations/0030_save_assignments_batch_rpc.sql). Mapping on the
+// (supabase/migrations/0033_save_assignments_batch_rpc.sql). Mapping on the
 // errcode rather than the raw Postgres error message keeps this decoupled
 // from whatever text/wrapping Postgres or PostgREST puts around it.
 const SLOT_TAKEN_ERRCODE = 'ASG01'
@@ -137,7 +138,7 @@ export async function saveAssignments(
   // WHICH rule was broken, so an over-cap-but-valid save would come back as
   // "Invalid request" — the same message a malformed payload gets. Splitting
   // it here keeps "too big, split it up" distinguishable from "your caller is
-  // broken", matching the ASG04-vs-ASG03 split in migration 0030.
+  // broken", matching the ASG04-vs-ASG03 split in migration 0033.
   // Array.isArray rather than a bare .length: these are declared as arrays but
   // this is a Server Action, so a caller can hand us null or a scalar. Reading
   // .length off that would throw here, where the safeParse below handles it
@@ -173,7 +174,7 @@ export async function saveAssignments(
   }
 
   // Runs the delete/status-update/occupancy-check/insert batch as one DB
-  // transaction (PERF-02) — see migration 0030 for the exact semantics
+  // transaction (PERF-02) — see migration 0033 for the exact semantics
   // preserved from the old sequential-calls version (re-read timing,
   // overflow allowance, slot-collision handling).
   const { data, error } = await supabase
@@ -199,7 +200,7 @@ export async function saveAssignments(
       return { error: INVALID_REQUEST_ERROR }
     }
     // Unreachable via this action — the cap check above already returned. Kept
-    // because 0030 is granted to `authenticated` and enforces its own caps, so
+    // because 0033 is granted to `authenticated` and enforces its own caps, so
     // this code is part of the RPC's contract regardless of who calls it.
     if (error.code === BATCH_TOO_LARGE_ERRCODE) {
       logger.warn('saveAssignments: RPC rejected an over-cap batch', { tenantId })

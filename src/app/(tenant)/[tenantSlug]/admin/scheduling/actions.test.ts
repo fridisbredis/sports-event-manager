@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AssignmentStatus } from '@/types/app'
 
 // PERF-02: saveAssignments delegates the whole batch to the
-// save_assignments_batch RPC (migration 0030) and maps its custom SQLSTATEs
+// save_assignments_batch RPC (migration 0033) and maps its custom SQLSTATEs
 // to user-facing strings. These tests pin that mapping and the zod gate in
 // front of it — both are the only things standing between a client-controlled
 // payload and the RPC.
@@ -203,7 +203,7 @@ describe('saveAssignments payload validation', () => {
   })
 })
 
-// The caps exist mainly in migration 0030 (the RPC is granted to
+// The caps exist mainly in migration 0033 (the RPC is granted to
 // `authenticated`, so it is reachable without this action). These tests cover
 // the client-facing half: the message has to say "too large", never the
 // generic "Invalid request", or nobody can tell an oversized save from a
@@ -266,7 +266,7 @@ describe('saveAssignments batch caps', () => {
     const result = await saveAssignments(
       'acme',
       TENANT_ID,
-      null as unknown as typeof VALID_ADDITION[],
+      null as unknown as (typeof VALID_ADDITION)[],
       []
     )
 
