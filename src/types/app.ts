@@ -24,6 +24,11 @@ export type OfficialListItem = Omit<
 export type Participant = DbTables['participants']['Row']
 export type Assignment = DbTables['assignments']['Row']
 export type Announcement = DbTables['announcements']['Row']
+// status is plain text at the DB level (CHECK constraint, not a Postgres
+// enum), so the generated Row type has it as `string` — narrow it here.
+export type SmsQueueItem = Omit<DbTables['sms_queue']['Row'], 'status'> & {
+  status: SmsQueueStatus
+}
 
 // Insert types (what you send to the DB when creating)
 export type TenantInsert = DbTables['tenants']['Insert']
@@ -53,6 +58,7 @@ export type StageType = 'race' | 'non_race'
 export type AssignmentStatus = 'assigned' | 'available'
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
+export type SmsQueueStatus = 'pending' | 'sending' | 'sent' | 'failed'
 
 // Useful aggregate types for queries that join data
 export type WorkstationWithDetails = Workstation & {

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
-import twilio from 'twilio'
 import { z } from 'zod'
 
 const publishSchema = z.object({
@@ -92,94 +90,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to publish announcement' }, { status: 500 })
   }
 
-  // The sender number and the client are resolved before any send, and a fault in either
-  // is our own configuration rather than a provider rejection, so both answer a
-  // controlled 500 with a client-safe message - the same shape the resend route uses.
-  // Without this guard twilio() throws synchronously on an unset or non-AC
-  // TWILIO_ACCOUNT_SID and escapes the handler entirely, leaving the admin with an
-  // unhandled 500 and no way to tell whether any of the announcement went out.
+  // PERF-04: sending is no longer done inline. Enqueue one sms_queue row per
+  // recipient and return immediately — the sms-queue-worker-trigger pg_cron
+  // job (migration 0030) drains the queue every minute with bounded
+  // concurrency and retry. The unique (announcement_id, recipient_phone)
+  // constraint makes this insert idempotent if the client ever retries the
+  // publish request.
   //
-  // The announcements row inserted above is deliberately left in place on this path. It
-  // was written with sms_sent: false, which is exactly what happened: the announcement is
-  // published and no SMS was sent. Rolling it back would need a transaction the rest of
-  // this handler does not have.
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER
-  if (!fromNumber) {
-    try {
-      logger.error('Announcement SMS blocked: TWILIO_PHONE_NUMBER is not set', undefined, {
-        tenantId,
-      })
-    } catch {
-      // Logging must never be able to change the response - see the send loop below.
-    }
-    return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
-  }
-
-  let client: ReturnType<typeof twilio>
-  try {
-    client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  } catch {
-    // The caught error is never logged: the Twilio constructor quotes the offending
-    // credential back in its own message.
-    try {
-      logger.error('Announcement SMS blocked: Twilio client could not be constructed', undefined, {
-        tenantId,
-      })
-    } catch {
-      // Logging must never be able to change the response - see the send loop below.
-    }
-    return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
-  }
-
-  const results = await Promise.allSettled(
-    (recipients ?? []).map(({ phone }) =>
-      client.messages.create({
-        body,
-        from: fromNumber,
-        to: toTwilioE164(phone),
-      })
+  // The announcements row above is deliberately left in place even if the
+  // enqueue below fails partially or fully: it was written with
+  // sms_sent: false, which the worker will correct once messages actually
+  // go out. Rolling it back would need a transaction the rest of this
+  // handler does not have.
+  if (recipients && recipients.length > 0) {
+    const { error: queueError } = await supabase.from('sms_queue').insert(
+      recipients.map(({ phone }) => ({
+        tenant_id: tenantId,
+        announcement_id: announcement.id,
+        recipient_phone: phone,
+      }))
     )
-  )
 
-  // Count and log in one pass. Each rejection is recorded with Twilio's numeric code
-  // only - never the raw error and never the number, because a Twilio rejection quotes
-  // the destination back in its message ("Invalid To number: +46..."). Recipients are
-  // identified by their position in the batch, which is enough to line a failure up
-  // against the send order without putting PII in the log.
-  //
-  // The try wraps each log rather than the whole loop: console patching by editor
-  // extensions can throw, and a throw that aborted the loop would leave `failed`
-  // undercounted and report a partial send as a clean one.
-  let failed = 0
-  for (const [index, result] of results.entries()) {
-    if (result.status !== 'rejected') continue
-
-    failed += 1
-    const code = (result.reason as { code?: unknown } | null)?.code
-    try {
-      logger.error('Announcement SMS failed for recipient', undefined, {
+    if (queueError) {
+      logger.error('Failed to enqueue announcement SMS', queueError, {
         tenantId,
-        channel,
-        recipientIndex: index,
-        twilioCode: code ?? 'none',
+        announcementId: announcement.id,
       })
-    } catch {
-      // Logging must never be able to change the response.
+      return NextResponse.json({ error: 'Failed to queue SMS delivery' }, { status: 500 })
     }
   }
 
-  const sent = results.length - failed
-  const { error: updateError } = await supabase
-    .from('announcements')
-    .update({ sms_sent: sent > 0 })
-    .eq('id', announcement.id)
-
-  if (updateError) {
-    logger.error('Failed to record delivery outcome for announcement', updateError, {
-      tenantId,
-      announcementId: announcement.id,
-    })
-  }
-
-  return NextResponse.json({ sent, failed })
+  return NextResponse.json(
+    { announcementId: announcement.id, queued: recipients?.length ?? 0 },
+    { status: 202 }
+  )
 }
