@@ -4,7 +4,7 @@ Context:
 
 Context:
 - PostgreSQL via Supabase
-- Migrations in supabase/migrations/ — numbered NNNN_description.sql (next: 0016)
+- Migrations in supabase/migrations/ — numbered NNNN_description.sql (next: 0033)
 - Existing production database — do NOT recreate schema, use ALTER TABLE
 - RLS enabled on all tables
 - Both dev (lhflutwvwvzawzbcuwup) and prod must receive the migration
@@ -22,6 +22,26 @@ Rules:
 - Use IF EXISTS / IF NOT EXISTS throughout
 - Minimal change — only what was asked for
 
+Forward-fix header (mandatory — see .claude/CLAUDE.md "Forward-fix plan"):
+- Every migration starts with a SQL comment header stating what it does and why
+- The header MUST include a filled-in Forward-fix block:
+    -- Forward-fix: <additive | destructive | replace>
+    --   Rollback: <SQL or steps for a new migration that undoes this>
+    --   Data:     <can the data be recovered, and from where — or "no data loss">
+    --   Blast:    <what breaks in the app between the bad deploy and the fix>
+- Pick exactly one class:
+    additive    — new table / nullable-or-defaulted column / index / RPC.
+                  Rollback is a `drop ... if exists`; Data is "no data loss".
+    destructive — drop or rename a column, tighten a CHECK, backfill or
+                  UPDATE existing rows. Data MUST name where the original
+                  lives (PITR window, export file) or say "not recoverable".
+    replace     — changed RPC / RLS policy / trigger. Rollback is "restore the
+                  definition from migration 00MM", naming the file.
+- Never leave a placeholder or a guess in these lines — an unfilled Data line
+  on a destructive migration blocks the prod push
+- CI enforces that the `-- Forward-fix:` line exists; only a human reviewer can
+  tell whether the Data line is true, so make it specific
+
 RLS rules (mandatory for new tables):
 - ALTER TABLE ... ENABLE ROW LEVEL SECURITY
 - Admin write policy: USING (public.get_user_role(tenant_id) = 'tenant_admin' OR public.is_system_admin())
@@ -36,12 +56,13 @@ Schema conventions:
 - Roles: 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 
 After generating, remind user to:
-1. Run npm run db:types to regenerate src/types/database.ts
-2. Update src/types/app.ts with any new Row/Insert/Update aliases
-3. Apply to both dev and prod Supabase projects
+1. Verify the Forward-fix block is filled in with real values, not placeholders
+2. Run npm run db:types to regenerate src/types/database.ts
+3. Update src/types/app.ts with any new Row/Insert/Update aliases
+4. Apply to both dev and prod Supabase projects
 
 Output:
-- SQL only
-- No explanation
+- SQL only, starting with the comment header described above
+- No prose outside the SQL comment header
 - No markdown fences
-- Suggested filename: 0016_<short_description>.sql
+- Suggested filename: 0033_<short_description>.sql
