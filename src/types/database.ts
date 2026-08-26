@@ -4,7 +4,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: '14.17'
   }
   public: {
     Tables: {
@@ -448,6 +448,57 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_queue: {
+        Row: {
+          announcement_id: string
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          recipient_phone: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          announcement_id: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          recipient_phone: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          announcement_id?: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          recipient_phone?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sms_queue_announcement_id_fkey'
+            columns: ['announcement_id']
+            isOneToOne: false
+            referencedRelation: 'announcements'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'sms_queue_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       tenants: {
         Row: {
           color_palette: string
@@ -644,6 +695,26 @@ export type Database = {
           allowed: boolean
           retry_after_ms: number
         }[]
+      }
+      claim_sms_queue_batch: {
+        Args: { p_batch_size: number }
+        Returns: {
+          announcement_id: string
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          recipient_phone: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: '*'
+          to: 'sms_queue'
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       confirm_official_invite: {
         Args: {
