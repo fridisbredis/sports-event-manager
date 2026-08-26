@@ -3,8 +3,6 @@ name: Quality checks
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -154,6 +152,70 @@ jobs:
       - name: Stop local Supabase stack
         if: always()
         run: supabase stop
+
+  migration-forward-fix:
+    name: Migration forward-fix
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so the merge-base diff below can resolve.
+          fetch-depth: 0
+
+      - name: Check new migrations document a forward-fix plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Only ADDED files are checked (--diff-filter=A). Migrations
+          # 0001-0032 predate this convention and are intentionally exempt
+          # (see .claude/CLAUDE.md "Forward-fix plan") — editing one of them
+          # must not start failing CI.
+          if [ -n "${BASE_SHA:-}" ]; then
+            base="$BASE_SHA"
+          else
+            # push/workflow_dispatch: compare against the previous commit.
+            base="HEAD^"
+          fi
+
+          new_migrations=$(git diff --name-only --diff-filter=A "$base" HEAD \
+            -- 'supabase/migrations/*.sql')
+
+          if [ -z "$new_migrations" ]; then
+            echo "No new migrations in this change."
+            exit 0
+          fi
+
+          missing=""
+          for file in $new_migrations; do
+            if grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*(additive|destructive|replace)\b' "$file"; then
+              echo "OK   $file"
+            else
+              echo "FAIL $file"
+              missing="$missing $file"
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            cat <<'EOF'
+
+          Every new migration must document a forward-fix plan in its SQL
+          comment header. Add a block like:
+
+            -- Forward-fix: additive
+            --   Rollback: drop table if exists public.<table>;
+            --   Data:     no data loss
+            --   Blast:    <what breaks between the bad deploy and the fix>
+
+          The class must be one of: additive, destructive, replace.
+          See .claude/CLAUDE.md -> "Forward-fix plan" for the full convention.
+          EOF
+            echo "Missing forward-fix block:$missing"
+            exit 1
+          fi
 
   build:
     name: Production build
