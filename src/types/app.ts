@@ -50,7 +50,15 @@ export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'partici
 export type EventStatus = 'draft' | 'published'
 export type RaceType = 'distance' | 'time'
 export type StageType = 'race' | 'non_race'
-export type AssignmentStatus = 'assigned' | 'available'
+// All four values the assignments status CHECK allows
+// (0003_phase6_schema.sql:244). Declared as a const tuple, with the type
+// derived from it, so there is exactly one list: a zod enum or a UI dropdown
+// can iterate the value and still be type-identical to anything annotated
+// with AssignmentStatus. The previous two-value type had drifted from the
+// CHECK, and actions.ts had forked its own four-value zod enum rather than
+// deriving from it.
+export const ASSIGNMENT_STATUSES = ['assigned', 'available', 'on_break', 'blocked'] as const
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number]
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 

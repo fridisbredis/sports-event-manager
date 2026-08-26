@@ -668,6 +668,26 @@ export type Database = {
         Args: { p_official_id: string; p_tenant_id: string }
         Returns: Json
       }
+      save_assignments_batch: {
+        Args: {
+          p_additions: Json
+          p_deletions: string[]
+          p_status_updates: Json
+          p_tenant_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          official_id: string
+          slot_index: number
+          status: string
+          tenant_id: string
+          timeslot_end: string
+          timeslot_start: string
+          todo_id: string | null
+          workstation_id: string | null
+        }[]
+      }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
         Returns: undefined

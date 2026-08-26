@@ -104,6 +104,38 @@ export async function createUserWithRole(tenantId: string, role: TenantRole) {
   return { userId: userData.user.id, phone }
 }
 
+// system_admin is a global role: migration 0021 made user_roles.tenant_id
+// nullable and added a CHECK requiring it to be NULL for system_admin and
+// NOT NULL for every other role. createUserWithRole() always writes a
+// tenant_id, so it cannot create one — hence this separate function.
+// Cleanup is the caller's job via deleteAuthUser(), since cleanupTenant()
+// keys its user list by tenant and a system_admin belongs to none.
+export async function createSystemAdmin() {
+  const admin = serviceClient()
+  const phone = await claimTestPhone(admin)
+
+  const { data: userData, error: userError } = await admin.auth.admin.createUser({
+    phone,
+    phone_confirm: true,
+  })
+  if (userError) throw userError
+
+  const { error: roleError } = await admin
+    .from('user_roles')
+    .insert({ user_id: userData.user.id, tenant_id: null, role: 'system_admin' })
+  if (roleError) throw roleError
+
+  return { userId: userData.user.id, phone }
+}
+
+// Frees the test phone the user holds. Only needed for users created outside
+// createUserWithRole() — cleanupTenant() already deletes the ones it tracks.
+export async function deleteAuthUser(userId: string) {
+  const admin = serviceClient()
+  await admin.from('user_roles').delete().eq('user_id', userId)
+  await admin.auth.admin.deleteUser(userId)
+}
+
 // Logs in as the given phone via the local test OTP (see supabase/config.toml
 // [auth.sms.test_otp]) and returns an anon-key client carrying that user's
 // real session — this is the client RLS actually sees.
