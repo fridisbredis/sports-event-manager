@@ -213,6 +213,55 @@ If `supabase db pull` ever reports a migration history mismatch pointing at a ve
 
 ---
 
+### Forward-fix plan (mandatory for every new migration)
+
+Migrations here are forward-only. There are no `down.sql` files and none
+will be added — recovery from a bad migration always means writing a new
+numbered migration that moves forward. To make that survivable during a
+live incident, **every migration from 0033 onward must document its own
+forward-fix plan in the SQL comment header.** The person paging through a
+broken deploy at 22:00 should find the answer already written down, not
+have to reverse-engineer the migration under pressure.
+
+This is the forward-fix half of MNT-07 ("every migration has a tested
+reverse or a documented forward-fix"). The 32 existing migrations
+(0001–0032) are intentionally exempt: they are already applied and stable
+on both dev and prod, and retrofitting plans onto them costs more than it
+would ever return.
+
+**Format** — extends the header convention already used in
+`0026_rate_limit_officials_invite.sql` and `0031_create_workstation_rpc.sql`:
+
+```sql
+-- ============================================================================
+-- Migration 00NN: <title>
+-- ============================================================================
+--
+-- <what it does and why — as today>
+--
+-- Forward-fix: <additive | destructive | replace>
+--   Rollback: <the SQL, or the steps, for a new migration that undoes this>
+--   Data:     <can the data be recovered, and from where — or "no data loss">
+--   Blast:    <what breaks in the app between the bad deploy and the fix>
+-- ============================================================================
+```
+
+**Risk classes** — pick exactly one; it sets the bar for the other lines:
+
+| Class         | Typical changes                                                            | What `Rollback:` must say                                                                                                                                                                                                |
+| ------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `additive`    | new table, new nullable/defaulted column, new index, new RPC               | A `drop ... if exists`. Safe by construction, so `Data:` is "no data loss".                                                                                                                                              |
+| `destructive` | drop or rename a column, tighten a CHECK, backfill or UPDATE existing rows | Must name where the original data lives — the PITR window, an export file, or an explicit "not recoverable". Snapshot the affected rows with a `select` **before** pushing, or state outright that the loss is accepted. |
+| `replace`     | changed RPC definition, changed RLS policy, changed trigger                | "Restore the definition from migration 00MM", with the filename. Always cheap, because the `create or replace` / `drop policy if exists` pattern is already the norm here.                                               |
+
+**The one hard rule:** a `destructive` migration does not get pushed to
+prod until the `Data:` line says something verified rather than something
+hoped. This is the same discipline that `docs/quality-requirements.md`
+credits for prod not having had a schema incident yet — no wildcard reads,
+a default on every mandatory column added. Keep it.
+
+---
+
 ### After any DB migration
 
 1. Run `npm run db:types` — regenerates src/types/database.ts
