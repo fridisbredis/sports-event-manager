@@ -94,14 +94,14 @@ F-REL-05, analys 2026-08-26), inte en uppgift som väntar på någon. Om en inci
 rör någon av dem är forward-fix enda vägen — och för `0009` gäller att en
 naiv reverse aktivt korrumperar giltig data.
 
-| Migration | Varför ingen down finns                                                                                           |
-| --------- | ----------------------------------------------------------------------------------------------------------------- |
-| `0003`    | Droppar `assignments.workstation` och `.todo`. Innehållet är borta; en down ger tillbaka tomma kolumner.          |
-| `0008`    | Droppar `events.category_type` efter en backfill som var smalare än droppen. Se F-REL-08.                         |
-| `0009`    | Remappar `invite_status`. En reverse kan inte skilja migrationens rader från appens senare confirmations.         |
-| `0012`    | Droppar `slot_index` → kastar bort vilken lane varje official står på, vilket inte kan räknas om.                 |
-| `0014`    | `DELETE FROM workstations WHERE stage_id IS NULL` + FK:n cascadar nu till `assignments`. Raderna finns inte kvar. |
-| `0015`    | Äger `logos`-bucketen. En down som tar bucketen tar även varje uppladdad logo.                                    |
+| Migration | Varför ingen down finns                                                                                                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0003`    | Droppar `assignments.workstation` och `.todo`. Innehållet är borta; en down ger tillbaka tomma kolumner.                                                                          |
+| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen. Inget data förlorat i praktiken (F-REL-08, mätt) — men kolumnen är borta, så en down kan inte återskapa den. |
+| `0009`    | Remappar `invite_status`. En reverse kan inte skilja migrationens rader från appens senare confirmations.                                                                         |
+| `0012`    | Droppar `slot_index` → kastar bort vilken lane varje official står på, vilket inte kan räknas om.                                                                                 |
+| `0014`    | `DELETE FROM workstations WHERE stage_id IS NULL` + FK:n cascadar nu till `assignments`. Raderna finns inte kvar.                                                                 |
+| `0015`    | Äger `logos`-bucketen. En down som tar bucketen tar även varje uppladdad logo.                                                                                                    |
 
 Två down-fällor i den reversibla delen: `0007` och `0021` släpper `NOT NULL`. En
 down som återinför constraintet **failar** om NULL-rader skapats sedan dess.
