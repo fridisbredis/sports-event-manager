@@ -4,7 +4,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: '14.17'
   }
   public: {
     Tables: {
@@ -448,6 +448,57 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_queue: {
+        Row: {
+          announcement_id: string
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          recipient_phone: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          announcement_id: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          recipient_phone: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          announcement_id?: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          recipient_phone?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sms_queue_announcement_id_fkey'
+            columns: ['announcement_id']
+            isOneToOne: false
+            referencedRelation: 'announcements'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'sms_queue_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       tenants: {
         Row: {
           color_palette: string
@@ -645,6 +696,26 @@ export type Database = {
           retry_after_ms: number
         }[]
       }
+      claim_sms_queue_batch: {
+        Args: { p_batch_size: number }
+        Returns: {
+          announcement_id: string
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          recipient_phone: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: '*'
+          to: 'sms_queue'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       confirm_official_invite: {
         Args: {
           p_name: string
@@ -658,6 +729,20 @@ export type Database = {
       confirm_official_invite_by_phone: {
         Args: { p_user_id: string; p_user_phone: string }
         Returns: Json
+      }
+      create_workstation: {
+        Args: {
+          p_capacity_ceiling?: number
+          p_description?: string
+          p_event_id: string
+          p_name?: string
+          p_recurring?: boolean
+          p_stage_id?: string
+          p_tenant_id: string
+          p_todos?: Json
+          p_windows?: Json
+        }
+        Returns: string
       }
       get_last_sign_in_at: { Args: { p_user_id: string }; Returns: string }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }

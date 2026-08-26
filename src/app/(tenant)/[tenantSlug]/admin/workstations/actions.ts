@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import type { Json } from '@/types/database'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -67,44 +68,24 @@ export async function createWorkstation(
     return { error: 'Operating window is shorter than the scheduling granularity' }
   }
 
-  const { data: ws, error: wsError } = await supabase
-    .from('workstations')
-    .insert({
-      tenant_id: parsedTenantId.data,
-      event_id: input.eventId,
-      stage_id: input.stageId,
-      name: input.name.trim(),
-      description: input.description.trim() || null,
-      capacity_ceiling: input.capacity,
-      recurring: input.recurring,
-    })
-    .select('id')
-    .single()
-
-  if (wsError || !ws) return { error: wsError?.message ?? 'Failed to create work area' }
-
-  if (validWindows.length > 0) {
-    const { error: winError } = await supabase.from('workstation_operating_windows').insert(
-      validWindows.map((w) => ({
-        workstation_id: ws.id,
-        window_start: w.window_start,
-        window_end: w.window_end,
-      }))
-    )
-    if (winError) return { error: winError.message }
-  }
-
   const validTodos = input.todos.map((t) => t.trim()).filter(Boolean)
-  if (validTodos.length > 0) {
-    const { error: todoError } = await supabase.from('workstation_todos').insert(
-      validTodos.map((text, i) => ({
-        workstation_id: ws.id,
-        instruction_text: text,
-        position: i,
-      }))
-    )
-    if (todoError) return { error: todoError.message }
-  }
+
+  const { error: rpcError } = await supabase.rpc('create_workstation', {
+    p_tenant_id: parsedTenantId.data,
+    p_event_id: input.eventId,
+    p_stage_id: input.stageId ?? undefined,
+    p_name: input.name.trim(),
+    p_description: input.description.trim() || undefined,
+    p_capacity_ceiling: input.capacity,
+    p_recurring: input.recurring,
+    p_windows: validWindows as unknown as Json,
+    p_todos: validTodos.map((text, i) => ({
+      instruction_text: text,
+      position: i,
+    })) as unknown as Json,
+  })
+
+  if (rpcError) return { error: rpcError.message }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
 
