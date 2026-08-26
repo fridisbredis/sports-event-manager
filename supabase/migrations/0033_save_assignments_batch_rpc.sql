@@ -76,6 +76,34 @@
 -- constraint from migration 0012 at INSERT time. That's caught below and
 -- normalized to the same friendly message/errcode as the in-batch check,
 -- rather than bubbling up as a raw Postgres constraint-violation message.
+--
+-- Forward-fix: additive
+--   Rollback: drop function if exists
+--               public.save_assignments_batch(uuid, uuid[], jsonb, jsonb);
+--             Revert the app first, not after. saveAssignments() in
+--             src/app/(tenant)/[tenantSlug]/admin/scheduling/actions.ts calls
+--             this RPC, so dropping the function while the deployed app still
+--             expects it turns every schedule save into a PostgREST 404 —
+--             a worse failure than the one being rolled back. Order: deploy
+--             the app revert to the pre-PERF-02 sequential path, then drop.
+--             If a LATER migration replaces this function and that
+--             replacement is the bad one, the forward-fix is the cheap
+--             `replace` case instead: re-apply this file's `create or
+--             replace` body verbatim in a new numbered migration.
+--   Data:     No data loss. This migration adds a function and its grants —
+--             it alters no table, column, constraint, policy or row. Rows
+--             the RPC committed before the rollback are ordinary
+--             `assignments` rows, identical in shape to what the old TS path
+--             wrote, and stay valid once the function is gone.
+--   Blast:    Scoped to the admin scheduling save path (SCHED-01). While the
+--             function is broken, every batch save raises instead of
+--             writing — and because the batch is one transaction, it fails
+--             whole rather than half-applied, so the grid stays consistent
+--             with the DB and a reload shows the true state. Reading the
+--             grid, MYSCH-01, announcements and every other table are
+--             unaffected; no other caller of this function exists. The
+--             inverse ordering is harmless: function present, app on the old
+--             code means nothing calls it at all.
 -- ============================================================================
 
 create or replace function public.save_assignments_batch(
