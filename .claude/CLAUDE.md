@@ -260,6 +260,21 @@ hoped. This is the same discipline that `docs/quality-requirements.md`
 credits for prod not having had a schema incident yet — no wildcard reads,
 a default on every mandatory column added. Keep it.
 
+**Rehearse it:** `docs/testing/rollback-rehearsal.md` is the routine for
+practising recovery before it is needed, and for verifying that the
+migration suite still builds prod's schema exactly. Run it before any prod
+release containing a migration. It runs against the local stack with
+`npm run seed:dev` — never against a copy of prod data, which carries real
+phone numbers under the SEC-09 retention decisions.
+
+**Six migrations have no correct reverse** (`0003`, `0008`, `0009`, `0012`,
+`0014`, `0015`) — retroactive downs for 0001–0032 were evaluated and
+rejected in 2026-08-26; see F-REL-05 for the per-migration classification
+and the rehearsal doc for the table. `0009` is the one to remember: a
+naive reverse of its `invite_status` remap corrupts legitimate
+confirmations, because it cannot tell them from the rows the migration
+touched.
+
 ---
 
 ### After any DB migration
