@@ -730,6 +730,20 @@ export type Database = {
         Args: { p_user_id: string; p_user_phone: string }
         Returns: Json
       }
+      create_workstation: {
+        Args: {
+          p_capacity_ceiling?: number
+          p_description?: string
+          p_event_id: string
+          p_name?: string
+          p_recurring?: boolean
+          p_stage_id?: string
+          p_tenant_id: string
+          p_todos?: Json
+          p_windows?: Json
+        }
+        Returns: string
+      }
       get_last_sign_in_at: { Args: { p_user_id: string }; Returns: string }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
