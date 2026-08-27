@@ -38,6 +38,17 @@
 # PRE-FLIGHT EXPORT below), so the image tag, replica settings and env vars
 # it applies are the ones already running - not some other stale or default
 # set that "all other parameters ignored" could otherwise clobber.
+#
+# THAT PROTECTION DOES NOT EXTEND TO SECRETS. `az containerapp show` returns
+# `.properties.configuration.secrets` as names only - values are always
+# omitted from a `show`/export response, which is exactly why `az
+# containerapp secret list --show-values` exists as a separate command. So
+# the export this script builds on is never a faithful copy of secrets (it
+# is faithful for image tag / replicas / env vars, just not this one field).
+# Re-applying it as-is would risk blanking real secret values, including the
+# ACR pull credential for sportsevtmgrprod.azurecr.io. See the SECRETS
+# PRE-FLIGHT GATE below, which aborts before the confirm prompt if the
+# export contains any secrets at all, rather than trying to guess or merge.
 # ------------------------------------------------------------------------------
 #
 # WHAT THIS SCRIPT DOES
@@ -218,6 +229,39 @@ jq \
 echo "Updated config (not yet applied) written to: ${UPDATED_FILE}"
 
 # ------------------------------------------------------------------------------
+# SECRETS PRE-FLIGHT GATE - `az containerapp show` returns secret NAMES only;
+# values are always omitted from the export (that's why `az containerapp
+# secret list --show-values` exists as a separate command). This script
+# builds $UPDATED_FILE on top of that export, so if the app has any secrets
+# configured, applying $UPDATED_FILE as-is would re-declare them with empty/
+# absent values - including the ACR pull credential for
+# sportsevtmgrprod.azurecr.io, which was configured via `az containerapp
+# registry set` and is stored as one of these secrets. The failure would be
+# silent at apply time (this script would print success, and the probe
+# read-back below would look correct) and only surface later, on the next
+# deploy or a cold-start image pull, when the app can no longer authenticate
+# to the registry.
+#
+# There is no safe auto-recovery here - fetching real values and splicing
+# them in is exactly the kind of thing that should not happen unattended in
+# a script that targets prod. Abort and hand it to the operator instead.
+# ------------------------------------------------------------------------------
+SECRET_COUNT=$(jq '(.properties.configuration.secrets // []) | length' "$BACKUP_FILE")
+if [[ "$SECRET_COUNT" -gt 0 ]]; then
+  echo "ERROR: the exported config for '${APP_NAME}' declares ${SECRET_COUNT} secret(s)." >&2
+  echo "'az containerapp show' returns secret values as omitted, not just this app's export -" >&2
+  echo "applying \$UPDATED_FILE as-is would re-apply those secrets with empty/absent values," >&2
+  echo "which risks blanking the real ACR pull credential and other secrets on next use." >&2
+  echo "" >&2
+  echo "Capture the real secret values first, then re-run this script:" >&2
+  echo "  az containerapp secret list --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --show-values -o json" >&2
+  echo "" >&2
+  echo "This script will not attempt to auto-recover or merge secret values. Aborting without" >&2
+  echo "making any change. Exported (unmodified) backup is still at: ${BACKUP_FILE}" >&2
+  exit 1
+fi
+
+# ------------------------------------------------------------------------------
 # CONFIRM AND APPLY
 # ------------------------------------------------------------------------------
 echo ""
@@ -249,7 +293,29 @@ az containerapp show \
   --query "properties.template.containers[0].probes" \
   --output jsonc
 
+# Also confirm nothing the SECRETS PRE-FLIGHT GATE above warned about was
+# silently damaged. This reads names only (never --show-values here - that
+# would print secret values to the terminal and into any CI log capturing
+# this script's output) and the registry credential wiring, since a blanked
+# ACR secret is exactly what would break the next image pull.
+echo ""
+echo "Reading back secret names (values never shown) for confirmation:"
+az containerapp secret list \
+  --name "$APP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --output table
+
+echo ""
+echo "Reading back registry configuration for confirmation:"
+az containerapp show \
+  --name "$APP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.configuration.registries" \
+  --output jsonc
+
 echo ""
 echo "Done. Backup of the pre-change config remains at: ${BACKUP_FILE}"
 echo "To re-run this same verification query later by hand:"
 echo "  az containerapp show --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --query \"properties.template.containers[0].probes\" --output jsonc"
+echo "  az containerapp secret list --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --output table"
+echo "  az containerapp show --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --query \"properties.configuration.registries\" --output jsonc"

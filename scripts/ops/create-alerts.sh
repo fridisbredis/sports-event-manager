@@ -75,7 +75,50 @@ echo "Target Container App resource id: ${CONTAINER_APP_ID}"
 # assumed one already existed would fail on first run. `az monitor
 # action-group create` upserts on --name + --resource-group, so this is
 # also safe to re-run if the recipient email ever needs to change.
+#
+# CAUTION - "upsert" here means REPLACE, not MERGE: the --action flags on a
+# given `create` call become the entire receiver set, full stop. If anyone
+# ever adds a second recipient by hand through the Azure portal, the next
+# run of this script silently deletes it - this script only ever knows
+# about $ALERT_EMAIL. PERF-05 alerting is single-email today, so this has
+# not bitten yet, but it will the first time a second person is added
+# outside this script. The RECEIVER CHECK below guards against that by
+# refusing to proceed quietly if more receivers already exist than this
+# script is about to set.
 # ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# RECEIVER CHECK - read existing receivers before the replace-not-merge
+# create call above can delete them. Must tolerate the action group not
+# existing yet (the normal first-run case, not an error) - under `set -e` a
+# failing command substitution would otherwise abort the whole script, so
+# stderr is suppressed and a failure is treated as "no existing receivers"
+# by falling back to an empty list / a count of 0.
+# ------------------------------------------------------------------------------
+EXISTING_RECEIVERS=$(az monitor action-group show \
+  --name "$ACTION_GROUP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "properties.emailReceivers" \
+  --output json 2>/dev/null || echo "[]")
+EXISTING_RECEIVER_COUNT=$(az monitor action-group show \
+  --name "$ACTION_GROUP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "length(properties.emailReceivers)" \
+  --output tsv 2>/dev/null || echo 0)
+
+if [[ "$EXISTING_RECEIVER_COUNT" -gt 1 ]]; then
+  echo "WARNING: action group '${ACTION_GROUP_NAME}' already has ${EXISTING_RECEIVER_COUNT} email receiver(s):" >&2
+  echo "${EXISTING_RECEIVERS}" >&2
+  echo "" >&2
+  echo "'az monitor action-group create' REPLACES the entire receiver set - it does not merge." >&2
+  echo "Proceeding will delete every receiver above except ${ALERT_EMAIL}." >&2
+  read -r -p "Type the app name (${APP_NAME}) to continue, anything else aborts: " CONFIRM
+  if [[ "$CONFIRM" != "$APP_NAME" ]]; then
+    echo "Aborted - confirmation did not match. No changes were applied." >&2
+    exit 1
+  fi
+fi
+
 echo "Creating/updating action group '${ACTION_GROUP_NAME}'..."
 az monitor action-group create \
   --name "$ACTION_GROUP_NAME" \
