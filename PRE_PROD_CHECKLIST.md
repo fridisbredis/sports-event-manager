@@ -57,8 +57,8 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 ### Performance and operations
 
 - [x] Pipe Next.js logs into Azure Log Analytics (structured logging) — `src/lib/logger.ts`, 2026-08-24. Container stdout already ships to `ContainerAppConsoleLogs_CL`, no new infra needed.
-- [x] Add a `/api/health` endpoint for Container Apps liveness/readiness probes — 2026-08-24, wired into the Dockerfile's `HEALTHCHECK`. Not yet wired into an Azure Container App probe config (separate from the Docker-level check).
-- [ ] Tune `min-replicas` and `max-replicas` for prod (consider 2 minimum for redundancy)
+- [x] Add a `/api/health` endpoint for Container Apps liveness/readiness probes — 2026-08-24. **Correction:** the Dockerfile's `HEALTHCHECK` does not provide this — Azure Container Apps never reads that instruction, it only affects local `docker run`. Probes are now *defined* in `scripts/ops/set-probes.sh` (targeting the DB-free `/api/health/live`), but that script has never been executed against Azure — no `az` CLI on the authoring machine. Prod is still running Container Apps' default TCP probe. See `docs/ops/operational-readiness.md`.
+- [ ] Tune `min-replicas` and `max-replicas` for prod — **min is settled**: `--min-replicas 2` (`deploy-prod.yml:100`), redundancy achieved. **max is provisional**: `--max-replicas 3` (`deploy-prod.yml:101`), held rather than raised because any replacement number would be equally invented. Revisit once PERF-01 yields a per-replica capacity figure and set it from that data — see `F-PERF-05` in `docs/quality-requirements.md`.
 - [ ] Enable Supabase connection pooling (Supavisor) if "too many connections" errors appear
 - [ ] Configure container app autoscaling rules based on HTTP traffic
 - [ ] Add index on `officials.user_id` (or composite `(user_id, tenant_id)`) — `canViewOfficialSurfaces` queries this combination on every official-surface page load; only `tenant_id` is indexed today. Low-priority at current volume, needed before scaling to many real tenants.
