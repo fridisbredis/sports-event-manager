@@ -141,14 +141,35 @@ faktiskt fungerar som skriven.
 Det här är den övning som faktiskt betyder något. Additiva rollbacks är lätta;
 det svåra är att skriva en ny migration framåt medan appen är trasig.
 
-- [ ] `supabase db reset` + `npm run seed:dev`
+- [ ] `supabase db reset` (se seed-noten i Del 2 om du behöver data)
 - [ ] Simulera en dålig migration: skriv en ny migrationsfil som medvetet gör
-      något fel som appen märker — t.ex. lägg en `NOT NULL`-kolumn utan default
-      på `officials`, eller byt namn på en kolumn en server action läser
-- [ ] `supabase db push` mot **lokal** stack
-- [ ] Bekräfta att appen faktiskt går sönder på det sätt du förväntade
+      något fel som appen märker. **Välj vägen med omsorg** — de flesta
+      läsvägar failar tyst, se varningen nedan. Ett byte av kolumnnamn som en
+      *sidas* `select` läser räcker INTE.
+- [ ] **`supabase db reset`, inte `db push`.** `db push` går alltid mot det
+      länkade remote-projektet (dev eller prod) — det finns ingen lokal push.
+      Lokalt applicerar man migrationer genom att spela om hela sviten. Det
+      betyder också att varje iteration kostar en full replay, vilket är en
+      reell faktor i återhämtningstiden. Vill du iterera snabbare: kör SQL:en
+      direkt mot databasen först
+      (`docker exec supabase_db_sports-event-manager psql -U postgres -c "..."`),
+      och `db reset` en gång på slutet för att verifiera från rent läge.
+- [ ] Bekräfta att appen faktiskt går sönder på det sätt du förväntade.
+      **Går den inte sönder är det ett fynd, inte ett misslyckat uppsättning** —
+      skriv upp det och byt väg.
 - [ ] Ta tid från här. Skriv forward-fix-migrationen som återställer läget
 - [ ] Notera hur lång tid det tog och vad som var svårt
+
+> **De flesta läsvägar larmar inte (F-REL-10, 2026-08-27).** 15 läsningar i 9
+> filer gör `const { data } = await supabase…` utan att destrukturera `error`,
+> och sedan `?? []`. En failad fråga blir en tom lista, sidan svarar 200, och
+> Sentry får ingenting. Övningen kunde därför inte köras 2026-08-27: den
+> medvetet trasiga migrationen (`event_stages.venue` → `location`) gav
+> `HTTP 400 / 42703` från PostgREST men var osynlig i appen.
+> Välj tills detta är åtgärdat en väg som **skriver**: en server action eller
+> en RPC som scheduling anropar. Ett `drop function` på
+> `save_assignments_batch` ger t.ex. ett verkligt fel i UI:t (verifierat i
+> Del 2: `HTTP 404 / PGRST202`).
 
 Det som ska komma ut av övningen är inte en grön bock utan tre svar:
 
@@ -192,7 +213,7 @@ Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 | Datum      | Vem   | Del 1                             | Del 2      | Del 3: tid till fix | Vad som saknade dokumentation                                                                                                          |
 | ---------- | ----- | --------------------------------- | ---------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-26 | Frida | **FAIL** — se fynden nedan        | ej körd än | ej körd än          | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                       |
-| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | ej körd än | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
+| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | **Kunde inte köras** — se F-REL-10 | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -310,3 +331,37 @@ Del 2 hittade alltså något Del 1 inte kan se.
 faktiskt behöver, så att lokal build blir körbar utan plattformens hjälp? Det
 gör lokal utveckling förutsägbar, men lägger till 100+ rader som duplicerar
 något Supabase redan gör i dev och prod. Värt ett eget kort.
+
+### Körning 2026-08-27 — Del 3 kunde inte köras
+
+Startläget sattes upp: en medvetet dålig migration som döper om
+`event_stages.venue` → `location`, applicerad mot lokal stack. Brottet
+verifierades på API-nivå — PostgREST svarar **`HTTP 400 / 42703`,
+`column event_stages.venue does not exist`**.
+
+**Appen visade ingenting.** Ingen krasch, inget felmeddelande, inget i Sentry.
+Sidorna svarade 200 med tomma listor.
+
+Orsaken är F-REL-10: läsvägarna destrukturerar bara `data`, aldrig `error`, och
+coalescar sedan med `?? []`. En failad fråga blir därmed omöjlig att skilja från
+en tom tabell. **15 läsningar i 9 filer**, verifierade individuellt — inklusive
+hela admin-ytan (dashboard, event, officials, workstations ×2, communication,
+scheduling ×3). En andra, mildare klass följs av `if (!x) notFound()`; de failar
+högt men med vilseledande 404.
+
+Övningen är därmed **blockerad på F-REL-10**, inte bara ej utförd. Del 3 kräver
+per konstruktion att man kan bekräfta att appen går sönder på det sätt
+`Blast:`-raden förutsade — och för de flesta läsvägar går det inte att bekräfta
+något alls.
+
+Två fynd som gäller oavsett:
+
+1. **`supabase db push` finns inte för lokal stack.** Rutinen sa så; det är fel.
+   `db push` går alltid mot det länkade remote-projektet. Lokalt applicerar man
+   via `db reset`, vilket betyder att varje iteration kostar en full replay av
+   hela sviten — en reell faktor i återhämtningstid som rutinen inte nämnde.
+   Rättat i stegen ovan.
+2. **Att välja brott är inte trivialt.** Instruktionens eget exempel ("byt namn
+   på en kolumn en server action läser") pekar mot en väg som visade sig vara
+   osynlig. Stegen anger nu att man ska välja en skrivväg eller en RPC tills
+   F-REL-10 är åtgärdad.
