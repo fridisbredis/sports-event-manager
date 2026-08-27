@@ -187,7 +187,7 @@ det svåra är att skriva en ny migration framåt medan appen är trasig.
 - [ ] Notera hur lång tid det tog och vad som var svårt
 
 > **Läsvägar larmar sedan PR #76 (F-REL-10, stängt 2026-08-27).** Tidigare gjorde
-> 15 läsningar i 9 filer `const { data } = await supabase…` utan att
+> 22 läsningar i 14 filer `const { data } = await supabase…` utan att
 > destrukturera `error`, och sedan `?? []` — en failad fråga blev en tom lista,
 > sidan svarade 200 och Sentry fick ingenting. Det blockerade förmiddagens
 > körning. Efter #76 kastar läsvägarna, och samma brott
