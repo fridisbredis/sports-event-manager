@@ -70,11 +70,13 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 
   const tenantId = (data as unknown as { tenant_id: string }).tenant_id
 
-  const { data: tenant } = await service
+  const { data: tenant, error: tenantError } = await service
     .from('tenants')
     .select('slug')
     .eq('id', tenantId)
     .maybeSingle()
+
+  if (tenantError) return null
 
   return tenant?.slug ?? null
 }

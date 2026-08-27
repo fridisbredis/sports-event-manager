@@ -37,7 +37,11 @@ export default async function EventConfigPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: stages }, { data: distances }, { data: facilities }] = await Promise.all([
+  const [
+    { data: stages, error: stagesError },
+    { data: distances, error: distancesError },
+    { data: facilities, error: facilitiesError },
+  ] = await Promise.all([
     supabase
       .from('event_stages')
       .select('id, name, stage_type, race_type, start_time, end_time, venue, position')
@@ -54,6 +58,9 @@ export default async function EventConfigPage({ params }: Props) {
       .eq('event_id', event.id)
       .order('position', { ascending: true }),
   ])
+
+  const queryError = stagesError ?? distancesError ?? facilitiesError
+  if (queryError) throw queryError
 
   const isPublished = event.status === 'published'
 

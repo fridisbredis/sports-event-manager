@@ -27,12 +27,14 @@ export default async function OfficialsPage({ params }: Props) {
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const { data: officials } = await supabase
+  const { data: officials, error } = await supabase
     .from('officials')
     .select('id, name, phone, invite_status, user_id, created_at, tenant_id, sms_opt_out')
     .eq('tenant_id', tenant.id)
     .neq('invite_status', 'removed')
     .order('created_at', { ascending: true })
+
+  if (error) throw error
 
   return (
     <div className="px-8 py-8">

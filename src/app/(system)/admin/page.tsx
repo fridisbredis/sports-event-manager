@@ -8,10 +8,12 @@ export default async function SystemAdminPage() {
   if ('error' in auth) notFound()
 
   const supabase = await createSupabaseServerClient()
-  const { data: tenants } = await supabase
+  const { data: tenants, error } = await supabase
     .from('tenants')
     .select('id, name, slug, is_active, tier')
     .order('created_at', { ascending: false })
+
+  if (error) throw error
 
   return <TenantList tenants={tenants ?? []} />
 }

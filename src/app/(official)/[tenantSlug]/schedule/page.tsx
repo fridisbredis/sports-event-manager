@@ -23,7 +23,7 @@ export default async function SchedulePage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const { data: officialsRows } = await supabase
+  const { data: officialsRows, error: officialsError } = await supabase
     .from('officials')
     .select('id')
     .eq('user_id', user.id)
@@ -31,12 +31,14 @@ export default async function SchedulePage({ params }: Props) {
     .eq('invite_status', 'confirmed')
     .limit(1)
 
+  if (officialsError) throw officialsError
+
   const official = officialsRows?.[0] ?? null
 
   let assignments: AssignmentRow[] = []
 
   if (official) {
-    const { data } = await supabase
+    const { data, error: assignmentsError } = await supabase
       .from('assignments')
       .select(
         `
@@ -57,6 +59,10 @@ export default async function SchedulePage({ params }: Props) {
       .eq('status', 'assigned')
       .not('workstation_id', 'is', null)
       .order('timeslot_start')
+
+    // An official seeing "no assignments" must mean they have none, not that
+    // the query failed — this is the screen they open on event day.
+    if (assignmentsError) throw assignmentsError
 
     assignments = (data ?? []) as AssignmentRow[]
   }
