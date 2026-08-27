@@ -37,12 +37,14 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
 
   if (!event) notFound()
 
-  const { data: stages } = await supabase
+  const { data: stages, error: stagesError } = await supabase
     .from('event_stages')
     .select('id, name, stage_type, start_time, end_time')
     .eq('event_id', event.id)
     .eq('tenant_id', tenant.id)
     .order('position', { ascending: true })
+
+  if (stagesError) throw stagesError
 
   const preselectedStage = stages?.find((s) => s.id === preselectedStageId) ?? null
 
