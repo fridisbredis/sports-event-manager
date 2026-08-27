@@ -41,4 +41,16 @@ describe('proxy — health check auth exemption', () => {
 
     expect(res.status).toBe(401)
   })
+
+  // Pins the exact-match decision itself. /api/tenants (above) only proves
+  // the mock isn't broken — it says nothing about /api/health specifically.
+  // This case proves the exemption is an exact-path list, not a prefix
+  // match: if the condition were ever widened to
+  // pathname.startsWith('/api/health'), this unlisted sibling path would
+  // wrongly become exempt and this test would catch it.
+  it('control: does not exempt an unlisted /api/health/* path', async () => {
+    const res = await proxy(requestFor('/api/health/detail'))
+
+    expect(res.status).toBe(401)
+  })
 })
