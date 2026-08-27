@@ -3,6 +3,9 @@ name: "Prod Health Check: /api/health Availability Probe"
 on:
   workflow_dispatch: # also allow manual trigger from GitHub UI
   schedule:
+    # This repo is public (unauthenticated api.github.com calls return 200),
+    # so scheduled Actions minutes are free here -- a `*/5` interval costs
+    # nothing. Do not tighten this to save minutes; it isn't spending any.
     - cron: '*/5 * * * *'
 
 jobs:
@@ -13,6 +16,14 @@ jobs:
       contents: read
     steps:
       - name: Curl /api/health three times
+        env:
+          # Assigned to an env var (rather than interpolating
+          # ${{ secrets.PROD_APP_URL }} directly into the shell body) so the
+          # guard below can check it and so a missing/renamed secret produces
+          # a distinct, self-describing failure instead of curl silently
+          # receiving "/api/health" as its URL and failing in a way that
+          # looks identical to a real outage.
+          URL: ${{ secrets.PROD_APP_URL }}
         run: |
           # Deliberately targets /api/health (DB-backed), NOT /api/health/live.
           # /api/health returns 503 when Supabase is unreachable, and that 503
@@ -52,7 +63,30 @@ jobs:
           # the crash-loop alert is silent. Do not dismiss a failing run of
           # this job because the Azure alert did not also fire -- for a
           # total outage, it will not.
+          #
+          # Guard against an unset/renamed PROD_APP_URL secret before the
+          # loop. Without this, curl would receive "/api/health" (empty URL
+          # prefix) as its target, fail, and this job would go red in a way
+          # indistinguishable from a real prod outage -- but per the "For a
+          # total outage" note above, this job IS the primary and only
+          # outage signal, so a config error masquerading as an outage is
+          # more costly here than it would be elsewhere. Fail loudly and
+          # distinctly instead.
+          [ -n "$URL" ] || { echo "::error::PROD_APP_URL secret is not set"; exit 1; }
+
+          # Each curl below must be non-fatal on its own. GitHub Actions
+          # runs `run:` steps under `bash -e`, which aborts the whole step
+          # the moment any command in it exits non-zero -- including a
+          # `curl --fail` inside this loop's body. Left as `curl ... ` with
+          # no `|| ...`, only the FIRST failing request would ever run; the
+          # other two would never execute, and only one 5xx would reach the
+          # Azure metric -- exactly the scenario the "Three curls per run"
+          # comment above says this loop exists to avoid. So: catch each
+          # failure into a counter instead of letting it kill the step, keep
+          # `--fail` so a 5xx still counts as a failure, and only fail the
+          # step (via exit 1) after all three attempts have run.
+          failures=0
           for i in 1 2 3; do
-            curl --fail --silent --show-error --max-time 10 \
-              "${{ secrets.PROD_APP_URL }}/api/health"
+            curl --fail --silent --show-error --max-time 10 "$URL/api/health" || failures=$((failures + 1))
           done
+          [ "$failures" -eq 0 ] || { echo "::error::$failures/3 probes failed"; exit 1; }

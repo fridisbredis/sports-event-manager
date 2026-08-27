@@ -110,3 +110,66 @@ jobs:
               "SENTRY_DSN=${{ secrets.PROD_SENTRY_DSN }}" \
               "SENTRY_ENVIRONMENT=production" \
               "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}"
+
+      - name: Verify prod health probes survived deploy
+        run: |
+          # PROBES POST-DEPLOY GUARD
+          #
+          # scripts/ops/set-probes.sh configures the Startup/Liveness/Readiness
+          # probes on this Container App out of band - it is a one-time,
+          # manually-run script (see its own header), NOT called from this or
+          # any other workflow. The deploy step above runs a flag-based
+          # `az containerapp update --image ... --set-env-vars ...`, and
+          # whether that flag-based form preserves an existing
+          # template.containers[0].probes array is UNVERIFIED anywhere in
+          # this repo (the already-logged F-MNT-11 covers the `--yaml`
+          # variant only, not this flag-based one). If a flag-based update
+          # silently drops the probes array, prod reverts to Azure's default
+          # TCP probe and nothing currently notices - no test, no alert, no
+          # other workflow step. This step exists to close that gap.
+          #
+          # IMPORTANT CONSTRAINT: probes have NEVER been successfully applied
+          # to prod yet (scripts/ops/set-probes.sh has never completed a run
+          # against prod). So an empty probe array here is today's normal
+          # state, not a regression, and must NOT fail this or any deploy.
+          # Only a non-empty probe array with a wrong httpGet path is an
+          # actual regression - that means probes existed and this deploy
+          # corrupted or misdirected them, which is the real thing this guard
+          # is meant to catch.
+          #
+          # TODO: once scripts/ops/set-probes.sh has been run successfully
+          # against prod (probes confirmed present via that script's own
+          # VERIFY step), flip the empty-array branch below from
+          # `::warning::` to a hard `exit 1`. Leaving it as a warning forever
+          # would make this guard permanently toothless for exactly the
+          # "probes were never applied" case it exists to eventually catch.
+          #
+          # Shell robustness under `bash -e` (same hazard as the health-check
+          # workflow's curl loop - GitHub Actions runs `run:` steps under
+          # `bash -e`, which aborts the step on the first non-zero exit
+          # inside it): PROBES_JSON is captured via a plain command
+          # substitution, not piped straight into jq, so an `az` failure
+          # surfaces as this step's own natural non-zero exit rather than
+          # being masked by a downstream pipeline stage. jq is preinstalled
+          # on the ubuntu-latest runner image.
+          PROBES_JSON=$(az containerapp show \
+            --name sports-event-manager-prod \
+            --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
+            --query "properties.template.containers[0].probes" \
+            --output json)
+          echo "Probes on sports-event-manager-prod after this deploy:"
+          echo "$PROBES_JSON" | jq .
+
+          PROBE_COUNT=$(echo "$PROBES_JSON" | jq 'length')
+          if [ "$PROBE_COUNT" -eq 0 ]; then
+            echo "::warning::No health probes are configured on sports-event-manager-prod (empty probes array). This is expected until scripts/ops/set-probes.sh has been run successfully against prod. Once it has, this branch must become a hard failure instead of a warning - see the TODO in this step's script."
+            exit 0
+          fi
+
+          BAD_PROBE_COUNT=$(echo "$PROBES_JSON" | jq '[.[] | select(.httpGet.path != "/api/health/live")] | length')
+          if [ "$BAD_PROBE_COUNT" -ne 0 ]; then
+            echo "::error::${BAD_PROBE_COUNT} probe(s) on sports-event-manager-prod do not target /api/health/live. Probes existed before this deploy and were corrupted or misdirected by it."
+            exit 1
+          fi
+
+          echo "All configured probes target /api/health/live as expected."

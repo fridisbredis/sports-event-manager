@@ -46,9 +46,12 @@
 # the export this script builds on is never a faithful copy of secrets (it
 # is faithful for image tag / replicas / env vars, just not this one field).
 # Re-applying it as-is would risk blanking real secret values, including the
-# ACR pull credential for sportsevtmgrprod.azurecr.io. See the SECRETS
-# PRE-FLIGHT GATE below, which aborts before the confirm prompt if the
-# export contains any secrets at all, rather than trying to guess or merge.
+# ACR pull credential for sportsevtmgrprod.azurecr.io. See the jq del() in
+# the update-building pipeline below, which strips
+# .properties.configuration.secrets and .properties.configuration.registries
+# from the payload entirely, and the SECRETS ASSERTION immediately after it,
+# which fails loudly if either field is still present in the built payload -
+# rather than trying to guess or merge real secret values back in.
 # ------------------------------------------------------------------------------
 #
 # WHAT THIS SCRIPT DOES
@@ -81,6 +84,12 @@ set -euo pipefail
 # otherwise fine) into a total one (app never stable enough to serve
 # anything).
 #
+# Confirmed against Microsoft's own docs, not just inferred:
+# https://learn.microsoft.com/en-us/azure/container-apps/health-probes -
+# "A revision state appears as unhealthy if any of its replicas fails its
+# readiness probe check... Container Apps restarts the replica in question
+# until it's healthy again or the failure threshold is exceeded."
+#
 # The DB-down signal still needs to reach someone - that's the job of the
 # 5xx-count metric alert in create-alerts.sh (health returns 503 on DB
 # failure, which passes through as a 5xx), not a probe.
@@ -107,10 +116,25 @@ HEALTH_PATH="${HEALTH_PATH:-/api/health/live}"
 # StartUp failed with status code: 1" - prod fell back to the hello-world
 # placeholder revision because the probe gave up too early during cold
 # start).
-STARTUP_FAILURE_THRESHOLD="${STARTUP_FAILURE_THRESHOLD:-240}"
-STARTUP_PERIOD_SECONDS="${STARTUP_PERIOD_SECONDS:-1}"
-# Arithmetic: 240 * 1 = 240 seconds (~4 minutes) of startup grace - matches,
-# rather than shrinks, the previous implicit default.
+#
+# The implicit 240x1 default CANNOT be reproduced literally, though - the
+# Azure Container Apps ARM schema (ContainerApps stable/2025-07-01
+# CommonDefinitions.json, ContainerAppProbe) caps failureThreshold at a
+# MAXIMUM of 10 (min 1) and periodSeconds at a maximum of 240 (min 1). A
+# genuine oddity: Azure's own portal-injected implicit default (240x1)
+# is itself above the maximum its public schema permits for an explicit
+# probe. So the same 240s of total grace has to be reassembled from
+# different factors that both stay within range:
+#   failureThreshold=10 (the schema max) * periodSeconds=24 = 240s total,
+# same grace as before, but legal. Do not set STARTUP_FAILURE_THRESHOLD
+# above 10 or STARTUP_PERIOD_SECONDS above 240 - the API will either
+# reject the value outright or (worse, silently) clamp it, which is what
+# a naive 240x1 configuration risked doing to the failureThreshold here.
+STARTUP_FAILURE_THRESHOLD="${STARTUP_FAILURE_THRESHOLD:-10}"
+STARTUP_PERIOD_SECONDS="${STARTUP_PERIOD_SECONDS:-24}"
+# Arithmetic: 10 * 24 = 240 seconds (~4 minutes) of startup grace - matches,
+# rather than shrinks, the previous implicit default, while staying inside
+# the schema's failureThreshold<=10 / periodSeconds<=240 limits above.
 
 # Liveness / readiness: steady-state values, not the cold-start allowance.
 # 3 * 10 = 30s of consecutive failures before ACA acts. Set explicitly for
@@ -124,6 +148,36 @@ LIVENESS_PERIOD_SECONDS="${LIVENESS_PERIOD_SECONDS:-10}"
 # under load would cause avoidable restarts, not just avoidable derotation.
 READINESS_FAILURE_THRESHOLD="${READINESS_FAILURE_THRESHOLD:-3}"
 READINESS_PERIOD_SECONDS="${READINESS_PERIOD_SECONDS:-10}"
+
+# ------------------------------------------------------------------------------
+# SCHEMA BOUNDS SANITY CHECK - every *_FAILURE_THRESHOLD / *_PERIOD_SECONDS
+# above can be overridden via environment variable, so a hardcoded default
+# being legal is not enough; an override could still smuggle an
+# out-of-range value through to the apply step. Enforce the same ARM schema
+# limits here that motivated the startup 10x24 split above (Azure
+# ContainerApps stable/2025-07-01 CommonDefinitions.json, ContainerAppProbe):
+# failureThreshold and successThreshold in [1,10], periodSeconds and
+# timeoutSeconds in [1,240]. This script never sets successThreshold or
+# timeoutSeconds explicitly (they fall back to the API's own defaults,
+# which are within range), so only failureThreshold/periodSeconds need
+# checking here.
+# ------------------------------------------------------------------------------
+for pair in \
+  "STARTUP_FAILURE_THRESHOLD:$STARTUP_FAILURE_THRESHOLD:1:10" \
+  "STARTUP_PERIOD_SECONDS:$STARTUP_PERIOD_SECONDS:1:240" \
+  "LIVENESS_FAILURE_THRESHOLD:$LIVENESS_FAILURE_THRESHOLD:1:10" \
+  "LIVENESS_PERIOD_SECONDS:$LIVENESS_PERIOD_SECONDS:1:240" \
+  "READINESS_FAILURE_THRESHOLD:$READINESS_FAILURE_THRESHOLD:1:10" \
+  "READINESS_PERIOD_SECONDS:$READINESS_PERIOD_SECONDS:1:240"
+do
+  IFS=":" read -r name value min max <<< "$pair"
+  if [[ "$value" -lt "$min" || "$value" -gt "$max" ]]; then
+    echo "ERROR: ${name}=${value} is outside the ARM schema's legal range [${min}, ${max}]." >&2
+    echo "Azure will reject or silently clamp an out-of-range probe value - see the STARTUP" >&2
+    echo "grace comment above for why 240 alone is no longer a legal failureThreshold." >&2
+    exit 1
+  fi
+done
 
 # ------------------------------------------------------------------------------
 # PRE-FLIGHT CHECKS
@@ -190,6 +244,18 @@ jq \
   # Container-Apps-specific computed values. This list is general defensive
   # practice for the export-edit-reapply pattern, not a confirmed-required
   # list from Azure support.
+  #
+  # .properties.configuration.secrets and .properties.configuration.registries
+  # are ALSO stripped here, deliberately, not just defensively: `az
+  # containerapp show` returns secret values as omitted (never the real
+  # value), so if this payload re-declared secrets at all it would be
+  # re-declaring them with empty/absent values - including the ACR pull
+  # credential for sportsevtmgrprod.azurecr.io, which was configured via `az
+  # containerapp registry set` and is stored as one of these secrets. Instead
+  # of declaring-and-then-gating-on that risk, remove the fields from the
+  # payload entirely so the update call never mentions secrets/registries at
+  # all. See SECRETS ASSERTION below for the one part of this that is not
+  # verified.
   del(
     .id, .systemData,
     .properties.provisioningState,
@@ -200,7 +266,9 @@ jq \
     .properties.customDomainVerificationId,
     .properties.outboundIPs,
     .properties.eventStreamEndpoint,
-    .properties.configuration.ingress.fqdn
+    .properties.configuration.ingress.fqdn,
+    .properties.configuration.secrets,
+    .properties.configuration.registries
   )
   |
   .properties.template.containers[0].probes = [
@@ -229,35 +297,46 @@ jq \
 echo "Updated config (not yet applied) written to: ${UPDATED_FILE}"
 
 # ------------------------------------------------------------------------------
-# SECRETS PRE-FLIGHT GATE - `az containerapp show` returns secret NAMES only;
+# SECRETS ASSERTION - `az containerapp show` returns secret NAMES only;
 # values are always omitted from the export (that's why `az containerapp
-# secret list --show-values` exists as a separate command). This script
-# builds $UPDATED_FILE on top of that export, so if the app has any secrets
-# configured, applying $UPDATED_FILE as-is would re-declare them with empty/
+# secret list --show-values` exists as a separate command). If $UPDATED_FILE
+# declared secrets at all, applying it would re-declare them with empty/
 # absent values - including the ACR pull credential for
 # sportsevtmgrprod.azurecr.io, which was configured via `az containerapp
-# registry set` and is stored as one of these secrets. The failure would be
-# silent at apply time (this script would print success, and the probe
-# read-back below would look correct) and only surface later, on the next
-# deploy or a cold-start image pull, when the app can no longer authenticate
-# to the registry.
+# registry set` and is stored as one of these secrets.
 #
-# There is no safe auto-recovery here - fetching real values and splicing
-# them in is exactly the kind of thing that should not happen unattended in
-# a script that targets prod. Abort and hand it to the operator instead.
+# The del() in the jq pipeline above already strips
+# .properties.configuration.secrets and .properties.configuration.registries
+# from $UPDATED_FILE, so that risk should not exist by the time we get here.
+# This check is deliberately checked against $UPDATED_FILE, not
+# $BACKUP_FILE - checking the backup would just re-detect that the *live*
+# app has secrets (always true, since prod's ACR credential is one), which
+# is expected and fine; it says nothing about what the jq pipeline above
+# actually produced. Checking $UPDATED_FILE turns this into a real invariant
+# assertion: "the payload we are about to apply must carry no secrets or
+# registries keys at all." If this fires, it means the del() above failed to
+# do its job - a bug in this script, not something an operator did wrong.
+#
+# ONE RESIDUAL UNKNOWN, stated honestly rather than assumed away (same
+# hedged style as the `update --yaml` caveat at the top of this file): it is
+# NOT verified whether `az containerapp update --yaml` treats an ABSENT
+# `.properties.configuration.secrets` key (rather than an explicit `[]`) as
+# "leave the existing secrets alone" or as "clear them". If it turns out to
+# mean "clear them", the VERIFY step below (which reads back secret names
+# and registry wiring after apply) will catch it immediately, and recovery
+# is a re-run of `az containerapp registry set` - not silent, not
+# unrecoverable, just not proven safe in advance.
 # ------------------------------------------------------------------------------
-SECRET_COUNT=$(jq '(.properties.configuration.secrets // []) | length' "$BACKUP_FILE")
-if [[ "$SECRET_COUNT" -gt 0 ]]; then
-  echo "ERROR: the exported config for '${APP_NAME}' declares ${SECRET_COUNT} secret(s)." >&2
-  echo "'az containerapp show' returns secret values as omitted, not just this app's export -" >&2
-  echo "applying \$UPDATED_FILE as-is would re-apply those secrets with empty/absent values," >&2
-  echo "which risks blanking the real ACR pull credential and other secrets on next use." >&2
-  echo "" >&2
-  echo "Capture the real secret values first, then re-run this script:" >&2
-  echo "  az containerapp secret list --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --show-values -o json" >&2
-  echo "" >&2
-  echo "This script will not attempt to auto-recover or merge secret values. Aborting without" >&2
-  echo "making any change. Exported (unmodified) backup is still at: ${BACKUP_FILE}" >&2
+UPDATED_SECRET_COUNT=$(jq '(.properties.configuration.secrets // []) | length' "$UPDATED_FILE")
+UPDATED_REGISTRIES_COUNT=$(jq '(.properties.configuration.registries // []) | length' "$UPDATED_FILE")
+if [[ "$UPDATED_SECRET_COUNT" -gt 0 || "$UPDATED_REGISTRIES_COUNT" -gt 0 ]]; then
+  echo "ERROR: \$UPDATED_FILE still declares ${UPDATED_SECRET_COUNT} secret(s) and" >&2
+  echo "${UPDATED_REGISTRIES_COUNT} registrie(s) after the jq del() that is supposed to strip both -" >&2
+  echo "that del() should have removed .properties.configuration.secrets and" >&2
+  echo ".properties.configuration.registries entirely. This is a bug in this script's jq" >&2
+  echo "pipeline, not an operator problem. Aborting without making any change." >&2
+  echo "Exported (unmodified) backup is still at: ${BACKUP_FILE}" >&2
+  echo "Updated (not applied) config is at: ${UPDATED_FILE}" >&2
   exit 1
 fi
 
@@ -287,17 +366,44 @@ az containerapp update \
 # ------------------------------------------------------------------------------
 echo ""
 echo "Reading back applied probe config for confirmation:"
-az containerapp show \
+PROBES_JSON=$(az containerapp show \
   --name "$APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --query "properties.template.containers[0].probes" \
-  --output jsonc
+  --output json)
+echo "$PROBES_JSON" | jq .
 
-# Also confirm nothing the SECRETS PRE-FLIGHT GATE above warned about was
-# silently damaged. This reads names only (never --show-values here - that
-# would print secret values to the terminal and into any CI log capturing
-# this script's output) and the registry credential wiring, since a blanked
-# ACR secret is exactly what would break the next image pull.
+# Real assertion, not just a printout: the previous version of this script
+# printed the probe config and stopped, so a silent API clamp (e.g.
+# failureThreshold accepted but capped below what was requested) would
+# never be noticed. Read back the applied Startup probe's actual
+# failureThreshold/periodSeconds and confirm their product still equals the
+# intended grace period - if Azure clamped either value, this will not
+# match and the script exits non-zero instead of reporting false success.
+APPLIED_STARTUP_FAILURE_THRESHOLD=$(echo "$PROBES_JSON" | jq '[.[] | select(.type == "Startup")][0].failureThreshold')
+APPLIED_STARTUP_PERIOD_SECONDS=$(echo "$PROBES_JSON" | jq '[.[] | select(.type == "Startup")][0].periodSeconds')
+INTENDED_STARTUP_GRACE=$((STARTUP_FAILURE_THRESHOLD * STARTUP_PERIOD_SECONDS))
+if [[ "$APPLIED_STARTUP_FAILURE_THRESHOLD" == "null" || "$APPLIED_STARTUP_PERIOD_SECONDS" == "null" ]]; then
+  echo "ERROR: no Startup probe found in the applied config - the update did not apply as expected." >&2
+  exit 1
+fi
+APPLIED_STARTUP_GRACE=$((APPLIED_STARTUP_FAILURE_THRESHOLD * APPLIED_STARTUP_PERIOD_SECONDS))
+if [[ "$APPLIED_STARTUP_GRACE" -ne "$INTENDED_STARTUP_GRACE" ]]; then
+  echo "ERROR: applied Startup probe grace (${APPLIED_STARTUP_FAILURE_THRESHOLD} x ${APPLIED_STARTUP_PERIOD_SECONDS}s = ${APPLIED_STARTUP_GRACE}s)" >&2
+  echo "does not match the intended grace (${STARTUP_FAILURE_THRESHOLD} x ${STARTUP_PERIOD_SECONDS}s = ${INTENDED_STARTUP_GRACE}s)." >&2
+  echo "Azure may have clamped a value on apply. Investigate before relying on this probe config." >&2
+  exit 1
+fi
+echo "Startup probe grace confirmed: ${APPLIED_STARTUP_FAILURE_THRESHOLD} x ${APPLIED_STARTUP_PERIOD_SECONDS}s = ${APPLIED_STARTUP_GRACE}s (matches intended)."
+
+# Also confirm nothing the SECRETS ASSERTION above was meant to protect was
+# silently damaged by the apply itself (see the ONE RESIDUAL UNKNOWN note in
+# that section - whether `update --yaml` treats an absent secrets/registries
+# key as "leave alone" or "clear" is not verified). This reads names only
+# (never --show-values here - that would print secret values to the
+# terminal and into any CI log capturing this script's output) and the
+# registry credential wiring, since a blanked ACR secret is exactly what
+# would break the next image pull.
 echo ""
 echo "Reading back secret names (values never shown) for confirmation:"
 az containerapp secret list \
