@@ -772,6 +772,12 @@ export type Database = {
           todo_id: string | null
           workstation_id: string | null
         }[]
+        SetofOptions: {
+          from: '*'
+          to: 'assignments'
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
