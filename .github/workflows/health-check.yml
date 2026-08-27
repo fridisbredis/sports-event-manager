@@ -1,0 +1,42 @@
+name: "Prod Health Check: /api/health Availability Probe"
+
+on:
+  workflow_dispatch: # also allow manual trigger from GitHub UI
+  schedule:
+    - cron: '*/5 * * * *'
+
+jobs:
+  health-check:
+    name: Probe /api/health
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Curl /api/health three times
+        run: |
+          # Deliberately targets /api/health (DB-backed), NOT /api/health/live.
+          # /api/health returns 503 when Supabase is unreachable, and that 503
+          # passes through Azure ingress and is counted under
+          # StatusCodeCategory = 5xx -- which feeds the 5xx metric alert
+          # (threshold: count >= 2 within 15 minutes).
+          #
+          # Three curls per run means a single cron run can clear that
+          # threshold on its own. GitHub Actions `*/5` schedules drift badly
+          # in practice (5-15 minutes between runs is normal), so an alert
+          # that needed two separate runs inside one 15-minute window would
+          # be unreliable. Three curls decouples the alert from cron drift
+          # entirely. This is also why the alert uses a count threshold
+          # rather than a rate: on a low-traffic app a rate would be diluted
+          # by healthy traffic.
+          #
+          # ${{ secrets.PROD_APP_URL }} is the Azure Container App URL.
+          # Prod also serves a custom domain (app.viadalevent.se) which an
+          # operator may prefer to target instead.
+          #
+          # If this job fails, GitHub will surface it as a secondary signal
+          # only -- the authoritative signal for prod health is the Azure
+          # 5xx metric alert, not this workflow's own notification.
+          for i in 1 2 3; do
+            curl --fail --silent --show-error --max-time 10 \
+              "${{ secrets.PROD_APP_URL }}/api/health"
+          done
