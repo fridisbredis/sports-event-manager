@@ -160,7 +160,7 @@ naiv reverse aktivt korrumperar giltig data.
 | Migration | Varför ingen down finns                                                                                                                                                           |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `0003`    | Droppar `assignments.workstation` och `.todo`. Innehållet är borta; en down ger tillbaka tomma kolumner.                                                                          |
-| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen. Droppen tog aldrig effekt (F-REL-09, nummerkollision); `0034` gör den skarpt — på dev 2026-08-27, prod avvaktar. Inget data förlorat (F-REL-08, mätt: varje rad höll default-värdet). En down kan ändå inte återskapa innehållet. |
+| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen. Droppen tog aldrig effekt (F-REL-09, nummerkollision); `0034` gör den skarpt — dev och prod 2026-08-27. Inget data förlorat (F-REL-08, mätt: varje rad höll default-värdet). En down kan ändå inte återskapa innehållet. |
 | `0009`    | Remappar `invite_status`. En reverse kan inte skilja migrationens rader från appens senare confirmations.                                                                         |
 | `0012`    | Droppar `slot_index` → kastar bort vilken lane varje official står på, vilket inte kan räknas om.                                                                                 |
 | `0014`    | `DELETE FROM workstations WHERE stage_id IS NULL` + FK:n cascadar nu till `assignments`. Raderna finns inte kvar.                                                                 |
@@ -180,7 +180,7 @@ Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 | Datum      | Vem   | Del 1                             | Del 2      | Del 3: tid till fix | Vad som saknade dokumentation                                                                                                          |
 | ---------- | ----- | --------------------------------- | ---------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-26 | Frida | **FAIL** — se fynden nedan        | ej körd än | ej körd än          | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                       |
-| 2026-08-27 | Frida | **PASS mot dev** (prod avvaktar)  | ej körd än | ej körd än          | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
+| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | ej körd än | ej körd än          | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -231,3 +231,29 @@ avvaktar: dess ledger står på 0032, så en push där applicerar även kollegan
 0033.
 
 Del 0 i detta dokument skrevs som direkt följd.
+
+**Prod klar samma dag.** `0033` (kollegans PERF-02-RPC, godkänd av hen för
+prod) och `0034` pushade tillsammans — prods ledger stod på 0032, så båda
+saknades. `--dry-run` först, som listade exakt dessa två och inget annat.
+
+Verifierat **mot prods schema**, inte mot pushens utdata:
+
+| Kontroll                            | Förväntat | Faktiskt |
+| ----------------------------------- | --------- | -------- |
+| `events.category_type` finns        | 0         | 0        |
+| `save_assignments_batch` finns      | 1         | 1        |
+| Ledger senaste                      | 0034      | 0034     |
+| Events kvar                         | 5         | 5        |
+| `event_stages.race_type = 'time'`   | 2         | 2        |
+
+Snapshot före push (alla fem prod-event höll `category_type = 'distance'`,
+alltså 0006:s default — värdet var aldrig medvetet satt) togs enligt Del 0:s
+krav för `destructive`.
+
+**`db diff --linked` mot prod efter push: 17 icke-grant statements, noll
+`category_type`-rader** — ned från 184 vid onsdagens körning. De 17 är de två
+redan kända icke-fynden: `pg_net` i `public` (fynd 2, **fortfarande öppen**)
+och Postgres egen normalisering av `anonymize_inactive_users` /
+`remove_official`. **Del 1 är därmed PASS mot prod:** migrationssviten beskriver
+prods schema, vilket är MNT-07:s "clean database build compared against
+production schema".
