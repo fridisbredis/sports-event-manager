@@ -191,10 +191,21 @@ jobs:
 
           missing=""
           for file in $new_migrations; do
-            if grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*(additive|destructive|replace)\b' "$file"; then
+            has_class=false
+            has_window=false
+            grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*(additive|destructive|replace)\b' "$file" \
+              && has_class=true
+            # Window: states what happens to the already-deployed code while the
+            # new schema is live and the new image is not — see .claude/CLAUDE.md
+            # "The ordering guarantee". Must say something, not just exist.
+            grep -qE '^--[[:space:]]*Window:[[:space:]]*[^[:space:]<]' "$file" \
+              && has_window=true
+
+            if $has_class && $has_window; then
               echo "OK   $file"
             else
-              echo "FAIL $file"
+              $has_class || echo "FAIL $file — no valid 'Forward-fix:' class"
+              $has_window || echo "FAIL $file — no filled-in 'Window:' line"
               missing="$missing $file"
             fi
           done
@@ -209,9 +220,20 @@ jobs:
             --   Rollback: drop table if exists public.<table>;
             --   Data:     no data loss
             --   Blast:    <what breaks between the bad deploy and the fix>
+            --   Window:   compatible
 
           The class must be one of: additive, destructive, replace.
-          See .claude/CLAUDE.md -> "Forward-fix plan" for the full convention.
+
+          Window: is about DEPLOY ORDER, not about a bad migration. Schema is
+          applied minutes before the new image ships (deploy-prod.yml step 1 vs
+          step 4), so the migration has to be backward-compatible with the code
+          already running. A new mandatory column without a default, or a
+          rename/drop of a column a deployed page selects, is NOT safe in one
+          release — split it expand/contract. "compatible" is a valid answer
+          for most additive migrations; a placeholder in <angle brackets> is not.
+
+          See .claude/CLAUDE.md -> "Forward-fix plan" and "The ordering
+          guarantee" for the full convention.
           EOF
             echo "Missing forward-fix block:$missing"
             exit 1
