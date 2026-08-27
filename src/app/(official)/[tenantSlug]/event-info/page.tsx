@@ -45,7 +45,11 @@ export default async function EventInfoPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const [{ data: event }, { data: stages }, { data: facilities }] = await Promise.all([
+  const [
+    { data: event, error: eventError },
+    { data: stages, error: stagesError },
+    { data: facilities, error: facilitiesError },
+  ] = await Promise.all([
     supabase
       .from('events')
       .select('name, event_type, description, logo_url, status')
@@ -62,6 +66,9 @@ export default async function EventInfoPage({ params }: Props) {
       .eq('tenant_id', tenant.id)
       .order('position'),
   ])
+
+  const queryError = eventError ?? stagesError ?? facilitiesError
+  if (queryError) throw queryError
 
   const stageList = stages ?? []
   const facilityList = facilities ?? []

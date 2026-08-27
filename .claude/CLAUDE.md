@@ -115,14 +115,23 @@ Example: `feat(EVT-01): scaffold event dashboard`
 
 ### GitHub Secrets
 
-**Dev (12) — naming is NOT uniformly prefixed, unlike prod. Actual names, verified against `deploy-dev.yml`:**
-`DEV_SUPABASE_URL`, `DEV_SUPABASE_ANON_KEY`, `DEV_SUPABASE_SERVICE_ROLE_KEY`, `DEV_APP_URL` (these four have the `DEV_` prefix), plus `AZURE_CREDENTIALS`, `AZURE_RESOURCE_GROUP_DEV` (suffix, not prefix), `REGISTRY_LOGIN_SERVER`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (these have no prefix at all).
+**18 secrets per environment.** Re-verified 2026-08-27 by listing every
+`secrets.*` reference in each workflow — the earlier count of 12 predated the
+Sentry split and `CRON_SECRET`. Read the workflow rather than this list if they
+ever disagree again.
 
-**Prod (12):** Consistently `PROD_`-prefixed: `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY`, `PROD_SUPABASE_SERVICE_ROLE_KEY`, `PROD_APP_URL`, `PROD_AZURE_CREDENTIALS`, `PROD_AZURE_RESOURCE_GROUP`, `PROD_REGISTRY_LOGIN_SERVER`, `PROD_REGISTRY_USERNAME`, `PROD_REGISTRY_PASSWORD`, `PROD_TWILIO_ACCOUNT_SID`, `PROD_TWILIO_AUTH_TOKEN`, `PROD_TWILIO_PHONE_NUMBER`.
+**Dev (18) — naming is NOT uniformly prefixed, unlike prod. Verified against `deploy-dev.yml`:**
+`DEV_SUPABASE_URL`, `DEV_SUPABASE_ANON_KEY`, `DEV_SUPABASE_SERVICE_ROLE_KEY`, `DEV_APP_URL`, `DEV_SENTRY_DSN`, `DEV_SENTRY_ORG`, `DEV_SENTRY_PROJECT`, `DEV_SENTRY_AUTH_TOKEN` (these eight have the `DEV_` prefix), plus `AZURE_RESOURCE_GROUP_DEV` (suffix, not prefix), and `AZURE_CREDENTIALS`, `REGISTRY_LOGIN_SERVER`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `CRON_SECRET`, `SUPABASE_ACCESS_TOKEN` (no prefix at all).
+
+**Prod (18):** Consistently `PROD_`-prefixed — `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY`, `PROD_SUPABASE_SERVICE_ROLE_KEY`, `PROD_APP_URL`, `PROD_AZURE_CREDENTIALS`, `PROD_AZURE_RESOURCE_GROUP`, `PROD_REGISTRY_LOGIN_SERVER`, `PROD_REGISTRY_USERNAME`, `PROD_REGISTRY_PASSWORD`, `PROD_TWILIO_ACCOUNT_SID`, `PROD_TWILIO_AUTH_TOKEN`, `PROD_TWILIO_PHONE_NUMBER`, `PROD_SENTRY_DSN`, `PROD_SENTRY_ORG`, `PROD_SENTRY_PROJECT`, `PROD_SENTRY_AUTH_TOKEN`, `PROD_CRON_SECRET` — with one exception: `SUPABASE_ACCESS_TOKEN`.
+
+**`SUPABASE_ACCESS_TOKEN` is the only genuinely shared secret.** Same unprefixed name in both workflows; it authenticates the Supabase CLI for `db push` and `db:types`. Everything else is per-environment.
 
 **Note:** `*_APP_URL` is the Azure Container App URL, `*_SUPABASE_URL` is the Supabase API URL — they are NOT the same thing and have caused confusion in the past. Double-check before pasting. When adding a new dev secret, match the existing (inconsistent) name in `deploy-dev.yml` rather than assuming a `DEV_` prefix.
 
-**Sentry (4) — shared between dev and prod, no `DEV_`/`PROD_` prefix, unlike everything else:** `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`. One Sentry project covers both environments; `SENTRY_ENVIRONMENT` (`development`/`production`, hardcoded per workflow, not a secret) is what tells events apart in the Sentry UI, not a separate DSN. `SENTRY_AUTH_TOKEN` is only used at build time for source-map upload — passed as a Docker `ARG`, never an `ENV`, so it isn't persisted into the pushed image's runtime environment.
+**Sentry (4 per environment, `DEV_`/`PROD_`-prefixed like everything else):** `*_SENTRY_DSN`, `*_SENTRY_ORG`, `*_SENTRY_PROJECT`, `*_SENTRY_AUTH_TOKEN`. Two separate Sentry projects (`viadal-event-dev`, `viadal-event-prod`), so the DSN differs per environment — an earlier version of this section claimed one shared project and unprefixed names, which was wrong. `SENTRY_ENVIRONMENT` (`development`/`production`) is hardcoded per workflow, not a secret. `*_SENTRY_AUTH_TOKEN` is only used at build time for source-map upload — passed as a Docker `ARG`, never an `ENV`, so it isn't persisted into the pushed image's runtime environment.
+
+**`CRON_SECRET` / `PROD_CRON_SECRET`** guard the scheduled route handlers (`api/cron/sms-worker`, `api/cron/gdpr-warning` — SEC-09). The same value must also exist in that environment's Supabase Vault, since pg_cron reads its own copy to make the call (see migration 0029). The handlers fail closed with 401 when the env var is unset.
 
 ---
 
@@ -243,6 +252,9 @@ would ever return.
 --   Rollback: <the SQL, or the steps, for a new migration that undoes this>
 --   Data:     <can the data be recovered, and from where — or "no data loss">
 --   Blast:    <what breaks in the app between the bad deploy and the fix>
+--   Window:   <what happens to the CURRENTLY DEPLOYED code while this schema
+--             is live but the new image is not — "compatible", or the
+--             expand/contract split this needs>
 -- ============================================================================
 ```
 
@@ -253,6 +265,64 @@ would ever return.
 | `additive`    | new table, new nullable/defaulted column, new index, new RPC               | A `drop ... if exists`. Safe by construction, so `Data:` is "no data loss".                                                                                                                                              |
 | `destructive` | drop or rename a column, tighten a CHECK, backfill or UPDATE existing rows | Must name where the original data lives — the PITR window, an export file, or an explicit "not recoverable". Snapshot the affected rows with a `select` **before** pushing, or state outright that the loss is accepted. |
 | `replace`     | changed RPC definition, changed RLS policy, changed trigger                | "Restore the definition from migration 00MM", with the filename. Always cheap, because the `create or replace` / `drop policy if exists` pattern is already the norm here.                                               |
+
+### The ordering guarantee (why `Window:` exists)
+
+**Schema goes first, and the app follows minutes later.** `deploy-prod.yml`
+applies `supabase db push` as step 1 and only swaps the Container App
+revision at step 4, after the type gate and the Docker build. Prod runs
+`minReplicas: 1` in Single revision mode, so there is also a short overlap
+where Azure has started the new revision and not yet drained the old one.
+For that whole window — minutes, not seconds — **the new schema is live and
+the previously deployed code is still serving traffic.**
+
+Schema-first is the right order (the alternative, code-first, breaks the new
+code instead and gives you no working version at all). But it obliges every
+migration to satisfy one rule:
+
+> **A migration must be backward-compatible with the code already running,
+> for the length of one deploy window.**
+
+What that permits and forbids:
+
+| Change                                             | Safe in one release?                                                    |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| New nullable column, new index, new table, new RPC | **Yes.** Old code ignores what it does not select.                      |
+| New mandatory column **with** a default            | **Yes.** Old code's `INSERT` omits the field; the default fills it.     |
+| New mandatory column **without** a default         | **No.** Every `INSERT` from old code fails for the whole window.        |
+| Renaming or dropping a column old code reads       | **No.** PostgREST returns `42703` to live users until step 4 completes. |
+| Tightening a CHECK old code can still violate      | **No.** Old writes fail until the new image lands.                      |
+
+**For anything in the "No" rows, split it across two releases** — the
+expand/contract pattern:
+
+1. **Expand.** Ship code that no longer depends on the old shape (stops
+   reading the column, writes both old and new, tolerates either). Deploy it.
+   The schema is untouched, so this release is safe in both directions.
+2. **Contract.** Ship the migration that drops or renames. By now no running
+   code reads the old shape, so the window is harmless.
+
+A rename is two migrations under this pattern, not one: add the new column
+and backfill (expand), then drop the old one in a later release (contract).
+Never `ALTER TABLE ... RENAME COLUMN` on a column any deployed page selects
+— that is exactly the break rehearsed in Del 3 of
+`docs/testing/rollback-rehearsal.md`, and in a real deploy it would have hit
+every user at once instead of one local test.
+
+The `Window:` line in the header is where this is stated per migration. For
+`additive` it is usually one word, "compatible". For `destructive` it must
+name which release this is — expand or contract — or explain why the change
+is safe against old code without a split. The `Migration forward-fix` job in
+`quality.yml` requires it on every newly added migration and rejects an
+unfilled `<placeholder>`; it only inspects files added in the diff, so
+`0033` and `0034` — written before this line existed — are not retroactively
+in breach, the same exemption 0001–0032 have.
+
+**What has protected prod so far** is not this rule but two habits that
+happen to imply it, and `docs/quality-requirements.md` says so outright: no
+wildcard reads (all 78 database reads name their fields) and a default on
+every mandatory column ever added. Habits do not survive three people
+working in parallel, which is why the rule is written down here.
 
 **The one hard rule:** a `destructive` migration does not get pushed to
 prod until the `Data:` line says something verified rather than something

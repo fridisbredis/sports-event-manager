@@ -35,7 +35,7 @@ export default async function EditWorkstationPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: ws }, { data: stages }] = await Promise.all([
+  const [{ data: ws, error: wsError }, { data: stages, error: stagesError }] = await Promise.all([
     supabase
       .from('workstations')
       .select(
@@ -51,6 +51,11 @@ export default async function EditWorkstationPage({ params }: Props) {
       .eq('tenant_id', tenant.id)
       .order('position', { ascending: true }),
   ])
+
+  // PGRST116 is .single() finding no row — a genuine 404 for this URL, not a
+  // failed query. Anything else means the read itself broke and must surface.
+  if (wsError && wsError.code !== 'PGRST116') throw wsError
+  if (stagesError) throw stagesError
 
   if (!ws) notFound()
 

@@ -44,7 +44,9 @@ export default async function DashboardPage({ params }: Props) {
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const { data: event } = await supabase
+  // No event yet is a legitimate state this dashboard renders an empty view
+  // for; a failed query is not, and must not look the same.
+  const { data: event, error: eventError } = await supabase
     .from('events')
     .select(
       'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
@@ -52,18 +54,24 @@ export default async function DashboardPage({ params }: Props) {
     .eq('tenant_id', tenant.id)
     .maybeSingle()
 
-  const { count: raceStageCount } = event
+  if (eventError) throw eventError
+
+  const { count: raceStageCount, error: raceStageError } = event
     ? await supabase
         .from('event_stages')
         .select('id', { count: 'exact', head: true })
         .eq('event_id', event.id)
         .eq('stage_type', 'race')
-    : { count: 0 }
+    : { count: 0, error: null }
 
-  const { data: officialsData } = await supabase
+  if (raceStageError) throw raceStageError
+
+  const { data: officialsData, error: officialsError } = await supabase
     .from('officials')
     .select('invite_status')
     .eq('tenant_id', tenant.id)
+
+  if (officialsError) throw officialsError
 
   const officialsInvited = officialsData?.filter((o) => o.invite_status === 'invited').length ?? 0
   const officialsConfirmed =

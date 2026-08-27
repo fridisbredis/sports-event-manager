@@ -21,7 +21,8 @@
     "heading": "Something broke mid-race.",
     "body": "This checkpoint hit a snag. Try again — if it keeps happening, let your organizer know.",
     "cta": "Try again",
-    "toast": "Something went wrong. Please try again."
+    "toast": "Something went wrong. Please try again.",
+    "navHint": "The other tabs still work."
   },
   "actions": {
     "save": "Save",

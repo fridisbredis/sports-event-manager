@@ -58,10 +58,18 @@ export async function POST(request: NextRequest) {
   // Prefetch each distinct announcement's body once, rather than re-querying
   // it per recipient — a single announcement can have up to 500 queued rows.
   const announcementIds = [...new Set(batch.map((row) => row.announcement_id))]
-  const { data: announcementRows } = await service
+  const { data: announcementRows, error: announcementsError } = await service
     .from('announcements')
     .select('id, body')
     .in('id', announcementIds)
+
+  // Throw rather than proceed with a partial map. Without this, a failed read
+  // left bodyById empty and every message below went out with an empty body
+  // (`?? ''`), was accepted by Twilio, and had its queue row marked 'sent' —
+  // blank SMS to every recipient, irreversibly, with no retry because nothing
+  // threw. Failing the tick leaves the rows queued for the next run instead.
+  if (announcementsError) throw announcementsError
+
   const bodyById = new Map((announcementRows ?? []).map((a) => [a.id, a.body]))
 
   let sent = 0
@@ -76,8 +84,17 @@ export async function POST(request: NextRequest) {
     await Promise.allSettled(
       chunk.map(async (row) => {
         try {
+          // An announcement whose row is missing or whose body is blank must
+          // not be sent as an empty message — the recipient cannot unsend it,
+          // and a blank SMS is worse than a delayed one. Treated as a failure
+          // for this row so it follows the normal retry/last_error path below.
+          const body = bodyById.get(row.announcement_id)
+          if (!body) {
+            throw new Error(`no body for announcement ${row.announcement_id}`)
+          }
+
           await client.messages.create({
-            body: bodyById.get(row.announcement_id) ?? '',
+            body,
             from: fromNumber,
             to: toTwilioE164(row.recipient_phone),
           })

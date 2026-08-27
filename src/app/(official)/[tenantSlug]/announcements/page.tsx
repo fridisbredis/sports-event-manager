@@ -56,12 +56,14 @@ export default async function AnnouncementsPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const { data: announcements } = await supabase
+  const { data: announcements, error } = await supabase
     .from('announcements')
     .select('id, body, published_at')
     .eq('tenant_id', tenant.id)
     .eq('channel', 'officials')
     .order('published_at', { ascending: false })
+
+  if (error) throw error
 
   const items = announcements ?? []
 
