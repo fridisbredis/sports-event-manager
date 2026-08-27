@@ -27,11 +27,13 @@ export default async function CommunicationPage({ params }: Props) {
 
   if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
-  const { data: announcements } = await supabase
+  const { data: announcements, error } = await supabase
     .from('announcements')
     .select('id, tenant_id, channel, body, sms_sent, published_at, created_at')
     .eq('tenant_id', tenant.id)
     .order('published_at', { ascending: false })
+
+  if (error) throw error
 
   return (
     <div className="px-8 py-8">

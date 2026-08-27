@@ -63,7 +63,11 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: stages }, { data: workstations }, { data: officials }] = await Promise.all([
+  const [
+    { data: stages, error: stagesError },
+    { data: workstations, error: workstationsError },
+    { data: officials, error: officialsError },
+  ] = await Promise.all([
     supabase
       .from('event_stages')
       .select('id, name, stage_type, stage_date, start_time, end_time')
@@ -87,6 +91,9 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
       .eq('invite_status', 'confirmed')
       .order('name', { ascending: true }),
   ])
+
+  const queryError = stagesError ?? workstationsError ?? officialsError
+  if (queryError) throw queryError
 
   const { day } = await searchParams
   const defaultStage = getCurrentStage(stages ?? []) ?? (stages ?? [])[0]
