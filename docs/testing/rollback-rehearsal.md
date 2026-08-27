@@ -11,7 +11,8 @@ Prod innehåller riktiga telefonnummer och omfattas av retentionsbesluten i
 SEC-09/F-SEC-10 — en prod-kopia i en testmiljö är en ny personuppgifts-
 behandling, inte ett gratis testverktyg. `npm run seed:dev` ger den realistiska
 data som behövs, och vägrar av konstruktion att köra mot annat än dev eller
-localhost.
+localhost — men **den väljer dev om du inte säger annat**, se Del 2 för hur den
+tvingas mot lokal stack.
 
 Rytm: kör hela rutinen **före varje prod-release som innehåller en migration**,
 och som helhet minst en gång före Viadal 2026.
@@ -115,12 +116,23 @@ faktiskt fungerar som skriven.
 
 - [ ] Välj den senaste migrationen med `Forward-fix: additive` i headern
 - [ ] `supabase db reset` för ett känt utgångsläge
-- [ ] `npm run seed:dev` mot den lokala stacken
+- [ ] Behöver du data: **`npm run seed:dev` går mot dev-molnet som standard, inte
+      mot lokal stack.** Skriptet läser hårdkodat `.env.local` och tar
+      `NEXT_PUBLIC_SUPABASE_URL` därifrån. Tvinga den lokalt med env-override
+      (`config()` i skriptet saknar `override: true`, så shell-miljön vinner):
+      `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \`
+      `SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])") \`
+      `npm run seed:dev`
+      Men se grant-fyndet nedan: mot en ren lokal build failar seed ändå.
 - [ ] Kör den `Rollback:`-SQL som står i migrationens header, ordagrant
 - [ ] Verifiera att den går igenom utan fel
-- [ ] Kör appen (`npm run dev`) och bekräfta vad som går sönder — jämför med vad
-      `Blast:`-raden lovade. Stämmer de inte överens är headern fel och ska rättas.
-- [ ] `supabase db reset` för att städa
+- [ ] Bekräfta vad som går sönder och jämför med `Blast:`-raden. Stämmer de inte
+      överens är headern fel och ska rättas. Rör migrationen en RPC går det
+      snabbare att curl:a PostgREST än att starta appen:
+      `curl -s -o /dev/null -w "%{http_code}\n" -X POST \`
+      `http://127.0.0.1:54321/rest/v1/rpc/<funktion> -H "apikey: $KEY" \`
+      `-H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}'`
+- [ ] `supabase db reset` för att städa, och bekräfta att objektet är tillbaka
 
 ---
 
@@ -129,14 +141,35 @@ faktiskt fungerar som skriven.
 Det här är den övning som faktiskt betyder något. Additiva rollbacks är lätta;
 det svåra är att skriva en ny migration framåt medan appen är trasig.
 
-- [ ] `supabase db reset` + `npm run seed:dev`
+- [ ] `supabase db reset` (se seed-noten i Del 2 om du behöver data)
 - [ ] Simulera en dålig migration: skriv en ny migrationsfil som medvetet gör
-      något fel som appen märker — t.ex. lägg en `NOT NULL`-kolumn utan default
-      på `officials`, eller byt namn på en kolumn en server action läser
-- [ ] `supabase db push` mot **lokal** stack
-- [ ] Bekräfta att appen faktiskt går sönder på det sätt du förväntade
+      något fel som appen märker. **Välj vägen med omsorg** — de flesta
+      läsvägar failar tyst, se varningen nedan. Ett byte av kolumnnamn som en
+      *sidas* `select` läser räcker INTE.
+- [ ] **`supabase db reset`, inte `db push`.** `db push` går alltid mot det
+      länkade remote-projektet (dev eller prod) — det finns ingen lokal push.
+      Lokalt applicerar man migrationer genom att spela om hela sviten. Det
+      betyder också att varje iteration kostar en full replay, vilket är en
+      reell faktor i återhämtningstiden. Vill du iterera snabbare: kör SQL:en
+      direkt mot databasen först
+      (`docker exec supabase_db_sports-event-manager psql -U postgres -c "..."`),
+      och `db reset` en gång på slutet för att verifiera från rent läge.
+- [ ] Bekräfta att appen faktiskt går sönder på det sätt du förväntade.
+      **Går den inte sönder är det ett fynd, inte ett misslyckat uppsättning** —
+      skriv upp det och byt väg.
 - [ ] Ta tid från här. Skriv forward-fix-migrationen som återställer läget
 - [ ] Notera hur lång tid det tog och vad som var svårt
+
+> **De flesta läsvägar larmar inte (F-REL-10, 2026-08-27).** 15 läsningar i 9
+> filer gör `const { data } = await supabase…` utan att destrukturera `error`,
+> och sedan `?? []`. En failad fråga blir en tom lista, sidan svarar 200, och
+> Sentry får ingenting. Övningen kunde därför inte köras 2026-08-27: den
+> medvetet trasiga migrationen (`event_stages.venue` → `location`) gav
+> `HTTP 400 / 42703` från PostgREST men var osynlig i appen.
+> Välj tills detta är åtgärdat en väg som **skriver**: en server action eller
+> en RPC som scheduling anropar. Ett `drop function` på
+> `save_assignments_batch` ger t.ex. ett verkligt fel i UI:t (verifierat i
+> Del 2: `HTTP 404 / PGRST202`).
 
 Det som ska komma ut av övningen är inte en grön bock utan tre svar:
 
@@ -160,7 +193,7 @@ naiv reverse aktivt korrumperar giltig data.
 | Migration | Varför ingen down finns                                                                                                                                                           |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `0003`    | Droppar `assignments.workstation` och `.todo`. Innehållet är borta; en down ger tillbaka tomma kolumner.                                                                          |
-| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen. Droppen tog aldrig effekt (F-REL-09, nummerkollision); `0034` gör den skarpt — på dev 2026-08-27, prod avvaktar. Inget data förlorat (F-REL-08, mätt: varje rad höll default-värdet). En down kan ändå inte återskapa innehållet. |
+| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen. Droppen tog aldrig effekt (F-REL-09, nummerkollision); `0034` gör den skarpt — dev och prod 2026-08-27. Inget data förlorat (F-REL-08, mätt: varje rad höll default-värdet). En down kan ändå inte återskapa innehållet. |
 | `0009`    | Remappar `invite_status`. En reverse kan inte skilja migrationens rader från appens senare confirmations.                                                                         |
 | `0012`    | Droppar `slot_index` → kastar bort vilken lane varje official står på, vilket inte kan räknas om.                                                                                 |
 | `0014`    | `DELETE FROM workstations WHERE stage_id IS NULL` + FK:n cascadar nu till `assignments`. Raderna finns inte kvar.                                                                 |
@@ -180,7 +213,7 @@ Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 | Datum      | Vem   | Del 1                             | Del 2      | Del 3: tid till fix | Vad som saknade dokumentation                                                                                                          |
 | ---------- | ----- | --------------------------------- | ---------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-26 | Frida | **FAIL** — se fynden nedan        | ej körd än | ej körd än          | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                       |
-| 2026-08-27 | Frida | **PASS mot dev** (prod avvaktar)  | ej körd än | ej körd än          | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
+| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | **Kunde inte köras** — se F-REL-10 | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -231,3 +264,104 @@ avvaktar: dess ledger står på 0032, så en push där applicerar även kollegan
 0033.
 
 Del 0 i detta dokument skrevs som direkt följd.
+
+**Prod klar samma dag.** `0033` (kollegans PERF-02-RPC, godkänd av hen för
+prod) och `0034` pushade tillsammans — prods ledger stod på 0032, så båda
+saknades. `--dry-run` först, som listade exakt dessa två och inget annat.
+
+Verifierat **mot prods schema**, inte mot pushens utdata:
+
+| Kontroll                            | Förväntat | Faktiskt |
+| ----------------------------------- | --------- | -------- |
+| `events.category_type` finns        | 0         | 0        |
+| `save_assignments_batch` finns      | 1         | 1        |
+| Ledger senaste                      | 0034      | 0034     |
+| Events kvar                         | 5         | 5        |
+| `event_stages.race_type = 'time'`   | 2         | 2        |
+
+Snapshot före push (alla fem prod-event höll `category_type = 'distance'`,
+alltså 0006:s default — värdet var aldrig medvetet satt) togs enligt Del 0:s
+krav för `destructive`.
+
+**`db diff --linked` mot prod efter push: 17 icke-grant statements, noll
+`category_type`-rader** — ned från 184 vid onsdagens körning. De 17 är de två
+redan kända icke-fynden: `pg_net` i `public` (fynd 2, **fortfarande öppen**)
+och Postgres egen normalisering av `anonymize_inactive_users` /
+`remove_official`. **Del 1 är därmed PASS mot prod:** migrationssviten beskriver
+prods schema, vilket är MNT-07:s "clean database build compared against
+production schema".
+
+### Körning 2026-08-27 — Del 2 resultat
+
+Objekt: `0033_save_assignments_batch_rpc.sql`, enda migrationen med
+`Forward-fix: additive` — och den första som skrevs under konventionen, alltså
+precis den man vill testa först.
+
+**Headern höll, båda raderna:**
+
+- `Rollback:`-SQL:en kördes ordagrant och fungerade — funktionen fanns (1),
+  `DROP FUNCTION`, funktionen borta (0). Ingen felstavad signatur, inget
+  saknat argument. Efter `db reset` är den tillbaka.
+- `Blast:`-raden lovade PostgREST 404 på varje schemaläggnings-save. Verifierat
+  med ett direktanrop mot den droppade RPC:n: **HTTP 404, `PGRST202`**. Stämmer
+  exakt.
+
+**Fynd 1 — dokumentationsfel i denna rutin (rättat ovan).** Steget sa
+"`npm run seed:dev` mot den lokala stacken", men skriptet läser hårdkodat
+`.env.local` och gick mot dev-molnet. Det räddades bara av att
+tenant `seed-klubben` redan fanns där, annars hade övningen skrivit testdata i
+dev. Kräver env-override, vilket nu står i steget.
+
+**Fynd 2 — lokal build ≠ prod, trots att alla migrationer replayas rent.**
+`service_role`, `anon` och `authenticated` har på en ren lokal build bara
+`REFERENCES/TRIGGER/TRUNCATE` på `public.tenants` — **ingen
+SELECT/INSERT/UPDATE/DELETE**. Seed-skriptet failar därför med `42501
+permission denied for table tenants` mot lokal stack, medan samma skript
+fungerar mot dev och prod. Skillnaden är Supabase-plattformens default-grants,
+som ingen migration deklarerar.
+
+Detta är samma sak som fynd 3 i onsdagens diff, men konsekvensen är större än
+"brus": **Del 1 mäter schemat, inte behörigheterna.** Tabeller, kolumner,
+constraints och funktioner stämmer mot prod — grants gör det inte, och de
+filtrerades bort ur diffen med `^grant `. Filtret är fortfarande rätt för att
+hitta drift, men en grön Del 1 betyder inte att lokal stack beter sig som prod.
+Del 2 hittade alltså något Del 1 inte kan se.
+
+Öppen fråga, inte åtgärdad här: ska en migration deklarera de grants appen
+faktiskt behöver, så att lokal build blir körbar utan plattformens hjälp? Det
+gör lokal utveckling förutsägbar, men lägger till 100+ rader som duplicerar
+något Supabase redan gör i dev och prod. Värt ett eget kort.
+
+### Körning 2026-08-27 — Del 3 kunde inte köras
+
+Startläget sattes upp: en medvetet dålig migration som döper om
+`event_stages.venue` → `location`, applicerad mot lokal stack. Brottet
+verifierades på API-nivå — PostgREST svarar **`HTTP 400 / 42703`,
+`column event_stages.venue does not exist`**.
+
+**Appen visade ingenting.** Ingen krasch, inget felmeddelande, inget i Sentry.
+Sidorna svarade 200 med tomma listor.
+
+Orsaken är F-REL-10: läsvägarna destrukturerar bara `data`, aldrig `error`, och
+coalescar sedan med `?? []`. En failad fråga blir därmed omöjlig att skilja från
+en tom tabell. **15 läsningar i 9 filer**, verifierade individuellt — inklusive
+hela admin-ytan (dashboard, event, officials, workstations ×2, communication,
+scheduling ×3). En andra, mildare klass följs av `if (!x) notFound()`; de failar
+högt men med vilseledande 404.
+
+Övningen är därmed **blockerad på F-REL-10**, inte bara ej utförd. Del 3 kräver
+per konstruktion att man kan bekräfta att appen går sönder på det sätt
+`Blast:`-raden förutsade — och för de flesta läsvägar går det inte att bekräfta
+något alls.
+
+Två fynd som gäller oavsett:
+
+1. **`supabase db push` finns inte för lokal stack.** Rutinen sa så; det är fel.
+   `db push` går alltid mot det länkade remote-projektet. Lokalt applicerar man
+   via `db reset`, vilket betyder att varje iteration kostar en full replay av
+   hela sviten — en reell faktor i återhämtningstid som rutinen inte nämnde.
+   Rättat i stegen ovan.
+2. **Att välja brott är inte trivialt.** Instruktionens eget exempel ("byt namn
+   på en kolumn en server action läser") pekar mot en väg som visade sig vara
+   osynlig. Stegen anger nu att man ska välja en skrivväg eller en RPC tills
+   F-REL-10 är åtgärdad.
