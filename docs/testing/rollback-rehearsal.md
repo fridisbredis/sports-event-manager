@@ -11,7 +11,8 @@ Prod innehåller riktiga telefonnummer och omfattas av retentionsbesluten i
 SEC-09/F-SEC-10 — en prod-kopia i en testmiljö är en ny personuppgifts-
 behandling, inte ett gratis testverktyg. `npm run seed:dev` ger den realistiska
 data som behövs, och vägrar av konstruktion att köra mot annat än dev eller
-localhost.
+localhost — men **den väljer dev om du inte säger annat**, se Del 2 för hur den
+tvingas mot lokal stack.
 
 Rytm: kör hela rutinen **före varje prod-release som innehåller en migration**,
 och som helhet minst en gång före Viadal 2026.
@@ -115,12 +116,23 @@ faktiskt fungerar som skriven.
 
 - [ ] Välj den senaste migrationen med `Forward-fix: additive` i headern
 - [ ] `supabase db reset` för ett känt utgångsläge
-- [ ] `npm run seed:dev` mot den lokala stacken
+- [ ] Behöver du data: **`npm run seed:dev` går mot dev-molnet som standard, inte
+      mot lokal stack.** Skriptet läser hårdkodat `.env.local` och tar
+      `NEXT_PUBLIC_SUPABASE_URL` därifrån. Tvinga den lokalt med env-override
+      (`config()` i skriptet saknar `override: true`, så shell-miljön vinner):
+      `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \`
+      `SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])") \`
+      `npm run seed:dev`
+      Men se grant-fyndet nedan: mot en ren lokal build failar seed ändå.
 - [ ] Kör den `Rollback:`-SQL som står i migrationens header, ordagrant
 - [ ] Verifiera att den går igenom utan fel
-- [ ] Kör appen (`npm run dev`) och bekräfta vad som går sönder — jämför med vad
-      `Blast:`-raden lovade. Stämmer de inte överens är headern fel och ska rättas.
-- [ ] `supabase db reset` för att städa
+- [ ] Bekräfta vad som går sönder och jämför med `Blast:`-raden. Stämmer de inte
+      överens är headern fel och ska rättas. Rör migrationen en RPC går det
+      snabbare att curl:a PostgREST än att starta appen:
+      `curl -s -o /dev/null -w "%{http_code}\n" -X POST \`
+      `http://127.0.0.1:54321/rest/v1/rpc/<funktion> -H "apikey: $KEY" \`
+      `-H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}'`
+- [ ] `supabase db reset` för att städa, och bekräfta att objektet är tillbaka
 
 ---
 
@@ -180,7 +192,7 @@ Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 | Datum      | Vem   | Del 1                             | Del 2      | Del 3: tid till fix | Vad som saknade dokumentation                                                                                                          |
 | ---------- | ----- | --------------------------------- | ---------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-26 | Frida | **FAIL** — se fynden nedan        | ej körd än | ej körd än          | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                       |
-| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | ej körd än | ej körd än          | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
+| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | ej körd än | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -257,3 +269,44 @@ och Postgres egen normalisering av `anonymize_inactive_users` /
 `remove_official`. **Del 1 är därmed PASS mot prod:** migrationssviten beskriver
 prods schema, vilket är MNT-07:s "clean database build compared against
 production schema".
+
+### Körning 2026-08-27 — Del 2 resultat
+
+Objekt: `0033_save_assignments_batch_rpc.sql`, enda migrationen med
+`Forward-fix: additive` — och den första som skrevs under konventionen, alltså
+precis den man vill testa först.
+
+**Headern höll, båda raderna:**
+
+- `Rollback:`-SQL:en kördes ordagrant och fungerade — funktionen fanns (1),
+  `DROP FUNCTION`, funktionen borta (0). Ingen felstavad signatur, inget
+  saknat argument. Efter `db reset` är den tillbaka.
+- `Blast:`-raden lovade PostgREST 404 på varje schemaläggnings-save. Verifierat
+  med ett direktanrop mot den droppade RPC:n: **HTTP 404, `PGRST202`**. Stämmer
+  exakt.
+
+**Fynd 1 — dokumentationsfel i denna rutin (rättat ovan).** Steget sa
+"`npm run seed:dev` mot den lokala stacken", men skriptet läser hårdkodat
+`.env.local` och gick mot dev-molnet. Det räddades bara av att
+tenant `seed-klubben` redan fanns där, annars hade övningen skrivit testdata i
+dev. Kräver env-override, vilket nu står i steget.
+
+**Fynd 2 — lokal build ≠ prod, trots att alla migrationer replayas rent.**
+`service_role`, `anon` och `authenticated` har på en ren lokal build bara
+`REFERENCES/TRIGGER/TRUNCATE` på `public.tenants` — **ingen
+SELECT/INSERT/UPDATE/DELETE**. Seed-skriptet failar därför med `42501
+permission denied for table tenants` mot lokal stack, medan samma skript
+fungerar mot dev och prod. Skillnaden är Supabase-plattformens default-grants,
+som ingen migration deklarerar.
+
+Detta är samma sak som fynd 3 i onsdagens diff, men konsekvensen är större än
+"brus": **Del 1 mäter schemat, inte behörigheterna.** Tabeller, kolumner,
+constraints och funktioner stämmer mot prod — grants gör det inte, och de
+filtrerades bort ur diffen med `^grant `. Filtret är fortfarande rätt för att
+hitta drift, men en grön Del 1 betyder inte att lokal stack beter sig som prod.
+Del 2 hittade alltså något Del 1 inte kan se.
+
+Öppen fråga, inte åtgärdad här: ska en migration deklarera de grants appen
+faktiskt behöver, så att lokal build blir körbar utan plattformens hjälp? Det
+gör lokal utveckling förutsägbar, men lägger till 100+ rader som duplicerar
+något Supabase redan gör i dev och prod. Värt ett eget kort.
