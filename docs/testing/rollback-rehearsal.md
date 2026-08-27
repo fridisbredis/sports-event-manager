@@ -18,12 +18,62 @@ och som helhet minst en gång före Viadal 2026.
 
 ---
 
+## Del 0 — Checklista kring `db push` mot prod
+
+Kort lista att gå igenom varje gång en migration ska till prod. Den finns för
+att `db push` **kan rapportera framgång utan att ha gjort någonting** — se
+varningen efter listan.
+
+**Före push:**
+
+- [ ] `cat supabase/.temp/project-ref` — vet vilken miljö du står i
+- [ ] `select version, name from supabase_migrations.schema_migrations order by version desc limit 5;`
+      mot prod. Kontrollera att inget av dina migrationsnummer redan är taget,
+      och notera vilka migrationer pushen kommer att applicera — det är
+      **alla** som saknas i prods ledger, inte bara din egen. Är någon av dem
+      en kollegas: stäm av att den är prod-redo innan du pushar den åt dem.
+- [ ] `git pull` på main och kontrollera att ditt filnamnsprefix fortfarande är
+      högst. Nummer ska tas mot `origin/main`, aldrig mot din egen branch.
+- [ ] `supabase db reset` lokalt — hela sviten inklusive din migration ska
+      replaya rent
+- [ ] Är migrationen `destructive`: kör snapshot-`select`:en som `Data:`-raden
+      hänvisar till, mot **prod**, och spara utdatan. Raden ska vila på något du
+      själv har tittat på, inte på en mätning från en annan dag eller miljö.
+
+**Efter push:**
+
+- [ ] **Verifiera mot schemat att ändringen faktiskt skedde.** Lita inte på
+      `Finished supabase db push`. För en droppad kolumn:
+      `select count(*) from information_schema.columns where table_schema = 'public' and table_name = '<tabell>' and column_name = '<kolumn>';`
+      → ska ge `0`. Ger den `1` är det ett incidentspår, inte ett omtag.
+- [ ] Kör Del 1 nedan (`db diff --linked` mot prod). Det är det egentliga
+      slutbeviset: din ändring ska inte längre synas i diffen.
+- [ ] `supabase link --project-ref lhflutwvwvzawzbcuwup` — **tillbaka till dev.**
+      Glöms lätt, och nästa `db push` går då mot prod.
+- [ ] `npm run db:types` behövs bara om dev ändrats. Den läser dev, inte prod —
+      har du redan pushat till dev är typerna aktuella.
+- [ ] Fyll i loggen längst ner.
+
+> **Varför verifieringssteget finns.** `db push` matchar migrationer på
+> **versionsnummer, aldrig på filinnehåll**. Ligger numret redan i målmiljöns
+> `schema_migrations` hoppas filen över och kommandot svarar "Remote database is
+> up to date" — utan fel, utan varning. Detta hände 2026-08-27 med `0034` (då
+> döpt `0033`, ett nummer kollegans PERF-02-migration redan hade tagit på dev),
+> och är den mest sannolika förklaringen till att `0008`:s `DROP COLUMN` aldrig
+> tog effekt: kolumnen återskapades förmodligen aldrig — den droppades aldrig.
+> Med tre personer som arbetar parallellt är nummerkollision normalfallet, inte
+> olyckan, och den failar tyst.
+
+---
+
 ## Del 1 — Clean build vs prod-schema
 
 Verifierar att migrationssviten är den enda källan till prod-schemat, dvs att
-inget har smugit in via en manuell SQL-session. Detta har hänt: migration 0032
-var applicerad på prod men saknades i `schema_migrations` (hittad 2026-08-26 vid
-F-REL-05).
+inget har smugit in via en manuell SQL-session — och att inget som sviten säger
+är gjort i själva verket hoppades över. Båda riktningarna har inträffat:
+migration 0032 var applicerad på prod men saknades i `schema_migrations` (hittad
+2026-08-26 vid F-REL-05), och `0008`:s `DROP COLUMN` stod som applicerad utan
+att ha utförts (F-REL-09, se nummerkollisionen i Del 0).
 
 - [ ] `cat supabase/.temp/project-ref` — **kolla vad CLI:n är länkad mot innan
       något annat.** Den ligger kvar från förra sessionen och kan vara prod
@@ -107,14 +157,14 @@ F-REL-05, analys 2026-08-26), inte en uppgift som väntar på någon. Om en inci
 rör någon av dem är forward-fix enda vägen — och för `0009` gäller att en
 naiv reverse aktivt korrumperar giltig data.
 
-| Migration | Varför ingen down finns                                                                                                                                                                                                                        |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0003`    | Droppar `assignments.workstation` och `.todo`. Innehållet är borta; en down ger tillbaka tomma kolumner.                                                                                                                                       |
-| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen — men droppen tog aldrig effekt: kolumnen finns kvar i både dev och prod (F-REL-09). Inget data förlorat (F-REL-08). Skulle droppen köras skarpt är den ändå irreversibel. |
-| `0009`    | Remappar `invite_status`. En reverse kan inte skilja migrationens rader från appens senare confirmations.                                                                                                                                      |
-| `0012`    | Droppar `slot_index` → kastar bort vilken lane varje official står på, vilket inte kan räknas om.                                                                                                                                              |
-| `0014`    | `DELETE FROM workstations WHERE stage_id IS NULL` + FK:n cascadar nu till `assignments`. Raderna finns inte kvar.                                                                                                                              |
-| `0015`    | Äger `logos`-bucketen. En down som tar bucketen tar även varje uppladdad logo.                                                                                                                                                                 |
+| Migration | Varför ingen down finns                                                                                                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0003`    | Droppar `assignments.workstation` och `.todo`. Innehållet är borta; en down ger tillbaka tomma kolumner.                                                                          |
+| `0008`    | Droppar `events.category_type` efter en backfill smalare än droppen. Droppen tog aldrig effekt (F-REL-09, nummerkollision); `0034` gör den skarpt — på dev 2026-08-27, prod avvaktar. Inget data förlorat (F-REL-08, mätt: varje rad höll default-värdet). En down kan ändå inte återskapa innehållet. |
+| `0009`    | Remappar `invite_status`. En reverse kan inte skilja migrationens rader från appens senare confirmations.                                                                         |
+| `0012`    | Droppar `slot_index` → kastar bort vilken lane varje official står på, vilket inte kan räknas om.                                                                                 |
+| `0014`    | `DELETE FROM workstations WHERE stage_id IS NULL` + FK:n cascadar nu till `assignments`. Raderna finns inte kvar.                                                                 |
+| `0015`    | Äger `logos`-bucketen. En down som tar bucketen tar även varje uppladdad logo.                                                                                                    |
 
 Två down-fällor i den reversibla delen: `0007` och `0021` släpper `NOT NULL`. En
 down som återinför constraintet **failar** om NULL-rader skapats sedan dess.
@@ -127,9 +177,10 @@ kan köras utan att först städa raderna.
 
 Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 
-| Datum      | Vem   | Del 1                      | Del 2      | Del 3: tid till fix | Vad som saknade dokumentation                                                                                     |
-| ---------- | ----- | -------------------------- | ---------- | ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 2026-08-26 | Frida | **FAIL** — se fynden nedan | ej körd än | ej körd än          | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev. |
+| Datum      | Vem   | Del 1                             | Del 2      | Del 3: tid till fix | Vad som saknade dokumentation                                                                                                          |
+| ---------- | ----- | --------------------------------- | ---------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-26 | Frida | **FAIL** — se fynden nedan        | ej körd än | ej körd än          | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                       |
+| 2026-08-27 | Frida | **PASS mot dev** (prod avvaktar)  | ej körd än | ej körd än          | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs. |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -139,31 +190,44 @@ stack. Sviten är internt konsistent.
 `db diff --linked --schema public` mot prod: **inte tom.** 184 statements,
 varav 164 grants. Fyra fynd:
 
-1. **`events.category_type` finns kvar i både dev och prod** trots att
-   `0008` kör `ALTER TABLE events DROP COLUMN IF EXISTS category_type` — och
-   `0008` **är** registrerad i `supabase_migrations.schema_migrations` på prod.
-   Kolumnen har alltså återskapats manuellt efter migrationen, med CHECK-
-   constraint och `NOT NULL DEFAULT 'distance'`. Den läcker in i
+1. **`events.category_type` finns kvar i både dev och prod** trots att `0008`
+   kör `ALTER TABLE events DROP COLUMN IF EXISTS category_type` — och `0008`
+   **är** registrerad i `supabase_migrations.schema_migrations`. Läcker in i
    `src/types/database.ts` (3 rader) eftersom `npm run db:types` genererar från
-   dev. Ingen appkod läser den (`grep category_type src/` → bara typfilen).
-   **Detta upphäver premissen i F-REL-08:** kolumnen droppades aldrig i
-   praktiken, så inget data kunde gå förlorat. Slutsatsen står, skälet ändras.
-   Öppen fråga: vem återskapade den och varför — troligen ett försök att laga
-   något innan `race_type` fanns i UI:t.
+   dev. Ingen appkod läser den. **Detta upphäver premissen i F-REL-08:**
+   kolumnen droppades aldrig i praktiken, så inget data kunde gå förlorat.
+   Slutsatsen står, skälet ändras. → F-REL-09, orsak fastställd 2026-08-27.
 2. **`pg_net` ligger i `public`-schemat i prod.** `0029` skapar extensionen utan
    `with schema`, så placeringen blev plattformens default. Supabase
-   rekommenderar `extensions`. Ingen funktionell påverkan i dag.
+   rekommenderar `extensions`. Ingen funktionell påverkan i dag. **Fortfarande
+   öppen.**
 3. **164 grant-rader** för `anon` / `authenticated` / `service_role` på i stort
-   sett varje tabell. Detta är Supabases automatiska default-grants som
-   migrationsfilerna aldrig deklarerar — förväntat brus i `db diff`, inte drift.
-   Värt att veta ändå: `anon` har `insert`/`update`/`delete` på allt, så **RLS är
-   det enda som skyddar**, aldrig grants. Jämför SEC-03/ADR-0001.
-4. `remove_official` och `anonymize_inactive_users` — signatur, `security
-definer` och `search_path` stämmer exakt med `0025` / `0029`. Bara
-   textnormalisering av funktionskroppen skiljer. **Ingen funktionell drift.**
+   sett varje tabell. Supabases automatiska default-grants, som
+   migrationsfilerna aldrig deklarerar — förväntat brus, inte drift. Värt att
+   veta ändå: `anon` har `insert`/`update`/`delete` på allt, så **RLS är det
+   enda som skyddar**, aldrig grants. Jämför SEC-03/ADR-0001.
+4. `remove_official` och `anonymize_inactive_users` — signatur, security definer
+   och search_path stämmer exakt med `0025` / `0029`. Bara textnormalisering av
+   funktionskroppen skiljer. **Ingen funktionell drift.**
 
-Slutsats: rutinen gjorde sitt jobb i första körningen. Fynd 1 är verklig drift
-och kräver ett beslut (droppa kolumnen på båda miljöerna via en ny migration,
-eller acceptera den och dokumentera varför). Fynd 3 betyder att `db diff` alltid
-kommer att vara högljudd — filtrera bort `^grant ` när diffen läses, annars
-drunknar de riktiga fynden.
+### Körning 2026-08-27 — orsaken till fynd 1
+
+Fynd 1 var inte manuell återskapning. `db push` av migrationen som skulle
+droppa kolumnen svarade **"Remote database is up to date" och applicerade
+ingenting** — filen hette `0033`, ett nummer som kollegans
+`0033_save_assignments_batch_rpc` (PERF-02) redan hade i dev:s ledger. `db push`
+matchar på versionsnummer, aldrig på filinnehåll.
+
+Samma mekanism förklarar med stor sannolikhet `0008`: numret var upptaget,
+pushen tyst, `DROP COLUMN` aldrig utförd. Kolumnen återuppstod inte — den
+försvann aldrig. Att `src/types/database.ts` fick tillbaka raderna 2026-08-18 i
+en orelaterad commit följer också av detta: `db:types` läser dev, där kolumnen
+alltid funnits.
+
+Omdöpt till `0034`, pushad till dev och **verifierad mot
+`information_schema`** — inte mot pushens utdata. Kolumnen är borta på dev;
+`src/types/database.ts` tappade de tre raderna, `tsc --noEmit` rent. Prod
+avvaktar: dess ledger står på 0032, så en push där applicerar även kollegans
+0033.
+
+Del 0 i detta dokument skrevs som direkt följd.
