@@ -1,0 +1,44 @@
+import { describe, it, expect, vi } from 'vitest'
+import { NextRequest } from 'next/server'
+
+// No authenticated user for any case in this file — every test below
+// exercises the exemption logic, not the auth-refresh mechanics.
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn(() => Promise.resolve({ data: { user: null } })),
+    },
+  })),
+}))
+
+import { proxy } from './proxy'
+
+function requestFor(pathname: string) {
+  return new NextRequest(`http://localhost${pathname}`)
+}
+
+describe('proxy — health check auth exemption', () => {
+  it('passes /api/health/live through without auth', async () => {
+    const res = await proxy(requestFor('/api/health/live'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  it('passes /api/health through without auth (regression guard, F-REL-02)', async () => {
+    const res = await proxy(requestFor('/api/health'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  // Control case — without this, the two cases above could pass trivially
+  // on a broken mock (e.g. one that always skips the auth check). This
+  // proves the same unauthenticated request IS blocked on a path that
+  // isn't exempted.
+  it('control: blocks an unexempted API path with 401', async () => {
+    const res = await proxy(requestFor('/api/tenants'))
+
+    expect(res.status).toBe(401)
+  })
+})

@@ -30,7 +30,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  if (pathname === '/api/health') {
+  // Health check paths are exempt from auth — Azure probes hit these with
+  // no Supabase session cookie. Kept as an explicit list of exact paths,
+  // not a startsWith prefix, so a future /api/health/* route doesn't
+  // become publicly reachable without anyone deciding it should be. Add
+  // any new health path here explicitly rather than widening this to a
+  // prefix match.
+  if (pathname === '/api/health' || pathname === '/api/health/live') {
     return supabaseResponse
   }
 
