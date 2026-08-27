@@ -54,3 +54,29 @@ describe('proxy — health check auth exemption', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('proxy — cron auth exemption', () => {
+  // Cron routes (pg_cron/pg_net, migration 0029) have no Supabase session
+  // cookie and authenticate via CRON_SECRET inside the route handler
+  // itself, so proxy-level auth must be skipped for them — mirrors the
+  // health check exemption above, moved above createServerClient() in the
+  // same commit (2f869d4) for the same reason.
+  it('passes /api/cron/anonymize through without auth', async () => {
+    const res = await proxy(requestFor('/api/cron/anonymize'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  // Pins the trailing-slash boundary of the startsWith('/api/cron/') check:
+  // a bare /api/cron (no trailing slash) is NOT exempt and falls through to
+  // the generic /api/ 401 branch. Without this case, a future change from
+  // startsWith('/api/cron/') to something looser (or the reverse — an
+  // accidental exact-match on '/api/cron/anonymize' only) could go
+  // unnoticed either way.
+  it('control: does not exempt the bare /api/cron path (no trailing slash)', async () => {
+    const res = await proxy(requestFor('/api/cron'))
+
+    expect(res.status).toBe(401)
+  })
+})
