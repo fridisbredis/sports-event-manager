@@ -159,11 +159,33 @@ det svåra är att skriva en ny migration framåt medan appen är trasig.
       instans i samma katalog oavsett port, så stoppa en redan körande server
       först (`kill $(lsof -ti :3000)`). Den som redan kör läser `.env.local`
       och pekar mot **dev-molnet** — mot den syns brottet aldrig. Starta med
-      override:
+      override (notera `SENTRY_DSN=` först — se nästa punkt):
+      `SENTRY_DSN= \`
       `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \`
       `NEXT_PUBLIC_SUPABASE_ANON_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['ANON_KEY'])") \`
       `SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])") \`
       `npx next dev`
+- [ ] **Nolla `SENTRY_DSN` — annars hamnar övningens fel i dev-Sentry, märkta
+      som `production`.** `sentry.server.config.ts` läser
+      `dsn: process.env.SENTRY_DSN`, och variabeln ligger i `.env.local`, så en
+      lokal server rapporterar till `viadal-event-dev` precis som en riktig
+      deploy. Värre: `environment` blir **`production`**, inte `development`.
+      `SENTRY_ENVIRONMENT` sätts inte lokalt och fallbacken är `NODE_ENV`, som
+      `next dev` med Turbopack rapporterar som `production` i denna kodväg —
+      verifierat i ett event från körningen 2026-08-27. Övningens fel är alltså
+      **inte** urskiljbara från prod-fel på `environment`-taggen. Tom sträng
+      räcker för att tysta dem: Sentry initieras utan DSN och skickar
+      ingenting.
+- [ ] **Stäng även av servern innan du kör `db reset`.** En öppen flik
+      RSC-prefetchar i bakgrunden och träffar databasen mitt under replayen,
+      vilket ger `42703` på kolumner som finns både före och efter — svårt att
+      känna igen som självförvållat i efterhand. Körningen 2026-08-27 fick två
+      sådana events (`/schedule` och `/event-info`) som först lästes som
+      riktiga fynd i dev. Kännetecken vid triage: `url` pekar på `localhost`,
+      `server_name` är den egna maskinen, och cookien heter
+      `sb-127-auth-token` (lokal stack) istället för `sb-<projectref>-auth-token`.
+      Sentry-UI:ts "2 h sedan" är relativt när du _tittar_, inte när du läser
+      det senare — jämför absoluta tidsstämplar mot övningens tidslinje.
 - [ ] **Lägg den trasiga migrationen utanför repot** — i en scratchpad, inte i
       `supabase/migrations/`. En medvetet trasig fil i repot kan följa med en
       commit eller en `db push`. Applicera den med
@@ -237,11 +259,11 @@ kan köras utan att först städa raderna.
 
 Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 
-| Datum      | Vem   | Del 1                                             | Del 2                 | Del 3: tid till fix                               | Vad som saknade dokumentation                                                                                                                                                                       |
-| ---------- | ----- | ------------------------------------------------- | --------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-26 | Frida | **FAIL** — se fynden nedan                        | ej körd än            | ej körd än                                        | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                                                                                   |
-| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | **Kunde inte köras** — se F-REL-10                | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs.                                                             |
-| 2026-08-27 | Frida | (ej omkörd — PASS ovan gäller)                    | (ej omkörd)           | **PASS — 28 s** (apply + verifiera, se förbehåll) | Att lokal stack saknar plattformens grants och därför inte har någon grön baslinje. Att `next dev` vägrar en andra instans i samma katalog oavsett port, och att `.env.local` pekar mot dev-molnet. |
+| Datum      | Vem   | Del 1                                             | Del 2                 | Del 3: tid till fix                               | Vad som saknade dokumentation                                                                                                                                                                                                                                                       |
+| ---------- | ----- | ------------------------------------------------- | --------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-26 | Frida | **FAIL** — se fynden nedan                        | ej körd än            | ej körd än                                        | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                                                                                                                                                                   |
+| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | **Kunde inte köras** — se F-REL-10                | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs.                                                                                                                                             |
+| 2026-08-27 | Frida | (ej omkörd — PASS ovan gäller)                    | (ej omkörd)           | **PASS — 28 s** (apply + verifiera, se förbehåll) | Att lokal stack saknar plattformens grants och därför inte har någon grön baslinje. Att `next dev` vägrar en andra instans i samma katalog oavsett port, och att `.env.local` pekar mot dev-molnet — både för Supabase och för `SENTRY_DSN`, så övningens fel hamnade i dev-Sentry. |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -437,7 +459,7 @@ siffra som betyder något.
    utan lokal stack finns ingen plats att verifiera fixen innan prod. Det är en
    beroendekedja värd att känna till kl 22 en lördag: Docker måste upp först.
 
-Två fynd:
+Tre fynd:
 
 1. **Lokal stack har ingen grön baslinje utan plattformens grants.** På en ren
    `db reset` svarade PostgREST `HTTP 403 / 42501 permission denied` på **alla
@@ -451,7 +473,31 @@ Två fynd:
    onsdagens diff-fynd 3, men konsekvensen är större än där beskriven: det är
    inte bara seed som failar, utan varje anrop appens klienter gör. Grants
    nollställs vid varje `db reset` och måste sättas om.
-2. **`next dev` vägrar en andra instans i samma katalog, oavsett port.** Felet
+2. **Övningen förorenade dev-Sentry, märkt som `production`.**
+   `sentry.server.config.ts` läser `SENTRY_DSN` ur `.env.local`, och
+   env-overriden gällde bara Supabase-variablerna — så den lokala servern
+   rapporterade till `viadal-event-dev` som vilken deploy som helst. Två
+   `42703`-events landade där, på `/schedule` och `/event-info`.
+
+   Två saker gjorde dem svåra att avskriva. Dels var `environment` satt till
+   **`production`** och inte `development`: `SENTRY_ENVIRONMENT` finns inte
+   lokalt, och fallbacken `NODE_ENV` rapporteras som `production` av
+   `next dev` med Turbopack i denna kodväg. Dels kom de inte från brottet utan
+   från en **öppen flik som RSC-prefetchade under `db reset`** — felet var
+   `column assignments.timeslot_start does not exist`, en kolumn som finns både
+   före och efter övningen, vilket lät som riktig schemadrift i dev.
+
+   Båda lästes först felaktigt som ett verkligt fynd. Det som avgjorde var
+   eventets `url` (`localhost:3100`), `server_name` (egna maskinen) och
+   cookienamnet `sb-127-auth-token` — lokal stack, inte dev-molnet. Åtgärdat i
+   stegen ovan: `SENTRY_DSN=` i overriden, och stäng servern före `db reset`.
+
+   **Två positiva bifynd:** #76 rapporterar till Sentry som avsett — felen kom
+   in som `Unhandled`, vilket är precis vad F-REL-10 saknade. Och
+   `sendDefaultPii: false` höll: cookien var `[Filtered]` och inga
+   telefonnummer eller namn fanns i eventet, vilket är kravet under SEC-09.
+
+3. **`next dev` vägrar en andra instans i samma katalog, oavsett port.** Felet
    är "Another next dev server is already running" även med `-p 3100`, så en
    redan körande server måste stoppas. Den som redan kör läser `.env.local`,
    som pekar mot **dev-molnet** — kör man Del 3 mot den testar man fel databas
