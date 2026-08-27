@@ -241,16 +241,53 @@ on two separate GitHub Actions cron runs landing inside the same
 (5–15 minutes between runs is normal for GitHub-hosted cron, not the
 exception).
 
-The **authoritative** signal for prod health is the Azure 5xx metric alert
-(section 5). This workflow's own GitHub notification is a secondary signal
-only — useful, but not the one to trust over the Azure alert if they
-disagree.
+**Which signal is authoritative depends on the failure mode.** For a
+partial failure — app up, serving 5xx, database unreachable, `/api/health`
+returning 503 — the Azure 5xx metric alert (section 5) is authoritative;
+this workflow's own GitHub notification is a secondary signal only,
+useful but not the one to trust over the Azure alert if they disagree.
+
+For a **total outage** — app stopped, revision never activates, ingress
+broken — this cron is the **primary and only** signal. All three Azure
+metric alerts created by `create-alerts.sh` are static-threshold metric
+alerts, and a static-threshold alert with no incoming data does not
+fire — it holds its previous state instead of evaluating to true. Walked
+through per alert: the 5xx alert needs `Requests` data with
+`StatusCodeCategory = 5xx`, and a stopped app records no requests at all;
+the replica-saturation alert's condition is `min Replicas >= 3`, and a
+stopped app sits at 0 replicas, so the condition is false rather than
+triggered; the crash-loop alert needs `RestartCount` data, and a stopped
+app records none. In a total outage, none of the three Azure alerts
+fire — this cron is the only thing that will.
+
+**This check does not exist yet.** A GitHub Actions `schedule:` trigger
+only runs once the workflow file is on the repository's default branch.
+`health-check.yml` currently lives only on `feat/PERF-05-metrics-alerting`
+— until this branch merges to `main`, this cron does not run, and prod
+has no outage detector at all, because (as above) the Azure metric alerts
+are blind to total outage. This is not a footnote: "documented" here does
+not mean "monitored" until the merge happens.
+
+**GitHub auto-disables scheduled workflows after 60 days of repository
+inactivity**, and they must then be re-enabled manually from the Actions
+UI. This is a silent failure mode — the workflow simply stops running,
+with no notification that it was disabled — and because the Azure alerts
+are blind to total outage (above), a silently-disabled cron would leave
+prod with no outage detector at all until someone notices.
 
 **Failure owner:** Frida Bredberg — named as the required reviewer on the
 prod deploy approval gate (`environment: production` in
 `deploy-prod.yml`) — *confirm with the team*. Assigning operational
 on-call ownership is a human decision this document cannot make on its
 own; this is a starting proposal, not a settled assignment.
+
+**Whether the failure notification actually reaches anyone is
+unverified.** This document assumes a failing workflow run surfaces
+somewhere a person reads — GitHub's default failed-workflow email, most
+likely — but that path has not been confirmed for this repository or for
+whoever ends up as failure owner. Treat "the cron will fail loudly" as
+unverified until someone checks, same as the failure-owner assignment
+above — *confirm with the team*.
 
 ## 9. Replica configuration
 
@@ -346,3 +383,13 @@ second read:
   not derived from measured load.
 - Neither `scripts/ops/set-probes.sh` nor `scripts/ops/create-alerts.sh`
   has ever been executed (section 2) — both are reviewed, unrun artifacts.
+- Whether a failing run of `health-check.yml` actually reaches a
+  person — the default GitHub Actions failure notification is assumed
+  but not confirmed (section 8).
+- `health-check.yml`'s `schedule:` trigger is not live yet — it only runs
+  once this branch merges to `main` (section 8). Strike this bullet once
+  merged.
+- The structural fix for the total-outage detection gap (section 8) would
+  be a log-search alert that fires on absent data rather than a static
+  metric threshold — not proposed or scoped here, deferred as a separate
+  decision.

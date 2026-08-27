@@ -33,9 +33,25 @@ jobs:
           # Prod also serves a custom domain (app.viadalevent.se) which an
           # operator may prefer to target instead.
           #
-          # If this job fails, GitHub will surface it as a secondary signal
-          # only -- the authoritative signal for prod health is the Azure
-          # 5xx metric alert, not this workflow's own notification.
+          # If this job fails, what that means depends on how prod is
+          # failing.
+          #
+          # For a partial failure -- app up, serving 5xx, DB unreachable,
+          # /api/health returning 503 -- the Azure 5xx metric alert is
+          # authoritative; this workflow's own notification is a secondary
+          # signal only.
+          #
+          # For a total outage -- app stopped, revision never activates,
+          # ingress broken -- this workflow is the primary and only signal.
+          # All three Azure metric alerts are static-threshold metric
+          # alerts, and a static-threshold alert with no incoming data does
+          # not fire; it holds its previous state instead. In a total
+          # outage: Requests records nothing, so the 5xx alert is silent;
+          # Replicas sits at 0, so "min Replicas >= 3" is false and the
+          # saturation alert is silent; RestartCount records nothing, so
+          # the crash-loop alert is silent. Do not dismiss a failing run of
+          # this job because the Azure alert did not also fire -- for a
+          # total outage, it will not.
           for i in 1 2 3; do
             curl --fail --silent --show-error --max-time 10 \
               "${{ secrets.PROD_APP_URL }}/api/health"
