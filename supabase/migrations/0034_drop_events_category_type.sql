@@ -1,0 +1,60 @@
+-- ============================================================================
+-- Migration 0034: drop events.category_type for real
+-- ============================================================================
+--
+-- Migration 0008_race_type_on_stages.sql already contains
+-- "ALTER TABLE events DROP COLUMN IF EXISTS category_type", and 0008 IS
+-- registered as applied in supabase_migrations.schema_migrations on both dev
+-- and prod. The column is nevertheless still present in both, with its CHECK
+-- constraint and NOT NULL DEFAULT 'distance' intact. See F-REL-09 in
+-- docs/quality-requirements.md. The effect is that the migration suite does
+-- not describe the live schema, which is exactly what MNT-07 requires it to do.
+--
+-- Note on the likely cause, found while writing this migration: `db push`
+-- matches on version NUMBER only, never on file content. This file was first
+-- numbered 0033, which dev's ledger already held (0033_save_assignments_batch_rpc,
+-- PERF-02, merged to main after this branch was cut). push reported
+-- "Remote database is up to date" and applied nothing — silently. The column
+-- was therefore probably never dropped rather than dropped-and-recreated, and
+-- src/types/database.ts regained the three lines on 2026-08-18 simply because
+-- db:types reads dev, where the column had never left. Not proven for 0008, but
+-- the mechanism is now demonstrated rather than hypothesised. Practical rule:
+-- after pushing, verify the schema changed — do not trust a success message.
+--
+-- This migration closes that gap by removing the column, rather than
+-- re-declaring it to match reality. The column is superseded by
+-- event_stages.race_type: race_type answers the question per stage, which is
+-- the level the domain actually needs — one stage can be measured by distance
+-- and the next by time, which an event-level column cannot express.
+--
+-- Forward-fix: destructive
+--   Rollback: alter table public.events
+--               add column if not exists category_type text not null
+--                 default 'distance'
+--                 check (category_type in ('distance', 'time'));
+--             Restores the column as migration 0006 defined it. Every row
+--             returns to 'distance', which is what every row holds today, so
+--             the rollback is value-identical — not merely structural.
+--   Data:     No data loss. Verified read-only against both environments on
+--             2026-08-27, immediately before this migration was written:
+--               - events.category_type = 'time':      0 rows (dev), 0 (prod)
+--               - events.category_type = 'distance':  5 rows (dev), 5 (prod)
+--             Every row holds the 0006 default; the value was never set
+--             deliberately in either environment. Meanwhile event_stages
+--             carries race_type = 'time' on 7 stages (dev) and 2 (prod),
+--             proving the per-stage column is populated and authoritative —
+--             and that category_type actively disagrees with it, reporting
+--             'distance' for events whose stages are timed.
+--             Events with no race stage (the only rows whose value could not
+--             be represented per-stage): 0 in both environments.
+--             Counts reproducible via docs/testing/frel08-category-type-count.sql.
+--   Blast:    Nothing. No application code reads or writes events.category_type
+--             (verified: grep across src/ matches only the generated
+--             src/types/database.ts). The sync_event_stages RPC has taken
+--             race_type per stage since 0008. Between a bad deploy and a fix
+--             the only breakage would be a query naming the column, and none
+--             exists.
+-- ============================================================================
+
+alter table public.events
+  drop column if exists category_type;
