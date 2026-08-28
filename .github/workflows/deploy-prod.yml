@@ -172,4 +172,23 @@ jobs:
             exit 1
           fi
 
-          echo "All configured probes target /api/health/live as expected."
+          # Path alone is not enough. A deploy that drops two of the three
+          # probe types, or that repoints them at the wrong port, leaves every
+          # surviving probe on the correct path and would pass the check above
+          # while prod is materially unprotected. Port 80 in particular is the
+          # exact Phase 5 bug in the root CLAUDE.md - the app was created with
+          # --target-port 80 from the hello-world placeholder default while
+          # Next.js listens on 3000.
+          PROBE_TYPES=$(echo "$PROBES_JSON" | jq -c '[.[] | .type] | sort')
+          if [ "$PROBE_TYPES" != '["Liveness","Readiness","Startup"]' ]; then
+            echo "::error::sports-event-manager-prod does not have all three probe types after this deploy. Found: ${PROBE_TYPES}. Expected [\"Liveness\",\"Readiness\",\"Startup\"]. Re-run scripts/ops/set-probes.sh."
+            exit 1
+          fi
+
+          BAD_PORT_COUNT=$(echo "$PROBES_JSON" | jq '[.[] | select(.httpGet.port != 3000)] | length')
+          if [ "$BAD_PORT_COUNT" -ne 0 ]; then
+            echo "::error::${BAD_PORT_COUNT} probe(s) on sports-event-manager-prod target a port other than 3000. Next.js listens on 3000; this is the Phase 5 port-mismatch failure mode. Probes: $(echo "$PROBES_JSON" | jq -c '[.[] | {type, port: .httpGet.port}]')"
+            exit 1
+          fi
+
+          echo "All configured probes target /api/health/live on port 3000, and all three probe types are present."

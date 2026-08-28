@@ -92,9 +92,15 @@ ingress target port, with a startup grace of `failureThreshold: 240` /
 explicitly — which `set-probes.sh` does, to repoint probes at
 `/api/health/live` — every field not set explicitly falls back to the API's
 own, much shorter default instead of that implicit ~4-minute grace. The
-script sets `STARTUP_FAILURE_THRESHOLD=240` / `STARTUP_PERIOD_SECONDS=1`
+script sets `STARTUP_FAILURE_THRESHOLD=10` / `STARTUP_PERIOD_SECONDS=24`
 explicitly so that defining probes does not silently shrink the startup
-grace. This matters concretely: shrinking it would recreate the Phase 5
+grace. That is the same 240 seconds as ACA's implicit default, expressed as
+10 × 24s rather than 240 × 1s: the ARM schema (ContainerApps 2025-07-01,
+`ContainerAppProbe`) caps `failureThreshold` at 10, so 240 is not a legal
+value for that field even though it is the implicit default's own. Do not
+"restore" `STARTUP_FAILURE_THRESHOLD=240` — the script's bounds check
+rejects it and exits 1 before touching prod.
+This matters concretely: shrinking the grace would recreate the Phase 5
 incident documented in the root `CLAUDE.md` ("Probe of StartUp failed with
 status code: 1"), where prod's cold start took longer than the probe
 allowed and Azure fell back to the hello-world placeholder revision.

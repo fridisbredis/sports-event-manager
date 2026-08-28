@@ -171,6 +171,25 @@ for pair in \
   "READINESS_PERIOD_SECONDS:$READINESS_PERIOD_SECONDS:1:240"
 do
   IFS=":" read -r name value min max <<< "$pair"
+  # Integer check FIRST. [[ ]] evaluates -lt arithmetically, so a non-integer
+  # never reaches the range test intact: "3.5" raises a bash arithmetic syntax
+  # error and the test evaluates false, so BOTH comparisons fall through and
+  # the value is reported in range, then handed to --argjson. "0x9" is worse -
+  # bash reads it as hex 9, passes [1,10] legitimately, and then breaks jq
+  # mid-run because 0x9 is not valid JSON.
+  #
+  # Leading zeros are rejected too, rather than normalised: the payload below
+  # reads $STARTUP_FAILURE_THRESHOLD and friends directly, not this loop's
+  # $value, so normalising here would fix nothing and "08" would still reach
+  # --argjson as invalid JSON. In a probe threshold a leading zero is a typo,
+  # not an input worth accepting.
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: ${name}=${value} is not a positive integer without leading zeros." >&2
+    echo "Probe thresholds are written into the update payload as JSON numbers; a" >&2
+    echo "non-integer override would either be silently accepted as an out-of-range" >&2
+    echo "value or abort this script mid-apply. Set an integer in [${min}, ${max}]." >&2
+    exit 1
+  fi
   if [[ "$value" -lt "$min" || "$value" -gt "$max" ]]; then
     echo "ERROR: ${name}=${value} is outside the ARM schema's legal range [${min}, ${max}]." >&2
     echo "Azure will reject or silently clamp an out-of-range probe value - see the STARTUP" >&2
@@ -397,27 +416,68 @@ fi
 echo "Startup probe grace confirmed: ${APPLIED_STARTUP_FAILURE_THRESHOLD} x ${APPLIED_STARTUP_PERIOD_SECONDS}s = ${APPLIED_STARTUP_GRACE}s (matches intended)."
 
 # Also confirm nothing the SECRETS ASSERTION above was meant to protect was
-# silently damaged by the apply itself (see the ONE RESIDUAL UNKNOWN note in
-# that section - whether `update --yaml` treats an absent secrets/registries
-# key as "leave alone" or "clear" is not verified). This reads names only
-# (never --show-values here - that would print secret values to the
-# terminal and into any CI log capturing this script's output) and the
-# registry credential wiring, since a blanked ACR secret is exactly what
-# would break the next image pull.
+# silently damaged by the apply itself. The ONE RESIDUAL UNKNOWN noted in that
+# section - whether `update --yaml` treats an absent secrets/registries key as
+# "leave alone" or "clear" - is still unverified against live Azure, so this
+# block does not trust it either way: it diffs the live config against
+# $BACKUP_FILE (the pre-change GET taken above) and exits non-zero if anything
+# present before is missing now.
+#
+# Printing alone was not enough. A wiped ACR pull credential would still exit 0
+# and report "Done.", and the next prod deploy would fail at image pull - the
+# Phase 5 incident class documented in the root CLAUDE.md ("ACR auth on
+# Container App is separate one-time config").
+#
+# Names only, never --show-values: that would print secret values to the
+# terminal and into any CI log capturing this script's output.
 echo ""
-echo "Reading back secret names (values never shown) for confirmation:"
-az containerapp secret list \
+echo "Verifying secrets and registry wiring survived the apply..."
+
+SECRETS_BEFORE=$(jq -r '[.properties.configuration.secrets // [] | .[].name] | sort | .[]' "$BACKUP_FILE")
+SECRETS_AFTER=$(az containerapp show \
   --name "$APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --output table
+  --output json | jq -r '[.properties.configuration.secrets // [] | .[].name] | sort | .[]')
 
-echo ""
-echo "Reading back registry configuration for confirmation:"
-az containerapp show \
+MISSING_SECRETS=""
+while IFS= read -r secret_name; do
+  [[ -z "$secret_name" ]] && continue
+  if ! grep -qxF "$secret_name" <<< "$SECRETS_AFTER"; then
+    MISSING_SECRETS+="  - ${secret_name}"$'\n'
+  fi
+done <<< "$SECRETS_BEFORE"
+
+if [[ -n "$MISSING_SECRETS" ]]; then
+  echo "ERROR: secret(s) present before this update are missing from the live config now:" >&2
+  printf '%s' "$MISSING_SECRETS" >&2
+  echo "The update payload deliberately strips .properties.configuration.secrets;" >&2
+  echo "Azure evidently treats an absent key as 'clear' rather than 'leave alone'." >&2
+  echo "" >&2
+  echo "If the ACR pull credential is among them, restore it before the next deploy:" >&2
+  echo "  az containerapp registry set --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} \\" >&2
+  echo "    --server <acr-login-server> --username <username> --password <password>" >&2
+  echo "Pre-change config is at: ${BACKUP_FILE}" >&2
+  exit 1
+fi
+
+REGISTRIES_BEFORE=$(jq -S '.properties.configuration.registries // []' "$BACKUP_FILE")
+REGISTRIES_AFTER=$(az containerapp show \
   --name "$APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --query "properties.configuration.registries" \
-  --output jsonc
+  --output json | jq -S '. // []')
+
+if [[ "$REGISTRIES_BEFORE" != "$REGISTRIES_AFTER" ]]; then
+  echo "ERROR: registry configuration changed across this update." >&2
+  echo "Before: ${REGISTRIES_BEFORE}" >&2
+  echo "After:  ${REGISTRIES_AFTER}" >&2
+  echo "An image pull will fail on the next deploy. Restore with 'az containerapp registry set'." >&2
+  echo "Pre-change config is at: ${BACKUP_FILE}" >&2
+  exit 1
+fi
+
+SECRET_COUNT=$(grep -c . <<< "$SECRETS_BEFORE" || true)
+echo "Secrets intact (${SECRET_COUNT} name(s) present before and after); registry wiring unchanged."
 
 echo ""
 echo "Done. Backup of the pre-change config remains at: ${BACKUP_FILE}"

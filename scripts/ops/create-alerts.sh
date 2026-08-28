@@ -6,11 +6,35 @@
 # email action group, plus three metric alerts wired to it (5xx errors,
 # replicas pinned at the max, and container restarts).
 #
-# Run this by hand. It is NOT called from any deploy workflow. Every
-# create call below is an upsert keyed on --name + --resource-group (action
-# group create, and metric alert create both work this way), so re-running
-# this script is safe - it re-applies the same config rather than creating
-# duplicates.
+# Run this by hand. It is NOT called from any deploy workflow.
+#
+# RE-RUN SAFETY IS NOT UNIFORM - the two create calls behave differently:
+#
+#   `az monitor action-group create`   upserts on --name + --resource-group.
+#                                      Safe to re-run. (Replaces the receiver
+#                                      set rather than merging it - see the
+#                                      CAUTION at the ACTION GROUP block.)
+#
+#   `az monitor metrics alert create`  does NOT upsert. It errors on an
+#                                      existing alert name; changing an
+#                                      existing alert needs `az monitor
+#                                      metrics alert update`.
+#
+# So this script is safe on a FIRST run only. On a re-run it aborts at the
+# first metric alert under `set -euo pipefail`, before the two remaining
+# alerts and before the VERIFY block at the end - leaving alerting partly
+# configured and reporting failure without saying which parts landed.
+#
+# [UNVERIFIED - confirm before relying on either statement above] No `az` was
+# available on the machine that wrote this script, so the create-vs-update
+# asymmetry is taken from the az CLI's documented behaviour, not observed.
+# Before the first re-run, check:
+#     az monitor metrics alert create --help
+#     az monitor metrics alert update --help
+# If `create` does in fact upsert, delete this block and restore the simpler
+# claim. If it does not, the fix is to guard each alert with an existence
+# check and branch to `update`, or to delete the three alerts by name before
+# re-running. Do not simply re-run and assume the errors are benign.
 #
 # SCOPE NOTE: this does not create an Application Insights resource. Azure
 # Monitor already collects Requests / Replicas / RestartCount for Container
@@ -251,7 +275,7 @@ echo "Action group id: ${ACTION_GROUP_ID}"
 # this script) - if this create fails with a parse error on --condition,
 # check `az monitor metrics alert create --help` for the current keyword.
 # ------------------------------------------------------------------------------
-echo "Creating/updating alert: 5xx errors..."
+echo "Creating alert: 5xx errors..."
 az monitor metrics alert create \
   --name "alert-sem-prod-5xx-errors" \
   --resource-group "$RESOURCE_GROUP" \
@@ -274,7 +298,7 @@ az monitor metrics alert create \
 # would fire on a single instantaneous spike. Neither of those is "sitting
 # at the ceiling for 15 minutes".
 # ------------------------------------------------------------------------------
-echo "Creating/updating alert: replicas at max..."
+echo "Creating alert: replicas at max..."
 az monitor metrics alert create \
   --name "alert-sem-prod-replicas-at-max" \
   --resource-group "$RESOURCE_GROUP" \
@@ -295,7 +319,7 @@ az monitor metrics alert create \
 # reads as "at least 3 container restarts within 15 minutes" - a
 # crash-loop signal.
 # ------------------------------------------------------------------------------
-echo "Creating/updating alert: restarts..."
+echo "Creating alert: restarts..."
 az monitor metrics alert create \
   --name "alert-sem-prod-restarts" \
   --resource-group "$RESOURCE_GROUP" \
