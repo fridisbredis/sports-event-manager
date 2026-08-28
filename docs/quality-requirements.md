@@ -321,10 +321,17 @@ itself.
   `tenant.ts`) is deployed — the migration-before-code ordering is satisfied,
   but the deploy is no longer the only remaining step: a separate phone-number
   normalization regression (`896122e`, fixed 2026-08-18) invalidated the
-  manual SMS-delivery verification for this requirement, and prod holds 23
-  `officials` rows stored with a leading `+` that the confirmation RPCs cannot
-  match. Both must be resolved/re-verified before SEC-04 can be called fully
-  met in production — see the manual test plan §6/§7.
+  manual SMS-delivery verification for this requirement. **Verified against
+  prod 2026-08-28:** all 23 affected `officials` rows were `confirmed` (19) or
+  `removed` (4) — none were `invited` — so the leading-`+` mismatch had no
+  active victim; `officials.phone` already matched `auth.users.phone` for
+  every row once the `+` was stripped, and the unique index
+  `officials_tenant_phone_active_uniq` (0020, confirmed present on prod)
+  showed no collisions. Normalized all 23 rows the same day via a plain
+  `UPDATE officials SET phone = ltrim(phone, '+') WHERE phone LIKE '+%'` (data
+  cleanup, not a schema change — no new migration file). 0 rows with a
+  leading `+` remain. The manual SMS-delivery re-verification from §6/§7
+  is still outstanding.
 - Whether the `participant` role ships in this version (F-REL-07). SEC-02
   and SEC-05 depend on the answer. (F-SEC-10's retention position is
   resolved independently as of 2026-08-25 — see SEC-09.)
