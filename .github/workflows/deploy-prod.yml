@@ -97,7 +97,7 @@ jobs:
             --name sports-event-manager-prod \
             --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
             --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
-            --min-replicas 1 \
+            --min-replicas 2 \
             --max-replicas 3 \
             --set-env-vars \
               "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.PROD_SUPABASE_URL }}" \
@@ -110,3 +110,114 @@ jobs:
               "SENTRY_DSN=${{ secrets.PROD_SENTRY_DSN }}" \
               "SENTRY_ENVIRONMENT=production" \
               "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}"
+
+      - name: Verify prod health probes survived deploy
+        run: |
+          # PROBES POST-DEPLOY GUARD
+          #
+          # scripts/ops/set-probes.sh configures the Startup/Liveness/Readiness
+          # probes on this Container App out of band - it is a one-time,
+          # manually-run script (see its own header), NOT called from this or
+          # any other workflow. The deploy step above runs a flag-based
+          # `az containerapp update --image ... --set-env-vars ...`, and
+          # whether that flag-based form preserves an existing
+          # template.containers[0].probes array is UNVERIFIED anywhere in
+          # this repo (the already-logged F-MNT-11 covers the `--yaml`
+          # variant only, not this flag-based one). If a flag-based update
+          # silently drops the probes array, prod reverts to Azure's default
+          # TCP probe and nothing currently notices - no test, no alert, no
+          # other workflow step. This step exists to close that gap.
+          #
+          # IMPORTANT CONSTRAINT: probes have NEVER been successfully applied
+          # to prod yet (scripts/ops/set-probes.sh has never completed a run
+          # against prod). So an empty probe array here is today's normal
+          # state, not a regression, and must NOT fail this or any deploy.
+          # Only a non-empty probe array with a wrong httpGet path is an
+          # actual regression - that means probes existed and this deploy
+          # corrupted or misdirected them, which is the real thing this guard
+          # is meant to catch.
+          #
+          # TODO: once scripts/ops/set-probes.sh has been run successfully
+          # against prod (probes confirmed present via that script's own
+          # VERIFY step), flip the empty-array branch below from
+          # `::warning::` to a hard `exit 1`. Leaving it as a warning forever
+          # would make this guard permanently toothless for exactly the
+          # "probes were never applied" case it exists to eventually catch.
+          #
+          # Shell robustness under `bash -e` (same hazard as the health-check
+          # workflow's curl loop - GitHub Actions runs `run:` steps under
+          # `bash -e`, which aborts the step on the first non-zero exit
+          # inside it): PROBES_JSON is captured via a plain command
+          # substitution, not piped straight into jq, so an `az` failure
+          # surfaces as this step's own natural non-zero exit rather than
+          # being masked by a downstream pipeline stage. jq is preinstalled
+          # on the ubuntu-latest runner image.
+          # INGRESS PORT FIRST - this runs before the probes are even fetched, and
+          # deliberately before the empty-probes branch below.
+          #
+          # The Phase 5 incident in the root CLAUDE.md was an INGRESS port bug: the
+          # app was created with --target-port 80 from the hello-world placeholder
+          # default while Next.js listens on 3000. Probe ports and
+          # ingress.targetPort are independent fields. Checking only the probe ports
+          # leaves the actual Phase 5 configuration passing this guard - ingress on
+          # 80 with probes on 3000 means every probe is green against the container
+          # while no external traffic ever arrives. And ingress on 80 with NO probes
+          # configured, which is prod's state today, would not even reach a probe
+          # check, because the empty-probes branch below exits 0 first. So the
+          # absolute assertion goes here, unconditionally.
+          INGRESS_PORT=$(az containerapp show \
+            --name sports-event-manager-prod \
+            --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.targetPort" \
+            --output tsv)
+          if [ "$INGRESS_PORT" != "3000" ]; then
+            echo "::error::sports-event-manager-prod ingress targetPort is '${INGRESS_PORT}', expected 3000. Next.js listens on 3000; this is the Phase 5 port-mismatch failure mode. Fix with: az containerapp ingress update --name sports-event-manager-prod --resource-group <rg> --target-port 3000"
+            exit 1
+          fi
+          echo "Ingress targetPort is 3000 as expected."
+
+          PROBES_JSON=$(az containerapp show \
+            --name sports-event-manager-prod \
+            --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
+            --query "properties.template.containers[0].probes" \
+            --output json)
+          echo "Probes on sports-event-manager-prod after this deploy:"
+          echo "$PROBES_JSON" | jq .
+
+          PROBE_COUNT=$(echo "$PROBES_JSON" | jq 'length')
+          if [ "$PROBE_COUNT" -eq 0 ]; then
+            echo "::warning::No health probes are configured on sports-event-manager-prod (empty probes array). This is expected until scripts/ops/set-probes.sh has been run successfully against prod. Once it has, this branch must become a hard failure instead of a warning - see the TODO in this step's script."
+            exit 0
+          fi
+
+          BAD_PROBE_COUNT=$(echo "$PROBES_JSON" | jq '[.[] | select(.httpGet.path != "/api/health/live")] | length')
+          if [ "$BAD_PROBE_COUNT" -ne 0 ]; then
+            echo "::error::${BAD_PROBE_COUNT} probe(s) on sports-event-manager-prod do not target /api/health/live. Probes existed before this deploy and were corrupted or misdirected by it."
+            exit 1
+          fi
+
+          # Path alone is not enough. A deploy that drops two of the three
+          # probe types, or that repoints them at the wrong port, leaves every
+          # surviving probe on the correct path and would pass the check above
+          # while prod is materially unprotected. Port 80 in particular is the
+          # exact Phase 5 bug in the root CLAUDE.md - the app was created with
+          # --target-port 80 from the hello-world placeholder default while
+          # Next.js listens on 3000.
+          PROBE_TYPES=$(echo "$PROBES_JSON" | jq -c '[.[] | .type] | sort')
+          if [ "$PROBE_TYPES" != '["Liveness","Readiness","Startup"]' ]; then
+            echo "::error::sports-event-manager-prod does not have all three probe types after this deploy. Found: ${PROBE_TYPES}. Expected [\"Liveness\",\"Readiness\",\"Startup\"]. Re-run scripts/ops/set-probes.sh."
+            exit 1
+          fi
+
+          # Probe ports are compared against $INGRESS_PORT, not against a second
+          # hardcoded 3000. The literal is asserted once, on the ingress, above; this
+          # is the drift check between the two independent fields. Duplicating the
+          # constant here would be the same trap scripts/ops/create-alerts.sh removed
+          # by reading scale.maxReplicas off the live app instead of hardcoding 3.
+          BAD_PORT_COUNT=$(echo "$PROBES_JSON" | jq --argjson p "$INGRESS_PORT" '[.[] | select(.httpGet.port != $p)] | length')
+          if [ "$BAD_PORT_COUNT" -ne 0 ]; then
+            echo "::error::${BAD_PORT_COUNT} probe(s) on sports-event-manager-prod target a port other than 3000. Next.js listens on 3000; this is the Phase 5 port-mismatch failure mode. Probes: $(echo "$PROBES_JSON" | jq -c '[.[] | {type, port: .httpGet.port}]')"
+            exit 1
+          fi
+
+          echo "All three probe types are present, all target /api/health/live, and all target the ingress port (${INGRESS_PORT})."

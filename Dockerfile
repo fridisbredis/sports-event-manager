@@ -54,9 +54,14 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# This HEALTHCHECK only applies to local `docker run` — Azure Container
+# Apps does NOT read this instruction. Production probes are configured
+# separately (scripts/ops/set-probes.sh, added in a later PERF-05 pass).
+# Points at the DB-free liveness endpoint, not /api/health, so a local
+# Supabase blip doesn't restart the local container either.
 # --start-period gives Next.js time to boot before failures count (see the
 # minReplicas/probe-retry lesson in .claude/CLAUDE.md's Lessons Learned).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/api/health/live || exit 1
 
 CMD ["node", "server.js"]
