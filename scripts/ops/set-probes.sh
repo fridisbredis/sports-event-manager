@@ -162,6 +162,20 @@ READINESS_PERIOD_SECONDS="${READINESS_PERIOD_SECONDS:-10}"
 # which are within range), so only failureThreshold/periodSeconds need
 # checking here.
 # ------------------------------------------------------------------------------
+# TARGET_PORT gets its own guard rather than joining the loop below, because
+# the loop's error text is written specifically about failureThreshold and
+# periodSeconds and their ARM ranges. TARGET_PORT reaches the payload through
+# `--argjson port`, so a non-integer aborts jq before the apply rather than
+# being silently accepted - not the same defect class the probe thresholds
+# had - but "80" would pass silently, and 80 is the Phase 5 port. The
+# absolute anchor for that lives in the INGRESS CROSS-CHECK after the export
+# below, where the live ingress port is readable; this is only the type guard.
+if [[ ! "$TARGET_PORT" =~ ^[1-9][0-9]*$ ]] || [[ "$TARGET_PORT" -gt 65535 ]]; then
+  echo "ERROR: TARGET_PORT=${TARGET_PORT} is not an integer in [1, 65535]." >&2
+  echo "It is written into the update payload as a JSON number via --argjson." >&2
+  exit 1
+fi
+
 for pair in \
   "STARTUP_FAILURE_THRESHOLD:$STARTUP_FAILURE_THRESHOLD:1:10" \
   "STARTUP_PERIOD_SECONDS:$STARTUP_PERIOD_SECONDS:1:240" \
@@ -245,6 +259,45 @@ if [[ "$CONTAINER_COUNT" -ne 1 ]]; then
   echo "and doesn't know which container the probes should attach to. Aborting without making any change." >&2
   exit 1
 fi
+
+# ----------------------------------------------------------------------------
+# INGRESS CROSS-CHECK - the same anchor-plus-drift pair the deploy workflow's
+# probe guard uses, applied here where it can still stop the apply.
+#
+# A probe port and ingress.targetPort are independent fields. Probes pointed
+# at a port the container is not listening on fail forever, and on ACA a
+# failing probe restarts the replica - the Phase 5 loop from the root
+# CLAUDE.md, where the app was created with --target-port 80 from the
+# hello-world placeholder default while Next.js listens on 3000.
+#
+# Two assertions, because either alone is insufficient. Comparing TARGET_PORT
+# against the live ingress port alone would inherit an already-wrong live
+# value (ingress 80, probes 80, perfectly "consistent", app unreachable).
+# Asserting the literal 3000 alone would not catch probes aimed elsewhere.
+# So: the live ingress port must be 3000, and TARGET_PORT must equal it.
+# ----------------------------------------------------------------------------
+INGRESS_TARGET_PORT=$(jq -r '.properties.configuration.ingress.targetPort // empty' "$BACKUP_FILE")
+if [[ -z "$INGRESS_TARGET_PORT" ]]; then
+  echo "ERROR: could not read .properties.configuration.ingress.targetPort from the export." >&2
+  echo "Without it there is no way to confirm the probes would target the port the" >&2
+  echo "container actually listens on. Aborting without making any change." >&2
+  echo "Exported (unmodified) backup is still at: ${BACKUP_FILE}" >&2
+  exit 1
+fi
+if [[ "$INGRESS_TARGET_PORT" != "3000" ]]; then
+  echo "ERROR: the live ingress targetPort on '${APP_NAME}' is ${INGRESS_TARGET_PORT}, not 3000." >&2
+  echo "Next.js listens on 3000. This is the Phase 5 port-mismatch state, and setting" >&2
+  echo "probes on top of it would not fix it. Repoint ingress first:" >&2
+  echo "  az containerapp ingress update --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --target-port 3000" >&2
+  exit 1
+fi
+if [[ "$TARGET_PORT" != "$INGRESS_TARGET_PORT" ]]; then
+  echo "ERROR: TARGET_PORT=${TARGET_PORT} does not match the live ingress targetPort (${INGRESS_TARGET_PORT})." >&2
+  echo "Probes would target a port the container is not reachable on, and on ACA a" >&2
+  echo "failing probe restarts the replica. Aborting without making any change." >&2
+  exit 1
+fi
+echo "Ingress cross-check passed: ingress targetPort and TARGET_PORT are both ${TARGET_PORT}."
 
 echo "Building updated config with probes pointed at ${HEALTH_PATH}:${TARGET_PORT}..."
 jq \

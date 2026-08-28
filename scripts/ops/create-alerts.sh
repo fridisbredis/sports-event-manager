@@ -20,21 +20,23 @@
 #                                      existing alert needs `az monitor
 #                                      metrics alert update`.
 #
-# So this script is safe on a FIRST run only. On a re-run it aborts at the
-# first metric alert under `set -euo pipefail`, before the two remaining
-# alerts and before the VERIFY block at the end - leaving alerting partly
-# configured and reporting failure without saying which parts landed.
+# Each metric alert is therefore guarded by an existence check (see ALERT
+# EXISTENCE GATE below) which SKIPS an alert that already exists instead of
+# letting `create` error and abort the run. So this script IS re-runnable: a
+# second run reports which alerts it skipped and still reaches the VERIFY
+# block. It does not, however, update anything - skipping is deliberate,
+# because `metrics alert update` would silently overwrite a threshold someone
+# tuned in the portal, and the thresholds here are explicitly provisional.
+# Delete an alert by name if you want this script to recreate it.
 #
-# [UNVERIFIED - confirm before relying on either statement above] No `az` was
-# available on the machine that wrote this script, so the create-vs-update
-# asymmetry is taken from the az CLI's documented behaviour, not observed.
-# Before the first re-run, check:
+# [UNVERIFIED] No `az` was available on the machine that wrote this script, so
+# the create-vs-update asymmetry above is taken from the az CLI's documented
+# behaviour, not observed. Confirm with:
 #     az monitor metrics alert create --help
 #     az monitor metrics alert update --help
-# If `create` does in fact upsert, delete this block and restore the simpler
-# claim. If it does not, the fix is to guard each alert with an existence
-# check and branch to `update`, or to delete the three alerts by name before
-# re-running. Do not simply re-run and assume the errors are benign.
+# The existence gate is correct either way - if `create` does upsert after
+# all, the gate is redundant rather than wrong - so this is worth confirming
+# but is not load-bearing for re-run safety any more.
 #
 # SCOPE NOTE: this does not create an Application Insights resource. Azure
 # Monitor already collects Requests / Replicas / RestartCount for Container
@@ -246,6 +248,38 @@ ACTION_GROUP_ID=$(az monitor action-group show \
   --resource-group "$RESOURCE_GROUP" \
   --query id --output tsv)
 echo "Action group id: ${ACTION_GROUP_ID}"
+# ----------------------------------------------------------------------------
+# ALERT EXISTENCE GATE
+#
+# `az monitor metrics alert create` does not upsert - it errors on an existing
+# name. Without a gate, a second run of this script aborted at the first alert
+# under `set -euo pipefail`, before the other two alerts and before the VERIFY
+# block, leaving alerting partly configured and reporting failure without
+# saying which parts landed.
+#
+# The gate SKIPS an existing alert rather than updating it. That is deliberate:
+# `az monitor metrics alert update` would silently overwrite a threshold or
+# window someone tuned in the portal after the first run, and the thresholds
+# here are explicitly provisional (see ALERT 2 - the replica ceiling is
+# "revisit once PERF-01 has a measured per-replica capacity figure"). Skipping
+# is recoverable by hand; a silent overwrite of a tuned value is not obvious
+# to anyone afterwards. Delete the alert by name if you want it recreated from
+# this script:
+#   az monitor metrics alert delete --name <name> --resource-group '$RESOURCE_GROUP'
+#
+# This does not need the create-vs-update question settled to be correct: if
+# `create` turns out to upsert after all, the gate is merely redundant, not
+# wrong. That is why it is here rather than waiting on an `az --help` check.
+# ----------------------------------------------------------------------------
+alert_exists() {
+  az monitor metrics alert show \
+    --name "$1" \
+    --resource-group "$RESOURCE_GROUP" \
+    --output none >/dev/null 2>&1
+}
+
+SKIPPED_ALERTS=0
+
 
 # ------------------------------------------------------------------------------
 # ALERT 1 - 5xx errors: COUNT, not RATE.
@@ -275,18 +309,25 @@ echo "Action group id: ${ACTION_GROUP_ID}"
 # this script) - if this create fails with a parse error on --condition,
 # check `az monitor metrics alert create --help` for the current keyword.
 # ------------------------------------------------------------------------------
-echo "Creating alert: 5xx errors..."
-az monitor metrics alert create \
-  --name "alert-sem-prod-5xx-errors" \
-  --resource-group "$RESOURCE_GROUP" \
-  --scopes "$CONTAINER_APP_ID" \
-  --condition "total Requests where StatusCodeCategory includes '5xx' >= 2" \
-  --window-size "$WINDOW_SIZE" \
-  --evaluation-frequency "$EVALUATION_FREQUENCY" \
-  --severity 1 \
-  --action "$ACTION_GROUP_ID" \
-  --description "Fires when >= 2 responses categorised as 5xx are recorded on ${APP_NAME} within ${WINDOW_SIZE}. Also the surfacing path for DB outages (see /api/health's 503-on-DB-failure behaviour)." \
-  --output none
+if alert_exists "alert-sem-prod-5xx-errors"; then
+  echo "Alert already exists, skipping create: alert-sem-prod-5xx-errors"
+  echo "  ('metrics alert create' errors on an existing name; use 'metrics alert update'"
+  echo "   to change it, or delete it by name to have this script recreate it.)"
+  SKIPPED_ALERTS=$((SKIPPED_ALERTS + 1))
+else
+  echo "Creating alert: 5xx errors..."
+  az monitor metrics alert create \
+    --name "alert-sem-prod-5xx-errors" \
+    --resource-group "$RESOURCE_GROUP" \
+    --scopes "$CONTAINER_APP_ID" \
+    --condition "total Requests where StatusCodeCategory includes '5xx' >= 2" \
+    --window-size "$WINDOW_SIZE" \
+    --evaluation-frequency "$EVALUATION_FREQUENCY" \
+    --severity 1 \
+    --action "$ACTION_GROUP_ID" \
+    --description "Fires when >= 2 responses categorised as 5xx are recorded on ${APP_NAME} within ${WINDOW_SIZE}. Also the surfacing path for DB outages (see /api/health's 503-on-DB-failure behaviour)." \
+    --output none
+fi
 
 # ------------------------------------------------------------------------------
 # ALERT 2 - replicas pinned at the ceiling.
@@ -298,18 +339,25 @@ az monitor metrics alert create \
 # would fire on a single instantaneous spike. Neither of those is "sitting
 # at the ceiling for 15 minutes".
 # ------------------------------------------------------------------------------
-echo "Creating alert: replicas at max..."
-az monitor metrics alert create \
-  --name "alert-sem-prod-replicas-at-max" \
-  --resource-group "$RESOURCE_GROUP" \
-  --scopes "$CONTAINER_APP_ID" \
-  --condition "min Replicas >= ${MAX_REPLICAS}" \
-  --window-size "$WINDOW_SIZE" \
-  --evaluation-frequency "$EVALUATION_FREQUENCY" \
-  --severity 2 \
-  --action "$ACTION_GROUP_ID" \
-  --description "Fires when replica count has not dropped below the current ceiling (${MAX_REPLICAS}) for a full ${WINDOW_SIZE} - sustained saturation, not a brief spike. Ceiling is provisional; revisit once PERF-01 has a measured per-replica capacity figure." \
-  --output none
+if alert_exists "alert-sem-prod-replicas-at-max"; then
+  echo "Alert already exists, skipping create: alert-sem-prod-replicas-at-max"
+  echo "  ('metrics alert create' errors on an existing name; use 'metrics alert update'"
+  echo "   to change it, or delete it by name to have this script recreate it.)"
+  SKIPPED_ALERTS=$((SKIPPED_ALERTS + 1))
+else
+  echo "Creating alert: replicas at max..."
+  az monitor metrics alert create \
+    --name "alert-sem-prod-replicas-at-max" \
+    --resource-group "$RESOURCE_GROUP" \
+    --scopes "$CONTAINER_APP_ID" \
+    --condition "min Replicas >= ${MAX_REPLICAS}" \
+    --window-size "$WINDOW_SIZE" \
+    --evaluation-frequency "$EVALUATION_FREQUENCY" \
+    --severity 2 \
+    --action "$ACTION_GROUP_ID" \
+    --description "Fires when replica count has not dropped below the current ceiling (${MAX_REPLICAS}) for a full ${WINDOW_SIZE} - sustained saturation, not a brief spike. Ceiling is provisional; revisit once PERF-01 has a measured per-replica capacity figure." \
+    --output none
+fi
 
 # ------------------------------------------------------------------------------
 # ALERT 3 - restarts.
@@ -319,18 +367,25 @@ az monitor metrics alert create \
 # reads as "at least 3 container restarts within 15 minutes" - a
 # crash-loop signal.
 # ------------------------------------------------------------------------------
-echo "Creating alert: restarts..."
-az monitor metrics alert create \
-  --name "alert-sem-prod-restarts" \
-  --resource-group "$RESOURCE_GROUP" \
-  --scopes "$CONTAINER_APP_ID" \
-  --condition "total RestartCount >= 3" \
-  --window-size "$WINDOW_SIZE" \
-  --evaluation-frequency "$EVALUATION_FREQUENCY" \
-  --severity 1 \
-  --action "$ACTION_GROUP_ID" \
-  --description "Fires when RestartCount sums to >= 3 within ${WINDOW_SIZE} on ${APP_NAME} - a crash-loop signal." \
-  --output none
+if alert_exists "alert-sem-prod-restarts"; then
+  echo "Alert already exists, skipping create: alert-sem-prod-restarts"
+  echo "  ('metrics alert create' errors on an existing name; use 'metrics alert update'"
+  echo "   to change it, or delete it by name to have this script recreate it.)"
+  SKIPPED_ALERTS=$((SKIPPED_ALERTS + 1))
+else
+  echo "Creating alert: restarts..."
+  az monitor metrics alert create \
+    --name "alert-sem-prod-restarts" \
+    --resource-group "$RESOURCE_GROUP" \
+    --scopes "$CONTAINER_APP_ID" \
+    --condition "total RestartCount >= 3" \
+    --window-size "$WINDOW_SIZE" \
+    --evaluation-frequency "$EVALUATION_FREQUENCY" \
+    --severity 1 \
+    --action "$ACTION_GROUP_ID" \
+    --description "Fires when RestartCount sums to >= 3 within ${WINDOW_SIZE} on ${APP_NAME} - a crash-loop signal." \
+    --output none
+fi
 
 # ------------------------------------------------------------------------------
 # VERIFY - list what's actually configured rather than assume the creates
@@ -351,4 +406,9 @@ az monitor metrics alert list \
   --output table
 
 echo ""
+if [[ "$SKIPPED_ALERTS" -gt 0 ]]; then
+  echo "${SKIPPED_ALERTS} alert(s) already existed and were skipped, not updated."
+  echo "The VERIFY output above shows what is actually configured - read it rather than"
+  echo "assuming the skipped alerts still match this script's current thresholds."
+fi
 echo "Done."

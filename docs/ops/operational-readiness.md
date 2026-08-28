@@ -56,19 +56,30 @@ section claimed they were the same:
   existing alert name; changing an existing alert needs `az monitor metrics
   alert update`.
 
-So a re-run aborts at the first metric alert under `set -euo pipefail`,
-before the remaining two alerts and before the script's own VERIFY block —
-leaving alerting **partly** configured, and reporting failure without saying
-which parts landed. Either delete the three `alert-sem-prod-*` alerts by
-name before re-running, or fix the script to gate each alert on an existence
-check. Do not re-run and assume the errors are benign.
+Each metric alert is therefore guarded by an existence check that **skips**
+an alert that already exists, so a re-run no longer aborts partway: it
+reports which alerts it skipped and still reaches its VERIFY block. The gate
+skips rather than updates on purpose — `metrics alert update` would silently
+overwrite a threshold someone tuned in the portal, and the thresholds here
+are explicitly provisional (the replica ceiling is flagged for revisit once
+PERF-01 has a measured per-replica capacity figure). **A re-run therefore
+does not bring an existing alert back in line with this script.** Read the
+VERIFY output rather than assuming it does; delete an alert by name if you
+want it recreated:
+
+```bash
+az monitor metrics alert delete   --name alert-sem-prod-5xx-errors   --resource-group sports-event-manager-prod-rg
+```
 
 `[UNVERIFIED]` The create-vs-update asymmetry above is taken from the az CLI's
 documented behaviour, not observed — no `az` was available on the machine
 that wrote these scripts. Confirm with `az monitor metrics alert create --help`
-and `az monitor metrics alert update --help` before the first re-run. If
-`create` does upsert after all, correct this section and the script header
-together — they were allowed to disagree once already.
+and `az monitor metrics alert update --help`. The existence gate is correct
+either way — if `create` does upsert after all, the gate is redundant rather
+than wrong — so this is worth confirming but no longer load-bearing. If you
+do correct it, correct this section **and** the script header together: they
+were allowed to disagree once already, and that is what this paragraph
+replaced.
 
 ## 3. What is monitored, and where
 
@@ -226,6 +237,57 @@ az containerapp show \
 ```
 
 Prefer this read-back over assuming probes are still correctly set.
+
+### What `set-probes.sh` can damage, and how to put it back
+
+Read this before the first run. It is the one part of the script that can
+break something other than probes.
+
+`az containerapp show` returns `.properties.configuration.secrets` as **names
+only** — values are always omitted, which is why `az containerapp secret list
+--show-values` exists as a separate command. So the export the script builds
+its payload from is not a faithful copy of secrets. Rather than re-declare
+them with empty values, the script strips
+`.properties.configuration.secrets` and `.properties.configuration.registries`
+from the payload entirely.
+
+**Whether `az containerapp update --yaml` reads an absent key as "leave alone"
+or as "clear" is not verified.** If it means "clear", the apply removes prod's
+ACR pull credential — the one configured out of band with `az containerapp
+registry set`, which is the separate one-time config the Phase 5 lesson in the
+root `CLAUDE.md` is about. Nothing would be visibly wrong until the **next**
+prod deploy failed at image pull.
+
+The script does not prevent this; it detects it. `run_credential_check` diffs
+the live config against the pre-change backup and exits non-zero naming
+anything that disappeared. It is armed as an `EXIT` trap immediately before
+the apply, so it also runs when the apply itself fails — the case where a
+partial write is most likely.
+
+**Exit codes to expect:**
+
+| Exit | Meaning | What to do |
+| ---- | ------- | ---------- |
+| `0` | Probes applied; secret names and registry block unchanged. | Nothing. |
+| `1` | Something is gone, and it is named in the output. | Restore it — see below. |
+| `2` | The live config could not be read back. State is **unknown**. | Check by hand before the next deploy. Do not assume either way. |
+| `130` | Interrupted. The report reflects the state at the interrupt. | Re-read the config before deciding anything. |
+
+**To restore the ACR pull credential:**
+
+```bash
+az containerapp registry set   --name sports-event-manager-prod   --resource-group sports-event-manager-prod-rg   --server sportsevtmgrprod.azurecr.io   --username <username>   --password <password>
+```
+
+Credentials are in 1Password as **"ACR sportsevtmgrprod"**. The script prints
+the path to its pre-change backup on every exit path; that file is the exact
+prior configuration.
+
+**Two limits on what a `0` proves.** It compares secret *names*, because
+values are never returned — a blanked value under a surviving name would pass.
+And it is a diff against the state a few seconds earlier, not an assertion
+that the credential is *valid*. If a deploy fails at image pull despite a
+clean run here, that is the case to suspect.
 
 **Why probes are not set inside the deploy workflow:** Azure Container Apps
 has no dedicated CLI flags for health probes — they can only be set by
@@ -406,13 +468,34 @@ second read:
 - Whether `az containerapp update --yaml` silently drops unspecified
   parameters the way `create --yaml` is documented to (section 7) — not
   verified either way.
+- Whether `az containerapp update --yaml` reads an **absent**
+  `.properties.configuration.secrets` key as "leave alone" or as "clear"
+  (section 7) — not verified. This is the one that can cost prod's ACR pull
+  credential. `set-probes.sh` now detects the loss and names it, but
+  detection is after the fact, not prevention.
+- Whether `az monitor metrics alert create` upserts on an existing name
+  (section 2) — taken from the CLI docs, not observed. The script's
+  existence gate is correct either way, so this is no longer load-bearing
+  for re-run safety, but the claim in section 2 is still unconfirmed.
+- `set-probes.sh` reports secret **names** only, because `az containerapp
+  show` never returns values (section 7). A blanked value under a surviving
+  name passes its check. Not fixable without printing secrets to the
+  terminal; the limit is documented rather than closed.
 - The exact dimension-filter keyword (`includes`) for the 5xx
   `StatusCodeCategory` alert condition (section 5) — not verified against
   a live `az` CLI.
 - The replica-at-max threshold of 3 (section 5, section 9) — provisional,
   not derived from measured load.
 - Neither `scripts/ops/set-probes.sh` nor `scripts/ops/create-alerts.sh`
-  has ever been executed (section 2) — both are reviewed, unrun artifacts.
+  has ever been executed against Azure (section 2) — both are reviewed,
+  unrun artifacts. `set-probes.sh` has since been exercised end-to-end
+  against a stubbed `az` across its failure paths, which verifies the
+  script's own control flow but tells you nothing about how Azure responds.
+  Rehearsing against `sports-event-manager-dev` (override `RESOURCE_GROUP`
+  and `APP_NAME`; the subscription is shared) is the cheapest way to settle
+  the `update --yaml` questions above — coordinate first, since it changes
+  dev's probe configuration and section 10 flags dev's replica config as
+  relevant to PERF-01's numbers.
 - Whether a failing run of `health-check.yml` actually reaches a
   person — the default GitHub Actions failure notification is assumed
   but not confirmed (section 8).
