@@ -55,7 +55,7 @@
 --
 -- Applied:
 --   dev  (lhflutwvwvzawzbcuwup) — 2026-08-17, zero duplicates found, verified
---   prod — NOT YET APPLIED
+--   prod — applied (confirmed by Frida, 2026-08-28)
 -- ---------------------------------------------------------------------------
 
 create unique index if not exists officials_tenant_phone_active_uniq
