@@ -15,6 +15,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:types": "supabase gen types typescript --project-id lhflutwvwvzawzbcuwup --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
+    "seed:dev:local": "bash scripts/seed-dev-local.sh",
     "seed:perf": "tsx scripts/seed-perf.ts",
     "seed:perf:clean": "tsx scripts/seed-perf-clean.ts",
     "perf:measure": "tsx scripts/perf-measure.ts"
