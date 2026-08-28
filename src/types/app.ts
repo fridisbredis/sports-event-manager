@@ -4,6 +4,17 @@ import type { Database } from './database'
 type DbTables = Database['public']['Tables']
 
 export type Tenant = DbTables['tenants']['Row']
+// status/action/target_type are plain text at the DB level (CHECK
+// constraints, not Postgres enums) — narrowed here (SEC-07).
+export type AuditEvent = Omit<
+  DbTables['audit_events']['Row'],
+  'actor_role' | 'action' | 'target_type'
+> & {
+  actor_role: AuditActorRole
+  action: AuditAction
+  target_type: AuditTargetType
+}
+export type AuditEventInsert = DbTables['audit_events']['Insert']
 export type UserRole = DbTables['user_roles']['Row']
 export type Event = DbTables['events']['Row']
 export type EventStage = DbTables['event_stages']['Row']
@@ -67,6 +78,17 @@ export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number]
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 export type SmsQueueStatus = 'pending' | 'sending' | 'sent' | 'failed'
+// Match migration 0035's CHECK constraints (SEC-07).
+export type AuditActorRole = 'system_admin' | 'tenant_admin'
+export type AuditAction =
+  | 'role_revoked'
+  | 'tenant_created'
+  | 'tenant_activated'
+  | 'tenant_deactivated'
+  | 'tenant_tier_changed'
+  | 'official_invited'
+  | 'announcement_published'
+export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement'
 
 // Useful aggregate types for queries that join data
 export type WorkstationWithDetails = Workstation & {

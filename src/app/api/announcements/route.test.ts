@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -10,6 +11,10 @@ vi.mock('@/lib/auth/tenant', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-audit-event', () => ({
+  logAuditEvent: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -291,5 +296,97 @@ describe('POST /api/announcements', () => {
     const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
     expect(res.status).toBe(500)
+  })
+
+  // SEC-07
+  it('logs an announcement_published audit event after sms_queue insert succeeds', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '46701111111' }, { phone: '46702222222' }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const queueBuilder = chain({ error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(queueBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorUserId: 'admin-1',
+      actorRole: 'tenant_admin',
+      action: 'announcement_published',
+      targetType: 'announcement',
+      targetId: 'ann-1',
+      detail: { channel: 'officials', recipientCount: 2 },
+    })
+  })
+
+  it('logs an audit event with recipientCount 0 when there are no recipients', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({ data: [], error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { channel: 'officials', recipientCount: 0 } })
+    )
+  })
+
+  it('does not log an audit event when the announcement insert fails', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({ data: [], error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+
+  it('does not log an audit event when the sms_queue enqueue fails', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({ data: [{ phone: '46701111111' }], error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const queueBuilder = chain({ error: { message: 'boom' } })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(queueBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })

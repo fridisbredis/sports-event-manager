@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
 
 const deleteSchema = z.object({
@@ -51,6 +53,18 @@ export async function DELETE(
     }
     return NextResponse.json({ error: 'Failed to remove official' }, { status: 500 })
   }
+
+  await logAuditEvent({
+    tenantId: parsed.data.tenantId,
+    actorUserId: auth.user.id,
+    // requireTenantAdmin only ever returns 'system_admin' | 'tenant_admin',
+    // though its type is the broader shared TenantRole.
+    actorRole: auth.role as AuditActorRole,
+    action: 'role_revoked',
+    targetType: 'user_role',
+    targetId: null,
+    detail: { officialId: id },
+  })
 
   return NextResponse.json({ ok: true })
 }

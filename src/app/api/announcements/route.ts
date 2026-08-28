@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
 
 const publishSchema = z.object({
@@ -119,6 +121,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to queue SMS delivery' }, { status: 500 })
     }
   }
+
+  await logAuditEvent({
+    tenantId,
+    actorUserId: auth.user.id,
+    // requireTenantAdmin only ever returns 'system_admin' | 'tenant_admin',
+    // though its type is the broader shared TenantRole.
+    actorRole: auth.role as AuditActorRole,
+    action: 'announcement_published',
+    targetType: 'announcement',
+    targetId: announcement.id,
+    detail: { channel, recipientCount: recipients?.length ?? 0 },
+  })
 
   return NextResponse.json(
     { announcementId: announcement.id, queued: recipients?.length ?? 0 },
