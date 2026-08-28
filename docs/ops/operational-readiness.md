@@ -41,10 +41,34 @@ reviewed artifacts, not battle-tested ones. Read a script in full before
 running it for the first time, and treat that first real run as a first
 run, not a formality. `set-probes.sh` mitigates this partially by taking
 its own backup and requiring confirmation before applying anything (section
-7). `create-alerts.sh` is safe to re-run because it is idempotent by name —
-`az monitor action-group create` and `az monitor metrics alert create` both
-upsert on name + resource group, so a failed or partial first run does not
-leave duplicates behind.
+7).
+
+**`create-alerts.sh` is safe on a FIRST run only — it is not idempotent.**
+The two `create` calls behave differently, and an earlier version of this
+section claimed they were the same:
+
+- `az monitor action-group create` **does** upsert on name + resource group.
+  Safe to re-run — but "upsert" there means REPLACE, not MERGE: a recipient
+  added by hand in the Azure portal is silently dropped on the next run. The
+  script has a receiver check that requires confirmation when it finds more
+  receivers than it is about to set.
+- `az monitor metrics alert create` **does not** upsert. It errors on an
+  existing alert name; changing an existing alert needs `az monitor metrics
+  alert update`.
+
+So a re-run aborts at the first metric alert under `set -euo pipefail`,
+before the remaining two alerts and before the script's own VERIFY block —
+leaving alerting **partly** configured, and reporting failure without saying
+which parts landed. Either delete the three `alert-sem-prod-*` alerts by
+name before re-running, or fix the script to gate each alert on an existence
+check. Do not re-run and assume the errors are benign.
+
+`[UNVERIFIED]` The create-vs-update asymmetry above is taken from the az CLI's
+documented behaviour, not observed — no `az` was available on the machine
+that wrote these scripts. Confirm with `az monitor metrics alert create --help`
+and `az monitor metrics alert update --help` before the first re-run. If
+`create` does upsert after all, correct this section and the script header
+together — they were allowed to disagree once already.
 
 ## 3. What is monitored, and where
 

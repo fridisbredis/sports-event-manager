@@ -152,6 +152,30 @@ jobs:
           # surfaces as this step's own natural non-zero exit rather than
           # being masked by a downstream pipeline stage. jq is preinstalled
           # on the ubuntu-latest runner image.
+          # INGRESS PORT FIRST - this runs before the probes are even fetched, and
+          # deliberately before the empty-probes branch below.
+          #
+          # The Phase 5 incident in the root CLAUDE.md was an INGRESS port bug: the
+          # app was created with --target-port 80 from the hello-world placeholder
+          # default while Next.js listens on 3000. Probe ports and
+          # ingress.targetPort are independent fields. Checking only the probe ports
+          # leaves the actual Phase 5 configuration passing this guard - ingress on
+          # 80 with probes on 3000 means every probe is green against the container
+          # while no external traffic ever arrives. And ingress on 80 with NO probes
+          # configured, which is prod's state today, would not even reach a probe
+          # check, because the empty-probes branch below exits 0 first. So the
+          # absolute assertion goes here, unconditionally.
+          INGRESS_PORT=$(az containerapp show \
+            --name sports-event-manager-prod \
+            --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.targetPort" \
+            --output tsv)
+          if [ "$INGRESS_PORT" != "3000" ]; then
+            echo "::error::sports-event-manager-prod ingress targetPort is '${INGRESS_PORT}', expected 3000. Next.js listens on 3000; this is the Phase 5 port-mismatch failure mode. Fix with: az containerapp ingress update --name sports-event-manager-prod --resource-group <rg> --target-port 3000"
+            exit 1
+          fi
+          echo "Ingress targetPort is 3000 as expected."
+
           PROBES_JSON=$(az containerapp show \
             --name sports-event-manager-prod \
             --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
@@ -185,10 +209,15 @@ jobs:
             exit 1
           fi
 
-          BAD_PORT_COUNT=$(echo "$PROBES_JSON" | jq '[.[] | select(.httpGet.port != 3000)] | length')
+          # Probe ports are compared against $INGRESS_PORT, not against a second
+          # hardcoded 3000. The literal is asserted once, on the ingress, above; this
+          # is the drift check between the two independent fields. Duplicating the
+          # constant here would be the same trap scripts/ops/create-alerts.sh removed
+          # by reading scale.maxReplicas off the live app instead of hardcoding 3.
+          BAD_PORT_COUNT=$(echo "$PROBES_JSON" | jq --argjson p "$INGRESS_PORT" '[.[] | select(.httpGet.port != $p)] | length')
           if [ "$BAD_PORT_COUNT" -ne 0 ]; then
             echo "::error::${BAD_PORT_COUNT} probe(s) on sports-event-manager-prod target a port other than 3000. Next.js listens on 3000; this is the Phase 5 port-mismatch failure mode. Probes: $(echo "$PROBES_JSON" | jq -c '[.[] | {type, port: .httpGet.port}]')"
             exit 1
           fi
 
-          echo "All configured probes target /api/health/live on port 3000, and all three probe types are present."
+          echo "All three probe types are present, all target /api/health/live, and all target the ingress port (${INGRESS_PORT})."

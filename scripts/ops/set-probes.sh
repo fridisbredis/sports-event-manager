@@ -341,10 +341,13 @@ echo "Updated config (not yet applied) written to: ${UPDATED_FILE}"
 # NOT verified whether `az containerapp update --yaml` treats an ABSENT
 # `.properties.configuration.secrets` key (rather than an explicit `[]`) as
 # "leave the existing secrets alone" or as "clear them". If it turns out to
-# mean "clear them", the VERIFY step below (which reads back secret names
-# and registry wiring after apply) will catch it immediately, and recovery
-# is a re-run of `az containerapp registry set` - not silent, not
-# unrecoverable, just not proven safe in advance.
+# mean "clear them", run_credential_check (defined just before the apply, and
+# armed there as an EXIT trap so it runs even if the apply itself fails)
+# detects it and exits non-zero naming every secret that disappeared, with the
+# `az containerapp registry set` remedy. So the outcome is detected rather
+# than silent - but detection is after the fact, not prevention, and it
+# compares secret NAMES only, since `show` never returns values. Still not
+# proven safe in advance; see the SCOPE note in that function.
 # ------------------------------------------------------------------------------
 UPDATED_SECRET_COUNT=$(jq '(.properties.configuration.secrets // []) | length' "$UPDATED_FILE")
 UPDATED_REGISTRIES_COUNT=$(jq '(.properties.configuration.registries // []) | length' "$UPDATED_FILE")
@@ -373,12 +376,193 @@ if [[ "$CONFIRM" != "$APP_NAME" ]]; then
   exit 1
 fi
 
+# ------------------------------------------------------------------------------
+# CREDENTIAL-SURVIVAL CHECK - defined here, and armed as an EXIT trap, BEFORE
+# the apply below.
+#
+# The check diffs the live config against $BACKUP_FILE (the pre-change GET
+# taken above) and fails if anything present before is missing now. What
+# matters is WHEN it runs. An earlier version ran it inline at the very end of
+# the VERIFY section, after the startup-probe grace assertion. That left two
+# `exit 1`s and one `az containerapp show` between the apply and the check, so
+# under `set -euo pipefail` it never ran in three of the cases it exists for:
+#
+#   - the apply itself exits non-zero (a partial apply - the case where a
+#     credential wipe is MOST likely),
+#   - the probe read-back GET fails,
+#   - the applied probe config does not match what was requested.
+#
+# Reordering alone fixes only the last two. The trap is what covers a failed
+# apply, because nothing after `az containerapp update` runs at all then. So:
+# armed immediately before the apply - NOT at the top of the script, since
+# every pre-flight abort above this point applied nothing, and a credential
+# diff after those would print a reassuring report about a change that never
+# happened - and invoked inline immediately after the apply so its output
+# appears in reading order on a normal run. $CREDENTIAL_CHECK_DONE stops it
+# running twice.
+#
+# The handler obeys three rules a naive `trap ... EXIT` does not:
+#
+#   1. It captures $? FIRST and exits with it, so a probe-assertion failure or
+#      a failed apply keeps its own exit code instead of being masked by the
+#      handler's own success.
+#   2. It runs under `set +e` so it cannot die half-way through its own
+#      report - but see rule 3, because `set +e` is also what would let it lie.
+#   3. It distinguishes "the secret is gone" from "I could not read the live
+#      config". Under `set +e` a failed `az containerapp show` leaves the
+#      after-list EMPTY, which is indistinguishable from a total wipe: the
+#      diff would then report every secret as missing and send an operator to
+#      run `az containerapp registry set` against a perfectly healthy app. An
+#      expired token, throttling, or whatever just killed the apply are all
+#      routes into exactly that. So the GET is checked before its result is
+#      interpreted, and an unreadable config reports "could not verify"
+#      (exit 2), never "missing".
+#
+# Interrupts: the INT/TERM trap below sets a flag AND exits explicitly. Ctrl-C
+# during the apply - the operator watching it hang and losing nerve - is
+# exactly when the credential state matters most. Without an INT trap the
+# shell dies without running the check. With an INT trap that only sets a flag
+# and does not exit, Ctrl-C would stop terminating the script at all. And the
+# code has to be set explicitly: the usual `trap - INT; kill -INT $$` re-raise
+# runs the EXIT handler a second time and double-prints the report.
+# ------------------------------------------------------------------------------
+INTERRUPTED=0
+CREDENTIAL_CHECK_DONE=0
+CREDENTIAL_CHECK_RC=0
+
+# 0 = intact | 1 = loss detected | 2 = could not verify
+run_credential_check() {
+  CREDENTIAL_CHECK_DONE=1
+  local live_json secrets_before secrets_after missing_secrets
+  local registries_before registries_after secret_count secret_name
+
+  echo ""
+  echo "Verifying secrets and registry wiring survived the apply..."
+
+  # One GET serves both comparisons, so each diff has the same shape on both
+  # sides - a full-object export against a full-object export, rather than an
+  # export on one side and a --query projection on the other.
+  #
+  # Names only, never --show-values: that would print secret values to the
+  # terminal and into any CI log capturing this script's output.
+  if ! live_json=$(az containerapp show \
+      --name "$APP_NAME" \
+      --resource-group "$RESOURCE_GROUP" \
+      --output json 2>/dev/null) || [[ -z "$live_json" ]]; then
+    echo "WARNING: could not read the live config back after the apply, so whether the" >&2
+    echo "secrets and the ACR pull credential survived is UNKNOWN. This is NOT a report" >&2
+    echo "that they are intact, and NOT a report that they are gone. Check by hand" >&2
+    echo "before the next prod deploy:" >&2
+    echo "  az containerapp secret list --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --output table" >&2
+    echo "  az containerapp show --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} --query properties.configuration.registries" >&2
+    echo "Pre-change config is at: ${BACKUP_FILE}" >&2
+    return 2
+  fi
+
+  # `| tr -d '\r'` is load-bearing, not cosmetic. jq on Git Bash / msys (the
+  # Windows dev machines for this project) writes CRLF, and these two are
+  # MULTI-LINE outputs. A single-value `$(jq ...)` is safe because command
+  # substitution strips the whole trailing CRLF, but in a multi-line list every
+  # line except the last keeps its \r. `read -r` then leaves that \r in the
+  # name while msys grep strips \r from its input, so `grep -qxF` fails to
+  # match and EVERY secret except the last is reported missing - a false wipe
+  # report on a completely healthy app, sending the operator to re-run
+  # `az containerapp registry set` for nothing. Observed, not theoretical:
+  # this check reported acr-password and cron-secret gone on a clean run
+  # before the tr was added.
+  secrets_before=$(jq -r '[.properties.configuration.secrets // [] | .[].name] | sort | .[]' "$BACKUP_FILE" | tr -d '\r')
+  secrets_after=$(jq -r '[.properties.configuration.secrets // [] | .[].name] | sort | .[]' <<< "$live_json" | tr -d '\r')
+
+  missing_secrets=""
+  while IFS= read -r secret_name; do
+    [[ -z "$secret_name" ]] && continue
+    if ! grep -qxF "$secret_name" <<< "$secrets_after"; then
+      missing_secrets+="  - ${secret_name}"$'\n'
+    fi
+  done <<< "$secrets_before"
+
+  if [[ -n "$missing_secrets" ]]; then
+    echo "ERROR: secret(s) present before this update are missing from the live config now:" >&2
+    printf '%s' "$missing_secrets" >&2
+    echo "The update payload deliberately strips .properties.configuration.secrets, and" >&2
+    echo "these names are no longer on the live app. Stated as observed, not as settled" >&2
+    echo "Azure semantics: whether an absent key means 'clear' is still unverified, and a" >&2
+    echo "concurrent change by someone else is another explanation. Either way, act now." >&2
+    echo "" >&2
+    echo "If the ACR pull credential is among them, restore it before the next deploy:" >&2
+    echo "  az containerapp registry set --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} \\" >&2
+    echo "    --server <acr-login-server> --username <username> --password <password>" >&2
+    echo "Credentials for sportsevtmgrprod are in 1Password as 'ACR sportsevtmgrprod'." >&2
+    echo "Pre-change config is at: ${BACKUP_FILE}" >&2
+    return 1
+  fi
+
+  # Same tr for the same reason. Both sides would carry CRLF identically here,
+  # so the comparison happens to survive without it - but relying on "both
+  # sides are broken the same way" is not a property worth depending on.
+  registries_before=$(jq -S '.properties.configuration.registries // []' "$BACKUP_FILE" | tr -d '\r')
+  registries_after=$(jq -S '.properties.configuration.registries // []' <<< "$live_json" | tr -d '\r')
+
+  if [[ "$registries_before" != "$registries_after" ]]; then
+    echo "ERROR: registry configuration changed across this update." >&2
+    echo "Before: ${registries_before}" >&2
+    echo "After:  ${registries_after}" >&2
+    echo "An image pull will fail on the next deploy. Restore with 'az containerapp registry set'." >&2
+    echo "Pre-change config is at: ${BACKUP_FILE}" >&2
+    return 1
+  fi
+
+  # [SCOPE] This compares secret NAMES and the registry block, because `az
+  # containerapp show` never returns secret VALUES. A blanked value under a
+  # surviving name would pass. If the next prod deploy fails at image pull
+  # despite this reporting intact, that is the case to suspect.
+  secret_count=$(grep -c . <<< "$secrets_before" || true)
+  echo "Secret names intact (${secret_count} present before and after); registry wiring unchanged."
+  echo "(Names and registry block only - secret VALUES are never returned by 'show'.)"
+  return 0
+}
+
+credential_check_trap() {
+  local rc=$?
+  set +e
+  if [[ "$CREDENTIAL_CHECK_DONE" -eq 0 ]]; then
+    run_credential_check
+    local check_rc=$?
+    if [[ "$rc" -eq 0 && "$check_rc" -ne 0 ]]; then
+      rc=$check_rc
+    fi
+  fi
+  if [[ "$INTERRUPTED" -eq 1 ]]; then
+    echo "" >&2
+    echo "Interrupted. The credential report above is the state as of the interrupt." >&2
+    exit 130
+  fi
+  exit "$rc"
+}
+
+trap 'INTERRUPTED=1; exit 130' INT TERM
+trap credential_check_trap EXIT
+
 echo "Applying update..."
 az containerapp update \
   --name "$APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --yaml "$UPDATED_FILE" \
   --output none
+
+# Credential check FIRST, before the probe read-back below - see the block
+# above for why the order matters. A DETECTED LOSS stops here (exit 1): a
+# wiped ACR pull credential needs acting on now, and the probe config can
+# still be read back by hand with the command in
+# docs/ops/operational-readiness.md section 7. "COULD NOT VERIFY" (2) does
+# not stop here - the probe read-back is still worth having - but it is
+# re-asserted before "Done." so this run cannot report success while the
+# credential state is unknown.
+CREDENTIAL_CHECK_RC=0
+run_credential_check || CREDENTIAL_CHECK_RC=$?
+if [[ "$CREDENTIAL_CHECK_RC" -eq 1 ]]; then
+  exit 1
+fi
 
 # ------------------------------------------------------------------------------
 # VERIFY - read the config back rather than assume the update worked.
@@ -415,69 +599,17 @@ if [[ "$APPLIED_STARTUP_GRACE" -ne "$INTENDED_STARTUP_GRACE" ]]; then
 fi
 echo "Startup probe grace confirmed: ${APPLIED_STARTUP_FAILURE_THRESHOLD} x ${APPLIED_STARTUP_PERIOD_SECONDS}s = ${APPLIED_STARTUP_GRACE}s (matches intended)."
 
-# Also confirm nothing the SECRETS ASSERTION above was meant to protect was
-# silently damaged by the apply itself. The ONE RESIDUAL UNKNOWN noted in that
-# section - whether `update --yaml` treats an absent secrets/registries key as
-# "leave alone" or "clear" - is still unverified against live Azure, so this
-# block does not trust it either way: it diffs the live config against
-# $BACKUP_FILE (the pre-change GET taken above) and exits non-zero if anything
-# present before is missing now.
-#
-# Printing alone was not enough. A wiped ACR pull credential would still exit 0
-# and report "Done.", and the next prod deploy would fail at image pull - the
-# Phase 5 incident class documented in the root CLAUDE.md ("ACR auth on
-# Container App is separate one-time config").
-#
-# Names only, never --show-values: that would print secret values to the
-# terminal and into any CI log capturing this script's output.
-echo ""
-echo "Verifying secrets and registry wiring survived the apply..."
-
-SECRETS_BEFORE=$(jq -r '[.properties.configuration.secrets // [] | .[].name] | sort | .[]' "$BACKUP_FILE")
-SECRETS_AFTER=$(az containerapp show \
-  --name "$APP_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --output json | jq -r '[.properties.configuration.secrets // [] | .[].name] | sort | .[]')
-
-MISSING_SECRETS=""
-while IFS= read -r secret_name; do
-  [[ -z "$secret_name" ]] && continue
-  if ! grep -qxF "$secret_name" <<< "$SECRETS_AFTER"; then
-    MISSING_SECRETS+="  - ${secret_name}"$'\n'
-  fi
-done <<< "$SECRETS_BEFORE"
-
-if [[ -n "$MISSING_SECRETS" ]]; then
-  echo "ERROR: secret(s) present before this update are missing from the live config now:" >&2
-  printf '%s' "$MISSING_SECRETS" >&2
-  echo "The update payload deliberately strips .properties.configuration.secrets;" >&2
-  echo "Azure evidently treats an absent key as 'clear' rather than 'leave alone'." >&2
+# The credential-survival check already ran immediately after the apply, and
+# is also armed as an EXIT trap, so it runs even if this script died before
+# reaching that call. All that is left here is making sure a "could not
+# verify" result cannot be walked past.
+if [[ "$CREDENTIAL_CHECK_RC" -ne 0 ]]; then
   echo "" >&2
-  echo "If the ACR pull credential is among them, restore it before the next deploy:" >&2
-  echo "  az containerapp registry set --name ${APP_NAME} --resource-group ${RESOURCE_GROUP} \\" >&2
-  echo "    --server <acr-login-server> --username <username> --password <password>" >&2
-  echo "Pre-change config is at: ${BACKUP_FILE}" >&2
-  exit 1
+  echo "ERROR: the probes applied and verified, but the credential-survival check could" >&2
+  echo "not be completed (see the warning above). Do not treat this run as finished" >&2
+  echo "until the secrets and registry wiring have been confirmed by hand." >&2
+  exit "$CREDENTIAL_CHECK_RC"
 fi
-
-REGISTRIES_BEFORE=$(jq -S '.properties.configuration.registries // []' "$BACKUP_FILE")
-REGISTRIES_AFTER=$(az containerapp show \
-  --name "$APP_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query "properties.configuration.registries" \
-  --output json | jq -S '. // []')
-
-if [[ "$REGISTRIES_BEFORE" != "$REGISTRIES_AFTER" ]]; then
-  echo "ERROR: registry configuration changed across this update." >&2
-  echo "Before: ${REGISTRIES_BEFORE}" >&2
-  echo "After:  ${REGISTRIES_AFTER}" >&2
-  echo "An image pull will fail on the next deploy. Restore with 'az containerapp registry set'." >&2
-  echo "Pre-change config is at: ${BACKUP_FILE}" >&2
-  exit 1
-fi
-
-SECRET_COUNT=$(grep -c . <<< "$SECRETS_BEFORE" || true)
-echo "Secrets intact (${SECRET_COUNT} name(s) present before and after); registry wiring unchanged."
 
 echo ""
 echo "Done. Backup of the pre-change config remains at: ${BACKUP_FILE}"
