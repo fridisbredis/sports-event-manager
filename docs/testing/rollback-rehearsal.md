@@ -123,12 +123,9 @@ faktiskt fungerar som skriven.
       `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \`
       `SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])") \`
       `npm run seed:dev`
-      Men se grant-fyndet nedan: mot en ren lokal build failar seed ändå
-      (`42501 permission denied for table tenants`, verifierat 2026-08-27 även
-      med overriden på plats). **Snabbaste vägen till data är i praktiken
-      `psql -U postgres` direkt** — den rollen har alla privilegier. En
-      `tenants`-rad, ett `events`, ett `event_stages` och en `user_roles`-rad
-      räcker för Del 3; se uppsättningen i Del 3-loggen nedan.
+      (Grant-luckan som tidigare fick seed att faila med `42501` även med
+      overriden på plats är löst sedan 2026-08-27 — `supabase/seed.sql` körs
+      automatiskt av `db reset`. Se fyndet längre ner.)
 - [ ] Kör den `Rollback:`-SQL som står i migrationens header, ordagrant
 - [ ] Verifiera att den går igenom utan fel
 - [ ] Bekräfta vad som går sönder och jämför med `Blast:`-raden. Stämmer de inte
@@ -147,14 +144,14 @@ Det här är den övning som faktiskt betyder något. Additiva rollbacks är lä
 det svåra är att skriva en ny migration framåt medan appen är trasig.
 
 - [ ] `supabase db reset` (se seed-noten i Del 2 om du behöver data)
-- [ ] **Skaffa en grön baslinje innan du bryter något.** På en ren lokal build
-      svarar PostgREST `403 / 42501` på varje tabell — plattformens grants
-      saknas (körningen 2026-08-27: `service_role` hade SELECT på 0 av 15
-      tabeller). Utan baslinje går det inte att skilja ditt brott från
-      grants-luckan. Sätt dem i sessionen, **inte som migration**:
-      `docker exec supabase_db_sports-event-manager psql -U postgres -c "grant select, insert, update, delete on all tables in schema public to anon, authenticated, service_role;"`
-      De försvinner vid nästa `db reset` och måste sättas om. Verifiera sedan
-      med en curl som ska ge `200` innan du går vidare.
+- [ ] **Skaffa en grön baslinje innan du bryter något.** Grants sätts numera
+      automatiskt av `supabase/seed.sql` vid varje `db reset`, så baslinjen ska
+      vara grön direkt — men verifiera det ändå, annars går det inte att skilja
+      ditt brott från ett miljöproblem:
+      `curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:54321/rest/v1/tenants?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"`
+      Ska ge `200`. Ger den `401`/`403` med `42501`: kontrollera att
+      `supabase/seed.sql` finns och att `db reset`-utdatan innehåller
+      `Seeding data from supabase/seed.sql`.
 - [ ] **Starta dev-servern mot lokal stack.** `next dev` vägrar en andra
       instans i samma katalog oavsett port, så stoppa en redan körande server
       först (`kill $(lsof -ti :3000)`). Den som redan kör läser `.env.local`
@@ -376,10 +373,48 @@ filtrerades bort ur diffen med `^grant `. Filtret är fortfarande rätt för att
 hitta drift, men en grön Del 1 betyder inte att lokal stack beter sig som prod.
 Del 2 hittade alltså något Del 1 inte kan se.
 
-Öppen fråga, inte åtgärdad här: ska en migration deklarera de grants appen
-faktiskt behöver, så att lokal build blir körbar utan plattformens hjälp? Det
-gör lokal utveckling förutsägbar, men lägger till 100+ rader som duplicerar
-något Supabase redan gör i dev och prod. Värt ett eget kort.
+Öppen fråga vid tillfället: ska en migration deklarera de grants appen faktiskt
+behöver, så att lokal build blir körbar utan plattformens hjälp? Det gör lokal
+utveckling förutsägbar, men lägger till rader som duplicerar något Supabase
+redan gör i dev och prod.
+
+**Löst 2026-08-27 — `supabase/seed.sql`.** Varken sessionsgrant eller migration.
+`config.toml` hade redan `[db.seed] enabled = true` med
+`sql_paths = ["./seed.sql"]`, men filen fanns inte — mekanismen var konfigurerad
+och oanvänd. `supabase db push` applicerar aldrig seed-filer och `[db.seed]` läses
+bara av `db reset`, så filen kan inte nå dev eller prod. Trello-kortets beslut
+(migrationssviten ska inte deklarera plattformens privilegier) bevaras alltså,
+samtidigt som det manuella steget efter varje reset försvinner.
+
+Uppskattningen "100+ rader" ovan var för hög: verklig inventering är **15
+tabeller, 0 vyer, 0 sekvenser** — alla PK är `uuid`/`gen_random_uuid()`. Filen
+blev ~30 rader SQL.
+
+Två saker filen medvetet inte gör, båda kommenterade i den:
+
+- **Inget `grant on all tables`** — det skulle grantea `rate_limit_hits` och
+  `sms_queue` och tyst upphäva REVOKE:arna i 0026/0030. Tabellerna räknas upp
+  explicit istället, så deny-listen aldrig bryts.
+- **Inget `grant on all routines`** — det skulle återexponera
+  `check_rate_limit`, `release_rate_limit`, `get_last_sign_in_at`,
+  `anonymize_inactive_users` och `claim_sms_queue_batch` för `anon`.
+  Funktionsprivilegier rörs inte alls; alla 14 har redan smala grants i sina
+  egna migrationer.
+
+Verifierat efter `db reset` på **CLI 2.115.0**, dvs den version som _inte_
+levererar plattform-grants: 13 tabeller × 3 roller med full DML,
+`rate_limit_hits` endast `service_role`, `sms_queue` service_role full +
+authenticated INSERT. `anon` nekas `42501` på båda deny-list-tabellerna men får
+`200 []` på `tenants` — grant finns, RLS ger noll rader, precis som avsett.
+**Hela integrationssviten är grön: 95/95.**
+
+Det sista är det egentliga utfallet: F-MNT-09 dokumenterade att alla 10 testfiler
+failade på 2.115.0 och passerade på 2.95.4. CI:s grönhet berodde alltså på en
+pinnad CLI-version snarare än på något i repot. Med `seed.sql` gör den inte
+längre det, och pinnen i `quality.yml` är ett vanligt reproducerbarhetsval igen.
+
+Samma lucka blockerade även PERF-01:s baslinjemätning — `npm run seed:perf`
+failade med `42501` på exakt samma sätt. Den kör nu utan manuella steg.
 
 ### Körning 2026-08-27 — Del 3 kunde inte köras
 
