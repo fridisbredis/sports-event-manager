@@ -20,7 +20,10 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned to match quality.yml — see that file's comment for why
+          # `latest` is avoided (version skew) and it also avoids GitHub API
+          # rate-limit failures from resolving "latest" on every run.
+          version: 2.95.4
 
       - name: Preview pending DB migrations (dev)
         run: |
