@@ -14,7 +14,10 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:types": "supabase gen types typescript --project-id lhflutwvwvzawzbcuwup --schema public > src/types/database.ts && prettier --write src/types/database.ts",
-    "seed:dev": "tsx scripts/seed-dev.ts"
+    "seed:dev": "tsx scripts/seed-dev.ts",
+    "seed:perf": "tsx scripts/seed-perf.ts",
+    "seed:perf:clean": "tsx scripts/seed-perf-clean.ts",
+    "perf:measure": "tsx scripts/perf-measure.ts"
   },
   "dependencies": {
     "@gravity-ui/icons": "^2.20.0",
