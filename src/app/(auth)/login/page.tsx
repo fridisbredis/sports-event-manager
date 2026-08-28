@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button, SelectItem } from '@heroui/react'
 import { Input, Select } from '@/components/ui/form-fields'
@@ -27,9 +26,25 @@ const AUTH_ERROR_KEYS: Record<string, string> = {
 
 const RESEND_COOLDOWN_SECONDS = 30
 
+// GoTrue error codes are surfaced the same way whether the error originates
+// from Supabase directly or from our own rate-limit rejection (over_request_rate_limit),
+// so the client's error handling doesn't need to distinguish the source.
+async function postJson(
+  url: string,
+  body: unknown
+): Promise<{ error: { message: string; code?: string } | null }> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.ok) return { error: null }
+  const data = await res.json().catch(() => ({}))
+  return { error: { message: data.error ?? 'Request failed', code: data.code } }
+}
+
 export default function LoginPage() {
   const router = useRouter()
-  const supabase = createSupabaseBrowserClient()
   const { t } = useTranslation('auth')
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
@@ -70,7 +85,7 @@ export default function LoginPage() {
   async function sendOtp() {
     const e164Phone = normalizePhoneToE164(phone, phoneCountry)
     if (!e164Phone) return
-    if (await request(() => supabase.auth.signInWithOtp({ phone: e164Phone }))) {
+    if (await request(() => postJson('/api/auth/send-otp', { phone: e164Phone }))) {
       setNormalizedPhone(e164Phone)
       setStep('otp')
       setResendCooldown(RESEND_COOLDOWN_SECONDS)
@@ -80,7 +95,7 @@ export default function LoginPage() {
   async function resendOtp() {
     if (resendCooldown > 0 || resending) return
     setResending(true)
-    const { error } = await supabase.auth.signInWithOtp({ phone: normalizedPhone })
+    const { error } = await postJson('/api/auth/send-otp', { phone: normalizedPhone })
     setResending(false)
     if (error) {
       logger.error('[auth] resend OTP failed', undefined, {
@@ -96,11 +111,11 @@ export default function LoginPage() {
 
   async function verifyOtp() {
     if (
-      await request(() =>
-        supabase.auth.verifyOtp({ phone: normalizedPhone, token: otp, type: 'sms' })
-      )
-    )
+      await request(() => postJson('/api/auth/verify-otp', { phone: normalizedPhone, token: otp }))
+    ) {
       router.push('/')
+      router.refresh()
+    }
   }
 
   return (
