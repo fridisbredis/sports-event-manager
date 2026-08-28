@@ -1,6 +1,6 @@
 # ADR-0002: `anon` holds default DML grants on nearly every table — is that intentional?
 
-- **Status:** Proposed (open question, not yet a decision)
+- **Status:** Accepted
 - **Date:** 2026-08-28
 - **Driver:** Trello backlog audit of medium/low priority labels, which
   flagged "Verifiera att anons DML-rättigheter är avsiktliga (SEC-03/ADR-0001)"
@@ -91,30 +91,64 @@ never actually established for this specific question.
   the same risk shape, one level further out, and it has never been
   reviewed as its own question.
 
-## The question this ADR needs to answer
+## Decision
 
-Is "no grant-level backstop for `anon`, RLS as the sole boundary" the
-project's **intentional, reviewed** security posture, or should `anon` be
-revoked down to nothing on tenant-scoped tables (the same treatment
-`rate_limit_hits` and `sms_queue` already got), leaving RLS to do the same
-job it already does but with a second, independent layer behind it that
-fails closed instead of relying on every future migration remembering the
-`0004` policy convention?
+**Revoke `anon`'s `insert`/`update`/`delete` grants on all 13 currently-ungoverned
+tables in `public`**, matching the treatment `rate_limit_hits` (0026) and
+`sms_queue` (0030/0032) already received. `anon` keeps `select` — that grant
+is equally unused today (no policy targets `anon` for reads either) but is
+left alone because revoking it changes nothing observable and this decision
+is scoped to the write-side risk the audit actually raised. Implemented in
+migration `0035_revoke_anon_table_dml.sql`; `supabase/seed.sql` updated in
+the same PR so local dev keeps matching dev/prod after a reset.
 
-Revoking `anon`'s grants outright looks, from the code alone, close to
-free: no policy anywhere targets `anon`, so no legitimate anonymous read or
-write path exists to break. The cost is not technical risk so much as
-verification effort — confirming that claim holds for every current table
-before revoking, and re-litigating the two existing carve-outs' migrations
-to make sure a blanket revoke doesn't collide with them.
+**Verification done before revoking (2026-08-28):** every call site of
+`createSupabaseBrowserClient()` (the only client configured with the public
+anon key) was audited. There are two: the login page and the invite-accept
+form. Both call only `supabase.auth.signInWithOtp`/`verifyOtp` — Auth API
+calls, unaffected by table-level grants — never a `.from(...)` table write.
+Every Server Action and API route that performs a table write uses the
+session-cookie client (`createSupabaseServerClient()`) or the service-role
+client, never the anon key directly. No RLS policy anywhere targets `anon`,
+confirming the revoke removes a grant nothing legitimate depends on.
 
-## Status
+This was close to a free decision once verified: the grant was defended by
+nothing (no policy, no code path), so revoking it costs nothing functional
+and closes the "one future migration forgets the `0004` policy convention"
+exposure described above. The verification step — not the revoke itself —
+was the part worth doing carefully, which is why it's recorded in the
+migration header rather than asserted from the code alone.
 
-This document records the question and the evidence, per the audit that
-raised it. It intentionally stops short of a Decision section — that
-requires the same kind of file-by-file review `docs/security/service-role-audit.md`
-did for the service-role question, which has not been done yet for the
-`anon`-grant question. Recommended next step: an audit pass equivalent to
-`service-role-audit.md`, scoped to `anon`'s table grants, before deciding
-between "leave as platform default, RLS-only" and "revoke to match
-`rate_limit_hits`/`sms_queue`."
+## Consequences
+
+**What this fixes:** the 12 tenant-scoped tables that previously relied on
+RLS alone against `anon` now also fail closed at the grant level. A future
+migration that adds a table and forgets its `0004`-convention RLS policies
+is unwritable by an anonymous request holding only the public anon key,
+rather than silently writable pending someone noticing the missing policy.
+
+**What this does not change:** `authenticated` and `service_role` grants,
+and every existing RLS policy — none of those were in question. `select` for
+`anon` is also untouched, for the reason given above.
+
+**Ongoing obligation:** a new table added to `public` gets `anon` `select`
+only in both a migration and `supabase/seed.sql`, never
+`insert`/`update`/`delete`, unless a future ADR reverses this one. The
+`seed.sql` "KEEP IN SYNC" note reflects this.
+
+## Alternatives considered
+
+- **Leave the platform default as-is, treat RLS as sufficient on its own.**
+  Rejected: this is exactly the posture CLAUDE.md's "defense in depth"
+  section argues against for every other role in the system (route handlers
+  validate tenant_id in addition to RLS; RLS is never trusted alone). No
+  reason to treat `anon` as the one exception, especially given it is the
+  role reachable from a key shipped to every browser.
+- **Wait for a dedicated file-by-file audit like
+  `docs/security/service-role-audit.md` before deciding.** Considered, but
+  that audit's cost is proportional to ambiguity, and there wasn't much
+  here: unlike the service-role question (four genuinely different
+  categories of legitimate use), the anon-grant question reduces to "does
+  any code path write via anon" — a single, answerable, already-answered
+  question. Revoking now and documenting the verification inline captures
+  the same rigor without deferring a low-risk, low-cost fix.
