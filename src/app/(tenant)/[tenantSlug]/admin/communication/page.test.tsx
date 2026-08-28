@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import CommunicationPage from './page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { CommunicationPanel } from './_components/communication-panel'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
 }))
 
+// getAdminTenant resolves the tenant only after the admin access check passes,
+// so a null return means either "no such tenant" or "not authorized". Both are
+// notFound() to the caller, which is deliberate: an unauthorized caller must not
+// be able to probe for tenant existence.
 vi.mock('@/lib/auth/tenant', () => ({
-  hasAdminAccessToTenant: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getAdminTenant: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -58,12 +63,9 @@ function mockServerClient(userId: string | null, tenant: unknown, announcementsR
     if (table === 'announcements') return chain(announcementsResult ?? { data: null })
     return chain({ data: tenant })
   })
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
-    },
-    from: fromMock,
-  } as never)
+  vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
+  vi.mocked(getAdminTenant).mockResolvedValue(tenant as never)
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
   return fromMock
 }
 
@@ -76,15 +78,14 @@ describe('CommunicationPage', () => {
     mockServerClient(null, null)
 
     await expect(CommunicationPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
-    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
+    expect(getAdminTenant).not.toHaveBeenCalled()
   })
 
   it('calls notFound when the user lacks admin access to the tenant', async () => {
-    mockServerClient('user-1', { id: TENANT_ID, name: 'Viadal', slug: 'viadal' })
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    mockServerClient('user-1', null)
 
     await expect(CommunicationPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
-    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
+    expect(getAdminTenant).toHaveBeenCalledWith('viadal')
   })
 
   it('loads announcements for the tenant and passes them to CommunicationPanel', async () => {
@@ -94,7 +95,6 @@ describe('CommunicationPage', () => {
       { id: TENANT_ID, name: 'Viadal', slug: 'viadal' },
       { data: announcements }
     )
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
 
     const result = await CommunicationPage({ params: PARAMS })
 
@@ -111,7 +111,6 @@ describe('CommunicationPage', () => {
 
   it('passes an empty announcements array when the query returns no data', async () => {
     mockServerClient('user-1', { id: TENANT_ID, name: 'Viadal', slug: 'viadal' }, { data: null })
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
 
     const result = await CommunicationPage({ params: PARAMS })
 

@@ -1,6 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { SidebarNav } from './_components/sidebar-nav'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
@@ -14,23 +13,17 @@ export default async function TenantLayout({ children, params }: Props) {
   const { tenantSlug } = await params
   const t = await getServerTranslation('en', 'admin')
 
-  const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id, color_palette')
-    .eq('slug', tenantSlug)
-    .single()
+  // Resolves the tenant only once the caller has passed the admin access check
+  // for it, so this layout still gates every page beneath it. Memoised per
+  // render pass (F-PERF-07), so the pages below reuse this result instead of
+  // repeating the GoTrue round trip and the two access-context queries.
+  const tenant = await getAdminTenant(tenantSlug)
 
   if (!tenant) notFound()
-
-  // Only a tenant_admin of this tenant or a system_admin may pass.
-  if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
   return (
     <>

@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SchedulePage from './page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { resolveTenantForOfficial } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { ScheduleView } from './_components/schedule-view'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
 }))
 
+// getOfficialTenant resolves the tenant only after the official-surface
+// access check passes, so a null return means either "no such tenant" or
+// "not authorized" — both are notFound() to the caller, by design.
 vi.mock('@/lib/auth/tenant', () => ({
-  resolveTenantForOfficial: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getOfficialTenant: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -60,16 +64,12 @@ const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null } }),
-    },
-    from: fromMock,
-  } as never)
+  vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 }
 
 function mockResolvedTenant() {
-  vi.mocked(resolveTenantForOfficial).mockResolvedValue({
+  vi.mocked(getOfficialTenant).mockResolvedValue({
     id: TENANT_ID,
     slug: 'viadal',
     color_palette: 'default',
@@ -87,16 +87,16 @@ describe('SchedulePage', () => {
     mockUser(null, fromMock)
 
     await expect(SchedulePage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
-    expect(resolveTenantForOfficial).not.toHaveBeenCalled()
+    expect(getOfficialTenant).not.toHaveBeenCalled()
     expect(fromMock).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when resolveTenantForOfficial denies access or the tenant is missing', async () => {
+  it('calls notFound when getOfficialTenant denies access or the tenant is missing', async () => {
     mockUser('user-1')
-    vi.mocked(resolveTenantForOfficial).mockResolvedValue(null)
+    vi.mocked(getOfficialTenant).mockResolvedValue(null)
 
     await expect(SchedulePage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
-    expect(resolveTenantForOfficial).toHaveBeenCalledWith('viadal', 'user-1')
+    expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
   })
 
   it('renders an empty assignments list when the user has no confirmed official row', async () => {
