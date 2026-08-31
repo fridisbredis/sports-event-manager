@@ -118,7 +118,7 @@ export type Database = {
         Row: {
           action: string
           actor_role: string
-          actor_user_id: string
+          actor_user_id: string | null
           created_at: string
           detail: Json
           id: string
@@ -140,7 +140,7 @@ export type Database = {
         Update: {
           action?: string
           actor_role?: string
-          actor_user_id?: string
+          actor_user_id?: string | null
           created_at?: string
           detail?: Json
           id?: string
