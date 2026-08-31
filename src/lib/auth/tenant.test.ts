@@ -9,6 +9,9 @@ import {
   requireTenantAdmin,
   resolveTenantForAdmin,
   resolveTenantForOfficial,
+  getCurrentUser,
+  getAdminTenant,
+  getOfficialTenant,
   type UserRoleWithTenant,
 } from './tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
@@ -639,6 +642,109 @@ describe('resolveTenantForOfficial', () => {
     })
 
     expect(await resolveTenantForOfficial('viadal', 'user-1')).toEqual({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+    })
+  })
+})
+
+// F-PERF-07's request-scoped memoisation exports. cache() is a no-op outside
+// a real React render (confirmed: plain `react` resolves to the identity
+// passthrough, not the react-server build Next.js uses), so these tests
+// exercise the same authorization logic as resolveTenantForAdmin /
+// resolveTenantForOfficial above on every call — they do not, and cannot,
+// verify the memoisation itself. What they do verify is that the access
+// check still actually runs through these exports, so a future edit can't
+// silently drop the gate without a call-site mock papering over it.
+describe('getCurrentUser', () => {
+  it('returns null when there is no session', async () => {
+    mockServerClient(null)
+
+    expect(await getCurrentUser()).toBeNull()
+  })
+
+  it('returns the session user', async () => {
+    mockServerClient({ id: 'user-1' })
+
+    expect(await getCurrentUser()).toEqual({ id: 'user-1' })
+  })
+})
+
+describe('getAdminTenant', () => {
+  it('returns null when there is no authenticated user', async () => {
+    mockServerClient(null)
+
+    expect(await getAdminTenant('viadal')).toBeNull()
+  })
+
+  it('returns null when the caller fails the admin access check', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [], error: null },
+    })
+
+    expect(await getAdminTenant('viadal')).toBeNull()
+  })
+
+  it('returns null when no tenant matches the slug', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({ tenants: { data: null, error: null } })
+
+    expect(await getAdminTenant('viadal')).toBeNull()
+  })
+
+  it('returns the tenant row when the caller passes the admin access check', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+    })
+
+    expect(await getAdminTenant('viadal')).toEqual({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+    })
+  })
+})
+
+describe('getOfficialTenant', () => {
+  it('returns null when there is no authenticated user', async () => {
+    mockServerClient(null)
+
+    expect(await getOfficialTenant('viadal')).toBeNull()
+  })
+
+  it('returns null when the caller fails the official surfaces check', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'participant', tenant_id: TENANT_ID }], error: null },
+    })
+
+    expect(await getOfficialTenant('viadal')).toBeNull()
+  })
+
+  it('returns null when no tenant matches the slug', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({ tenants: { data: null, error: null } })
+
+    expect(await getOfficialTenant('viadal')).toBeNull()
+  })
+
+  it('returns the tenant row when the caller passes the official surfaces check', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      officials: { data: { invite_status: 'confirmed' }, error: null },
+    })
+
+    expect(await getOfficialTenant('viadal')).toEqual({
       id: TENANT_ID,
       slug: 'viadal',
       color_palette: 'blue',
