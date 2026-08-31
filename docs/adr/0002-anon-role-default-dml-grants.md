@@ -172,6 +172,38 @@ it `anon`-writable by default.) `0036` does not touch grants on tables that
 already exist; per-table revokes (`0035`, and any future table's own
 migration) remain how the deny-list is declared for already-created tables.
 
+**What `0036` does not cover: tables created outside the migration path.**
+`alter default privileges` is scoped to the role that creates the object, and
+`0036` names `postgres` because that is who `supabase db push` connects as.
+A table created any other way keeps the platform default. Measured on dev
+after `0036` was applied:
+
+| Default privileges for role           | `anon` gets                                       |
+| ------------------------------------- | ------------------------------------------------- |
+| `postgres` (i.e. `db push`)           | `SELECT, REFERENCES, TRIGGER, TRUNCATE, MAINTAIN` |
+| `supabase_admin` (i.e. the dashboard) | the same **plus `INSERT`, `UPDATE`, `DELETE`**    |
+
+So a table created through the Supabase dashboard's table editor still lands
+`anon`-writable, exactly as every table did before `0035`.
+
+This is a discipline gap rather than a live hole: CLAUDE.md is emphatic that
+schema reaches dev and prod only through numbered migrations, and Del 1 of
+`docs/testing/rollback-rehearsal.md` exists specifically to detect schema that
+arrived any other way. It is recorded here because the paragraph above could
+otherwise be read as "`0036` closes this at the grant level, full stop" — it
+closes it for the path this project actually uses, which is not the same claim.
+
+Widening `0036` to cover `supabase_admin` was considered and not done: that
+role owns the platform's own objects, and revoking defaults out from under it
+risks breaking Supabase-managed schema for a path this project does not use.
+If dashboard-created tables ever become part of the workflow, that decision
+should be revisited rather than assumed still correct.
+
+Two narrower scoping notes, for completeness: `0036` covers `IN SCHEMA public`
+only, which is where every tenant-scoped table lives; and it covers tables,
+not sequences or functions — function `EXECUTE` grants are declared per
+migration already, so that omission is consistent rather than an oversight.
+
 ## Alternatives considered
 
 - **Leave the platform default as-is, treat RLS as sufficient on its own.**
