@@ -80,3 +80,35 @@ describe('proxy — cron auth exemption', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('proxy — login OTP auth exemption', () => {
+  // These two routes ARE the login flow (F-SEC-08): by definition there is
+  // no session yet when they're called, so requiring one would make signing
+  // in impossible. Their own per-phone rate limiting is the abuse guard,
+  // not proxy-level auth — see checkLoginSendRateLimit/VerifyRateLimit.
+  it('passes /api/auth/send-otp through without auth', async () => {
+    const res = await proxy(requestFor('/api/auth/send-otp'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  it('passes /api/auth/verify-otp through without auth', async () => {
+    const res = await proxy(requestFor('/api/auth/verify-otp'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  // Pins the exact-match decision, same purpose as the /api/health/detail
+  // control above. The exemption is two `===` comparisons, not
+  // startsWith('/api/auth/'); if it were ever widened, every future
+  // /api/auth/* route would silently become reachable without a session —
+  // which for an auth namespace is the worst place for that to happen
+  // unnoticed. This unlisted sibling must stay blocked.
+  it('control: does not exempt an unlisted /api/auth/* path', async () => {
+    const res = await proxy(requestFor('/api/auth/signout'))
+
+    expect(res.status).toBe(401)
+  })
+})
