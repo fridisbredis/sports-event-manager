@@ -7,7 +7,7 @@
 -- at creation time, not as a standing rule — so the very next migration that
 -- creates a table gets anon insert/update/delete back automatically. 0035's
 -- own PR review caught a live example of this: a sibling branch's
--- 0035_audit_events.sql creates a table with three RLS policies that all
+-- 0037_audit_events.sql creates a table with three RLS policies that all
 -- target auth.uid()/system_admin/tenant_admin, none of which match anon,
 -- yet anon would land with insert/update/delete on it by default — exactly
 -- the exposure ADR-0002 says is closed.

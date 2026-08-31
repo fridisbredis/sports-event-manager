@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createTenant, setTenantActive, setTenantTier } from './actions'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-audit-event', () => ({
+  logAuditEvent: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -111,6 +116,16 @@ describe('createTenant', () => {
       expect.objectContaining({ tenant_id: 'tenant-1', name: 'Viadal 2026' })
     )
     expect(revalidatePath).toHaveBeenCalledWith('/admin')
+    // SEC-07
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      actorUserId: 'admin-1',
+      actorRole: 'system_admin',
+      action: 'tenant_created',
+      targetType: 'tenant',
+      targetId: 'tenant-1',
+      detail: { name: 'Viadal 2026', slug: 'viadal-2026' },
+    })
   })
 
   it('returns a friendly error on a duplicate tenant name (unique violation)', async () => {
@@ -122,6 +137,7 @@ describe('createTenant', () => {
 
     expect(result).toEqual({ error: 'A tenant with that name already exists' })
     expect(revalidatePath).not.toHaveBeenCalled()
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })
 
@@ -149,6 +165,16 @@ describe('setTenantActive', () => {
     expect(updateBuilder.eq).toHaveBeenCalledWith('id', TENANT_ID)
     expect(revalidatePath).toHaveBeenCalledWith('/admin')
     expect(revalidatePath).toHaveBeenCalledWith('/admin/' + TENANT_ID)
+    // SEC-07
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorUserId: 'admin-1',
+      actorRole: 'system_admin',
+      action: 'tenant_deactivated',
+      targetType: 'tenant',
+      targetId: TENANT_ID,
+      detail: { isActive: false },
+    })
   })
 
   it('returns an error and skips revalidation when the update fails', async () => {
@@ -160,6 +186,7 @@ describe('setTenantActive', () => {
 
     expect(result).toEqual({ error: 'Failed to update tenant' })
     expect(revalidatePath).not.toHaveBeenCalled()
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })
 
@@ -196,6 +223,16 @@ describe('setTenantTier', () => {
     expect(updateBuilder.update).toHaveBeenCalledWith({ tier: 'premium' })
     expect(updateBuilder.eq).toHaveBeenCalledWith('id', TENANT_ID)
     expect(revalidatePath).toHaveBeenCalledWith('/admin/' + TENANT_ID)
+    // SEC-07
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorUserId: 'admin-1',
+      actorRole: 'system_admin',
+      action: 'tenant_tier_changed',
+      targetType: 'tenant',
+      targetId: TENANT_ID,
+      detail: { tier: 'premium' },
+    })
   })
 
   it('returns an error and skips revalidation when the update fails', async () => {
@@ -207,5 +244,6 @@ describe('setTenantTier', () => {
 
     expect(result).toEqual({ error: 'Failed to update tier' })
     expect(revalidatePath).not.toHaveBeenCalled()
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })

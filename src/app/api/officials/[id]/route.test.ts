@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { DELETE } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -10,6 +11,10 @@ vi.mock('@/lib/auth/tenant', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-audit-event', () => ({
+  logAuditEvent: vi.fn(),
 }))
 
 function makeRequest(tenantId?: string) {
@@ -108,5 +113,38 @@ describe('DELETE /api/officials/[id]', () => {
     const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
     expect(res.status).toBe(500)
+  })
+
+  // SEC-07
+  it('logs a role_revoked audit event after remove_official succeeds', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: { ok: true }, error: null })
+
+    await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorUserId: 'admin-1',
+      actorRole: 'tenant_admin',
+      action: 'role_revoked',
+      targetType: 'user_role',
+      targetId: null,
+      detail: { officialId: OFFICIAL_ID },
+    })
+  })
+
+  it('does not log an audit event when remove_official fails', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: null, error: { message: 'boom' } })
+
+    await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })

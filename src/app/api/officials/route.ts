@@ -3,6 +3,8 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { normalizePhoneToE164, PHONE_COUNTRIES, stripE164Plus, toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import type { AuditActorRole } from '@/types/app'
 import twilio from 'twilio'
 import { z } from 'zod'
 import {
@@ -162,6 +164,18 @@ export async function POST(request: NextRequest) {
     await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
   }
+
+  await logAuditEvent({
+    tenantId,
+    actorUserId: auth.user.id,
+    // requireTenantAdmin only ever returns 'system_admin' | 'tenant_admin',
+    // though its type is the broader shared TenantRole.
+    actorRole: auth.role as AuditActorRole,
+    action: 'official_invited',
+    targetType: 'official',
+    targetId: official.id,
+    detail: { phoneLast4: phone.slice(-4) },
+  })
 
   const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
 
