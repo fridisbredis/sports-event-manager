@@ -1,0 +1,43 @@
+-- ============================================================================
+-- Migration 0036: revoke anon's default DML grants for future tables too
+-- ============================================================================
+--
+-- 0035 revoked anon's insert/update/delete on the 13 tables that existed at
+-- the time. But Supabase's hosted platform grants those privileges per table
+-- at creation time, not as a standing rule — so the very next migration that
+-- creates a table gets anon insert/update/delete back automatically. 0035's
+-- own PR review caught a live example of this: a sibling branch's
+-- 0035_audit_events.sql creates a table with three RLS policies that all
+-- target auth.uid()/system_admin/tenant_admin, none of which match anon,
+-- yet anon would land with insert/update/delete on it by default — exactly
+-- the exposure ADR-0002 says is closed.
+--
+-- ALTER DEFAULT PRIVILEGES changes what grant a table gets at CREATE TABLE
+-- time, scoped to the role that creates it. supabase db push connects and
+-- runs migrations as `postgres`, so the rule must be registered for that
+-- creating role to take effect on future `create table` statements.
+--
+-- Forward-fix: replace
+--   Rollback: alter default privileges for role postgres in schema public
+--               grant insert, update, delete on tables to anon;
+--             Restores the platform-default behavior for tables created
+--             after this migration. Does not affect tables created between
+--             0035 and this migration — those keep whatever 0035 (or a
+--             future per-table revoke) already set explicitly.
+--   Data:     No data loss — this changes a privilege default, not rows or
+--             any existing grant. Nothing is deleted, updated, or read by
+--             this migration itself.
+--   Blast:    None expected, for the same reason 0035 was safe: no
+--             application code path writes to Postgres as anon (see 0035's
+--             header for the call-site audit). The only observable effect
+--             is that tables created after this migration no longer receive
+--             anon insert/update/delete by default; RLS was already the
+--             only thing stopping those writes.
+--   Window:   Compatible. This only changes the default applied to tables
+--             created after the migration runs — it does not alter any
+--             grant on an existing table, so currently-deployed code is
+--             unaffected either way.
+-- ============================================================================
+
+alter default privileges for role postgres in schema public
+  revoke insert, update, delete on tables from anon;

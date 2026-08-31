@@ -16,6 +16,12 @@
 -- the app's own queries and the whole integration suite fail. Cloud is
 -- unaffected, which is why this went unnoticed for a while.
 --
+-- Migrations 0035/0036 will revoke anon's insert/update/delete grant (see
+-- docs/adr/0002-anon-role-default-dml-grants.md) once merged and pushed to
+-- dev and prod — verified not yet applied to either as of 2026-08-31. This
+-- file mirrors the post-revoke state ahead of that push, so it no longer
+-- reproduces every platform default, only the ones still in force.
+--
 -- See docs/testing/rollback-rehearsal.md (Del 2 fynd 2, Del 3 fynd 1) and
 -- F-MNT-09 in docs/quality-requirements.md.
 --
@@ -56,7 +62,8 @@
 --
 -- KEEP IN SYNC: 15 tables in `public`. 13 are listed below; rate_limit_hits
 -- and sms_queue are handled separately. Adding a table to a migration means
--- adding it here too.
+-- adding it here too. A new table gets anon select only, per 0035 — not
+-- insert/update/delete, unless a future decision reverses ADR-0002.
 -- ============================================================================
 
 begin;
@@ -68,17 +75,31 @@ grant usage on schema public to anon, authenticated, service_role;
 -- ----------------------------------------------------------------------------
 -- The 13 tables with no deny-list decision.
 -- ----------------------------------------------------------------------------
--- Full DML for all three roles, matching what the hosted platform grants.
--- RLS is what gates rows, never grants — see SEC-03 / ADR-0001. Note that no
--- policy in this schema targets `anon` at all (verified: zero `to anon`
--- occurrences across all migrations), so anon matches no policy and reads zero
--- rows regardless of the grant below.
---
--- anon is included on purpose, for two reasons: it mirrors cloud exactly, and
--- tests/integration/rate-limit.test.ts asserts that anon is *denied* on
--- rate_limit_hits and both rate-limit RPCs. If anon held no grants anywhere,
--- those assertions would pass vacuously and stop testing migration 0026's
--- REVOKE. Granting the 13 tables here keeps the two carve-outs load-bearing.
+-- Full DML for authenticated/service_role, matching what the hosted platform
+-- grants. RLS is what gates rows for those two, never grants — see
+-- SEC-03 / ADR-0001. anon gets select only, per ADR-0002 / migration 0035:
+-- no policy in this schema ever targeted `anon` for select either, so this
+-- grants nothing anon can actually use — it exists only to mirror cloud's
+-- read grant. anon's insert/update/delete grant was revoked by 0035 (never
+-- reviewed as intentional, and no code path relies on it); this file must
+-- keep matching that or a clean `supabase db reset` re-grants what 0035
+-- removed and local dev stops matching dev/prod.
+
+grant select on table
+  public.tenants,
+  public.user_roles,
+  public.events,
+  public.event_stages,
+  public.event_distances,
+  public.event_facilities,
+  public.officials,
+  public.participants,
+  public.assignments,
+  public.announcements,
+  public.workstations,
+  public.workstation_operating_windows,
+  public.workstation_todos
+to anon;
 
 grant select, insert, update, delete on table
   public.tenants,
@@ -94,7 +115,7 @@ grant select, insert, update, delete on table
   public.workstations,
   public.workstation_operating_windows,
   public.workstation_todos
-to anon, authenticated, service_role;
+to authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- rate_limit_hits — service_role only.
