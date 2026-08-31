@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import OfficialsList from './_components/officials-list'
 
 interface Props {
@@ -11,21 +11,17 @@ export default async function OfficialsPage({ params }: Props) {
   const { tenantSlug } = await params
 
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id, name, slug')
-    .eq('slug', tenantSlug)
-    .single()
+  // Memoised per render pass (F-PERF-07): the layout above already
+  // resolved and authorized this tenant, so this reuses that result
+  // instead of repeating the GoTrue round trip and the access-context
+  // queries. The check still runs for this page — it is not skipped.
+  const tenant = await getAdminTenant(tenantSlug)
 
   if (!tenant) notFound()
-
-  if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
 
   const { data: officials, error } = await supabase
     .from('officials')

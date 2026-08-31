@@ -1,6 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { canViewOfficialSurfaces } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
@@ -12,25 +11,17 @@ interface Props {
 export default async function OfficialLayout({ children, params }: Props) {
   const { tenantSlug } = await params
 
-  const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id, slug, color_palette')
-    .eq('slug', tenantSlug)
-    .single()
+  // This layout gates every screen beneath it. The pages also resolve the
+  // tenant through the same guarded helper, so the check runs on both — but
+  // it is memoised per render pass (F-PERF-07), so it costs one GoTrue round
+  // trip and one access-context lookup for the whole render, not two.
+  const tenant = await getOfficialTenant(tenantSlug)
 
   if (!tenant) notFound()
-
-  // This layout is the only authorization gate for every screen beneath it —
-  // none of the official pages guard themselves. Only an official or
-  // tenant_admin of this tenant, or a system_admin, may pass.
-  if (!(await canViewOfficialSurfaces(user.id, tenant.id))) notFound()
 
   return (
     <>

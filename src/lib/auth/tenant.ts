@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
@@ -332,3 +333,71 @@ export async function resolveTenantForOfficial(
 
   return tenant
 }
+
+// ---------------------------------------------------------------------------
+// Request-scoped memoisation (F-PERF-07)
+// ---------------------------------------------------------------------------
+//
+// Every admin page render used to resolve the caller three times: once in the
+// proxy, once in the tenant layout, and once in the page itself. Each
+// auth.getUser() is a network round trip to GoTrue that validates the JWT
+// against the database, and the layout/page pair additionally repeated the
+// whole tenant lookup plus authorization check — 6 of 10 operations per render
+// were duplicated work.
+//
+// Measured 2026-08-27 (npm run perf:measure, 20 concurrent sessions): GoTrue
+// /user answered at p50 313 ms and p95 1748 ms, against a page p95 of
+// 704-804 ms. A single p95 auth call therefore exceeded the whole page's p95,
+// which is why all four PERF-01 read paths failed the 300% ceiling at a 0%
+// error rate. The queries were never the bottleneck.
+//
+// React's cache() memoises for the duration of one render pass, which is
+// exactly the scope needed: the layout and the pages beneath it share one
+// resolution, and nothing leaks between requests. This is the Data Access Layer
+// pattern the installed Next.js docs recommend for authorization
+// (node_modules/next/dist/docs/01-app/02-guides/authentication.md).
+//
+// The proxy's own getUser() is deliberately NOT covered here. Proxy is a
+// separate execution context — the same docs are explicit that it must not rely
+// on shared modules — and @supabase/ssr needs that call to refresh the session
+// cookie. It can be made cheaper, never deduplicated.
+//
+// Safety note: fetchAccessContext uses the service client, not the session
+// client (ADR-0001, category 1 bootstrap lookup), so these queries do not
+// depend on the request JWT. Memoising them per render cannot leak one user's
+// access context into another user's request.
+
+// Zero arguments on purpose. Reading the cookies internally means every caller
+// in a render pass produces the same cache key, so the memoisation cannot be
+// defeated by two callers passing subtly different arguments.
+export const getCurrentUser = cache(async (): Promise<User | null> => {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user
+})
+
+// One argument, not two: userId is derived internally rather than passed in,
+// for the same cache-key reason. tenantSlug stays because it is genuinely part
+// of the question's identity — a render may legitimately ask about more than
+// one tenant.
+//
+// This does not weaken the layout-as-gate property. The layout and the page
+// both still call it and both still act on the result; the authorization check
+// is memoised, not skipped.
+export const getAdminTenant = cache(async (tenantSlug: string): Promise<ResolvedTenant | null> => {
+  const user = await getCurrentUser()
+  if (!user) return null
+  return resolveTenantForAdmin(tenantSlug, user.id)
+})
+
+// Official-surface counterpart. The official pages already went through
+// resolveTenantForOfficial, so this only adds the memoisation.
+export const getOfficialTenant = cache(
+  async (tenantSlug: string): Promise<ResolvedTenant | null> => {
+    const user = await getCurrentUser()
+    if (!user) return null
+    return resolveTenantForOfficial(tenantSlug, user.id)
+  }
+)
