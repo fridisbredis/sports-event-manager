@@ -119,8 +119,8 @@ exposure described above. The verification step — not the revoke itself —
 was the part worth doing carefully, which is why it's recorded in the
 migration header rather than asserted from the code alone.
 
-**Status as of PR #89 (2026-08-31): neither `0035` nor `0036` has been
-applied to dev or prod yet — verified directly, not assumed.** Ran, against
+**Status when PR #89 was opened (2026-08-31): neither `0035` nor `0036` had
+been applied to dev or prod — verified directly, not assumed.** Ran, against
 both linked projects via `supabase db query --linked`:
 
 ```sql
@@ -172,7 +172,84 @@ it `anon`-writable by default.) `0036` does not touch grants on tables that
 already exist; per-table revokes (`0035`, and any future table's own
 migration) remain how the deny-list is declared for already-created tables.
 
+**What `0036` does not cover: tables created outside the migration path.**
+`alter default privileges` is scoped to the role that creates the object, and
+`0036` names `postgres` because that is who `supabase db push` connects as.
+A table created any other way keeps the platform default.
+
+**Measured on dev 2026-08-31, after #89 merged (`a91004e`) and its deploy
+applied both migrations** — i.e. after the status block above, which recorded
+the state at the moment #89 was opened. `pg_default_acl`, `defaclobjtype = 'r'`,
+schema `public`:
+
+| Default privileges for role | `anon` gets                                       |
+| --------------------------- | ------------------------------------------------- |
+| `postgres`                  | `SELECT, REFERENCES, TRIGGER, TRUNCATE, MAINTAIN` |
+| `supabase_admin`            | the same **plus `INSERT`, `UPDATE`, `DELETE`**    |
+
+Raw, so the reading is checkable rather than paraphrased — `defaclacl` for the
+two rows, where `r`/`w`/`a`/`d` are select/update/insert/delete:
+
+```
+postgres        {postgres=arwdDxtm/postgres,anon=rDxtm/postgres,
+                 authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}
+supabase_admin  {postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,
+                 authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}
+```
+
+`anon=rDxtm` on the `postgres` row is `0036` having taken effect: `a`, `w` and
+`d` are gone. The `supabase_admin` row still reads `anon=arwdDxtm`.
+
+**Which client creates tables as `supabase_admin` is not verified here.** What
+is measured is that a second default-privilege row exists for that role and
+still carries anon DML, so any path creating tables as `supabase_admin` bypasses
+`0036`. The Supabase dashboard's table editor is the obvious candidate and the
+reason this matters in practice, but confirming it would mean creating a table
+through the dashboard on a real project — not worth doing to settle a footnote.
+Treat the role as the fact and the client as the likely explanation.
+
+So a table created by any path that runs as `supabase_admin` still lands
+`anon`-writable, exactly as every table did before `0035`.
+
+**Prod is a different state again, measured the same day:** neither role has
+been revoked there — both `postgres` and `supabase_admin` still carry the full
+`INSERT, UPDATE, DELETE` default for `anon`, because `0035`/`0036` have not
+been deployed to prod. Everything above describes dev. Prod inherits the same
+posture when the next prod release carries these migrations, at which point
+the `postgres` row closes and the `supabase_admin` row does not.
+
+This is a discipline gap rather than a live hole: CLAUDE.md is emphatic that
+schema reaches dev and prod only through numbered migrations, and Del 1 of
+`docs/testing/rollback-rehearsal.md` exists specifically to detect schema that
+arrived any other way. It is recorded here because the paragraph above could
+otherwise be read as "`0036` closes this at the grant level, full stop" — it
+closes it for the path this project actually uses, which is not the same claim.
+
+Two narrower scoping notes, for completeness: `0036` covers `IN SCHEMA public`
+only, which is where every tenant-scoped table lives; and it covers tables,
+not sequences or functions.
+
+The function surface is **not assessed here** — see F-SEC-14. It is not the
+consistent omission an earlier draft of this paragraph claimed: Postgres grants
+`EXECUTE` to `PUBLIC` on every new function, and `PUBLIC` includes `anon`, so
+declaring a grant in a migration restricts nothing by itself. Ten of the
+fourteen functions the migrations create declare one — the four without are
+`get_user_role`, `is_system_admin`, `sync_event_stages` and
+`create_workstation`. Twelve `revoke ... from public` statements do exist,
+across 10 distinct functions, which is why the exposure is narrower than the
+table case was — but the shape of the question is the same one this ADR exists
+to close, one role further out, and it deserves its own answer rather than a
+footnote in this one.
+
 ## Alternatives considered
+
+- **Widen `0036` to cover `supabase_admin` as well.** Rejected: that role owns
+  Supabase's own managed objects, and revoking defaults out from under it to
+  protect a path this project does not use is the worse trade. Schema reaches
+  dev and prod through numbered migrations only, so the `postgres` scoping
+  covers every table this project actually creates. Revisit if
+  dashboard-created tables ever become part of the workflow — this is a
+  decision with a trigger, not a permanent answer.
 
 - **Leave the platform default as-is, treat RLS as sufficient on its own.**
   Rejected: this is exactly the posture CLAUDE.md's "defense in depth"
