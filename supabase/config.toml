@@ -248,7 +248,12 @@ template = "Your code is {{ .Code }}"
 max_frequency = "5s"
 
 # Use pre-defined map of phone number to OTP for testing.
-# Unprefixed matches normalizePhoneToE164()'s output; GoTrue normalizes both sides, so either form works.
+# Keys are E.164 WITH the leading '+', because that is what the app sends:
+# api/auth/send-otp validates the payload with /^\+[1-9]\d{1,14}$/, so a
+# request without the plus is rejected before it ever reaches GoTrue.
+# Do not 'simplify' these to the unprefixed form — normalizePhoneToE164()
+# strips the plus for DB storage only (src/lib/phone.ts), which is a
+# different concern. tests/integration/helpers.ts claims this same pool.
 [auth.sms.test_otp]
 "+46700000001" = "000000"
 "+46700000002" = "000000"
@@ -260,6 +265,15 @@ max_frequency = "5s"
 "+46700000008" = "000000"
 "+46700000009" = "000000"
 "+46700000010" = "000000"
+
+# The four numbers scripts/seed-dev.ts creates. Without these, `npm run
+# seed:dev:local` produces a tenant admin and officials nobody can sign in
+# as, which is the whole point of seeding locally. Disjoint from the pool
+# above (integration tests) and from +4672000xxxx (scripts/perf-env.ts).
+"+46709900001" = "000000"
+"+46709900002" = "000000"
+"+46709900003" = "000000"
+"+46709900004" = "000000"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
