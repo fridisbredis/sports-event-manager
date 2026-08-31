@@ -175,6 +175,23 @@ describe('F-SEC-08: check_rate_limit / release_rate_limit RPCs', () => {
     const resultB = await check(admin, keyTenantB, 1, 5)
     expect(resultB.allowed).toBe(true)
   })
+
+  it('does not share budget between login:send and login:verify for the same phone', async () => {
+    const admin = serviceClient()
+    const suffix = uniqueKey('shared-login-phone')
+    const keySend = `login:send:${suffix}`
+    const keyVerify = `login:verify:${suffix}`
+    createdKeys.push(keySend, keyVerify)
+
+    const sendResult = await check(admin, keySend, 1, 5)
+    expect(sendResult.allowed).toBe(true)
+    const blockedSend = await check(admin, keySend, 1, 5)
+    expect(blockedSend.allowed).toBe(false)
+
+    // login:verify's identical-phone key must still have its own fresh budget.
+    const verifyResult = await check(admin, keyVerify, 1, 5)
+    expect(verifyResult.allowed).toBe(true)
+  })
 })
 
 // The whole access-control model for this table and its two RPCs lives in
