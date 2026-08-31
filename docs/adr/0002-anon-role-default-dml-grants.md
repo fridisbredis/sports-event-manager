@@ -119,6 +119,26 @@ exposure described above. The verification step — not the revoke itself —
 was the part worth doing carefully, which is why it's recorded in the
 migration header rather than asserted from the code alone.
 
+**Status as of PR #89 (2026-08-31): neither `0035` nor `0036` has been
+applied to dev or prod yet — verified directly, not assumed.** Ran, against
+both linked projects via `supabase db query --linked`:
+
+```sql
+select defaclrole::regrole, defaclobjtype, defaclacl
+from pg_default_acl
+where defaclnamespace::regnamespace::text = 'public';
+```
+
+Both dev (`lhflutwvwvzawzbcuwup`) and prod (`rauvaxuypujbeintnnoe`) show the
+same row for `defaclrole = postgres, defaclobjtype = 'r'`:
+`{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}`
+— `anon` still carries the full `arwdDxtm` default (including `a`=insert,
+`w`=update, `d`=delete), meaning `0036`'s `ALTER DEFAULT PRIVILEGES` revoke
+has not run there. This settles the question raised in review: the
+"Ongoing obligation" below describes what `0035`+`0036` will do once
+merged and pushed, not a state already live anywhere. `supabase db push`
+after merge (per CLAUDE.md's migration routine) is what applies both.
+
 ## Consequences
 
 **What this fixes:** the 12 tenant-scoped tables that previously relied on

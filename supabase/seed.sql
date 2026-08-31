@@ -16,10 +16,11 @@
 -- the app's own queries and the whole integration suite fail. Cloud is
 -- unaffected, which is why this went unnoticed for a while.
 --
--- As of migration 0035, anon's insert/update/delete grant is revoked on dev
--- and prod (see docs/adr/0002-anon-role-default-dml-grants.md) — this file
--- mirrors that, so it no longer reproduces every platform default, only the
--- ones still in force.
+-- Migrations 0035/0036 will revoke anon's insert/update/delete grant (see
+-- docs/adr/0002-anon-role-default-dml-grants.md) once merged and pushed to
+-- dev and prod — verified not yet applied to either as of 2026-08-31. This
+-- file mirrors the post-revoke state ahead of that push, so it no longer
+-- reproduces every platform default, only the ones still in force.
 --
 -- See docs/testing/rollback-rehearsal.md (Del 2 fynd 2, Del 3 fynd 1) and
 -- F-MNT-09 in docs/quality-requirements.md.
