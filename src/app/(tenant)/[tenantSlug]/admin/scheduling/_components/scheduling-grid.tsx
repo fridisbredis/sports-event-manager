@@ -2,19 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Button,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ScrollShadow,
-} from '@heroui/react'
-import { Input } from '@/components/ui/form-fields'
+import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
 import { saveAssignments, type AssignmentInput } from '../actions'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
@@ -23,8 +11,6 @@ import {
   slotEndTime,
   isWithinWindow,
   formatDayLabel,
-  formatSlotLabel,
-  initials,
   computeOverCapacityCells,
   computeOverCapacityDetails,
   computeDoubleBookedOfficials,
@@ -32,17 +18,16 @@ import {
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
-import {
-  toLocalAssignments,
-  getAssignmentsForCell,
-  applyCellAction,
-  resolveCellActionLabel,
-} from './grid-helpers'
+import { toLocalAssignments, getAssignmentsForCell, applyCellAction } from './grid-helpers'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
 import { ByPersonGrid } from './by-person-grid'
 import { ByWorkAreaGrid } from './by-work-area-grid'
 import { useSchedulingGridInteraction } from './use-scheduling-grid-interaction'
+import { CellActionPopup } from './cell-action-popup'
+import { WsPersonPicker } from './ws-person-picker'
+import { DragOfficialPicker } from './drag-official-picker'
+import { WsSlotModal } from './ws-slot-modal'
 import type {
   Stage,
   WorkstationData,
@@ -802,279 +787,47 @@ export function SchedulingGrid({
       )}
 
       {/* Action popup — status change / remove for an existing assignment */}
-      {cellActionCell &&
-        (() => {
-          return (
-            <div
-              className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px]"
-              style={{
-                top: cellActionCell.anchorBottom ?? 0,
-                left: cellActionCell.anchorLeft ?? 0,
-              }}
-              data-cell-action
-            >
-              {cellActionCell.assignments.length > 1 && (
-                <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                  {cellActionCell.labelBy === 'official'
-                    ? t('scheduling.overflowPickToRemove')
-                    : t('scheduling.conflictPickToRemove')}
-                </p>
-              )}
-              {cellActionCell.assignments.map((assignment, i) => {
-                const label = resolveCellActionLabel(
-                  cellActionCell.labelBy,
-                  assignment,
-                  officials,
-                  workstations
-                )
-                return (
-                  <div
-                    key={assignment.id ?? i}
-                    className="border-t border-gray-100 py-1 first:border-t-0"
-                  >
-                    <div className="flex items-center justify-between gap-2 px-3 py-1">
-                      <span className="text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[160px]">
-                        {label}
-                      </span>
-                      <Button
-                        color="danger"
-                        variant="light"
-                        size="sm"
-                        className="shrink-0 px-2 hover:bg-red-50"
-                        onPress={() => handleCellAction('remove', assignment)}
-                      >
-                        {t('scheduling.actionRemove')}
-                      </Button>
-                    </div>
-                    {assignment.status !== 'assigned' && (
-                      <Button
-                        variant="light"
-                        size="sm"
-                        className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                        onPress={() => handleCellAction('assigned', assignment)}
-                      >
-                        {t('scheduling.actionMarkAssigned')}
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
+      {cellActionCell && (
+        <CellActionPopup
+          cellActionCell={cellActionCell}
+          officials={officials}
+          workstations={workstations}
+          onAction={handleCellAction}
+        />
+      )}
 
       {/* Person picker for by-work-area expanded view */}
-      {wsPickerCell &&
-        (() => {
-          const slot = new Date(wsPickerCell.slotStart)
-          const assignedAtSlot = new Set(
-            activeAssignments
-              .filter((a) => a.timeslot_start === wsPickerCell.slotStart)
-              .map((a) => a.official_id)
-          )
-          const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
-          return (
-            <div
-              className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-              style={{
-                top: wsPickerCell.anchorTop,
-                left: wsPickerCell.anchorLeft,
-                transform: 'translateY(calc(-100% - 4px))',
-              }}
-              data-ws-picker
-            >
-              <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                {t('scheduling.assignPerson', {
-                  slot: formatSlotLabel(slot),
-                  index: wsPickerCell.slotIndex,
-                })}
-              </p>
-              {availableOfficials.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-gray-400">
-                  {t('scheduling.noConfirmedOfficials')}
-                </p>
-              ) : (
-                <ScrollShadow className="flex flex-col max-h-64">
-                  {availableOfficials.map((off) => (
-                    <Button
-                      key={off.id}
-                      variant="light"
-                      size="sm"
-                      className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                      onPress={() => handleWsPersonPick(off.id)}
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
-                          {initials(off.name)}
-                        </span>
-                        <span className="truncate">{off.name}</span>
-                      </span>
-                    </Button>
-                  ))}
-                </ScrollShadow>
-              )}
-            </div>
-          )
-        })()}
+      {wsPickerCell && (
+        <WsPersonPicker
+          wsPickerCell={wsPickerCell}
+          activeAssignments={activeAssignments}
+          officials={officials}
+          onPick={handleWsPersonPick}
+        />
+      )}
 
       {/* One-time official picker after a by-work-area drag-to-paint gesture */}
       {dragOfficialPicker && (
-        <div
-          className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-          style={{
-            top: dragOfficialPicker.anchorTop,
-            left: dragOfficialPicker.anchorLeft,
-            transform: 'translateY(calc(-100% - 4px))',
-          }}
-          data-drag-official-picker
-        >
-          <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-            {t('scheduling.dragPaintPickPerson', { count: dragOfficialPicker.cellStarts.length })}
-          </p>
-          {dragAvailableOfficials.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-400">
-              {t('scheduling.noConfirmedOfficials')}
-            </p>
-          ) : (
-            <ScrollShadow className="flex flex-col max-h-64">
-              {dragAvailableOfficials.map((off) => (
-                <Button
-                  key={off.id}
-                  variant="light"
-                  size="sm"
-                  className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                  onPress={() => handleDragOfficialPick(off.id)}
-                >
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
-                      {initials(off.name)}
-                    </span>
-                    <span className="truncate">{off.name}</span>
-                  </span>
-                </Button>
-              ))}
-            </ScrollShadow>
-          )}
-        </div>
+        <DragOfficialPicker
+          dragOfficialPicker={dragOfficialPicker}
+          availableOfficials={dragAvailableOfficials}
+          onPick={handleDragOfficialPick}
+        />
       )}
 
       {/* Slot modal for by-work-area expanded rows */}
-      {wsSlotModal &&
-        (() => {
-          const slot = new Date(wsSlotModal.slotStart)
-          const assignedInSlot = activeAssignments.filter(
-            (a) =>
-              a.workstation_id === wsSlotModal.workstationId &&
-              a.timeslot_start === wsSlotModal.slotStart &&
-              a.slot_index === wsSlotModal.slotIndex
-          )
-          const assignedAtSlot = new Set(
-            activeAssignments
-              .filter((a) => a.timeslot_start === wsSlotModal.slotStart)
-              .map((a) => a.official_id)
-          )
-          const availableOfficialsAll = officials.filter((off) => !assignedAtSlot.has(off.id))
-          const availableOfficials = availableOfficialsAll.filter((off) =>
-            off.name.toLowerCase().includes(wsSlotModalSearch.toLowerCase())
-          )
-          return (
-            <Modal
-              isOpen
-              size="2xl"
-              onOpenChange={(open) => {
-                if (!open) {
-                  closeWsSlotModal()
-                }
-              }}
-              classNames={{ base: 'bg-gray-50' }}
-            >
-              <ModalContent>
-                {() => (
-                  <>
-                    <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
-                      {t('scheduling.slotModalTitle', {
-                        index: wsSlotModal.slotIndex,
-                        ws: wsSlotModal.wsName,
-                        time: formatSlotLabel(slot),
-                      })}
-                    </ModalHeader>
-                    <ModalBody>
-                      {assignedInSlot.length === 0 && availableOfficialsAll.length === 0 && (
-                        <p className="text-sm text-gray-400">{t('scheduling.slotModalEmpty')}</p>
-                      )}
-
-                      {assignedInSlot.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                            {t('scheduling.slotModalAssigned')}
-                          </p>
-                          {assignedInSlot.map((a) => {
-                            const off = officials.find((o) => o.id === a.official_id)
-                            return (
-                              <div
-                                key={a.official_id}
-                                className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2"
-                              >
-                                <span className="text-sm text-gray-900">{off?.name ?? '—'}</span>
-                                <Button
-                                  color="danger"
-                                  variant="light"
-                                  size="sm"
-                                  onPress={() => handleWsSlotRemove(a)}
-                                >
-                                  {t('scheduling.slotModalRemove')}
-                                </Button>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {assignedInSlot.length === 0 && availableOfficialsAll.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                            {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
-                          </p>
-                          <Input
-                            type="text"
-                            size="sm"
-                            placeholder={t('scheduling.slotModalSearchPlaceholder')}
-                            value={wsSlotModalSearch}
-                            onValueChange={setWsSlotModalSearch}
-                            className="mb-2"
-                          />
-                          {availableOfficials.length === 0 ? (
-                            <p className="text-sm text-gray-400 px-1 py-2">
-                              {t('scheduling.slotModalNoResults')}
-                            </p>
-                          ) : (
-                            <ScrollShadow className="flex flex-col max-h-80 divide-y divide-gray-100">
-                              {availableOfficials.map((off) => (
-                                <div
-                                  key={off.id}
-                                  className="flex items-center justify-between px-2 py-1.5"
-                                >
-                                  <span className="text-sm text-gray-900">{off.name}</span>
-                                  <Button
-                                    variant="bordered"
-                                    size="sm"
-                                    onPress={() => handleWsSlotAdd(off.id)}
-                                  >
-                                    {t('scheduling.slotModalAdd')}
-                                  </Button>
-                                </div>
-                              ))}
-                            </ScrollShadow>
-                          )}
-                        </div>
-                      )}
-                    </ModalBody>
-                  </>
-                )}
-              </ModalContent>
-            </Modal>
-          )
-        })()}
+      {wsSlotModal && (
+        <WsSlotModal
+          wsSlotModal={wsSlotModal}
+          wsSlotModalSearch={wsSlotModalSearch}
+          onSearchChange={setWsSlotModalSearch}
+          activeAssignments={activeAssignments}
+          officials={officials}
+          onRemove={handleWsSlotRemove}
+          onAdd={handleWsSlotAdd}
+          onClose={closeWsSlotModal}
+        />
+      )}
 
       <SchedulingLegend />
     </div>
