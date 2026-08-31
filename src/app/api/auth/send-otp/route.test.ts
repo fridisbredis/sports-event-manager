@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkLoginSendRateLimit } from '@/lib/rate-limit'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -10,6 +11,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   checkLoginSendRateLimit: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-auth-event', () => ({
+  logAuthEvent: vi.fn(),
 }))
 
 function makeRequest(body: unknown) {
@@ -46,6 +51,7 @@ describe('POST /api/auth/send-otp', () => {
     expect(res.status).toBe(429)
     expect(res.headers.get('Retry-After')).toBe('120')
     expect(createSupabaseServerClient).not.toHaveBeenCalled()
+    expect(logAuthEvent).toHaveBeenCalledWith({ phone: PHONE, event: 'otp_send_rate_limited' })
   })
 
   it('returns 503 when the rate limit check itself fails', async () => {
@@ -55,6 +61,7 @@ describe('POST /api/auth/send-otp', () => {
 
     expect(res.status).toBe(503)
     expect(createSupabaseServerClient).not.toHaveBeenCalled()
+    expect(logAuthEvent).toHaveBeenCalledWith({ phone: PHONE, event: 'otp_send_rate_limit_error' })
   })
 
   it('calls signInWithOtp and returns ok when under the limit', async () => {
@@ -70,6 +77,7 @@ describe('POST /api/auth/send-otp', () => {
     expect(signInWithOtp).toHaveBeenCalledWith({ phone: PHONE })
     expect(res.status).toBe(200)
     expect(body).toEqual({ ok: true })
+    expect(logAuthEvent).toHaveBeenCalledWith({ phone: PHONE, event: 'otp_send_succeeded' })
   })
 
   it('never forwards GoTrue error.message to the client', async () => {
@@ -90,5 +98,10 @@ describe('POST /api/auth/send-otp', () => {
 
     expect(body.error).not.toContain('internal GoTrue detail')
     expect(body.code).toBe('over_sms_send_rate_limit')
+    expect(logAuthEvent).toHaveBeenCalledWith({
+      phone: PHONE,
+      event: 'otp_send_failed',
+      errorCode: 'over_sms_send_rate_limit',
+    })
   })
 })
