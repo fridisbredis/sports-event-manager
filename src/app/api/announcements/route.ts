@@ -104,24 +104,30 @@ export async function POST(request: NextRequest) {
   // sms_sent: false, which the worker will correct once messages actually
   // go out. Rolling it back would need a transaction the rest of this
   // handler does not have.
+  let queueError: { message: string } | null = null
   if (recipients && recipients.length > 0) {
-    const { error: queueError } = await supabase.from('sms_queue').insert(
+    const result = await supabase.from('sms_queue').insert(
       recipients.map(({ phone }) => ({
         tenant_id: tenantId,
         announcement_id: announcement.id,
         recipient_phone: phone,
       }))
     )
+    queueError = result.error
 
     if (queueError) {
       logger.error('Failed to enqueue announcement SMS', queueError, {
         tenantId,
         announcementId: announcement.id,
       })
-      return NextResponse.json({ error: 'Failed to queue SMS delivery' }, { status: 500 })
     }
   }
 
+  // Logged right after the announcement row commits (mirrors
+  // officials/route.ts), regardless of enqueue outcome — the announcements
+  // row is kept even when enqueue fails (see above), so the audit trail must
+  // reflect that real persisted state rather than skip it. `queued` records
+  // whether the enqueue step actually succeeded.
   await logAuditEvent({
     tenantId,
     actorUserId: auth.user.id,
@@ -131,8 +137,16 @@ export async function POST(request: NextRequest) {
     action: 'announcement_published',
     targetType: 'announcement',
     targetId: announcement.id,
-    detail: { channel, recipientCount: recipients?.length ?? 0 },
+    detail: {
+      channel,
+      recipientCount: recipients?.length ?? 0,
+      queued: !queueError,
+    },
   })
+
+  if (queueError) {
+    return NextResponse.json({ error: 'Failed to queue SMS delivery' }, { status: 500 })
+  }
 
   return NextResponse.json(
     { announcementId: announcement.id, queued: recipients?.length ?? 0 },

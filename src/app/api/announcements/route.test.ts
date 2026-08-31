@@ -326,7 +326,7 @@ describe('POST /api/announcements', () => {
       action: 'announcement_published',
       targetType: 'announcement',
       targetId: 'ann-1',
-      detail: { channel: 'officials', recipientCount: 2 },
+      detail: { channel: 'officials', recipientCount: 2, queued: true },
     })
   })
 
@@ -346,7 +346,7 @@ describe('POST /api/announcements', () => {
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
     expect(logAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { channel: 'officials', recipientCount: 0 } })
+      expect.objectContaining({ detail: { channel: 'officials', recipientCount: 0, queued: true } })
     )
   })
 
@@ -367,7 +367,7 @@ describe('POST /api/announcements', () => {
     expect(logAuditEvent).not.toHaveBeenCalled()
   })
 
-  it('does not log an audit event when the sms_queue enqueue fails', async () => {
+  it('logs an audit event with queued: false when the sms_queue enqueue fails', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
@@ -385,8 +385,13 @@ describe('POST /api/announcements', () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     restoreConsoleError = () => consoleErrorSpy.mockRestore()
 
-    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
 
-    expect(logAuditEvent).not.toHaveBeenCalled()
+    expect(res.status).toBe(500)
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: { channel: 'officials', recipientCount: 1, queued: false },
+      })
+    )
   })
 })

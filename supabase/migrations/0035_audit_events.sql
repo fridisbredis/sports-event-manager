@@ -66,11 +66,17 @@
 --             underlying mutation's response.
 --   Window:   Compatible. No lock concerns — new table, no backfill.
 -- ============================================================================
+--
+-- actor_user_id is nullable, not `not null`: the FK is `on delete set null`
+-- (keep the audit row, forget the actor once their auth.users row is gone),
+-- matching the officials.user_id / participants.user_id precedent in 0001.
+-- A `not null` column here would make Postgres abort any auth.users delete
+-- that has audit events with 23502 instead of nulling the column as intended.
 
 create table public.audit_events (
   id               uuid primary key default gen_random_uuid(),
   tenant_id        uuid references public.tenants(id) on delete set null,
-  actor_user_id    uuid not null references auth.users(id) on delete set null,
+  actor_user_id    uuid references auth.users(id) on delete set null,
   actor_role       text not null check (actor_role in ('system_admin', 'tenant_admin')),
   action           text not null check (action in (
                      'role_revoked',
