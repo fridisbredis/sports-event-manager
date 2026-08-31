@@ -233,8 +233,10 @@ The function surface is **not assessed here** — see F-SEC-14. It is not the
 consistent omission an earlier draft of this paragraph claimed: Postgres grants
 `EXECUTE` to `PUBLIC` on every new function, and `PUBLIC` includes `anon`, so
 declaring a grant in a migration restricts nothing by itself. Ten of the
-fourteen migrations that create functions declare one. Eight `revoke ... from
-public` statements do exist, which is why the exposure is narrower than the
+fourteen functions the migrations create declare one — the four without are
+`get_user_role`, `is_system_admin`, `sync_event_stages` and
+`create_workstation`. Twelve `revoke ... from public` statements do exist,
+across 10 distinct functions, which is why the exposure is narrower than the
 table case was — but the shape of the question is the same one this ADR exists
 to close, one role further out, and it deserves its own answer rather than a
 footnote in this one.
