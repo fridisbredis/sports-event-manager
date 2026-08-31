@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button, SelectItem } from '@heroui/react'
 import { Input, Select } from '@/components/ui/form-fields'
-import { toastError } from '@/lib/toast'
+import { toastError, parseRetryAfterMinutes } from '@/lib/toast'
 import { logger } from '@/lib/logger'
 import {
   normalizePhoneToE164,
@@ -32,7 +32,9 @@ const RESEND_COOLDOWN_SECONDS = 30
 async function postJson(
   url: string,
   body: unknown
-): Promise<{ error: { message: string; code?: string } | null }> {
+): Promise<{
+  error: { message: string; code?: string; retryAfterMinutes?: number } | null
+}> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -40,7 +42,8 @@ async function postJson(
   })
   if (res.ok) return { error: null }
   const data = await res.json().catch(() => ({}))
-  return { error: { message: data.error ?? 'Request failed', code: data.code } }
+  const retryAfterMinutes = res.status === 429 ? parseRetryAfterMinutes(res) : undefined
+  return { error: { message: data.error ?? 'Request failed', code: data.code, retryAfterMinutes } }
 }
 
 export default function LoginPage() {
@@ -66,7 +69,11 @@ export default function LoginPage() {
     return () => clearInterval(timer)
   }, [resendCooldown])
 
-  async function request(fn: () => Promise<{ error: { message: string; code?: string } | null }>) {
+  async function request(
+    fn: () => Promise<{
+      error: { message: string; code?: string; retryAfterMinutes?: number } | null
+    }>
+  ) {
     setLoading(true)
     const { error } = await fn()
     setLoading(false)
@@ -77,7 +84,16 @@ export default function LoginPage() {
         code: error.code,
         message: error.message,
       })
-      toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
+      if (error.retryAfterMinutes !== undefined) {
+        toastError(
+          t('signIn.tooManyRequests', {
+            count: error.retryAfterMinutes,
+            minutes: error.retryAfterMinutes,
+          })
+        )
+      } else {
+        toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
+      }
     }
     return !error
   }
@@ -102,7 +118,16 @@ export default function LoginPage() {
         code: error.code,
         message: error.message,
       })
-      toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
+      if (error.retryAfterMinutes !== undefined) {
+        toastError(
+          t('signIn.tooManyRequests', {
+            count: error.retryAfterMinutes,
+            minutes: error.retryAfterMinutes,
+          })
+        )
+      } else {
+        toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
+      }
       return
     }
     setOtp('')

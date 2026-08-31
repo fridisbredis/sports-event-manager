@@ -44,8 +44,12 @@ export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
   const { error } = await supabase.auth.signInWithOtp({ phone })
   if (error) {
+    // CLAUDE.md: never expose raw errors to the client — error.code is a
+    // stable GoTrue enum the login page already maps to a translated
+    // message; error.message is developer-worded prose meant for logs.
+    logger.error('signInWithOtp failed', undefined, { code: error.code, message: error.message })
     return NextResponse.json(
-      { error: error.message, code: error.code },
+      { error: 'Request failed', code: error.code },
       { status: error.status ?? 400 }
     )
   }
