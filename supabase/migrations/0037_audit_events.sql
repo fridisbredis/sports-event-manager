@@ -111,9 +111,9 @@ alter table public.audit_events enable row level security;
 -- authenticated INSERT/SELECT fails with 42501 "permission denied for
 -- table" before RLS is even evaluated if the grant is missing — the same
 -- bug migration 0032 fixed for sms_queue. UPDATE/DELETE are deliberately
--- never granted here at all (see the revoke below and the "no UPDATE/DELETE
--- policy" note above) — write-once is enforced at the grant layer, not only
--- by the absence of a policy.
+-- never granted here at all (see the revokes below and the "no UPDATE/DELETE
+-- policy" note above) — write-once is enforced at the grant layer for both
+-- `authenticated` and `anon`, not only by the absence of a policy.
 grant insert, select on public.audit_events to authenticated;
 
 -- INSERT: actor must be the authenticated caller, and must be tenant_admin
@@ -141,6 +141,17 @@ create policy "tenant_admin_read_own_tenant_audit_events"
 -- No UPDATE/DELETE policy at all — default-deny. Audit rows are write-once
 -- for every role, including tenant_admin and system_admin.
 revoke update, delete on public.audit_events from authenticated;
+
+-- Stated rather than inherited. As of migration 0036 this table is created
+-- with no anon DML anyway — `alter default privileges` strips it at creation
+-- time — so on a database that has replayed the full suite these revokes are
+-- redundant. They are here so the deny is a property of this table's own
+-- migration rather than of the order two migrations happen to run in: a
+-- database where 0036 was reverted, or an environment that acquired this
+-- table any other way, still gets the same answer. RLS already denies anon
+-- (no policy targets it), so this is the grant-layer half of the same
+-- decision, matching how 0026 and 0030 declare their own deny-lists.
+revoke insert, update, delete on public.audit_events from anon;
 
 -- ============================================================================
 -- DONE
