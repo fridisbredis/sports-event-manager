@@ -136,6 +136,22 @@ only in both a migration and `supabase/seed.sql`, never
 `insert`/`update`/`delete`, unless a future ADR reverses this one. The
 `seed.sql` "KEEP IN SYNC" note reflects this.
 
+This obligation is now enforced at the grant level, not just by convention.
+Migration `0036_revoke_anon_default_privileges.sql` runs
+`alter default privileges for role postgres in schema public revoke insert,
+update, delete on tables from anon` — since `supabase db push` creates
+tables as `postgres`, every table created by a migration after `0036` no
+longer receives `anon` `insert`/`update`/`delete` automatically. Without
+`0036`, `0035`'s revoke would only have covered the 13 tables that existed
+on 2026-08-28; the very next migration that creates a table would have
+gotten the platform default back, silently reopening the exposure this ADR
+describes. (A concrete instance of exactly that surfaced in this PR's
+review: a sibling branch's `audit_events` migration creates a table whose
+RLS policies never target `anon`, which — before `0036` — would have left
+it `anon`-writable by default.) `0036` does not touch grants on tables that
+already exist; per-table revokes (`0035`, and any future table's own
+migration) remain how the deny-list is declared for already-created tables.
+
 ## Alternatives considered
 
 - **Leave the platform default as-is, treat RLS as sufficient on its own.**
