@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { resolveTenantForOfficial } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
 
 interface Props {
@@ -13,13 +13,13 @@ export default async function OfficialAccountPage({ params }: Props) {
   const t = await getServerTranslation('en', 'official')
 
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const tenant = await resolveTenantForOfficial(tenantSlug, user.id)
+  // Memoised per render pass (F-PERF-07): shares one auth resolution and one
+  // access check with the layout above instead of repeating both.
+  const tenant = await getOfficialTenant(tenantSlug)
 
   if (!tenant) notFound()
 
