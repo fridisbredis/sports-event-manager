@@ -31,6 +31,15 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // F-SEC-08: these routes ARE the login flow (send/verify OTP) — by
+  // definition there is no session yet when they're called, so they can't
+  // require one. Their own rate limiting (checkLoginSendRateLimit/
+  // checkLoginVerifyRateLimit) is the abuse guard here, not this middleware.
+  // Exact paths, not a prefix, for the same reason as the health block above.
+  if (pathname === '/api/auth/send-otp' || pathname === '/api/auth/verify-otp') {
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

@@ -4,6 +4,8 @@ import { logger } from '@/lib/logger'
 
 const PHONE_LIMIT = { limit: 3, windowSeconds: 3600 }
 const ADMIN_LIMIT = { limit: 100, windowSeconds: 3600 }
+const LOGIN_SEND_LIMIT = { limit: 5, windowSeconds: 3600 }
+const LOGIN_VERIFY_LIMIT = { limit: 10, windowSeconds: 3600 }
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number }
 
@@ -15,6 +17,15 @@ function phoneRateLimitKey(tenantId: string, phone: string): string {
   const canonical = phone.replace(/\D/g, '')
   const hash = createHash('sha256').update(canonical).digest('hex')
   return `invite:phone:${tenantId}:${hash}`
+}
+
+// Login is not tenant-scoped — the same phone can hold roles across tenants,
+// and the caller has no tenant context until after they're authenticated —
+// so this key has no tenant segment, unlike phoneRateLimitKey above.
+function loginPhoneRateLimitKey(prefix: string, phone: string): string {
+  const canonical = phone.replace(/\D/g, '')
+  const hash = createHash('sha256').update(canonical).digest('hex')
+  return `login:${prefix}:${hash}`
 }
 
 async function hit(key: string, limit: number, windowSeconds: number): Promise<RateLimitResult> {
@@ -45,6 +56,22 @@ export async function checkInviteRateLimit(
   if (!phoneResult.allowed) return phoneResult
 
   return hit(adminKey, ADMIN_LIMIT.limit, ADMIN_LIMIT.windowSeconds)
+}
+
+export async function checkLoginSendRateLimit(phone: string): Promise<RateLimitResult> {
+  return hit(
+    loginPhoneRateLimitKey('send', phone),
+    LOGIN_SEND_LIMIT.limit,
+    LOGIN_SEND_LIMIT.windowSeconds
+  )
+}
+
+export async function checkLoginVerifyRateLimit(phone: string): Promise<RateLimitResult> {
+  return hit(
+    loginPhoneRateLimitKey('verify', phone),
+    LOGIN_VERIFY_LIMIT.limit,
+    LOGIN_VERIFY_LIMIT.windowSeconds
+  )
 }
 
 function redactPhone(message: string, phone: string): string {
