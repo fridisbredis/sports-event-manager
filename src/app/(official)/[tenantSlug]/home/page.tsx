@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { resolveTenantForOfficial } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 
@@ -104,13 +104,13 @@ export default async function OfficialHomePage({ params }: Props) {
   const t = await getServerTranslation('en', 'official')
 
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const tenant = await resolveTenantForOfficial(tenantSlug, user.id)
+  // Memoised per render pass (F-PERF-07): shares one auth resolution and one
+  // access check with the layout above instead of repeating both.
+  const tenant = await getOfficialTenant(tenantSlug)
 
   if (!tenant) notFound()
 

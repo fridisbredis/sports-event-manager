@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
@@ -30,19 +30,16 @@ export default async function DashboardPage({ params }: Props) {
   const t = await getServerTranslation('en', 'admin')
 
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id, name, slug, is_active, tier')
-    .eq('slug', tenantSlug)
-    .single()
-  if (!tenant) notFound()
+  // Memoised per render pass (F-PERF-07): the layout above already
+  // resolved and authorized this tenant, so this reuses that result
+  // instead of repeating the GoTrue round trip and the access-context
+  // queries. The check still runs for this page — it is not skipped.
+  const tenant = await getAdminTenant(tenantSlug)
 
-  if (!(await hasAdminAccessToTenant(user.id, tenant.id))) notFound()
+  if (!tenant) notFound()
 
   // No event yet is a legitimate state this dashboard renders an empty view
   // for; a failed query is not, and must not look the same.
