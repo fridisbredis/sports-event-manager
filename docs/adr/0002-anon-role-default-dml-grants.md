@@ -208,7 +208,7 @@ reason this matters in practice, but confirming it would mean creating a table
 through the dashboard on a real project — not worth doing to settle a footnote.
 Treat the role as the fact and the client as the likely explanation.
 
-So a table created through the Supabase dashboard's table editor still lands
+So a table created by any path that runs as `supabase_admin` still lands
 `anon`-writable, exactly as every table did before `0035`.
 
 **Prod is a different state again, measured the same day:** neither role has
