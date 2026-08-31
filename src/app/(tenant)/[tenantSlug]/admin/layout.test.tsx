@@ -66,23 +66,16 @@ describe('TenantLayout', () => {
     expect(getAdminTenant).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the tenant slug does not resolve', async () => {
+  // getAdminTenant (resolveTenantForAdmin -> hasAdminAccessToTenant) returns
+  // null for both a missing tenant and a failed admin access check, by design
+  // — an unauthorized caller cannot probe for tenant existence. The two cases
+  // are indistinguishable from here, so this is one test, not two.
+  it('calls notFound when getAdminTenant denies access or the tenant is missing', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
     vi.mocked(getAdminTenant).mockResolvedValue(null)
 
     await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
-  })
-
-  // Only a tenant_admin of this tenant or a system_admin may pass. The check
-  // lives inside getAdminTenant (resolveTenantForAdmin -> hasAdminAccessToTenant),
-  // which returns null when it fails — indistinguishable from a missing tenant
-  // by design, so an unauthorized caller cannot probe for tenant existence.
-  it('calls notFound when the user has no admin access to this tenant', async () => {
-    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
-    vi.mocked(getAdminTenant).mockResolvedValue(null)
-
-    await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
   })
 
   it('renders children and SidebarNav when the user has admin access', async () => {

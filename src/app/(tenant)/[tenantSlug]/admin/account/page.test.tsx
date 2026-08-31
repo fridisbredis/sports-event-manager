@@ -95,15 +95,9 @@ describe('AdminAccountPage', () => {
     expect(getAdminTenant).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the user has no admin access to this tenant', async () => {
-    // A denied access check and a missing tenant both surface as null.
-    mockUser('user-1', {}, vi.fn(), null)
-
-    await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
-    expect(getAdminTenant).toHaveBeenCalledWith('viadal')
-  })
-
-  it('calls notFound when the resolved tenant slug does not exist', async () => {
+  // A denied access check and a missing tenant both surface as null, so
+  // they're indistinguishable from here and this is one test, not two.
+  it('calls notFound when getAdminTenant denies access or the tenant is missing', async () => {
     mockUser('user-1', {}, vi.fn(), null)
 
     await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')

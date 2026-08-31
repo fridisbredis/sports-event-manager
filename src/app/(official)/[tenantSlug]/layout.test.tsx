@@ -70,18 +70,10 @@ describe('OfficialLayout', () => {
     expect(getOfficialTenant).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the tenant slug does not resolve', async () => {
-    mockUser('user-1', null)
-
-    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
-      'NEXT_NOT_FOUND'
-    )
-    expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
-  })
-
   // A denied access check is indistinguishable from a missing tenant here, by
   // design: an unauthorized caller must not be able to probe for existence.
-  it('calls notFound when the user may not view official surfaces', async () => {
+  // The two cases collapse to the same null return, so this is one test.
+  it('calls notFound when getOfficialTenant denies access or the tenant is missing', async () => {
     mockUser('user-1', null)
 
     await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(

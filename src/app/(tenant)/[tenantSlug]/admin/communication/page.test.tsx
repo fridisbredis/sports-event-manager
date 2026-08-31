@@ -81,7 +81,9 @@ describe('CommunicationPage', () => {
     expect(getAdminTenant).not.toHaveBeenCalled()
   })
 
-  it('calls notFound when the user lacks admin access to the tenant', async () => {
+  // getAdminTenant returns null for both a denied access check and a missing
+  // tenant, so this can't distinguish the two — name it for what it covers.
+  it('calls notFound when getAdminTenant denies access or the tenant is missing', async () => {
     mockServerClient('user-1', null)
 
     await expect(CommunicationPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
