@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { resolveTenantForOfficial } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { AnnouncementCard } from './_components/announcement-card'
 
@@ -46,13 +46,13 @@ export default async function AnnouncementsPage({ params }: Props) {
   const t = await getServerTranslation('en', 'official')
 
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const tenant = await resolveTenantForOfficial(tenantSlug, user.id)
+  // Memoised per render pass (F-PERF-07): shares one auth resolution and one
+  // access check with the layout above instead of repeating both.
+  const tenant = await getOfficialTenant(tenantSlug)
 
   if (!tenant) notFound()
 
