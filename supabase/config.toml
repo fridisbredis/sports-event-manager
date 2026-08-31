@@ -248,20 +248,18 @@ template = "Your code is {{ .Code }}"
 max_frequency = "5s"
 
 # Use pre-defined map of phone number to OTP for testing.
-# Keys have no leading "+" — normalizePhoneToE164() in src/lib/phone.ts sends
-# numbers without one (e.g. "46700000001"), and GoTrue matches these keys
-# literally against the number the client submits.
+# Unprefixed matches normalizePhoneToE164()'s output; GoTrue normalizes both sides, so either form works.
 [auth.sms.test_otp]
-"46700000001" = "000000"
-"46700000002" = "000000"
-"46700000003" = "000000"
-"46700000004" = "000000"
-"46700000005" = "000000"
-"46700000006" = "000000"
-"46700000007" = "000000"
-"46700000008" = "000000"
-"46700000009" = "000000"
-"46700000010" = "000000"
+"+46700000001" = "000000"
+"+46700000002" = "000000"
+"+46700000003" = "000000"
+"+46700000004" = "000000"
+"+46700000005" = "000000"
+"+46700000006" = "000000"
+"+46700000007" = "000000"
+"+46700000008" = "000000"
+"+46700000009" = "000000"
+"+46700000010" = "000000"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
