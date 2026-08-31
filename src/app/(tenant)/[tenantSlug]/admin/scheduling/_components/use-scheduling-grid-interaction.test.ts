@@ -200,9 +200,7 @@ describe('useSchedulingGridInteraction', () => {
           anchorLeft: 2,
         })
       )
-      expect(result.current.dragOfficialPicker?.cellStarts).toEqual([
-        '2026-08-31T09:00:00.000Z',
-      ])
+      expect(result.current.dragOfficialPicker?.cellStarts).toEqual(['2026-08-31T09:00:00.000Z'])
 
       act(() => result.current.closeDragOfficialPicker())
       expect(result.current.dragOfficialPicker).toBeNull()
