@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 0035: audit_events table (SEC-07)
+-- Migration 0037: audit_events table (SEC-07)
 -- ============================================================================
 --
 -- SEC-07 requires structured audit events for admin role changes, tenant

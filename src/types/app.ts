@@ -78,7 +78,7 @@ export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number]
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 export type SmsQueueStatus = 'pending' | 'sending' | 'sent' | 'failed'
-// Match migration 0035's CHECK constraints (SEC-07).
+// Match migration 0037's CHECK constraints (SEC-07).
 export type AuditActorRole = 'system_admin' | 'tenant_admin'
 export type AuditAction =
   | 'role_revoked'
