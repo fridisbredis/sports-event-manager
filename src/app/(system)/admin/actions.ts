@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { toSlug } from './_utils'
 import { z } from 'zod'
 
@@ -22,7 +23,11 @@ const setTenantTierSchema = z.object({
 
 type SystemAdminCheck =
   | { ok: false; error: string }
-  | { ok: true; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> }
+  | {
+      ok: true
+      supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+      userId: string
+    }
 
 async function assertSystemAdmin(): Promise<SystemAdminCheck> {
   const supabase = await createSupabaseServerClient()
@@ -43,13 +48,13 @@ async function assertSystemAdmin(): Promise<SystemAdminCheck> {
     .maybeSingle()
 
   if (!data) return { ok: false, error: 'Forbidden' }
-  return { ok: true, supabase }
+  return { ok: true, supabase, userId: user.id }
 }
 
 export async function createTenant(name: string): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
   if (!check.ok) return { error: check.error }
-  const { supabase } = check
+  const { supabase, userId } = check
 
   const parsed = createTenantSchema.safeParse({ name })
   if (!parsed.success) return { error: 'Invalid name' }
@@ -117,6 +122,16 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
 
   if (stagesError) return { error: 'Failed to create default stages' }
 
+  await logAuditEvent({
+    tenantId: tenant.id,
+    actorUserId: userId,
+    actorRole: 'system_admin',
+    action: 'tenant_created',
+    targetType: 'tenant',
+    targetId: tenant.id,
+    detail: { name: parsed.data.name, slug },
+  })
+
   revalidatePath('/admin')
   return {}
 }
@@ -127,7 +142,7 @@ export async function setTenantActive(
 ): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
   if (!check.ok) return { error: check.error }
-  const { supabase } = check
+  const { supabase, userId } = check
 
   const parsed = setTenantActiveSchema.safeParse({ tenantId, isActive })
   if (!parsed.success) return { error: 'Invalid request' }
@@ -138,6 +153,16 @@ export async function setTenantActive(
     .eq('id', parsed.data.tenantId)
 
   if (error) return { error: 'Failed to update tenant' }
+
+  await logAuditEvent({
+    tenantId: parsed.data.tenantId,
+    actorUserId: userId,
+    actorRole: 'system_admin',
+    action: parsed.data.isActive ? 'tenant_activated' : 'tenant_deactivated',
+    targetType: 'tenant',
+    targetId: parsed.data.tenantId,
+    detail: { isActive: parsed.data.isActive },
+  })
 
   revalidatePath('/admin')
   revalidatePath('/admin/' + parsed.data.tenantId)
@@ -150,7 +175,7 @@ export async function setTenantTier(
 ): Promise<{ error?: string }> {
   const check = await assertSystemAdmin()
   if (!check.ok) return { error: check.error }
-  const { supabase } = check
+  const { supabase, userId } = check
 
   const parsed = setTenantTierSchema.safeParse({ tenantId, tier })
   if (!parsed.success) return { error: 'Invalid request' }
@@ -161,6 +186,16 @@ export async function setTenantTier(
     .eq('id', parsed.data.tenantId)
 
   if (error) return { error: 'Failed to update tier' }
+
+  await logAuditEvent({
+    tenantId: parsed.data.tenantId,
+    actorUserId: userId,
+    actorRole: 'system_admin',
+    action: 'tenant_tier_changed',
+    targetType: 'tenant',
+    targetId: parsed.data.tenantId,
+    detail: { tier: parsed.data.tier },
+  })
 
   revalidatePath('/admin/' + parsed.data.tenantId)
   return {}

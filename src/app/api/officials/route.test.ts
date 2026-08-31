@@ -5,6 +5,7 @@ import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import type { Database } from '@/types/database'
 import twilio from 'twilio'
 
@@ -20,6 +21,10 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/rate-limit', () => ({
   checkInviteRateLimit: vi.fn(),
   releaseInviteRateLimit: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-audit-event', () => ({
+  logAuditEvent: vi.fn(),
 }))
 
 const messagesCreate = vi.fn()
@@ -467,5 +472,55 @@ describe('POST /api/officials', () => {
     )
 
     expect(releaseInviteRateLimit).not.toHaveBeenCalled()
+  })
+
+  // SEC-07
+  it('logs an official_invited audit event after the insert succeeds', async () => {
+    asAdmin()
+    mockService(
+      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+      chain({ data: { name: 'Viadal 2026' } })
+    )
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorUserId: 'admin-1',
+      actorRole: 'tenant_admin',
+      action: 'official_invited',
+      targetType: 'official',
+      targetId: 'off-1',
+      detail: { phoneLast4: '4567' },
+    })
+  })
+
+  it('does not log an audit event when the insert fails', async () => {
+    asAdmin()
+    mockService(chain({ data: null, error: { message: 'boom' } }))
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+
+  it('does not log an audit event for a duplicate phone rejection', async () => {
+    asAdmin()
+    const insertBuilder = chain({ data: null, error: null })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(chain({ data: { id: 'existing-official' } }))
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })
