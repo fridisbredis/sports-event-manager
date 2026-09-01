@@ -100,7 +100,16 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
   const selectedStage = requestedStage ?? getCurrentStage(stages ?? []) ?? (stages ?? [])[0]
   const selectedStageDays = selectedStage ? getAllocableDays(selectedStage) : []
   const today = new Date().toISOString().slice(0, 10)
-  const selectedDay = day ?? (selectedStageDays.includes(today) ? today : selectedStageDays[0])
+  // Same defensive validation as ?stage= above: a `?day=` from a stale link
+  // (e.g. the dashboard's earliest-warning day, after a stage's own dates
+  // were edited later) must not put the grid on a day outside the selected
+  // stage's allocable range — dayIndex would resolve to -1 downstream.
+  const selectedDay =
+    day && selectedStageDays.includes(day)
+      ? day
+      : selectedStageDays.includes(today)
+        ? today
+        : selectedStageDays[0]
 
   const assignments = selectedDay
     ? await fetchAssignmentsForDay(supabase, tenant.id, selectedDay)

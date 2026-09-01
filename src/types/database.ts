@@ -1,6 +1,11 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: '14.5'
+  }
   public: {
     Tables: {
       announcements: {
@@ -857,7 +862,7 @@ export type Database = {
         }
       }
       scheduling_warning_counts: {
-        Args: { p_tenant_id: string }
+        Args: { p_event_id: string; p_tenant_id: string }
         Returns: {
           double_booked: number
           earliest_day: string | null

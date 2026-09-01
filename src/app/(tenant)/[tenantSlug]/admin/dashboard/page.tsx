@@ -92,7 +92,7 @@ export default async function DashboardPage({ params }: Props) {
   let reviewHref = `/${tenantSlug}/admin/scheduling`
   if (event) {
     const { data: warningCounts, error: warningCountsError } = await supabase
-      .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id })
+      .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id, p_event_id: event.id })
       .single()
 
     if (warningCountsError) throw warningCountsError

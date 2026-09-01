@@ -16,7 +16,7 @@
 -- stage and day instead of always landing on the grid's own default
 -- (getCurrentStage/today) and making the admin hunt for it manually.
 --
--- Count semantics mirror grid-logic.ts exactly:
+-- Count semantics mirror grid-logic.ts closely but not exactly:
 --   - over capacity: count of DISTINCT workstations where any single
 --     timeslot has more assignments than that workstation's capacity_ceiling
 --   - double booked: count of DISTINCT officials who have >1 DISTINCT
@@ -24,6 +24,14 @@
 --     flags per adjacent-pair-changed, but the net set of flagged
 --     official+slot keys is exactly "count(distinct workstation_id) > 1" —
 --     verified against the TS implementation before writing this)
+--   - divergence: computeDoubleBookedOfficials coerces a null workstation_id
+--     to '' and counts it as a distinct work area, so an assignment with no
+--     workstation still contributes to double-booking there. This RPC's
+--     inner join on workstations drops those rows instead, so it only counts
+--     rows that do have a workstation. No behavioural difference today —
+--     handleCellAction only ever writes an 'assigned' status (always with a
+--     workstation) or deletes the row — but would diverge if a status
+--     allowing a null workstation_id is ever wired up.
 --
 -- earliest_stage_id is "good enough to navigate to", not authoritative: a
 -- double-booked official's two workstations could in principle belong to
@@ -31,10 +39,14 @@
 -- grid itself only ever shows one stage at a time, so a single pick is the
 -- most this contract can express regardless.
 --
--- Scoped to tenant_id only, same as fetchAssignmentsForDay/fetchAllAssignments
--- and every other assignments query in the app — the codebase's one-event-
--- per-tenant assumption (events queried via .eq('tenant_id', ...).maybeSingle()
--- everywhere) means this is not itself a new scoping decision.
+-- Scoped to tenant_id AND event_id: the counts alone would be safe under
+-- tenant_id-only scoping (same one-event-per-tenant assumption as
+-- fetchAssignmentsForDay/fetchAllAssignments and every other assignments
+-- query in the app), but earliest_stage_id is resolved by the scheduling
+-- page against an event-scoped stages list — a tenant with a second event
+-- could otherwise return a stage id that page can't find, leaving the grid
+-- on the wrong day with no error. p_event_id closes that gap explicitly
+-- rather than leaning on the one-event assumption for a new output.
 --
 -- SECURITY INVOKER: read-only, no reason to elevate privilege. `assignments`
 -- has only tenant_admin_manage_assignments (FOR ALL, migration 0004) — no
@@ -46,7 +58,7 @@
 -- not a substitute for it, same as every other RPC in this schema.
 --
 -- Forward-fix: additive
---   Rollback: drop function if exists public.scheduling_warning_counts(uuid);
+--   Rollback: drop function if exists public.scheduling_warning_counts(uuid, uuid);
 --   Data:     no data loss — this is a read-only function, no tables changed.
 --   Blast:    none. Nothing depends on this function yet except the one
 --             dashboard call site being added in the same PR.
@@ -54,7 +66,7 @@
 --             partially-migrated state for old code to be incompatible with.
 -- ============================================================================
 
-create or replace function public.scheduling_warning_counts(p_tenant_id uuid)
+create or replace function public.scheduling_warning_counts(p_tenant_id uuid, p_event_id uuid)
 returns table (
   over_capacity integer,
   double_booked integer,
@@ -73,6 +85,7 @@ as $$
     join public.workstations w
       on w.id = a.workstation_id
      and w.tenant_id = p_tenant_id
+     and w.event_id = p_event_id
     where a.tenant_id = p_tenant_id
     group by a.workstation_id, a.timeslot_start, w.capacity_ceiling, w.stage_id
     having count(*) > w.capacity_ceiling
@@ -90,6 +103,7 @@ as $$
     join public.workstations w
       on w.id = a.workstation_id
      and w.tenant_id = p_tenant_id
+     and w.event_id = p_event_id
     where a.tenant_id = p_tenant_id
     group by a.official_id, a.timeslot_start
     having count(distinct a.workstation_id) > 1
@@ -119,5 +133,5 @@ as $$
     (select (timeslot_start at time zone 'UTC')::date from earliest_overall);
 $$;
 
-revoke execute on function public.scheduling_warning_counts(uuid) from public, anon;
-grant execute on function public.scheduling_warning_counts(uuid) to authenticated;
+revoke execute on function public.scheduling_warning_counts(uuid, uuid) from public, anon;
+grant execute on function public.scheduling_warning_counts(uuid, uuid) to authenticated;

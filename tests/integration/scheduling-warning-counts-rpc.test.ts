@@ -27,6 +27,7 @@ describe('scheduling_warning_counts RPC', () => {
 
   let tenantA: { id: string }
   let tenantB: { id: string }
+  let eventA: { id: string }
   let stageA: { id: string }
   let workstationA: { id: string; capacity_ceiling: number }
   let workstationA2: { id: string }
@@ -94,12 +95,13 @@ describe('scheduling_warning_counts RPC', () => {
 
     const admin = serviceClient()
 
-    const { data: eventA, error: eventAError } = await admin
+    const { data: eventARow, error: eventAError } = await admin
       .from('events')
       .insert({ tenant_id: tenantA.id, name: 'SchedWarnings Event A', event_type: 'race' })
       .select()
       .single()
     if (eventAError) throw eventAError
+    eventA = eventARow
 
     const { data: stageARow, error: stageAError } = await admin
       .from('event_stages')
@@ -211,6 +213,7 @@ describe('scheduling_warning_counts RPC', () => {
   it('returns 0/0 and no earliest-warning location when there are no assignments', async () => {
     const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(error).toBeNull()
@@ -240,6 +243,7 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(error).toBeNull()
@@ -272,6 +276,7 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(data?.map(normalizeWarningCounts)).toEqual([noWarnings()])
@@ -295,6 +300,7 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(error).toBeNull()
@@ -329,6 +335,7 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     // Two rows on the SAME workstation is what over-capacity is for, not
@@ -379,6 +386,7 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(error).toBeNull()
@@ -414,12 +422,85 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(error).toBeNull()
     expect(data?.map(normalizeWarningCounts)).toEqual([noWarnings()])
 
     await deleteAllAssignments(tenantB.id)
+  })
+
+  it("does not count another event's warnings within the same tenant", async () => {
+    // A second event in tenant A, with its own stage/workstation, seeded
+    // with an over-capacity warning of its own. p_event_id must scope the
+    // counts (and earliest_stage_id/earliest_day) to eventA only — a leak
+    // here would resolve to a stage the scheduling page can't find for
+    // eventA, landing the grid on getCurrentStage/today instead of the
+    // warning it's supposed to jump to.
+    const admin = serviceClient()
+
+    const { data: eventA2, error: eventA2Error } = await admin
+      .from('events')
+      .insert({ tenant_id: tenantA.id, name: 'SchedWarnings Event A2', event_type: 'race' })
+      .select()
+      .single()
+    if (eventA2Error) throw eventA2Error
+
+    const { data: stageA2, error: stageA2Error } = await admin
+      .from('event_stages')
+      .insert({
+        tenant_id: tenantA.id,
+        event_id: eventA2.id,
+        name: 'SchedWarnings Stage A2',
+        stage_date: '2026-09-15',
+      })
+      .select()
+      .single()
+    if (stageA2Error) throw stageA2Error
+
+    const { data: wsA2Event, error: wsA2EventError } = await admin
+      .from('workstations')
+      .insert({
+        tenant_id: tenantA.id,
+        event_id: eventA2.id,
+        stage_id: stageA2.id,
+        name: 'SchedWarnings WS A2-Event',
+        capacity_ceiling: 1,
+      })
+      .select()
+      .single()
+    if (wsA2EventError) throw wsA2EventError
+
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: wsA2Event.id,
+      slotIndex: 0,
+      timeslotStart: EARLY_T,
+      timeslotEnd: EARLY_T_END,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[1].id,
+      workstationId: wsA2Event.id,
+      slotIndex: 1,
+      timeslotStart: EARLY_T,
+      timeslotEnd: EARLY_T_END,
+    })
+
+    const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
+      p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
+    })
+
+    expect(error).toBeNull()
+    expect(data?.map(normalizeWarningCounts)).toEqual([noWarnings()])
+
+    await deleteAllAssignments(tenantA.id)
+    await admin.from('workstations').delete().eq('id', wsA2Event.id)
+    await admin.from('event_stages').delete().eq('id', stageA2.id)
+    await admin.from('events').delete().eq('id', eventA2.id)
   })
 
   it('returns 0/0 for a non-admin caller instead of an error (RLS-filtered, not authorized)', async () => {
@@ -444,6 +525,7 @@ describe('scheduling_warning_counts RPC', () => {
 
     const { data, error } = await clientOfficialA.rpc('scheduling_warning_counts', {
       p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
     })
 
     expect(error).toBeNull()
