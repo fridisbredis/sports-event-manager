@@ -35,8 +35,7 @@ export function getStageDays(stage: Stage | null): string[] {
 }
 
 // A day + "HH:MM" pair, rolled to the next calendar day when `overnight` is
-// true, as an ISO instant — for comparing a window's actual roll-over end
-// against the stage's real (tz-aware) end timestamp.
+// true, as an ISO instant.
 function rolloverEndInstant(day: string, endHHMM: string, overnight: boolean): Date {
   const d = new Date(`${day}T${endHHMM}:00Z`)
   if (overnight) d.setUTCDate(d.getUTCDate() + 1)
@@ -46,11 +45,9 @@ function rolloverEndInstant(day: string, endHHMM: string, overnight: boolean): D
 export function expandWindows(
   windows: TimeWindow[],
   stageDays: string[],
-  stageStart: string | null,
-  stageEnd: string | null = null
+  stageStart: string | null
 ): { window_start: string; window_end: string }[] {
   const lastDay = stageDays[stageDays.length - 1] ?? null
-  const stageEndInstant = stageEnd ? new Date(stageEnd) : null
 
   return windows
     .filter((w) => w.start && w.end)
@@ -66,18 +63,19 @@ export function expandWindows(
             days = stageDays.slice(1)
           }
         }
-        // A recurring overnight window (end <= start) rolls into the next
-        // calendar day. On the stage's last day, that roll-over lands past
-        // the stage's own end only if its actual end instant is later than
-        // the stage's — e.g. a 00:00->00:00 full day always is, but a
-        // 22:00->06:00 night shift isn't when the stage's buffered end is
-        // itself past 06:00 the next morning. Drop the last-day instance
-        // only in the former case, so real coverage on the final night isn't
-        // lost to a check that only needs to guard the full-day collision.
-        if (days.length > 1 && w.end <= w.start && days[days.length - 1] === lastDay) {
-          const rollsPastStageEnd =
-            !stageEndInstant || rolloverEndInstant(lastDay, w.end, true) > stageEndInstant
-          if (rollsPastStageEnd) days = days.slice(0, -1)
+        // A recurring overnight window (end <= start, e.g. a full 00:00->00:00
+        // day) always rolls into the next calendar day — which, on the
+        // stage's last day, is past the stage's own end time. It would
+        // collide with a separate window explicitly limited to that last day
+        // to cap it there.
+        //
+        // Test stageDays.length here, not the post-slice `days.length`: the
+        // slice above (for a window starting before the stage's own start
+        // time) already shrinks `days` to stageDays.length - 1 on its own,
+        // so on a 2-day stage `days.length > 1` would never be true and this
+        // guard would silently never fire, letting the collision through.
+        if (stageDays.length > 1 && w.end <= w.start && days[days.length - 1] === lastDay) {
+          days = days.slice(0, -1)
         }
       }
       return days.map((day) => {

@@ -210,12 +210,7 @@ export default function WorkstationEditForm({
     setSaveSuccess(false)
 
     startSave(async () => {
-      const finalWindows = expandWindows(
-        windows,
-        stageDays,
-        allocableRange?.start ?? null,
-        allocableRange?.end ?? null
-      )
+      const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
 
       const result = await updateWorkstation({
         tenantSlug,

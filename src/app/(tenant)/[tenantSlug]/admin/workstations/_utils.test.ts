@@ -128,9 +128,10 @@ describe('expandWindows', () => {
     ])
   })
 
-  it('drops the last stage day for a recurring overnight window when stageEnd is unknown (nothing to roll into beyond the stage)', () => {
-    // Without a stageEnd to check against, the guard can't tell whether the
-    // roll-over is safe, so it falls back to always excluding the last day.
+  it('drops the last stage day for a recurring overnight window (nothing to roll into beyond the stage)', () => {
+    // Only one instance is generated, anchored on the first of the two stage
+    // days — the window is never re-applied starting on the last day, since
+    // rolling from there would go a full day past the stage's own end.
     const stageDays = ['2026-08-10', '2026-08-11']
     const windows = [{ start: '22:00', end: '06:00', limitToDay: null }]
 
@@ -139,41 +140,28 @@ describe('expandWindows', () => {
     expect(result).toEqual([{ window_start: '2026-08-10T22:00', window_end: '2026-08-11T06:00' }])
   })
 
-  it('drops the last stage day for a recurring full-day (00:00->00:00) window even when stageEnd is known', () => {
-    // A full-day window always rolls past any stage end time, so it's
-    // excluded from the last day regardless of where stageEnd falls.
+  it('drops the last-day instance of a recurring full-day window on a 2-day stage even when the first day is skipped', () => {
+    // Regression: the guard used to test `days.length > 1` — the length
+    // AFTER the "window starts before the stage's own start time" slice a
+    // few lines up already ran. On a 2-day stage that slice alone shrinks
+    // days to length 1, so the guard's `days.length > 1` was never true and
+    // silently never fired, letting the 00:00->00:00 window roll a full day
+    // past the stage's real end and collide with the window limited to the
+    // last day. Must test stageDays.length (the stage's actual day count),
+    // not the post-slice list.
     const stageDays = ['2026-08-10', '2026-08-11']
-    const windows = [{ start: '00:00', end: '00:00', limitToDay: null }]
+    const windows = [
+      { start: '08:00', end: '00:00', limitToDay: '2026-08-10' },
+      { start: '00:00', end: '00:00', limitToDay: null },
+      { start: '00:00', end: '18:00', limitToDay: '2026-08-11' },
+    ]
 
-    const result = expandWindows(
-      windows,
-      stageDays,
-      '2026-08-10T00:00:00.000Z',
-      '2026-08-11T23:00:00.000Z'
-    )
-
-    expect(result).toEqual([{ window_start: '2026-08-10T00:00', window_end: '2026-08-11T00:00' }])
-  })
-
-  it('keeps a recurring overnight window on the last stage day when the buffered stage end covers its roll-over', () => {
-    // A race stage ending 23:00 buffers to a 00:00 allocable end the next
-    // calendar day. A 22:00->06:00 night shift on the last day rolls to
-    // 06:00 that same next day — earlier than the buffered end, so real
-    // staffable hours on the final night must not be dropped.
-    const stageDays = ['2026-08-10', '2026-08-11']
-    const windows = [{ start: '22:00', end: '06:00', limitToDay: null }]
-
-    const result = expandWindows(
-      windows,
-      stageDays,
-      '2026-08-10T22:00:00.000Z',
-      '2026-08-12T12:00:00.000Z'
-    )
+    const result = expandWindows(windows, stageDays, '2026-08-10T08:00:00.000Z')
     const sorted = [...result].sort((a, b) => a.window_start.localeCompare(b.window_start))
 
     expect(sorted).toEqual([
-      { window_start: '2026-08-10T22:00', window_end: '2026-08-11T06:00' },
-      { window_start: '2026-08-11T22:00', window_end: '2026-08-12T06:00' },
+      { window_start: '2026-08-10T08:00', window_end: '2026-08-11T00:00' },
+      { window_start: '2026-08-11T00:00', window_end: '2026-08-11T18:00' },
     ])
   })
 
