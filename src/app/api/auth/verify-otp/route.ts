@@ -4,8 +4,10 @@ import { checkLoginVerifyRateLimit, type RateLimitResult } from '@/lib/rate-limi
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
+// Leading '+' optional — see send-otp/route.ts. The phone posted here is the same
+// normalizePhoneToE164 output the send step used, which carries no '+'.
 const verifyOtpSchema = z.object({
-  phone: z.string().regex(/^\+[1-9]\d{1,14}$/),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
   token: z.string().length(6),
 })
 
