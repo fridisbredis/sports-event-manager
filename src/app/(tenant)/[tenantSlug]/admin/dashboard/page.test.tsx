@@ -61,6 +61,16 @@ const EVENT = {
   logo_url: null,
 }
 
+// The scheduling-warning tile is not what these tests are about, but the page
+// calls scheduling_warning_counts on every render that has an event, so the
+// RPC needs a stub or the officials assertions never get reached.
+const WARNING_COUNTS = {
+  over_capacity: 0,
+  double_booked: 0,
+  earliest_day: null,
+  earliest_stage_id: null,
+}
+
 function findByType(node: unknown, target: unknown): { props: Record<string, unknown> } | null {
   if (!node || typeof node !== 'object') return null
   const el = node as { type?: unknown; props?: { children?: unknown } }
@@ -134,8 +144,15 @@ function mockServerClient(counts: OfficialsCounts = {}) {
 
   vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
   vi.mocked(getAdminTenant).mockResolvedValue(TENANT as never)
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
-  return { fromMock, officialsCalls }
+  const rpcMock = vi.fn(() => ({
+    single: vi.fn(() => Promise.resolve({ data: WARNING_COUNTS, error: null })),
+  }))
+
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({
+    from: fromMock,
+    rpc: rpcMock,
+  } as never)
+  return { fromMock, rpcMock, officialsCalls }
 }
 
 beforeEach(() => {
