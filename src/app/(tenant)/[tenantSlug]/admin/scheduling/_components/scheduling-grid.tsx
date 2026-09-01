@@ -2,20 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Button,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ScrollShadow,
-} from '@heroui/react'
-import { Input } from '@/components/ui/form-fields'
-import { saveAssignments, type AssignmentInput } from '../actions'
+import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
   getCurrentStage,
@@ -23,25 +10,23 @@ import {
   slotEndTime,
   isWithinWindow,
   formatDayLabel,
-  formatSlotLabel,
-  initials,
   computeOverCapacityCells,
   computeOverCapacityDetails,
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { toastError } from '@/lib/toast'
-import {
-  toLocalAssignments,
-  getAssignmentsForCell,
-  applyCellAction,
-  resolveCellActionLabel,
-} from './grid-helpers'
+import { getAssignmentsForCell } from './grid-helpers'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
 import { ByPersonGrid } from './by-person-grid'
 import { ByWorkAreaGrid } from './by-work-area-grid'
+import { useSchedulingGridInteraction } from './use-scheduling-grid-interaction'
+import { useSchedulingAutosave } from './use-scheduling-autosave'
+import { CellActionPopup } from './cell-action-popup'
+import { WsPersonPicker } from './ws-person-picker'
+import { DragOfficialPicker } from './drag-official-picker'
+import { WsSlotModal } from './ws-slot-modal'
 import type {
   Stage,
   WorkstationData,
@@ -65,20 +50,6 @@ interface Props {
 }
 
 type View = 'by-person' | 'by-work-area'
-
-function toLocalAssignmentsFromInitial(initialAssignments: AssignmentData[]): LocalAssignment[] {
-  return initialAssignments
-    .filter((a) => a.workstation_id)
-    .map((a) => ({
-      id: a.id,
-      official_id: a.official_id,
-      workstation_id: a.workstation_id!,
-      timeslot_start: new Date(a.timeslot_start).toISOString(),
-      timeslot_end: new Date(a.timeslot_end).toISOString(),
-      status: a.status ?? 'assigned',
-      slot_index: a.slot_index,
-    }))
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -108,103 +79,48 @@ export function SchedulingGrid({
     setSelectedDay(day)
     router.push(`?day=${day}`, { scroll: false })
   }
-  const [assignments, setAssignments] = useState<LocalAssignment[]>(() =>
-    toLocalAssignmentsFromInitial(initialAssignments)
-  )
 
-  // `initialAssignments` is a new array on every server re-render (e.g. after
-  // router.refresh()), but useState only reads it once at mount — without this,
-  // local state goes stale relative to the DB and autosave rejects edits to
-  // cells that look empty but are already taken. Resyncing during render
-  // (rather than in an effect) avoids an extra cascading render and still
-  // preserves unrelated local UI state (pickerCell, expandedWorkAreas, etc.)
-  // that a remount-by-key approach would lose.
-  const [prevInitialAssignments, setPrevInitialAssignments] = useState(initialAssignments)
-  if (initialAssignments !== prevInitialAssignments) {
-    setPrevInitialAssignments(initialAssignments)
-    setAssignments(toLocalAssignmentsFromInitial(initialAssignments))
-  }
-  // By-person work-area picker
-  const [pickerCell, setPickerCell] = useState<{
-    officialId: string
-    slotStart: string
-    anchorTop: number
-    anchorLeft: number
-  } | null>(null)
+  const {
+    pickerCell,
+    openPickerCell,
+    closePickerCell,
+    cellActionCell,
+    openCellActionCell,
+    closeCellActionCell,
+    expandedWorkAreas,
+    toggleExpandedWorkArea,
+    wsPickerCell,
+    closeWsPickerCell,
+    pendingCells,
+    beginPending,
+    endPending,
+    wsSlotModal,
+    openWsSlotModal,
+    closeWsSlotModal,
+    wsSlotModalSearch,
+    setWsSlotModalSearch,
+    wsDrag,
+    startWsDrag,
+    updateWsDragCurrent,
+    endWsDrag,
+    dragOfficialPicker,
+    openDragOfficialPicker,
+    closeDragOfficialPicker,
+    dragSaving,
+    setDragSaving,
+  } = useSchedulingGridInteraction()
 
-  // Action popup for existing assignment cells (remove / set status).
-  // Holds all assignments in the cell so double-booked officials (labelBy: 'workArea')
-  // or over-capacity/overflow work areas (labelBy: 'official') can pick which one to remove.
-  const [cellActionCell, setCellActionCell] = useState<{
-    assignments: LocalAssignment[]
-    labelBy: 'workArea' | 'official'
-    anchorTop: number
-    anchorLeft: number
-    anchorBottom: number
-  } | null>(null)
-
-  // By-work-area expand state
-  const [expandedWorkAreas, setExpandedWorkAreas] = useState<Set<string>>(new Set())
-
-  // By-work-area person picker (top-level row)
-  const [wsPickerCell, setWsPickerCell] = useState<{
-    workstationId: string
-    slotIndex: number
-    slotStart: string
-    anchorTop: number
-    anchorLeft: number
-  } | null>(null)
-
-  // Cells currently mid-autosave — rendered as a skeleton so the grid doesn't
-  // look unresponsive during the round-trip to the server.
-  const [pendingCells, setPendingCells] = useState<Set<string>>(new Set())
-
-  function personCellKey(officialId: string, slotStart: string): string {
-    return `p:${officialId}:${slotStart}`
-  }
-
-  function wsCellKey(workstationId: string, slotIndex: number | null, slotStart: string): string {
-    return `w:${workstationId}:${slotIndex}:${slotStart}`
-  }
-
-  function beginPending(key: string) {
-    setPendingCells((prev) => new Set(prev).add(key))
-  }
-
-  function endPending(key: string) {
-    setPendingCells((prev) => {
-      const next = new Set(prev)
-      next.delete(key)
-      return next
-    })
-  }
-
-  // By-work-area slot modal (expanded numbered slot rows)
-  const [wsSlotModal, setWsSlotModal] = useState<{
-    workstationId: string
-    wsName: string
-    slotIndex: number
-    slotStart: string
-    slotEnd: string
-  } | null>(null)
-  const [wsSlotModalSearch, setWsSlotModalSearch] = useState('')
-
-  // By-work-area drag-to-paint (expanded numbered slot rows)
-  const [wsDrag, setWsDrag] = useState<{
-    workstationId: string
-    wsName: string
-    slotIndex: number
-    startIdx: number
-    currentIdx: number
-  } | null>(null)
-  const [dragOfficialPicker, setDragOfficialPicker] = useState<{
-    workstationId: string
-    slotIndex: number
-    cellStarts: string[]
-    anchorTop: number
-    anchorLeft: number
-  } | null>(null)
-  const [dragSaving, setDragSaving] = useState(false)
+  const autosave = useSchedulingAutosave({
+    tenantSlug,
+    tenantId,
+    granularityMin,
+    initialAssignments,
+    beginPending,
+    endPending,
+  })
+  const { assignments } = autosave
+  const addAssignment = autosave.addAssignment
+  const handleWsSlotRemove = autosave.handleWsSlotRemove
 
   const selectedStage = stages.find((s) => s.id === selectedStageId) ?? stages[0]
 
@@ -227,28 +143,6 @@ export function SchedulingGrid({
     () => workstations.filter((w) => w.stage_id === selectedStageId),
     [workstations, selectedStageId]
   )
-
-  // Close popups when clicking outside
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (pickerCell && !(e.target as HTMLElement).closest('[data-picker-cell]')) {
-        setPickerCell(null)
-      }
-      if (cellActionCell && !(e.target as HTMLElement).closest('[data-cell-action]')) {
-        setCellActionCell(null)
-      }
-      if (wsPickerCell && !(e.target as HTMLElement).closest('[data-ws-picker]')) {
-        setWsPickerCell(null)
-      }
-      if (dragOfficialPicker && !(e.target as HTMLElement).closest('[data-drag-official-picker]')) {
-        setDragOfficialPicker(null)
-      }
-    }
-    if (pickerCell || cellActionCell || wsPickerCell || dragOfficialPicker) {
-      document.addEventListener('mousedown', handleClick)
-    }
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [pickerCell, cellActionCell, wsPickerCell, dragOfficialPicker])
 
   // ─── Derived conflict data ────────────────────────────────────────────────
 
@@ -298,66 +192,65 @@ export function SchedulingGrid({
   const handleWsExpandedSlotClick = useCallback(
     (wsId: string, wsName: string, slotIndex: number, slot: Date) => {
       const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-      setWsSlotModal({
+      openWsSlotModal({
         workstationId: wsId,
         wsName,
         slotIndex,
         slotStart: slot.toISOString(),
         slotEnd,
       })
-      setWsSlotModalSearch('')
     },
-    [granularityMin]
+    [granularityMin, openWsSlotModal]
   )
 
   // Finalize a by-work-area drag on mouseup (window-level so it can't get stuck
-  // if the mouse leaves the table before releasing)
+  // if the mouse leaves the table before releasing). The listener re-subscribes
+  // whenever `wsDrag` changes (it's in the dependency array below), so reading
+  // it directly here always sees the current value — no functional-updater
+  // needed to avoid a stale closure.
   useEffect(() => {
     if (!wsDrag) return
 
     function handleUp(e: PointerEvent) {
-      setWsDrag((current) => {
-        if (!current) return null
-        const { workstationId, wsName, slotIndex, startIdx, currentIdx } = current
-        const lo = Math.min(startIdx, currentIdx)
-        const hi = Math.max(startIdx, currentIdx)
+      if (!wsDrag) return
+      const { workstationId, wsName, slotIndex, startIdx, currentIdx } = wsDrag
+      const lo = Math.min(startIdx, currentIdx)
+      const hi = Math.max(startIdx, currentIdx)
+      endWsDrag()
 
-        if (lo === hi) {
-          // No movement — treat as an ordinary click on a single slot.
-          const slot = slots[lo]
-          if (slot) handleWsExpandedSlotClick(workstationId, wsName, slotIndex, slot)
-          return null
-        }
+      if (lo === hi) {
+        // No movement — treat as an ordinary click on a single slot.
+        const slot = slots[lo]
+        if (slot) handleWsExpandedSlotClick(workstationId, wsName, slotIndex, slot)
+        return
+      }
 
-        const ws = stageWorkstations.find((w) => w.id === workstationId)
-        const validCells: string[] = []
-        for (let i = lo; i <= hi; i++) {
-          const slot = slots[i]
-          if (!slot) continue
-          if (ws && !isWithinWindow(slot, granularityMin, ws.workstation_operating_windows))
-            continue
-          const slotStart = slot.toISOString()
-          const occupied = activeAssignments.some(
-            (a) =>
-              a.workstation_id === workstationId &&
-              a.slot_index === slotIndex &&
-              a.timeslot_start === slotStart
-          )
-          if (occupied) continue
-          validCells.push(slotStart)
-        }
+      const ws = stageWorkstations.find((w) => w.id === workstationId)
+      const validCells: string[] = []
+      for (let i = lo; i <= hi; i++) {
+        const slot = slots[i]
+        if (!slot) continue
+        if (ws && !isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)) continue
+        const slotStart = slot.toISOString()
+        const occupied = activeAssignments.some(
+          (a) =>
+            a.workstation_id === workstationId &&
+            a.slot_index === slotIndex &&
+            a.timeslot_start === slotStart
+        )
+        if (occupied) continue
+        validCells.push(slotStart)
+      }
 
-        if (validCells.length > 0) {
-          setDragOfficialPicker({
-            workstationId,
-            slotIndex,
-            cellStarts: validCells,
-            anchorTop: e.clientY,
-            anchorLeft: e.clientX,
-          })
-        }
-        return null
-      })
+      if (validCells.length > 0) {
+        openDragOfficialPicker({
+          workstationId,
+          slotIndex,
+          cellStarts: validCells,
+          anchorTop: e.clientY,
+          anchorLeft: e.clientX,
+        })
+      }
     }
 
     window.addEventListener('pointerup', handleUp)
@@ -369,6 +262,8 @@ export function SchedulingGrid({
     granularityMin,
     activeAssignments,
     handleWsExpandedSlotClick,
+    endWsDrag,
+    openDragOfficialPicker,
   ])
 
   const dragAvailableOfficials = useMemo(() => {
@@ -383,31 +278,6 @@ export function SchedulingGrid({
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
-  function nextLocalFreeSlot(wsId: string, slotStart: string): number {
-    const used = new Set<number>()
-    for (const a of activeAssignments) {
-      if (a.workstation_id === wsId && a.timeslot_start === slotStart && a.slot_index !== null) {
-        used.add(a.slot_index)
-      }
-    }
-    let idx = 1
-    while (used.has(idx)) idx++
-    return idx
-  }
-
-  async function persistAdditions(additions: AssignmentInput[]) {
-    const result = await saveAssignments(tenantSlug, tenantId, additions, [])
-    if (result.error) {
-      toastError(result.error)
-      return
-    }
-    setAssignments((prev) => [
-      ...prev,
-      ...toLocalAssignments(result.inserted ?? [], granularityMin),
-    ])
-    router.refresh()
-  }
-
   async function handleCellClick(
     officialId: string,
     slot: Date,
@@ -419,7 +289,7 @@ export function SchedulingGrid({
 
     if (existing.length > 0 && !ws) {
       const rect = anchor?.getBoundingClientRect()
-      setCellActionCell({
+      openCellActionCell({
         assignments: existing,
         labelBy: 'workArea',
         anchorTop: rect ? rect.top : 0,
@@ -428,12 +298,12 @@ export function SchedulingGrid({
       })
     } else if (ws) {
       const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-      const slotIdx = nextLocalFreeSlot(ws.id, slotStart)
-      setPickerCell(null)
+      const slotIdx = autosave.nextLocalFreeSlot(activeAssignments, ws.id, slotStart)
+      closePickerCell()
 
-      const key = personCellKey(officialId, slotStart)
+      const key = `p:${officialId}:${slotStart}`
       beginPending(key)
-      await persistAdditions([
+      await autosave.persistAdditions([
         {
           official_id: officialId,
           workstation_id: ws.id,
@@ -445,7 +315,7 @@ export function SchedulingGrid({
       endPending(key)
     } else {
       const rect = anchor?.getBoundingClientRect()
-      setPickerCell({
+      openPickerCell({
         officialId,
         slotStart,
         anchorTop: rect ? rect.top : 0,
@@ -455,56 +325,20 @@ export function SchedulingGrid({
   }
 
   async function handleCellAction(action: 'remove' | 'assigned', assignment: LocalAssignment) {
-    setCellActionCell(null)
-    if (!assignment.id) return
-
-    const key = personCellKey(assignment.official_id, assignment.timeslot_start)
-    beginPending(key)
-    const result =
-      action === 'remove'
-        ? await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
-        : await saveAssignments(
-            tenantSlug,
-            tenantId,
-            [],
-            [],
-            [{ id: assignment.id, status: action }]
-          )
-    endPending(key)
-
-    if (result.error) {
-      toastError(result.error)
-      return
-    }
-
-    setAssignments((prev) => applyCellAction(prev, action, assignment.id!))
-    router.refresh()
+    closeCellActionCell()
+    await autosave.handleCellAction(action, assignment)
   }
 
   async function handleWsPersonPick(officialId: string) {
     if (!wsPickerCell) return
-    const { workstationId, slotIndex, slotStart } = wsPickerCell
-    const slot = new Date(slotStart)
-    const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-    setWsPickerCell(null)
-
-    const key = wsCellKey(workstationId, slotIndex, slotStart)
-    beginPending(key)
-    await persistAdditions([
-      {
-        official_id: officialId,
-        workstation_id: workstationId,
-        timeslot_start: slotStart,
-        timeslot_end: slotEnd,
-        slot_index: slotIndex,
-      },
-    ])
-    endPending(key)
+    const cell = wsPickerCell
+    closeWsPickerCell()
+    await autosave.handleWsPersonPick(cell, officialId)
   }
 
   function handleOverflowClick(overflowAssignments: LocalAssignment[], anchor: HTMLElement) {
     const rect = anchor.getBoundingClientRect()
-    setCellActionCell({
+    openCellActionCell({
       assignments: overflowAssignments,
       labelBy: 'official',
       anchorTop: rect.top,
@@ -513,40 +347,10 @@ export function SchedulingGrid({
     })
   }
 
-  async function addAssignment(
-    workstationId: string,
-    slotIndex: number,
-    slotStart: string,
-    slotEnd: string,
-    officialId: string
-  ) {
-    const slotTaken = assignments.some(
-      (a) =>
-        a.workstation_id === workstationId &&
-        a.slot_index === slotIndex &&
-        a.timeslot_start === slotStart
-    )
-    if (slotTaken) return
-
-    const key = wsCellKey(workstationId, slotIndex, slotStart)
-    beginPending(key)
-    await persistAdditions([
-      {
-        official_id: officialId,
-        workstation_id: workstationId,
-        timeslot_start: slotStart,
-        timeslot_end: slotEnd,
-        slot_index: slotIndex,
-      },
-    ])
-    endPending(key)
-  }
-
   function handleWsSlotAdd(officialId: string) {
     if (!wsSlotModal) return
     const { workstationId, slotIndex, slotStart, slotEnd } = wsSlotModal
-    setWsSlotModal(null)
-    setWsSlotModalSearch('')
+    closeWsSlotModal()
     addAssignment(workstationId, slotIndex, slotStart, slotEnd, officialId)
   }
 
@@ -554,70 +358,20 @@ export function SchedulingGrid({
 
   function handleWsDragStart(wsId: string, wsName: string, slotIndex: number, idx: number) {
     if (dragSaving) return
-    setWsDrag({ workstationId: wsId, wsName, slotIndex, startIdx: idx, currentIdx: idx })
+    startWsDrag(wsId, wsName, slotIndex, idx)
   }
 
   function handleWsDragEnter(wsId: string, slotIndex: number, idx: number) {
-    setWsDrag((prev) => {
-      if (!prev || prev.workstationId !== wsId || prev.slotIndex !== slotIndex) return prev
-      if (prev.currentIdx === idx) return prev
-      return { ...prev, currentIdx: idx }
-    })
+    updateWsDragCurrent(wsId, slotIndex, idx)
   }
 
-  // Persists a drag-to-paint batch immediately (rather than leaving it in
-  // local state for the manual Save button) so a slot-collision from another
-  // admin only affects this small batch, not every other pending edit on the
-  // page — and so a big drag doesn't silently discard its own valid cells if
-  // just one of them collides.
   async function handleDragOfficialPick(officialId: string) {
     if (!dragOfficialPicker) return
-    const { workstationId, slotIndex, cellStarts } = dragOfficialPicker
-    setDragOfficialPicker(null)
+    const picker = dragOfficialPicker
+    closeDragOfficialPicker()
     setDragSaving(true)
-
-    const additions: AssignmentInput[] = cellStarts.map((slotStart) => ({
-      official_id: officialId,
-      workstation_id: workstationId,
-      timeslot_start: slotStart,
-      timeslot_end: slotEndTime(new Date(slotStart), granularityMin).toISOString(),
-      slot_index: slotIndex,
-    }))
-
-    await persistAdditions(additions)
-
+    await autosave.handleDragOfficialPick(picker, officialId)
     setDragSaving(false)
-  }
-
-  async function handleWsSlotRemove(assignment: LocalAssignment) {
-    if (!assignment.id) return
-
-    const key = wsCellKey(
-      assignment.workstation_id,
-      assignment.slot_index,
-      assignment.timeslot_start
-    )
-    beginPending(key)
-    const result = await saveAssignments(tenantSlug, tenantId, [], [assignment.id])
-    endPending(key)
-
-    if (result.error) {
-      toastError(result.error)
-      return
-    }
-
-    setAssignments((prev) =>
-      prev.filter(
-        (a) =>
-          !(
-            a.official_id === assignment.official_id &&
-            a.workstation_id === assignment.workstation_id &&
-            a.timeslot_start === assignment.timeslot_start &&
-            a.slot_index === assignment.slot_index
-          )
-      )
-    )
-    router.refresh()
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -696,8 +450,8 @@ export function SchedulingGrid({
               const stage = stages.find((s) => s.id === id)
               if (stage) {
                 setSelectedStageId(id)
-                setPickerCell(null)
-                setCellActionCell(null)
+                closePickerCell()
+                closeCellActionCell()
                 changeDay(getAllocableDays(stage)[0] ?? '')
               }
             }}
@@ -860,14 +614,7 @@ export function SchedulingGrid({
           overCapacityCells={overCapacityCells}
           expandedWorkAreas={expandedWorkAreas}
           pendingCells={pendingCells}
-          onToggleExpand={(wsId) =>
-            setExpandedWorkAreas((prev) => {
-              const next = new Set(prev)
-              if (next.has(wsId)) next.delete(wsId)
-              else next.add(wsId)
-              return next
-            })
-          }
+          onToggleExpand={toggleExpandedWorkArea}
           onWsExpandedSlotClick={handleWsExpandedSlotClick}
           onOverflowClick={handleOverflowClick}
           wsDrag={wsDrag}
@@ -878,280 +625,47 @@ export function SchedulingGrid({
       )}
 
       {/* Action popup — status change / remove for an existing assignment */}
-      {cellActionCell &&
-        (() => {
-          return (
-            <div
-              className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px]"
-              style={{
-                top: cellActionCell.anchorBottom ?? 0,
-                left: cellActionCell.anchorLeft ?? 0,
-              }}
-              data-cell-action
-            >
-              {cellActionCell.assignments.length > 1 && (
-                <p className="px-3 pt-2.5 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                  {cellActionCell.labelBy === 'official'
-                    ? t('scheduling.overflowPickToRemove')
-                    : t('scheduling.conflictPickToRemove')}
-                </p>
-              )}
-              {cellActionCell.assignments.map((assignment, i) => {
-                const label = resolveCellActionLabel(
-                  cellActionCell.labelBy,
-                  assignment,
-                  officials,
-                  workstations
-                )
-                return (
-                  <div
-                    key={assignment.id ?? i}
-                    className="border-t border-gray-100 py-1 first:border-t-0"
-                  >
-                    <div className="flex items-center justify-between gap-2 px-3 py-1">
-                      <span className="text-xs text-gray-400 font-medium uppercase tracking-wider truncate max-w-[160px]">
-                        {label}
-                      </span>
-                      <Button
-                        color="danger"
-                        variant="light"
-                        size="sm"
-                        className="shrink-0 px-2 hover:bg-red-50"
-                        onPress={() => handleCellAction('remove', assignment)}
-                      >
-                        {t('scheduling.actionRemove')}
-                      </Button>
-                    </div>
-                    {assignment.status !== 'assigned' && (
-                      <Button
-                        variant="light"
-                        size="sm"
-                        className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                        onPress={() => handleCellAction('assigned', assignment)}
-                      >
-                        {t('scheduling.actionMarkAssigned')}
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
+      {cellActionCell && (
+        <CellActionPopup
+          cellActionCell={cellActionCell}
+          officials={officials}
+          workstations={workstations}
+          onAction={handleCellAction}
+        />
+      )}
 
       {/* Person picker for by-work-area expanded view */}
-      {wsPickerCell &&
-        (() => {
-          const slot = new Date(wsPickerCell.slotStart)
-          const assignedAtSlot = new Set(
-            activeAssignments
-              .filter((a) => a.timeslot_start === wsPickerCell.slotStart)
-              .map((a) => a.official_id)
-          )
-          const availableOfficials = officials.filter((off) => !assignedAtSlot.has(off.id))
-          return (
-            <div
-              className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-              style={{
-                top: wsPickerCell.anchorTop,
-                left: wsPickerCell.anchorLeft,
-                transform: 'translateY(calc(-100% - 4px))',
-              }}
-              data-ws-picker
-            >
-              <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                {t('scheduling.assignPerson', {
-                  slot: formatSlotLabel(slot),
-                  index: wsPickerCell.slotIndex,
-                })}
-              </p>
-              {availableOfficials.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-gray-400">
-                  {t('scheduling.noConfirmedOfficials')}
-                </p>
-              ) : (
-                <ScrollShadow className="flex flex-col max-h-64">
-                  {availableOfficials.map((off) => (
-                    <Button
-                      key={off.id}
-                      variant="light"
-                      size="sm"
-                      className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                      onPress={() => handleWsPersonPick(off.id)}
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
-                          {initials(off.name)}
-                        </span>
-                        <span className="truncate">{off.name}</span>
-                      </span>
-                    </Button>
-                  ))}
-                </ScrollShadow>
-              )}
-            </div>
-          )
-        })()}
+      {wsPickerCell && (
+        <WsPersonPicker
+          wsPickerCell={wsPickerCell}
+          activeAssignments={activeAssignments}
+          officials={officials}
+          onPick={handleWsPersonPick}
+        />
+      )}
 
       {/* One-time official picker after a by-work-area drag-to-paint gesture */}
       {dragOfficialPicker && (
-        <div
-          className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-          style={{
-            top: dragOfficialPicker.anchorTop,
-            left: dragOfficialPicker.anchorLeft,
-            transform: 'translateY(calc(-100% - 4px))',
-          }}
-          data-drag-official-picker
-        >
-          <p className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-            {t('scheduling.dragPaintPickPerson', { count: dragOfficialPicker.cellStarts.length })}
-          </p>
-          {dragAvailableOfficials.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-400">
-              {t('scheduling.noConfirmedOfficials')}
-            </p>
-          ) : (
-            <ScrollShadow className="flex flex-col max-h-64">
-              {dragAvailableOfficials.map((off) => (
-                <Button
-                  key={off.id}
-                  variant="light"
-                  size="sm"
-                  className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
-                  onPress={() => handleDragOfficialPick(off.id)}
-                >
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600 shrink-0">
-                      {initials(off.name)}
-                    </span>
-                    <span className="truncate">{off.name}</span>
-                  </span>
-                </Button>
-              ))}
-            </ScrollShadow>
-          )}
-        </div>
+        <DragOfficialPicker
+          dragOfficialPicker={dragOfficialPicker}
+          availableOfficials={dragAvailableOfficials}
+          onPick={handleDragOfficialPick}
+        />
       )}
 
       {/* Slot modal for by-work-area expanded rows */}
-      {wsSlotModal &&
-        (() => {
-          const slot = new Date(wsSlotModal.slotStart)
-          const assignedInSlot = activeAssignments.filter(
-            (a) =>
-              a.workstation_id === wsSlotModal.workstationId &&
-              a.timeslot_start === wsSlotModal.slotStart &&
-              a.slot_index === wsSlotModal.slotIndex
-          )
-          const assignedAtSlot = new Set(
-            activeAssignments
-              .filter((a) => a.timeslot_start === wsSlotModal.slotStart)
-              .map((a) => a.official_id)
-          )
-          const availableOfficialsAll = officials.filter((off) => !assignedAtSlot.has(off.id))
-          const availableOfficials = availableOfficialsAll.filter((off) =>
-            off.name.toLowerCase().includes(wsSlotModalSearch.toLowerCase())
-          )
-          return (
-            <Modal
-              isOpen
-              size="2xl"
-              onOpenChange={(open) => {
-                if (!open) {
-                  setWsSlotModal(null)
-                  setWsSlotModalSearch('')
-                }
-              }}
-              classNames={{ base: 'bg-gray-50' }}
-            >
-              <ModalContent>
-                {() => (
-                  <>
-                    <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
-                      {t('scheduling.slotModalTitle', {
-                        index: wsSlotModal.slotIndex,
-                        ws: wsSlotModal.wsName,
-                        time: formatSlotLabel(slot),
-                      })}
-                    </ModalHeader>
-                    <ModalBody>
-                      {assignedInSlot.length === 0 && availableOfficialsAll.length === 0 && (
-                        <p className="text-sm text-gray-400">{t('scheduling.slotModalEmpty')}</p>
-                      )}
-
-                      {assignedInSlot.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                            {t('scheduling.slotModalAssigned')}
-                          </p>
-                          {assignedInSlot.map((a) => {
-                            const off = officials.find((o) => o.id === a.official_id)
-                            return (
-                              <div
-                                key={a.official_id}
-                                className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2"
-                              >
-                                <span className="text-sm text-gray-900">{off?.name ?? '—'}</span>
-                                <Button
-                                  color="danger"
-                                  variant="light"
-                                  size="sm"
-                                  onPress={() => handleWsSlotRemove(a)}
-                                >
-                                  {t('scheduling.slotModalRemove')}
-                                </Button>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {assignedInSlot.length === 0 && availableOfficialsAll.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                            {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
-                          </p>
-                          <Input
-                            type="text"
-                            size="sm"
-                            placeholder={t('scheduling.slotModalSearchPlaceholder')}
-                            value={wsSlotModalSearch}
-                            onValueChange={setWsSlotModalSearch}
-                            className="mb-2"
-                          />
-                          {availableOfficials.length === 0 ? (
-                            <p className="text-sm text-gray-400 px-1 py-2">
-                              {t('scheduling.slotModalNoResults')}
-                            </p>
-                          ) : (
-                            <ScrollShadow className="flex flex-col max-h-80 divide-y divide-gray-100">
-                              {availableOfficials.map((off) => (
-                                <div
-                                  key={off.id}
-                                  className="flex items-center justify-between px-2 py-1.5"
-                                >
-                                  <span className="text-sm text-gray-900">{off.name}</span>
-                                  <Button
-                                    variant="bordered"
-                                    size="sm"
-                                    onPress={() => handleWsSlotAdd(off.id)}
-                                  >
-                                    {t('scheduling.slotModalAdd')}
-                                  </Button>
-                                </div>
-                              ))}
-                            </ScrollShadow>
-                          )}
-                        </div>
-                      )}
-                    </ModalBody>
-                  </>
-                )}
-              </ModalContent>
-            </Modal>
-          )
-        })()}
+      {wsSlotModal && (
+        <WsSlotModal
+          wsSlotModal={wsSlotModal}
+          wsSlotModalSearch={wsSlotModalSearch}
+          onSearchChange={setWsSlotModalSearch}
+          activeAssignments={activeAssignments}
+          officials={officials}
+          onRemove={handleWsSlotRemove}
+          onAdd={handleWsSlotAdd}
+          onClose={closeWsSlotModal}
+        />
+      )}
 
       <SchedulingLegend />
     </div>
