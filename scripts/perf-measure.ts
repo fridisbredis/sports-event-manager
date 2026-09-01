@@ -35,6 +35,24 @@
 //     path's own cost rather than autoscaling behaviour.
 //   * Timings are wall-clock from the client, so they include Next.js render,
 //     the Supabase round trips, and loopback HTTP. They do not isolate the SQL.
+//
+// COMPARING TWO RUNS — read this before concluding anything from a delta:
+//   * PIN THE REPLICA COUNT AND CPU. Two runs are only comparable if the app
+//     was the same size for both. A comparison in this session was invalid
+//     because one run had 2 replicas and the other 3; the "regression" was the
+//     rig. `az containerapp show --query properties.template.scale` and
+//     `...resources` before and after, and record both alongside the numbers.
+//   * WATCH THE BASELINE, NOT JUST THE RATIO. The criterion divides by each
+//     path's own unloaded baseline, so a genuine improvement can show as a
+//     worse percentage: optimise the app and the baseline tightens too. Read
+//     the absolute p95 and the `min` column next to the ratio.
+//   * `min` IS THE HONEST PER-REQUEST COST. Under saturation p50/p95 measure
+//     queueing, not the code. If `min` falls while p50 does not, the change
+//     worked and something upstream is the constraint.
+//   * AZURE CPU METRICS AVERAGE AWAY SPIKES. `az monitor metrics list` at
+//     PT1M reported 43-58% while the replica was in fact hitting 102% of its
+//     limit; PT5M caught it. Do not conclude "CPU is not saturated" from a
+//     one-minute maximum.
 
 import { Agent, setGlobalDispatcher } from 'undici'
 import { loadPerfEnv, PERF_SLUG_PREFIX } from './perf-env'
