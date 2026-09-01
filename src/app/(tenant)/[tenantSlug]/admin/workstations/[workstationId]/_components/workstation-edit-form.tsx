@@ -69,29 +69,21 @@ export default function WorkstationEditForm({
   const stageEndHHMM = allocableRange?.end.slice(11, 16) ?? null
   const lastDay = stageDays[stageDays.length - 1] ?? null
 
-  function minStartFor() {
-    // On a multi-day stage, a window limited to the first day is allowed to
-    // start before the stage's own start time (e.g. staffing arrives ahead of
-    // the stage officially beginning) — there's no earlier day to put that
-    // time on instead. A single-day stage has no such earlier day either, so
-    // the floor still applies there.
-    if (stageDays.length === 1) return stageStartHHMM ?? undefined
-    return undefined
-  }
+  // On a multi-day stage, a window limited to the first day is allowed to
+  // start before the stage's own start time (e.g. staffing arrives ahead of
+  // the stage officially beginning) — there's no earlier day to put that
+  // time on instead. A single-day stage has no such earlier day either, so
+  // the floor still applies there.
+  const minStartFor = stageDays.length === 1 ? (stageStartHHMM ?? undefined) : undefined
   function maxEndFor(limitToDay: string | null) {
     if (stageDays.length === 1 || limitToDay === lastDay) return stageEndHHMM ?? undefined
     return undefined
   }
+  // Only called for multi-day windows (see call sites below), so there is no
+  // first-day-of-a-single-day-stage case to clamp against here.
   function clampToDay(win: TimeWindow, newDay: string): TimeWindow {
-    let { start, end } = win
-    if (
-      newDay === stageDays[0] &&
-      stageDays.length === 1 &&
-      stageStartHHMM &&
-      start &&
-      start < stageStartHHMM
-    )
-      start = ''
+    const { start } = win
+    let { end } = win
     if (newDay === lastDay && stageEndHHMM && end && end > stageEndHHMM) end = ''
     return { ...win, start, end, limitToDay: newDay }
   }
@@ -218,7 +210,12 @@ export default function WorkstationEditForm({
     setSaveSuccess(false)
 
     startSave(async () => {
-      const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
+      const finalWindows = expandWindows(
+        windows,
+        stageDays,
+        allocableRange?.start ?? null,
+        allocableRange?.end ?? null
+      )
 
       const result = await updateWorkstation({
         tenantSlug,

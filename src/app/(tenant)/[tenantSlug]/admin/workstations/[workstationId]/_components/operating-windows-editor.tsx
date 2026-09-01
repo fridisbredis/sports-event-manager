@@ -10,7 +10,7 @@ interface Props {
   isMultiDay: boolean
   stageDays: string[]
   canMatchStageHours: boolean
-  minStartFor: () => string | undefined
+  minStartFor: string | undefined
   maxEndFor: (limitToDay: string | null) => string | undefined
   onUpdateWindow: (index: number, field: 'start' | 'end', value: string) => void
   onRemoveWindow: (index: number) => void
@@ -65,7 +65,7 @@ export function OperatingWindowsEditor({
               <TimeInput
                 aria-label={t('workstations.windowStartLabel')}
                 value={hhmmToTime(w.start) ?? null}
-                minValue={hhmmToTime(minStartFor() ?? '')}
+                minValue={hhmmToTime(minStartFor ?? '')}
                 validationBehavior="aria"
                 isInvalid={!!errors?.[i]}
                 onChange={(val) => onUpdateWindow(i, 'start', timeToHHMM(val as Time | null))}

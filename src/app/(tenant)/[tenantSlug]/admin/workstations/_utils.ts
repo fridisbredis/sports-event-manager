@@ -1,5 +1,5 @@
 import { Time } from '@internationalized/date'
-import { getAllocableRange } from '@/lib/scheduling/allocable-range'
+import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 
 export interface Stage {
   id: string
@@ -27,32 +27,31 @@ export function windowDurationMin(start: string, end: string): number {
   return endMin <= startMin ? endMin + 24 * 60 - startMin : endMin - startMin
 }
 
-// Mirrors the scheduling grid's own day range (getAllocableDays in
-// allocable-range.ts) so a race stage's ±1h buffer is available here too —
-// otherwise a workstation window couldn't be set to match slots the grid
-// actually shows.
+// Thin null-safe wrapper so callers here don't each need their own
+// `stage ?? ` guard before reaching the grid's own day-range logic.
 export function getStageDays(stage: Stage | null): string[] {
   if (!stage?.start_time || !stage?.end_time) return []
-  const range = getAllocableRange(stage)
-  if (!range) return []
+  return getAllocableDays(stage)
+}
 
-  const daySet = new Set<string>()
-  const cur = new Date(range.start)
-  cur.setUTCHours(0, 0, 0, 0)
-  const last = new Date(range.end)
-  last.setUTCHours(0, 0, 0, 0)
-  while (cur <= last) {
-    daySet.add(cur.toISOString().slice(0, 10))
-    cur.setUTCDate(cur.getUTCDate() + 1)
-  }
-  return [...daySet].sort()
+// A day + "HH:MM" pair, rolled to the next calendar day when `overnight` is
+// true, as an ISO instant — for comparing a window's actual roll-over end
+// against the stage's real (tz-aware) end timestamp.
+function rolloverEndInstant(day: string, endHHMM: string, overnight: boolean): Date {
+  const d = new Date(`${day}T${endHHMM}:00Z`)
+  if (overnight) d.setUTCDate(d.getUTCDate() + 1)
+  return d
 }
 
 export function expandWindows(
   windows: TimeWindow[],
   stageDays: string[],
-  stageStart: string | null
+  stageStart: string | null,
+  stageEnd: string | null = null
 ): { window_start: string; window_end: string }[] {
+  const lastDay = stageDays[stageDays.length - 1] ?? null
+  const stageEndInstant = stageEnd ? new Date(stageEnd) : null
+
   return windows
     .filter((w) => w.start && w.end)
     .flatMap((w) => {
@@ -67,23 +66,27 @@ export function expandWindows(
             days = stageDays.slice(1)
           }
         }
-        // A recurring overnight window (end <= start, e.g. a full 00:00->00:00
-        // day) always rolls into the next calendar day — which, on the stage's
-        // last day, is past the stage's own end time. It would collide with a
-        // separate window explicitly limited to that last day to cap it there.
-        if (days.length > 1 && w.end <= w.start) {
-          days = days.slice(0, -1)
+        // A recurring overnight window (end <= start) rolls into the next
+        // calendar day. On the stage's last day, that roll-over lands past
+        // the stage's own end only if its actual end instant is later than
+        // the stage's — e.g. a 00:00->00:00 full day always is, but a
+        // 22:00->06:00 night shift isn't when the stage's buffered end is
+        // itself past 06:00 the next morning. Drop the last-day instance
+        // only in the former case, so real coverage on the final night isn't
+        // lost to a check that only needs to guard the full-day collision.
+        if (days.length > 1 && w.end <= w.start && days[days.length - 1] === lastDay) {
+          const rollsPastStageEnd =
+            !stageEndInstant || rolloverEndInstant(lastDay, w.end, true) > stageEndInstant
+          if (rollsPastStageEnd) days = days.slice(0, -1)
         }
       }
       return days.map((day) => {
         const overnight = w.end <= w.start
-        let endDay = day
-        if (overnight) {
-          const d = new Date(day + 'T12:00:00Z')
-          d.setUTCDate(d.getUTCDate() + 1)
-          endDay = d.toISOString().slice(0, 10)
+        const endInstant = rolloverEndInstant(day, w.end, overnight)
+        return {
+          window_start: `${day}T${w.start}`,
+          window_end: endInstant.toISOString().slice(0, 16),
         }
-        return { window_start: `${day}T${w.start}`, window_end: `${endDay}T${w.end}` }
       })
     })
 }
