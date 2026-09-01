@@ -71,7 +71,7 @@ export function expandWindows(
         // day) always rolls into the next calendar day — which, on the stage's
         // last day, is past the stage's own end time. It would collide with a
         // separate window explicitly limited to that last day to cap it there.
-        if (days.length > 0 && w.end <= w.start) {
+        if (days.length > 1 && w.end <= w.start) {
           days = days.slice(0, -1)
         }
       }

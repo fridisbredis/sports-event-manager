@@ -139,6 +139,18 @@ describe('expandWindows', () => {
 
     expect(result).toEqual([{ window_start: '2026-08-10T22:00', window_end: '2026-08-11T06:00' }])
   })
+
+  it('keeps a recurring overnight window on a single-day stage instead of dropping it', () => {
+    // A single-day stage has no "last day to exclude" — the last-day guard
+    // must not treat the stage's only day as if it were the tail of a
+    // multi-day range, or the window collapses to nothing.
+    const stageDays = ['2026-08-10']
+    const windows = [{ start: '20:00', end: '02:00', limitToDay: null }]
+
+    const result = expandWindows(windows, stageDays, '2026-08-10T08:00:00.000Z')
+
+    expect(result).toEqual([{ window_start: '2026-08-10T20:00', window_end: '2026-08-11T02:00' }])
+  })
 })
 
 describe('matchStageHoursWindows', () => {
