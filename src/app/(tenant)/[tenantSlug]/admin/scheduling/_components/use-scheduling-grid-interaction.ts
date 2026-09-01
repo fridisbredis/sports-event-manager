@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { LocalAssignment } from './scheduling-types'
 
-type PickerCell = {
+export type PickerCell = {
   officialId: string
   slotStart: string
   anchorTop: number
   anchorLeft: number
 } | null
 
-type CellActionCell = {
+export type CellActionCell = {
   assignments: LocalAssignment[]
   labelBy: 'workArea' | 'official'
   anchorTop: number
@@ -18,7 +18,7 @@ type CellActionCell = {
   anchorBottom: number
 } | null
 
-type WsPickerCell = {
+export type WsPickerCell = {
   workstationId: string
   slotIndex: number
   slotStart: string
@@ -26,7 +26,7 @@ type WsPickerCell = {
   anchorLeft: number
 } | null
 
-type WsSlotModal = {
+export type WsSlotModal = {
   workstationId: string
   wsName: string
   slotIndex: number
@@ -42,7 +42,7 @@ type WsDrag = {
   currentIdx: number
 } | null
 
-type DragOfficialPicker = {
+export type DragOfficialPicker = {
   workstationId: string
   slotIndex: number
   cellStarts: string[]
