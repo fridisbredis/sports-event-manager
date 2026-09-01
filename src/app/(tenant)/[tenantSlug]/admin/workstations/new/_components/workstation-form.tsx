@@ -11,7 +11,9 @@ import {
   getStageDays,
   expandWindows,
   windowDurationMin,
+  matchStageHoursWindows,
 } from '../../_utils'
+import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 
 interface Props {
   tenantSlug: string
@@ -39,12 +41,21 @@ export default function WorkstationForm({
   const stageId = preselectedStage?.id ?? '__all__'
   const stageDays = getStageDays(preselectedStage)
   const isMultiDay = stageDays.length > 1
-  const stageStartHHMM = preselectedStage?.start_time?.slice(11, 16) ?? null
-  const stageEndHHMM = preselectedStage?.end_time?.slice(11, 16) ?? null
+  // Use the buffered allocable range (±1h around a race), not the stage's raw
+  // start/end — otherwise a window couldn't be set to match what the
+  // scheduling grid actually shows around a race.
+  const allocableRange = preselectedStage ? getAllocableRange(preselectedStage) : null
+  const stageStartHHMM = allocableRange?.start.slice(11, 16) ?? null
+  const stageEndHHMM = allocableRange?.end.slice(11, 16) ?? null
   const lastDay = stageDays[stageDays.length - 1] ?? null
 
-  function minStartFor(limitToDay: string | null) {
-    if (stageDays.length === 1 || limitToDay === stageDays[0]) return stageStartHHMM ?? undefined
+  function minStartFor() {
+    // On a multi-day stage, a window limited to the first day is allowed to
+    // start before the stage's own start time (e.g. staffing arrives ahead of
+    // the stage officially beginning) — there's no earlier day to put that
+    // time on instead. A single-day stage has no such earlier day either, so
+    // the floor still applies there.
+    if (stageDays.length === 1) return stageStartHHMM ?? undefined
     return undefined
   }
   function maxEndFor(limitToDay: string | null) {
@@ -53,7 +64,14 @@ export default function WorkstationForm({
   }
   function clampToDay(win: TimeWindow, newDay: string): TimeWindow {
     let { start, end } = win
-    if (newDay === stageDays[0] && stageStartHHMM && start && start < stageStartHHMM) start = ''
+    if (
+      newDay === stageDays[0] &&
+      stageDays.length === 1 &&
+      stageStartHHMM &&
+      start &&
+      start < stageStartHHMM
+    )
+      start = ''
     if (newDay === lastDay && stageEndHHMM && end && end > stageEndHHMM) end = ''
     return { ...win, start, end, limitToDay: newDay }
   }
@@ -70,6 +88,13 @@ export default function WorkstationForm({
 
   function addWindow() {
     setWindows((prev) => [...prev, { start: '', end: '', limitToDay: null }])
+  }
+
+  function matchStageHours() {
+    const generated = matchStageHoursWindows(stageDays, stageStartHHMM, stageEndHHMM)
+    if (generated.length === 0) return
+    setWindows(generated)
+    setErrors((prev) => ({ ...prev, windows: undefined }))
   }
 
   function removeWindow(index: number) {
@@ -110,7 +135,10 @@ export default function WorkstationForm({
         windowErrors[i] = t('workstations.windowEndRequired')
         return
       }
-      const onFirstDay = stageDays.length === 1 || w.limitToDay === stageDays[0]
+      // A window limited to the stage's first day is allowed to start before
+      // the stage's own start time on a multi-day stage (see minStartFor) —
+      // the floor only applies on a single-day stage.
+      const onFirstDay = stageDays.length === 1
       const onLastDay = stageDays.length === 1 || w.limitToDay === lastDay
       if (onFirstDay && stageStartHHMM && w.start < stageStartHHMM) {
         windowErrors[i] = t('workstations.windowBeforeStageStart', { time: stageStartHHMM })
@@ -130,7 +158,7 @@ export default function WorkstationForm({
     setSaveSuccess(false)
 
     startSave(async () => {
-      const finalWindows = expandWindows(windows, stageDays, preselectedStage?.start_time ?? null)
+      const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
 
       const result = await createWorkstation({
         tenantSlug,
@@ -244,9 +272,22 @@ export default function WorkstationForm({
 
           {/* Operating windows */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.operatingWindowsLabel')}
-            </h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {t('workstations.operatingWindowsLabel')}
+              </h2>
+              {!!preselectedStage &&
+                !!stageStartHHMM &&
+                !!stageEndHHMM &&
+                windows.every((w) => !w.start && !w.end) && (
+                  <button
+                    onClick={matchStageHours}
+                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    {t('workstations.matchStageHours')}
+                  </button>
+                )}
+            </div>
             <p className="mb-3 text-xs text-gray-400">
               {t('workstations.operatingWindowMidnightHint')}
             </p>
@@ -260,7 +301,7 @@ export default function WorkstationForm({
                     <input
                       type="time"
                       value={w.start}
-                      min={minStartFor(w.limitToDay)}
+                      min={minStartFor()}
                       onChange={(e) => {
                         updateWindow(i, 'start', e.target.value)
                         if (errors.windows?.[i])

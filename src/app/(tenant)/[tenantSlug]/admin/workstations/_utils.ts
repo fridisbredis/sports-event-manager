@@ -1,4 +1,5 @@
 import { Time } from '@internationalized/date'
+import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 
 export interface Stage {
   id: string
@@ -26,12 +27,19 @@ export function windowDurationMin(start: string, end: string): number {
   return endMin <= startMin ? endMin + 24 * 60 - startMin : endMin - startMin
 }
 
+// Mirrors the scheduling grid's own day range (getAllocableDays in
+// allocable-range.ts) so a race stage's ±1h buffer is available here too —
+// otherwise a workstation window couldn't be set to match slots the grid
+// actually shows.
 export function getStageDays(stage: Stage | null): string[] {
   if (!stage?.start_time || !stage?.end_time) return []
+  const range = getAllocableRange(stage)
+  if (!range) return []
+
   const daySet = new Set<string>()
-  const cur = new Date(stage.start_time)
+  const cur = new Date(range.start)
   cur.setUTCHours(0, 0, 0, 0)
-  const last = new Date(stage.end_time)
+  const last = new Date(range.end)
   last.setUTCHours(0, 0, 0, 0)
   while (cur <= last) {
     daySet.add(cur.toISOString().slice(0, 10))
@@ -59,6 +67,13 @@ export function expandWindows(
             days = stageDays.slice(1)
           }
         }
+        // A recurring overnight window (end <= start, e.g. a full 00:00->00:00
+        // day) always rolls into the next calendar day — which, on the stage's
+        // last day, is past the stage's own end time. It would collide with a
+        // separate window explicitly limited to that last day to cap it there.
+        if (days.length > 0 && w.end <= w.start) {
+          days = days.slice(0, -1)
+        }
       }
       return days.map((day) => {
         const overnight = w.end <= w.start
@@ -71,6 +86,29 @@ export function expandWindows(
         return { window_start: `${day}T${w.start}`, window_end: `${endDay}T${w.end}` }
       })
     })
+}
+
+// Builds the minimal set of windows that exactly covers the stage's own
+// allocable range (its raw hours, or the ±1h buffer around a race — whichever
+// stageStartHHMM/stageEndHHMM were derived from). Replaces whatever windows
+// exist with a clean baseline the admin can then split into extra shifts by
+// adding more day-limited windows alongside these.
+export function matchStageHoursWindows(
+  stageDays: string[],
+  stageStartHHMM: string | null,
+  stageEndHHMM: string | null
+): TimeWindow[] {
+  if (stageDays.length === 0 || !stageStartHHMM || !stageEndHHMM) return []
+
+  if (stageDays.length === 1) {
+    return [{ start: stageStartHHMM, end: stageEndHHMM, limitToDay: null }]
+  }
+
+  return [
+    { start: stageStartHHMM, end: '00:00', limitToDay: stageDays[0] },
+    { start: '00:00', end: '00:00', limitToDay: null },
+    { start: '00:00', end: stageEndHHMM, limitToDay: stageDays[stageDays.length - 1] },
+  ]
 }
 
 // Windows are stored and compared as plain "HH:MM" wall-clock strings with no

@@ -9,13 +9,15 @@ interface Props {
   errors: Record<number, string> | undefined
   isMultiDay: boolean
   stageDays: string[]
-  minStartFor: (limitToDay: string | null) => string | undefined
+  canMatchStageHours: boolean
+  minStartFor: () => string | undefined
   maxEndFor: (limitToDay: string | null) => string | undefined
   onUpdateWindow: (index: number, field: 'start' | 'end', value: string) => void
   onRemoveWindow: (index: number) => void
   onAddWindow: () => void
   onToggleLimitToDay: (index: number) => void
   onSetLimitDay: (index: number, day: string) => void
+  onMatchStageHours: () => void
 }
 
 export function OperatingWindowsEditor({
@@ -23,6 +25,7 @@ export function OperatingWindowsEditor({
   errors,
   isMultiDay,
   stageDays,
+  canMatchStageHours,
   minStartFor,
   maxEndFor,
   onUpdateWindow,
@@ -30,14 +33,27 @@ export function OperatingWindowsEditor({
   onAddWindow,
   onToggleLimitToDay,
   onSetLimitDay,
+  onMatchStageHours,
 }: Props) {
   const { t } = useTranslation('admin')
 
   return (
     <section>
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-        {t('workstations.operatingWindowsLabel')}
-      </h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          {t('workstations.operatingWindowsLabel')}
+        </h2>
+        {canMatchStageHours && (
+          <Button
+            variant="light"
+            size="sm"
+            onPress={onMatchStageHours}
+            className="text-default-500"
+          >
+            {t('workstations.matchStageHours')}
+          </Button>
+        )}
+      </div>
       <p className="mb-3 text-xs text-gray-400">{t('workstations.operatingWindowMidnightHint')}</p>
       <div className="space-y-3">
         {windows.map((w, i) => (
@@ -49,7 +65,7 @@ export function OperatingWindowsEditor({
               <TimeInput
                 aria-label={t('workstations.windowStartLabel')}
                 value={hhmmToTime(w.start) ?? null}
-                minValue={hhmmToTime(minStartFor(w.limitToDay) ?? '')}
+                minValue={hhmmToTime(minStartFor() ?? '')}
                 validationBehavior="aria"
                 isInvalid={!!errors?.[i]}
                 onChange={(val) => onUpdateWindow(i, 'start', timeToHHMM(val as Time | null))}
