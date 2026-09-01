@@ -271,10 +271,7 @@ faster than `dashboard`, which makes three sequential ones.
 **Two routes forward, and they are not exclusive:**
 
 1. **Shorten the chain.** The prologue is uniform across all four paths, so
-   every hop removed helps all of them. Two are cheap and specific:
-   `schedule/page.tsx:26-33` re-runs the exact `officials` query that
-   `canViewOfficialSurfaces` already ran at `tenant.ts:179-186` and discarded —
-   wrapping that in `cache()` removes one hop from MYSCH-01 for free.
+   every hop removed helps all of them. One is cheap and specific:
    `dashboard/page.tsx:66` awaits `officials` after `events` although the two
    are independent — a `Promise.all` collapses two hops into one. Validating
    the JWT locally instead of calling GoTrue would remove a further ~180 ms
@@ -283,6 +280,16 @@ faster than `dashboard`, which makes three sequential ones.
    PASS (143-195%). It did not carry 90, so this alone is not sufficient — but
    it is the larger single lever measured, and the current 0.5 vCPU is
    demonstrably under-provisioned for the confirmed operational load.
+
+**Not a free win, despite looking like one:** `schedule/page.tsx:26-33`
+re-runs the same-shaped `officials` query that `canViewOfficialSurfaces`
+already ran at `tenant.ts:179-186`. Wrapping the guard in `cache()` does not
+remove that hop — the guard queries via `createSupabaseServiceClient()` and
+returns only a `boolean`, while the page needs the row's `id` via the
+user-scoped (RLS-respecting) client. De-duplicating the two would mean either
+returning the `id` from the service-client guard (bypassing RLS for a value
+the page then trusts) or re-deriving it with the user-scoped client (no hop
+saved). Left as a real, separate fix rather than done here.
 
 **Do not set `--max-replicas` from this run.** The measurement shows replica
 count is not the constraint at this chain length; F-PERF-05's ceiling of 3

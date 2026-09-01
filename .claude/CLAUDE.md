@@ -102,7 +102,12 @@ volume data, no real phone numbers, nothing anyone else depends on.
 - Container App: `sports-event-manager-perf` in `sports-event-manager-dev-rg`,
   on the shared `kanban-env`
 - URL: `https://sports-event-manager-perf.lemonbay-48b8af2a.swedencentral.azurecontainerapps.io`
-- Sized to match prod for measurement: 0.5 vCPU, 1 GiB, min 2 / max 3 replicas
+- CPU/memory sized to match prod: 0.5 vCPU, 1 GiB per replica. Replica count
+  does NOT match prod: this env runs min 2 / max 3 for measurement, while prod
+  runs `minReplicas: 1` (see Prod environment below). The PERF-01 result does
+  not depend on this difference — the 2026-09-01 run found replica count is
+  not the constraint (3 → 5 moved throughput by 2 rps) — but the two configs
+  are not identical and shouldn't be described as such.
 - **Scaled to `minReplicas 0` between runs** so it costs nothing idle. Scale it
   back up before measuring, and check `az containerapp replica list` — a run
   against a cold or single replica is not comparable to an earlier one.
