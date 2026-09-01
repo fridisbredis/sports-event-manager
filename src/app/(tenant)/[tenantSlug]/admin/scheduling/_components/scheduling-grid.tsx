@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
-  getCurrentStage,
   generateSlotsForDay,
   slotEndTime,
   isWithinWindow,
@@ -14,6 +13,7 @@ import {
   computeOverCapacityDetails,
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
+  uniqueIdsFromCellKeys,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { getAssignmentsForCell } from './grid-helpers'
@@ -47,6 +47,7 @@ interface Props {
   officials: OfficialData[]
   initialAssignments: AssignmentData[]
   initialSelectedDay: string
+  initialSelectedStageId: string
 }
 
 type View = 'by-person' | 'by-work-area'
@@ -62,12 +63,15 @@ export function SchedulingGrid({
   officials,
   initialAssignments,
   initialSelectedDay,
+  initialSelectedStageId,
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
-  const [selectedStageId, setSelectedStageId] = useState<string>(
-    () => getCurrentStage(stages)?.id ?? stages[0]?.id ?? ''
-  )
+  // The server already resolved the right stage (honoring a `?stage=` param
+  // if one named a real stage of this event, falling back to
+  // getCurrentStage/first otherwise) — trust that instead of re-deriving it
+  // here, so a "review this warning" link actually lands on the flagged stage.
+  const [selectedStageId, setSelectedStageId] = useState<string>(initialSelectedStageId)
   const [view, setView] = useState<View>('by-person')
   const [selectedDay, setSelectedDay] = useState<string>(initialSelectedDay)
 
@@ -161,17 +165,15 @@ export function SchedulingGrid({
     [assignments]
   )
 
-  const overCapacityCount = useMemo(() => {
-    const wsSet = new Set<string>()
-    for (const key of overCapacityCells) wsSet.add(key.split(':')[0])
-    return wsSet.size
-  }, [overCapacityCells])
+  const overCapacityCount = useMemo(
+    () => uniqueIdsFromCellKeys(overCapacityCells),
+    [overCapacityCells]
+  )
 
-  const doubleBookedCount = useMemo(() => {
-    const officialSet = new Set<string>()
-    for (const key of doubleBookedOfficials) officialSet.add(key.split(':')[0])
-    return officialSet.size
-  }, [doubleBookedOfficials])
+  const doubleBookedCount = useMemo(
+    () => uniqueIdsFromCellKeys(doubleBookedOfficials),
+    [doubleBookedOfficials]
+  )
 
   const doubleBookedDetails = useMemo(
     () => computeDoubleBookedDetails(doubleBookedOfficials, assignments, officials, workstations),
