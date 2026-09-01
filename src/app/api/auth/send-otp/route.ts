@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkLoginSendRateLimit, type RateLimitResult } from '@/lib/rate-limit'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
@@ -34,9 +35,11 @@ export async function POST(request: NextRequest) {
     } catch {
       // Logging must never be able to change the response.
     }
+    await logAuthEvent({ phone, event: 'otp_send_rate_limit_error' })
     return NextResponse.json({ error: 'Rate limit check failed' }, { status: 503 })
   }
   if (!rateLimit.allowed) {
+    await logAuthEvent({ phone, event: 'otp_send_rate_limited' })
     return NextResponse.json(
       { error: 'Too many requests', code: 'over_request_rate_limit' },
       { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
@@ -50,11 +53,13 @@ export async function POST(request: NextRequest) {
     // stable GoTrue enum the login page already maps to a translated
     // message; error.message is developer-worded prose meant for logs.
     logger.error('signInWithOtp failed', undefined, { code: error.code, message: error.message })
+    await logAuthEvent({ phone, event: 'otp_send_failed', errorCode: error.code ?? null })
     return NextResponse.json(
       { error: 'Request failed', code: error.code },
       { status: error.status ?? 400 }
     )
   }
 
+  await logAuthEvent({ phone, event: 'otp_send_succeeded' })
   return NextResponse.json({ ok: true })
 }

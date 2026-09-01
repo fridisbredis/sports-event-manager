@@ -15,6 +15,9 @@ export type AuditEvent = Omit<
   target_type: AuditTargetType
 }
 export type AuditEventInsert = DbTables['audit_events']['Insert']
+export type AuthEvent = Omit<DbTables['auth_events']['Row'], 'event'> & {
+  event: AuthEventType
+}
 export type UserRole = DbTables['user_roles']['Row']
 export type Event = DbTables['events']['Row']
 export type EventStage = DbTables['event_stages']['Row']
@@ -89,6 +92,17 @@ export type AuditAction =
   | 'official_invited'
   | 'announcement_published'
 export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement'
+// Match migration 0038's CHECK constraint (SEC-07-rest). Separate from
+// AuditAction/audit_events — see docs/adr/0001 category 5.
+export type AuthEventType =
+  | 'otp_send_succeeded'
+  | 'otp_send_failed'
+  | 'otp_send_rate_limited'
+  | 'otp_send_rate_limit_error'
+  | 'otp_verify_succeeded'
+  | 'otp_verify_failed'
+  | 'otp_verify_rate_limited'
+  | 'otp_verify_rate_limit_error'
 
 // Useful aggregate types for queries that join data
 export type WorkstationWithDetails = Workstation & {

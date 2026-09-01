@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkLoginVerifyRateLimit, type RateLimitResult } from '@/lib/rate-limit'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
@@ -36,9 +37,11 @@ export async function POST(request: NextRequest) {
     } catch {
       // Logging must never be able to change the response.
     }
+    await logAuthEvent({ phone, event: 'otp_verify_rate_limit_error' })
     return NextResponse.json({ error: 'Rate limit check failed' }, { status: 503 })
   }
   if (!rateLimit.allowed) {
+    await logAuthEvent({ phone, event: 'otp_verify_rate_limited' })
     return NextResponse.json(
       { error: 'Too many attempts', code: 'over_request_rate_limit' },
       { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
@@ -46,17 +49,36 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient()
-  const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
+  const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' })
   if (error) {
     // CLAUDE.md: never expose raw errors to the client — error.code is a
     // stable GoTrue enum the login page already maps to a translated
     // message; error.message is developer-worded prose meant for logs.
     logger.error('verifyOtp failed', undefined, { code: error.code, message: error.message })
+    await logAuthEvent({ phone, event: 'otp_verify_failed', errorCode: error.code ?? null })
     return NextResponse.json(
       { error: 'Request failed', code: error.code },
       { status: error.status ?? 400 }
     )
   }
 
+  if (!data.user) {
+    // GoTrue's contract is that a null error implies a populated user for
+    // this call — this branch means that contract broke. Treat it as a
+    // failure (never respond ok:true for a login the audit trail can't
+    // attribute to anyone) rather than silently logging a "succeeded" row
+    // with a null actor, which is indistinguishable from an intentionally
+    // anonymous event.
+    logger.error('verifyOtp returned no error but no user', undefined, { phone: '[redacted]' })
+    await logAuthEvent({ phone, event: 'otp_verify_failed', errorCode: 'no_user_in_response' })
+    return NextResponse.json(
+      { error: 'Request failed', code: 'no_user_in_response' },
+      {
+        status: 500,
+      }
+    )
+  }
+
+  await logAuthEvent({ phone, event: 'otp_verify_succeeded', actorUserId: data.user.id })
   return NextResponse.json({ ok: true })
 }

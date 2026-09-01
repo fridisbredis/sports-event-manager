@@ -4,7 +4,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.17'
+    PostgrestVersion: '14.5'
   }
   public: {
     Tables: {
@@ -151,6 +151,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'audit_events_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      auth_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          error_code: string | null
+          event: string
+          id: string
+          phone_hash: string
+          tenant_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          error_code?: string | null
+          event: string
+          id?: string
+          phone_hash: string
+          tenant_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          error_code?: string | null
+          event?: string
+          id?: string
+          phone_hash?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'auth_events_tenant_id_fkey'
             columns: ['tenant_id']
             isOneToOne: false
             referencedRelation: 'tenants'
