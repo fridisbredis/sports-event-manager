@@ -19,7 +19,8 @@ function makeRequest(body: unknown) {
   })
 }
 
-const PHONE = '+46701234567'
+// What normalizePhoneToE164 actually produces: E.164 with the '+' stripped.
+const PHONE = '46701234567'
 const TOKEN = '123456'
 
 beforeEach(() => {
@@ -71,6 +72,20 @@ describe('POST /api/auth/verify-otp', () => {
     expect(verifyOtp).toHaveBeenCalledWith({ phone: PHONE, token: TOKEN, type: 'sms' })
     expect(res.status).toBe(200)
     expect(body).toEqual({ ok: true })
+  })
+
+  // See send-otp/route.test.ts — the '+' is optional, both shapes pass through.
+  it('also accepts E.164 with a leading +', async () => {
+    vi.mocked(checkLoginVerifyRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    const verifyOtp = vi.fn().mockResolvedValue({ error: null })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { verifyOtp },
+    } as never)
+
+    const res = await POST(makeRequest({ phone: `+${PHONE}`, token: TOKEN }))
+
+    expect(verifyOtp).toHaveBeenCalledWith({ phone: `+${PHONE}`, token: TOKEN, type: 'sms' })
+    expect(res.status).toBe(200)
   })
 
   it('never forwards GoTrue error.message to the client', async () => {
