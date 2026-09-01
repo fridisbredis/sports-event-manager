@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant, getConfirmedOfficial } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { ScheduleView, type AssignmentRow } from './_components/schedule-view'
 
@@ -23,17 +23,11 @@ export default async function SchedulePage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const { data: officialsRows, error: officialsError } = await supabase
-    .from('officials')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('tenant_id', tenant.id)
-    .eq('invite_status', 'confirmed')
-    .limit(1)
-
-  if (officialsError) throw officialsError
-
-  const official = officialsRows?.[0] ?? null
+  // Memoised per render pass, and shared with canViewOfficialSurfaces in the
+  // layout's access check above — which needs this exact row and previously
+  // threw it away, forcing this page to fetch it again. One query now serves
+  // both (PERF-01: ~67 ms per hop under load).
+  const official = await getConfirmedOfficial(user.id, tenant.id)
 
   let assignments: AssignmentRow[] = []
 

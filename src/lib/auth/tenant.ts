@@ -168,30 +168,50 @@ export async function canViewOfficialSurfaces(userId: string, tenantId: string):
 
   if (!hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return false
 
-  // Ask for a confirmed row and take the first, rather than asking for "the" row:
-  // removal is a soft delete, so a re-invited official has both a 'removed' row and a
-  // 'confirmed' row for this (user_id, tenant_id). maybeSingle() alone treats that
-  // second row as an error, and this guard reads any error as deny — locking a
-  // legitimately confirmed official out of every official surface. limit(1) makes the
-  // two-row shape unrepresentable instead of relying on it never occurring, so the
-  // guard cannot fail closed on a data shape 0020 permits by design.
-  const service = createSupabaseServiceClient()
-  const { data: official, error } = await service
-    .from('officials')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('tenant_id', tenantId)
-    .eq('invite_status', 'confirmed')
-    .limit(1)
-    .maybeSingle()
-
-  if (error) {
-    logger.error('Failed to fetch official invite status', error)
-    return false
-  }
-
-  return official !== null
+  return (await getConfirmedOfficial(userId, tenantId)) !== null
 }
+
+/**
+ * The caller's confirmed `officials` row for a tenant, or null.
+ *
+ * Memoised per render pass, and exported, for one reason: MYSCH-01 needs the
+ * same row this guard needs. Before this, `canViewOfficialSurfaces` fetched it,
+ * discarded everything but "did it exist", and the page then re-fetched the
+ * identical row — a second dependent round trip on a path where PERF-01
+ * measured every hop at ~67 ms under load. `cache()` collapses both callers
+ * onto one query.
+ *
+ * Ask for a confirmed row and take the first, rather than asking for "the" row:
+ * removal is a soft delete, so a re-invited official has both a 'removed' row and a
+ * 'confirmed' row for this (user_id, tenant_id). maybeSingle() alone treats that
+ * second row as an error, and the guard above reads any error as deny — locking a
+ * legitimately confirmed official out of every official surface. limit(1) makes the
+ * two-row shape unrepresentable instead of relying on it never occurring, so the
+ * guard cannot fail closed on a data shape 0020 permits by design.
+ *
+ * Returns null on error, which keeps the guard's fail-closed behaviour: a query
+ * failure must never read as "confirmed".
+ */
+export const getConfirmedOfficial = cache(
+  async (userId: string, tenantId: string): Promise<{ id: string } | null> => {
+    const service = createSupabaseServiceClient()
+    const { data, error } = await service
+      .from('officials')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('tenant_id', tenantId)
+      .eq('invite_status', 'confirmed')
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      logger.error('Failed to fetch official invite status', error)
+      return null
+    }
+
+    return data
+  }
+)
 
 export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {
   const supabase = await createSupabaseServerClient()

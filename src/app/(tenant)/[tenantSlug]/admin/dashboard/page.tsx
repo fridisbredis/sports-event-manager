@@ -41,17 +41,26 @@ export default async function DashboardPage({ params }: Props) {
 
   if (!tenant) notFound()
 
+  // events and officials are independent — both keyed on tenant_id alone — so
+  // they go in one hop rather than two. Only the stage count genuinely depends
+  // on event.id and has to follow (PERF-01: ~70 ms per hop under load).
+  //
   // No event yet is a legitimate state this dashboard renders an empty view
   // for; a failed query is not, and must not look the same.
-  const { data: event, error: eventError } = await supabase
-    .from('events')
-    .select(
-      'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
-    )
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
+  const [{ data: event, error: eventError }, { data: officialsData, error: officialsError }] =
+    await Promise.all([
+      supabase
+        .from('events')
+        .select(
+          'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
+        )
+        .eq('tenant_id', tenant.id)
+        .maybeSingle(),
+      supabase.from('officials').select('invite_status').eq('tenant_id', tenant.id),
+    ])
 
   if (eventError) throw eventError
+  if (officialsError) throw officialsError
 
   const { count: raceStageCount, error: raceStageError } = event
     ? await supabase
@@ -62,13 +71,6 @@ export default async function DashboardPage({ params }: Props) {
     : { count: 0, error: null }
 
   if (raceStageError) throw raceStageError
-
-  const { data: officialsData, error: officialsError } = await supabase
-    .from('officials')
-    .select('invite_status')
-    .eq('tenant_id', tenant.id)
-
-  if (officialsError) throw officialsError
 
   const officialsInvited = officialsData?.filter((o) => o.invite_status === 'invited').length ?? 0
   const officialsConfirmed =
