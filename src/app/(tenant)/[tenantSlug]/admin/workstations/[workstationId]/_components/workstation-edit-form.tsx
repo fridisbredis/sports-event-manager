@@ -16,7 +16,9 @@ import {
   expandWindows,
   windowDurationMin,
   initWindowsFromStored,
+  matchStageHoursWindows,
 } from '../../_utils'
+import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from './operating-windows-editor'
 import { TodosEditor } from './todos-editor'
 
@@ -59,21 +61,29 @@ export default function WorkstationEditForm({
   const selectedStage = stages.find((s) => s.id === stageId) ?? null
   const stageDays = getStageDays(selectedStage)
   const isMultiDay = stageDays.length > 1
-  const stageStartHHMM = selectedStage?.start_time?.slice(11, 16) ?? null
-  const stageEndHHMM = selectedStage?.end_time?.slice(11, 16) ?? null
+  // Use the buffered allocable range (±1h around a race), not the stage's raw
+  // start/end — otherwise a window couldn't be set to match what the
+  // scheduling grid actually shows around a race.
+  const allocableRange = selectedStage ? getAllocableRange(selectedStage) : null
+  const stageStartHHMM = allocableRange?.start.slice(11, 16) ?? null
+  const stageEndHHMM = allocableRange?.end.slice(11, 16) ?? null
   const lastDay = stageDays[stageDays.length - 1] ?? null
 
-  function minStartFor(limitToDay: string | null) {
-    if (stageDays.length === 1 || limitToDay === stageDays[0]) return stageStartHHMM ?? undefined
-    return undefined
-  }
+  // On a multi-day stage, a window limited to the first day is allowed to
+  // start before the stage's own start time (e.g. staffing arrives ahead of
+  // the stage officially beginning) — there's no earlier day to put that
+  // time on instead. A single-day stage has no such earlier day either, so
+  // the floor still applies there.
+  const minStartFor = stageDays.length === 1 ? (stageStartHHMM ?? undefined) : undefined
   function maxEndFor(limitToDay: string | null) {
     if (stageDays.length === 1 || limitToDay === lastDay) return stageEndHHMM ?? undefined
     return undefined
   }
+  // Only called for multi-day windows (see call sites below), so there is no
+  // first-day-of-a-single-day-stage case to clamp against here.
   function clampToDay(win: TimeWindow, newDay: string): TimeWindow {
-    let { start, end } = win
-    if (newDay === stageDays[0] && stageStartHHMM && start && start < stageStartHHMM) start = ''
+    const { start } = win
+    let { end } = win
     if (newDay === lastDay && stageEndHHMM && end && end > stageEndHHMM) end = ''
     return { ...win, start, end, limitToDay: newDay }
   }
@@ -94,6 +104,14 @@ export default function WorkstationEditForm({
 
   function addWindow() {
     setWindows((prev) => [...prev, { start: '', end: '', limitToDay: null }])
+    markDirty()
+  }
+
+  function matchStageHours() {
+    const generated = matchStageHoursWindows(stageDays, stageStartHHMM, stageEndHHMM)
+    if (generated.length === 0) return
+    setWindows(generated)
+    setErrors((prev) => ({ ...prev, windows: undefined }))
     markDirty()
   }
 
@@ -169,7 +187,10 @@ export default function WorkstationEditForm({
         windowErrors[i] = t('workstations.windowEndRequired')
         return
       }
-      const onFirstDay = stageDays.length === 1 || w.limitToDay === stageDays[0]
+      // A window limited to the stage's first day is allowed to start before
+      // the stage's own start time on a multi-day stage (see minStartFor) —
+      // the floor only applies on a single-day stage.
+      const onFirstDay = stageDays.length === 1
       const onLastDay = stageDays.length === 1 || w.limitToDay === lastDay
       if (onFirstDay && stageStartHHMM && w.start < stageStartHHMM) {
         windowErrors[i] = t('workstations.windowBeforeStageStart', { time: stageStartHHMM })
@@ -189,7 +210,7 @@ export default function WorkstationEditForm({
     setSaveSuccess(false)
 
     startSave(async () => {
-      const finalWindows = expandWindows(windows, stageDays, selectedStage?.start_time ?? null)
+      const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
 
       const result = await updateWorkstation({
         tenantSlug,
@@ -333,13 +354,20 @@ export default function WorkstationEditForm({
             errors={errors.windows}
             isMultiDay={isMultiDay}
             stageDays={stageDays}
-            minStartFor={minStartFor}
-            maxEndFor={maxEndFor}
+            canMatchStageHours={
+              !!selectedStage &&
+              !!stageStartHHMM &&
+              !!stageEndHHMM &&
+              windows.every((w) => !w.start && !w.end)
+            }
             onUpdateWindow={updateWindow}
             onRemoveWindow={removeWindow}
             onAddWindow={addWindow}
             onToggleLimitToDay={toggleLimitToDay}
             onSetLimitDay={setLimitDay}
+            onMatchStageHours={matchStageHours}
+            minStartFor={minStartFor}
+            maxEndFor={maxEndFor}
           />
         </div>
 
