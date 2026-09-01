@@ -56,6 +56,18 @@ taxonomy:
    resolving an identity the auth-admin API doesn't expose a lookup for
    (`get_user_id_by_phone`), called only from the same auth-admin code path
    as category 3.
+5. **Unauthenticated write, added SEC-07-rest** — the write happens before
+   or independent of any session existing, so there is no `auth.uid()` to
+   derive an RLS INSERT policy from at all, not even a token-gated one.
+   Example: `src/lib/audit/log-auth-event.ts`, writing to `auth_events`
+   from `POST /api/auth/send-otp` and `POST /api/auth/verify-otp` — a
+   failed OTP verify has no authenticated caller by definition, and even a
+   successful one is recorded before the route does anything with the
+   resulting session. Distinct from category 2 (public token-gated flow):
+   there the security boundary is a token RLS could in principle key off of
+   if one existed; here there is no boundary to key off of, only the fact
+   that the write's own audit purpose requires it to always succeed,
+   including on failure paths that prove nothing about the caller.
 
 Everything else — every read of tenant-scoped data once the caller's role
 is already established, and every write an already-verified `tenant_admin`/
@@ -69,11 +81,13 @@ Corrected C4 language (to be applied to
 
 > All data access goes through the server using the authenticated user's
 > token per request, so Row Level Security applies to nearly all reads and
-> writes. The Supabase service role is reserved for four narrow cases where
+> writes. The Supabase service role is reserved for five narrow cases where
 > RLS cannot apply: role-bootstrap lookups, public token-gated flows with no
-> session yet, the Supabase Auth admin API, and RPCs that exist only to
-> support that admin API. See `docs/security/service-role-audit.md` for the
-> exhaustive, file-by-file list.
+> session yet, the Supabase Auth admin API, RPCs that exist only to
+> support that admin API, and unauthenticated writes (e.g. login audit
+> events) with no session to key an RLS policy off of at all. See
+> `docs/security/service-role-audit.md` for the exhaustive, file-by-file
+> list.
 
 ## Consequences
 
