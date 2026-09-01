@@ -1,4 +1,5 @@
 import { Time } from '@internationalized/date'
+import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 
 export interface Stage {
   id: string
@@ -26,18 +27,19 @@ export function windowDurationMin(start: string, end: string): number {
   return endMin <= startMin ? endMin + 24 * 60 - startMin : endMin - startMin
 }
 
+// Thin null-safe wrapper so callers here don't each need their own
+// `stage ?? ` guard before reaching the grid's own day-range logic.
 export function getStageDays(stage: Stage | null): string[] {
   if (!stage?.start_time || !stage?.end_time) return []
-  const daySet = new Set<string>()
-  const cur = new Date(stage.start_time)
-  cur.setUTCHours(0, 0, 0, 0)
-  const last = new Date(stage.end_time)
-  last.setUTCHours(0, 0, 0, 0)
-  while (cur <= last) {
-    daySet.add(cur.toISOString().slice(0, 10))
-    cur.setUTCDate(cur.getUTCDate() + 1)
-  }
-  return [...daySet].sort()
+  return getAllocableDays(stage)
+}
+
+// A day + "HH:MM" pair, rolled to the next calendar day when `overnight` is
+// true, as an ISO instant.
+function rolloverEndInstant(day: string, endHHMM: string, overnight: boolean): Date {
+  const d = new Date(`${day}T${endHHMM}:00Z`)
+  if (overnight) d.setUTCDate(d.getUTCDate() + 1)
+  return d
 }
 
 export function expandWindows(
@@ -45,6 +47,8 @@ export function expandWindows(
   stageDays: string[],
   stageStart: string | null
 ): { window_start: string; window_end: string }[] {
+  const lastDay = stageDays[stageDays.length - 1] ?? null
+
   return windows
     .filter((w) => w.start && w.end)
     .flatMap((w) => {
@@ -59,18 +63,53 @@ export function expandWindows(
             days = stageDays.slice(1)
           }
         }
+        // A recurring overnight window (end <= start, e.g. a full 00:00->00:00
+        // day) always rolls into the next calendar day — which, on the
+        // stage's last day, is past the stage's own end time. It would
+        // collide with a separate window explicitly limited to that last day
+        // to cap it there.
+        //
+        // Test stageDays.length here, not the post-slice `days.length`: the
+        // slice above (for a window starting before the stage's own start
+        // time) already shrinks `days` to stageDays.length - 1 on its own,
+        // so on a 2-day stage `days.length > 1` would never be true and this
+        // guard would silently never fire, letting the collision through.
+        if (stageDays.length > 1 && w.end <= w.start && days[days.length - 1] === lastDay) {
+          days = days.slice(0, -1)
+        }
       }
       return days.map((day) => {
         const overnight = w.end <= w.start
-        let endDay = day
-        if (overnight) {
-          const d = new Date(day + 'T12:00:00Z')
-          d.setUTCDate(d.getUTCDate() + 1)
-          endDay = d.toISOString().slice(0, 10)
+        const endInstant = rolloverEndInstant(day, w.end, overnight)
+        return {
+          window_start: `${day}T${w.start}`,
+          window_end: endInstant.toISOString().slice(0, 16),
         }
-        return { window_start: `${day}T${w.start}`, window_end: `${endDay}T${w.end}` }
       })
     })
+}
+
+// Builds the minimal set of windows that exactly covers the stage's own
+// allocable range (its raw hours, or the ±1h buffer around a race — whichever
+// stageStartHHMM/stageEndHHMM were derived from). Replaces whatever windows
+// exist with a clean baseline the admin can then split into extra shifts by
+// adding more day-limited windows alongside these.
+export function matchStageHoursWindows(
+  stageDays: string[],
+  stageStartHHMM: string | null,
+  stageEndHHMM: string | null
+): TimeWindow[] {
+  if (stageDays.length === 0 || !stageStartHHMM || !stageEndHHMM) return []
+
+  if (stageDays.length === 1) {
+    return [{ start: stageStartHHMM, end: stageEndHHMM, limitToDay: null }]
+  }
+
+  return [
+    { start: stageStartHHMM, end: '00:00', limitToDay: stageDays[0] },
+    { start: '00:00', end: '00:00', limitToDay: null },
+    { start: '00:00', end: stageEndHHMM, limitToDay: stageDays[stageDays.length - 1] },
+  ]
 }
 
 // Windows are stored and compared as plain "HH:MM" wall-clock strings with no
