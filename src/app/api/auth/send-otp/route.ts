@@ -4,10 +4,12 @@ import { checkLoginSendRateLimit, type RateLimitResult } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
-// E.164: leading +, then 1-15 digits. The client already normalized via
-// normalizePhoneToE164 before calling here — this just rejects malformed input.
+// E.164, leading '+' optional. normalizePhoneToE164 strips the '+' so its output
+// matches the shape Supabase Auth stores in user.phone, and that stripped value is
+// what the login page posts — requiring the '+' here rejected every real login.
+// GoTrue normalizes either shape, so both are accepted and passed through as-is.
 const sendOtpSchema = z.object({
-  phone: z.string().regex(/^\+[1-9]\d{1,14}$/),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
 })
 
 // F-SEC-08: login has no server route in front of it today, so it has no
