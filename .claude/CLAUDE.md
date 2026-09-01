@@ -93,6 +93,29 @@ Example: `feat(EVT-01): scaffold event dashboard`
 - Twilio subaccount: `sports-event-manager` (SID in 1Password)
 - Sentry project: `viadal-event-dev` in org `extrapreneur` — https://extrapreneur.sentry.io/projects/viadal-event-dev/ (added 2026-08-25, REL-02)
 
+### Perf environment (PERF-01 load testing)
+
+Created 2026-09-01 for the PERF-01 load run. **Disposable** — holds only seeded
+volume data, no real phone numbers, nothing anyone else depends on.
+
+- Supabase project ref: `jsusfleoufnjfrgsshmi` (eu-north-1, ~10 USD/month)
+- Container App: `sports-event-manager-perf` in `sports-event-manager-dev-rg`,
+  on the shared `kanban-env`
+- URL: `https://sports-event-manager-perf.lemonbay-48b8af2a.swedencentral.azurecontainerapps.io`
+- Sized to match prod for measurement: 0.5 vCPU, 1 GiB, min 2 / max 3 replicas
+- **Scaled to `minReplicas 0` between runs** so it costs nothing idle. Scale it
+  back up before measuring, and check `az containerapp replica list` — a run
+  against a cold or single replica is not comparable to an earlier one.
+- Config is in `.env.perf` (gitignored). `scripts/perf-env.ts` reaches this
+  project through an **exact-ref allowlist**: dev is explicitly refused, prod is
+  refused by default-deny. Never add either.
+- Auth rate limits are raised here (`sign_in_sign_ups = 500`) because the
+  harness signs in 90 users at the start of a run. Phone auth is enabled;
+  the harness uses password sign-in on the seeded +4672000xxxx pool.
+
+To delete when PERF-01 is closed: `az containerapp delete` plus removing the
+Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
+
 ### Prod environment
 
 - Resource group: `sports-event-manager-prod-rg`
