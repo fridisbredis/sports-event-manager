@@ -92,7 +92,7 @@ describe('POST /api/auth/verify-otp', () => {
   // See send-otp/route.test.ts — the '+' is optional, both shapes pass through.
   it('also accepts E.164 with a leading +', async () => {
     vi.mocked(checkLoginVerifyRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
-    const verifyOtp = vi.fn().mockResolvedValue({ error: null })
+    const verifyOtp = vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { verifyOtp },
     } as never)
