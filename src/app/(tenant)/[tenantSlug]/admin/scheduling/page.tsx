@@ -7,7 +7,7 @@ import { SchedulingGrid } from './_components/scheduling-grid'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
-  searchParams: Promise<{ day?: string }>
+  searchParams: Promise<{ day?: string; stage?: string }>
 }
 
 // Assignments are scoped to a single calendar day (UTC) rather than fetched for
@@ -91,11 +91,16 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
   const queryError = stagesError ?? workstationsError ?? officialsError
   if (queryError) throw queryError
 
-  const { day } = await searchParams
-  const defaultStage = getCurrentStage(stages ?? []) ?? (stages ?? [])[0]
-  const defaultDays = defaultStage ? getAllocableDays(defaultStage) : []
+  const { day, stage: stageParam } = await searchParams
+  // A `?stage=` from e.g. the dashboard's "review this warning" link takes
+  // priority over the grid's own default (current stage, or the first one)
+  // — but only if it actually names a stage of this event, so a stale or
+  // tampered param can't put the grid in a broken state.
+  const requestedStage = stageParam ? (stages ?? []).find((s) => s.id === stageParam) : undefined
+  const selectedStage = requestedStage ?? getCurrentStage(stages ?? []) ?? (stages ?? [])[0]
+  const selectedStageDays = selectedStage ? getAllocableDays(selectedStage) : []
   const today = new Date().toISOString().slice(0, 10)
-  const selectedDay = day ?? (defaultDays.includes(today) ? today : defaultDays[0])
+  const selectedDay = day ?? (selectedStageDays.includes(today) ? today : selectedStageDays[0])
 
   const assignments = selectedDay
     ? await fetchAssignmentsForDay(supabase, tenant.id, selectedDay)
@@ -113,6 +118,7 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
         officials={officials ?? []}
         initialAssignments={assignments}
         initialSelectedDay={selectedDay ?? ''}
+        initialSelectedStageId={selectedStage?.id ?? ''}
       />
     </div>
   )

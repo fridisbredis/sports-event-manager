@@ -79,9 +79,38 @@ export default async function DashboardPage({ params }: Props) {
   const canPublish = hasName && hasRaceStage
   const isPublished = event?.status === 'published'
 
-  // Scheduling warning counts — real values come once scheduling is built
-  const overCapacity = 0
-  const doubleBooked = 0
+  // Scheduling warnings cover the whole event (every day, every stage) rather
+  // than the single day the scheduling grid itself shows at a time — a
+  // dashboard summary that only reflected today would hide a double-booking
+  // three days out until an admin happened to click through to that day.
+  // Aggregated in Postgres (scheduling_warning_counts, migration 0040) rather
+  // than pulling every assignment row into Node — this page's other tiles
+  // are all cheap counts, and a naive fetch-then-reduce here would make the
+  // dashboard's load time scale with total assignment count for the event.
+  let overCapacity = 0
+  let doubleBooked = 0
+  let reviewHref = `/${tenantSlug}/admin/scheduling`
+  if (event) {
+    const { data: warningCounts, error: warningCountsError } = await supabase
+      .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id })
+      .single()
+
+    if (warningCountsError) throw warningCountsError
+
+    overCapacity = warningCounts.over_capacity
+    doubleBooked = warningCounts.double_booked
+
+    // Jump straight to where the earliest warning is, rather than the grid's
+    // own default (getCurrentStage/today) — otherwise an admin has to hunt
+    // for the flagged stage and day manually.
+    if (warningCounts.earliest_day && warningCounts.earliest_stage_id) {
+      const params = new URLSearchParams({
+        day: warningCounts.earliest_day,
+        stage: warningCounts.earliest_stage_id,
+      })
+      reviewHref = `/${tenantSlug}/admin/scheduling?${params.toString()}`
+    }
+  }
   const totalWarnings = overCapacity + doubleBooked
 
   const tenantId = tenant.id
@@ -133,7 +162,7 @@ export default async function DashboardPage({ params }: Props) {
           doubleBookedLabel={t('dashboard.doubleBooked')}
           allClearLabel={t('dashboard.allClear')}
           issuesLabel={t('dashboard.issues', { count: totalWarnings })}
-          reviewHref={`/${tenantSlug}/admin/scheduling`}
+          reviewHref={reviewHref}
           reviewLabel={t('dashboard.reviewInScheduling')}
         />
       </div>
