@@ -7,10 +7,7 @@ import { LogoutButton } from '@/components/logout-button'
 
 export function SidebarNav() {
   const pathname = usePathname()
-  const isTenantsActive =
-    pathname === '/admin' ||
-    (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/health'))
-  const isHealthActive = pathname.startsWith('/admin/health')
+  const isActive = pathname === '/admin' || pathname.startsWith('/admin/')
 
   return (
     <div className="flex flex-col flex-1">
@@ -18,22 +15,12 @@ export function SidebarNav() {
         <Link
           href="/admin"
           className={`block px-6 py-2.5 text-sm transition-colors ${
-            isTenantsActive
+            isActive
               ? 'bg-gray-100 text-gray-900 font-medium'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
         >
           Tenants
-        </Link>
-        <Link
-          href="/admin/health"
-          className={`block px-6 py-2.5 text-sm transition-colors ${
-            isHealthActive
-              ? 'bg-gray-100 text-gray-900 font-medium'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-          }`}
-        >
-          Systemstatus
         </Link>
       </nav>
       <div className="border-t border-gray-100 py-2">

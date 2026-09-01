@@ -39,7 +39,7 @@ export default async function SystemHealthPage() {
           status={twilio.status}
           facts={
             twilio.status === 'ok'
-              ? [{ label: 'SMS senaste dygnet', value: String(twilio.sentLast24h ?? 0) }]
+              ? [{ label: 'SMS idag', value: String(twilio.sentToday ?? 0) }]
               : undefined
           }
           note={
