@@ -6,7 +6,10 @@ import { NextRequest } from 'next/server'
 vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => ({
     auth: {
-      getUser: vi.fn(() => Promise.resolve({ data: { user: null } })),
+      // The proxy verifies the JWT locally via getClaims rather than calling
+      // GoTrue (PERF-01). No claims means no session, which is what every test
+      // in this file wants.
+      getClaims: vi.fn(() => Promise.resolve({ data: null, error: null })),
     },
   })),
 }))

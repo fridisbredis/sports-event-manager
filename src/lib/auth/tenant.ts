@@ -377,10 +377,12 @@ export async function resolveTenantForOfficial(
 // pattern the installed Next.js docs recommend for authorization
 // (node_modules/next/dist/docs/01-app/02-guides/authentication.md).
 //
-// The proxy's own getUser() is deliberately NOT covered here. Proxy is a
+// The proxy's own auth call is deliberately NOT covered here. Proxy is a
 // separate execution context — the same docs are explicit that it must not rely
 // on shared modules — and @supabase/ssr needs that call to refresh the session
-// cookie. It can be made cheaper, never deduplicated.
+// cookie. It can be made cheaper, never deduplicated. Making it cheaper is
+// exactly what the getClaims() switch did (PERF-01): the call still happens on
+// every request, it just verifies locally instead of round-tripping to GoTrue.
 //
 // Safety note: fetchAccessContext uses the service client, not the session
 // client (ADR-0001, category 1 bootstrap lookup), so these queries do not
@@ -392,11 +394,58 @@ export async function resolveTenantForOfficial(
 // defeated by two callers passing subtly different arguments.
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
+  return resolveUserFromClaims(supabase)
 })
+
+/**
+ * Establishes the caller's identity from their access token, verifying the JWT
+ * signature rather than asking GoTrue who they are.
+ *
+ * This is not a weaker check than `getUser()`. `getClaims()` verifies the
+ * token's signature against the project's published signing keys — for our
+ * projects that is ES256, confirmed on dev, prod and perf — using WebCrypto,
+ * locally and usually without a network call. Supabase's own guidance treats it
+ * as the equivalent of `getUser()` for establishing identity, and both reject a
+ * forged or tampered token. The difference is where the verification happens,
+ * not whether it happens.
+ *
+ * Why it matters here: PERF-01 measured GoTrue `/user` at 130 ms p50 under the
+ * derived load, against 3 ms for a local verify — and the read paths pay this
+ * twice per request (proxy plus this helper). It was the single largest term in
+ * the serial auth prologue.
+ *
+ * Two properties this relies on, both documented on `getClaims()`:
+ *   - If the token is near expiry the session is refreshed first, so the cookie
+ *     rotation `@supabase/ssr` needs is preserved.
+ *   - If a project ever falls back to a symmetric signing secret, or WebCrypto
+ *     is unavailable, `getClaims()` transparently makes the same server call
+ *     `getUser()` would. Correctness does not depend on the fast path existing;
+ *     only the speed does.
+ *
+ * Returns a User-shaped object built from the claims. Only fields the callers
+ * actually read are populated — `id` is the one that matters, and it is the
+ * `sub` claim, exactly what `getUser()` returns as the id.
+ */
+async function resolveUserFromClaims(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+): Promise<User | null> {
+  const { data, error } = await supabase.auth.getClaims()
+
+  if (error || !data?.claims?.sub) return null
+
+  const claims = data.claims
+
+  return {
+    id: claims.sub,
+    aud: typeof claims.aud === 'string' ? claims.aud : 'authenticated',
+    role: typeof claims.role === 'string' ? claims.role : undefined,
+    email: typeof claims.email === 'string' ? claims.email : undefined,
+    phone: typeof claims.phone === 'string' ? claims.phone : undefined,
+    app_metadata: (claims.app_metadata ?? {}) as User['app_metadata'],
+    user_metadata: (claims.user_metadata ?? {}) as User['user_metadata'],
+    created_at: '',
+  } as User
+}
 
 // One argument, not two: userId is derived internally rather than passed in,
 // for the same cache-key reason. tenantSlug stays because it is genuinely part

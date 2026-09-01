@@ -59,13 +59,21 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Refresh session — required for @supabase/ssr, do not remove. Health
-  // and cron paths return above and never reach this call: both are
-  // machine-called (Azure probes, pg_cron/pg_net) and have no session to
-  // refresh, so skipping it for them is safe.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Establishes the session AND refreshes it — both still required for
+  // @supabase/ssr, do not remove. Health and cron paths return above and never
+  // reach this call: both are machine-called (Azure probes, pg_cron/pg_net) and
+  // have no session to refresh, so skipping it for them is safe.
+  //
+  // getClaims() rather than getUser(): it verifies the JWT signature locally
+  // against the project's ES256 signing keys instead of asking GoTrue, which
+  // PERF-01 measured at 130 ms p50 under load versus 3 ms. The session refresh
+  // this comment has always insisted on is preserved — getClaims() refreshes a
+  // near-expiry token before validating it, and the setAll cookie writer above
+  // is what persists the rotated cookie either way. It also falls back to the
+  // same server call getUser() makes if a project is ever on a symmetric
+  // secret, so this is a speed change, not a security one.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
 
   if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {
     // For API routes, return 401 JSON instead of redirecting to login HTML
