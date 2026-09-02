@@ -50,7 +50,10 @@ const EVENTS = intArg('events', 5)
 const ADMINS_PER_EVENT = intArg('admins', 3)
 const OFFICIALS_PER_EVENT = intArg('officials', 15)
 const ASSIGNMENTS_PER_EVENT = intArg('assignments', 200)
-const WORK_AREAS_PER_EVENT = intArg('workareas', 12)
+// Confirmed (Frida, 2026-09-01): 15 work areas per event, distributed across
+// the event's stages rather than all hanging off one. This was the last
+// baseline volume still carrying a PLACEHOLDER marker.
+const WORK_AREAS_PER_EVENT = intArg('workareas', 15)
 
 // Each parallel event is its own tenant: the five events in the confirmed
 // figure are different clubs, not five events inside one club. That matters for
@@ -71,6 +74,9 @@ function nextPhone(): string {
 const storedPhone = (phone: string) => phone.replace(/^\+/, '')
 
 const STAGE_DATE = '2026-09-05'
+// Three stages per event, all on STAGE_DATE. WORK_AREAS_PER_EVENT is dealt
+// across these round-robin (15 areas -> 5 per stage at the confirmed volume).
+const STAGE_NAMES = ['Morning Stage', 'Midday Stage', 'Afternoon Stage']
 const WINDOW_START = `${STAGE_DATE}T07:00:00Z`
 const WINDOW_END = `${STAGE_DATE}T19:00:00Z`
 
@@ -155,32 +161,41 @@ async function seedTenant(index: number) {
     .single()
   if (eventError) throw eventError
 
-  // One race stage covering the whole day. The scheduling view resolves the
-  // selected day from the stage's allocable range (getAllocableDays), so every
-  // seeded assignment has to fall inside this window to be fetched at all.
-  const { data: stage, error: stageError } = await admin
+  // Stages all sit on the same day and share the operating window: the
+  // scheduling view resolves the selected day from the stages' allocable range
+  // (getAllocableDays), so every seeded assignment has to fall inside this
+  // window to be fetched at all. Splitting across days instead would put most
+  // of the seeded volume outside whichever day the view happens to select.
+  const stageRows = STAGE_NAMES.map((name, i) => ({
+    tenant_id: tenant.id,
+    event_id: event.id,
+    name,
+    stage_type: 'race' as const,
+    stage_date: STAGE_DATE,
+    start_time: WINDOW_START,
+    end_time: WINDOW_END,
+    venue: 'Perf Arena',
+    position: i,
+  }))
+
+  const { data: stages, error: stageError } = await admin
     .from('event_stages')
-    .insert({
-      tenant_id: tenant.id,
-      event_id: event.id,
-      name: 'Race Day',
-      stage_type: 'race',
-      stage_date: STAGE_DATE,
-      start_time: WINDOW_START,
-      end_time: WINDOW_END,
-      venue: 'Perf Arena',
-      position: 0,
-    })
+    .insert(stageRows)
     .select('id')
-    .single()
   if (stageError) throw stageError
 
-  // Work areas (workstations). event-info reads facilities, the scheduling view
-  // reads workstations with their operating windows nested — so both need depth.
+  // Work areas (workstations), dealt round-robin across the stages so the
+  // confirmed "15 per event, distributed across the stages" shape is what gets
+  // measured. Note this does not change the scheduling page's server-side read
+  // cost: that query filters on event_id, not stage_id, and fetches all 15 —
+  // the stage filter is applied client-side in getCurrentStage. The
+  // distribution matters for client rendering and the allocable-range logic.
+  // event-info reads facilities, the scheduling view reads workstations with
+  // their operating windows nested — so both need depth.
   const workstationRows = Array.from({ length: WORK_AREAS_PER_EVENT }, (_, i) => ({
     tenant_id: tenant.id,
     event_id: event.id,
-    stage_id: stage.id,
+    stage_id: stages[i % stages.length].id,
     name: `Work area ${i + 1}`,
     description: `Seeded work area ${i + 1} for PERF-01 volume`,
     capacity_ceiling: 4,
@@ -382,8 +397,7 @@ async function main() {
   )
   console.log('')
   console.log('Volume provenance:')
-  console.log('  CONFIRMED  events, admins, officials, assignments per event')
-  console.log(`  PLACEHOLDER work areas per event (${WORK_AREAS_PER_EVENT}) — no agreed figure`)
+  console.log('  CONFIRMED  events, admins, officials, assignments, work areas per event')
   console.log('')
 
   // The measurement harness needs to sign in as these users, so it needs the

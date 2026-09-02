@@ -36,6 +36,7 @@
 //   * Timings are wall-clock from the client, so they include Next.js render,
 //     the Supabase round trips, and loopback HTTP. They do not isolate the SQL.
 
+import { Agent, setGlobalDispatcher } from 'undici'
 import { loadPerfEnv, PERF_SLUG_PREFIX } from './perf-env'
 import { grantHarnessPassword, signInToJar, type CookieJar } from './perf-auth'
 import { createClient } from '@supabase/supabase-js'
@@ -71,6 +72,33 @@ const JSON_OUT = stringArg('json')
 // module and route-tree initialisation even under `next start`, which is not
 // what PERF-01 is about.
 const WARMUP_SAMPLES = 3
+
+// Node's fetch (undici) opens at most SIX connections per origin by default.
+// Every simulated session here targets the same origin, so without this the
+// harness funnels all N sessions through 6 sockets and measures its own client
+// queue instead of the server.
+//
+// This is not a hypothetical: the first 90-session run (2026-09-01) reported
+// p95 ratios of 2431-3873% with a 0% error rate, while the app's CPU peaked at
+// 43% of its limit and the database sat at one active connection. The tell was
+// the `min` column — the fastest request under load matched its unloaded
+// baseline almost exactly (257 ms vs 256 ms on dashboard), which is queueing,
+// not slower work.
+//
+// Sized above the session count so the client is never the constraint; a run
+// that needs more sessions than this should raise it.
+const MAX_CLIENT_CONNECTIONS = 512
+
+setGlobalDispatcher(
+  new Agent({
+    connections: MAX_CLIENT_CONNECTIONS,
+    // undici's default is 300s for both; tightened to 120s so a truly hung
+    // request fails the run promptly instead of stalling it for 5 minutes,
+    // while still comfortably outlasting any real p95 this harness expects.
+    headersTimeout: 120_000,
+    bodyTimeout: 120_000,
+  })
+)
 
 // ---------------------------------------------------------------------------
 // Read paths under measurement
@@ -395,7 +423,11 @@ async function measureUnderLoad(
 
 const CEILING_PCT = 300
 
-function report(baseline: Record<string, Stats>, loaded: Record<string, Stats> | null) {
+function report(
+  baseline: Record<string, Stats>,
+  loaded: Record<string, Stats> | null,
+  appUrl: string
+) {
   console.log('')
   console.log('='.repeat(78))
   console.log('PERF-01 — core read paths')
@@ -441,10 +473,10 @@ function report(baseline: Record<string, Stats>, loaded: Record<string, Stats> |
   console.log(`Verdict: ${allPass ? 'PASS' : 'FAIL'}`)
   console.log('')
   console.log("Read these numbers with the caveats in this script's header:")
-  console.log("  * Local stack — absolute ms are not prod's. The 300% ratio is the criterion.")
-  console.log('  * No cold starts here; prod (minReplicas: 1, Single revision) would have them')
-  console.log('    in the p95 tail. This isolates read-path cost, not autoscaling.')
-  console.log('  * Work areas per event is still a PLACEHOLDER volume (no agreed figure).')
+  console.log(`  * Measured against ${appUrl}`)
+  console.log('  * Absolute ms depend on the environment; the 300% ratio is the criterion.')
+  console.log('  * Cold starts are largely excluded by a warm replica floor. A prod run')
+  console.log('    with a cold pod would put that start-up cost into the p95 tail.')
 
   return allPass
 }
@@ -512,20 +544,17 @@ async function main() {
     }
   }
 
-  const passed = report(baseline, loaded)
+  const passed = report(baseline, loaded, appUrl)
 
   if (JSON_OUT) {
     const fs = await import('fs')
     const payload = {
       // No Date.now() concerns here — this is a plain script, not a workflow.
       measuredAt: new Date().toISOString(),
-      environment: 'local',
+      appUrl,
       ceilingPct: CEILING_PCT,
       sessions: { admin: sessions.admin.length, official: sessions.official.length },
-      volumes: {
-        tenants: seeds.length,
-        note: 'work areas per event is a placeholder volume; see docs/quality-requirements.md',
-      },
+      volumes: { tenants: seeds.length },
       baseline,
       loaded,
       passed,
