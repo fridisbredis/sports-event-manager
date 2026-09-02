@@ -202,6 +202,17 @@ export function computeDoubleBookedOfficials(assignments: AssignmentLike[]): Set
   return result
 }
 
+// Cell keys from computeOverCapacityCells/computeDoubleBookedOfficials are
+// "<id>:<timeslotStart>" — one entry per offending slot, so a single
+// work area or official flagged across several timeslots would otherwise be
+// counted once per slot. Warning counts (the dashboard summary tile, the
+// grid's own badge counts) want one count per distinct id instead.
+export function uniqueIdsFromCellKeys(cellKeys: Set<string>): number {
+  const ids = new Set<string>()
+  for (const key of cellKeys) ids.add(key.split(':')[0])
+  return ids.size
+}
+
 export function computeDoubleBookedDetails(
   doubleBookedOfficials: Set<string>,
   assignments: AssignmentLike[],

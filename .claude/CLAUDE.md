@@ -13,7 +13,7 @@ Multi-tenant sports event web platform. Each tenant is a sports organization or 
 - **Frida Bredberg** — IT consultant at Extrapreneur AB, developer on this project
 - **Peter Thorn** — project manager / customer
 - **Deadline:** Viadal 2026
-- As of 2026-08, three people work on this codebase in parallel (previously solo) — see "Workflow" below for how work is now coordinated.
+- As of 2026-09, **two** people work on this codebase in parallel (Frida and Eduardo; previously solo) — see "Workflow" below for how work is now coordinated. It was briefly three; the third has since left.
 
 **Repo:** github.com/fridisbredis/sports-event-manager
 
@@ -102,7 +102,12 @@ volume data, no real phone numbers, nothing anyone else depends on.
 - Container App: `sports-event-manager-perf` in `sports-event-manager-dev-rg`,
   on the shared `kanban-env`
 - URL: `https://sports-event-manager-perf.lemonbay-48b8af2a.swedencentral.azurecontainerapps.io`
-- Sized to match prod for measurement: 0.5 vCPU, 1 GiB, min 2 / max 3 replicas
+- CPU/memory sized to match prod: 0.5 vCPU, 1 GiB per replica. Replica count
+  does NOT match prod: this env runs min 2 / max 3 for measurement, while prod
+  runs `minReplicas: 1` (see Prod environment below). The PERF-01 result does
+  not depend on this difference — the 2026-09-01 run found replica count is
+  not the constraint (3 → 5 moved throughput by 2 rps) — but the two configs
+  are not identical and shouldn't be described as such.
 - **Scaled to `minReplicas 0` between runs** so it costs nothing idle. Scale it
   back up before measuring, and check `az containerapp replica list` — a run
   against a cold or single replica is not comparable to an earlier one.
@@ -344,7 +349,7 @@ in breach, the same exemption 0001–0032 have.
 **What has protected prod so far** is not this rule but two habits that
 happen to imply it, and `docs/quality-requirements.md` says so outright: no
 wildcard reads (all 78 database reads name their fields) and a default on
-every mandatory column ever added. Habits do not survive three people
+every mandatory column ever added. Habits do not survive two people
 working in parallel, which is why the rule is written down here.
 
 **The one hard rule:** a `destructive` migration does not get pushed to
@@ -449,8 +454,8 @@ UX decisions and wireframes are located in `/Docs/`
 
 ### Workflow
 
-- **Task tracking:** Trello board at https://trello.com/b/7uISlZyI/sports-event-manager is the source of truth for who's working on what — used now that three people work on this codebase in parallel. Reference the Trello card in branch names/commits where it clarifies scope, similar to how screen IDs (EVT-01, SEC-09, etc.) are already used.
-- Branch + PR for non-trivial changes (helps with traceability, and is now required with three people working in parallel to avoid conflicting changes)
+- **Task tracking:** Trello board at https://trello.com/b/7uISlZyI/sports-event-manager is the source of truth for who's working on what — used now that two people work on this codebase in parallel. Reference the Trello card in branch names/commits where it clarifies scope, similar to how screen IDs (EVT-01, SEC-09, etc.) are already used.
+- Branch + PR for non-trivial changes (helps with traceability, and is now required with two people working in parallel to avoid conflicting changes)
 - Commit messages: imperative mood, scope first if applicable ("auth: add requireTenantAdmin helper")
 - Push tags (`v*`) only when intentionally cutting a release for prod
 

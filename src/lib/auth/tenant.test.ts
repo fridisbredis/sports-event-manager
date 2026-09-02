@@ -5,7 +5,6 @@ import {
   confirmOfficialInvite,
   hasAdminAccessToTenant,
   canViewOfficialSurfaces,
-  getConfirmedOfficial,
   requireSystemAdmin,
   requireTenantAdmin,
   resolveTenantForAdmin,
@@ -336,31 +335,6 @@ describe('canViewOfficialSurfaces', () => {
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
     expect(officialsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
     expect(officialsBuilder.limit).toHaveBeenCalledWith(1)
-  })
-
-  // getConfirmedOfficial exists so MYSCH-01 can reuse the row this guard
-  // resolves instead of fetching it a second time (PERF-01). The guard's
-  // behaviour is covered above; these cover what the page relies on — that the
-  // row itself comes back, and that a failure still reads as "no official"
-  // rather than throwing into the page.
-  describe('getConfirmedOfficial', () => {
-    it('returns the confirmed row so callers can use its id', async () => {
-      mockServiceClientByTable({
-        officials: { data: { id: 'off-1' }, error: null },
-      })
-
-      expect(await getConfirmedOfficial('user-1', TENANT_ID)).toEqual({ id: 'off-1' })
-    })
-
-    it('returns null and logs on error, keeping the guard fail-closed', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      mockServiceClientByTable({
-        officials: { data: null, error: { message: 'boom' } },
-      })
-
-      expect(await getConfirmedOfficial('user-1', TENANT_ID)).toBeNull()
-      expect(consoleSpy).toHaveBeenCalled()
-    })
   })
 
   it('denies an official role with no matching officials row', async () => {

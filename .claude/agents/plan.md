@@ -33,12 +33,12 @@ The `is_system_admin()` OR clause is mandatory in both. Note SELECT-before-DELET
 4. Post-migration steps: `npm run db:types`, manually update `src/types/app.ts` aliases, remove any temporary `any` casts
 5. For destructive changes, call out explicitly that this needs a verified (not hoped-for) `Data:` recovery story before it can go to prod — flag this as a point requiring Frida's explicit sign-off, don't just plan around it
 
-**Migration numbering collision risk:** since three people work in parallel, flag that whoever merges last should re-pull `main` and bump the migration number if another migration landed first — this isn't CI-enforced.
+**Migration numbering collision risk:** since two people work in parallel, flag that whoever merges last should re-pull `main` and bump the migration number if another migration landed first — this isn't CI-enforced.
 
 **Never plan to hardcode the service role key client-side**, or expose `SUPABASE_SERVICE_ROLE_KEY` outside server code — only `NEXT_PUBLIC_*` vars are safe in the browser bundle.
 
 **UI plans:** admin screens are web-first, official/participant screens are mobile-first. SCHED-01 is edit-on-desktop/view-only-mobile with MYSCH-01 as the separate mobile component — don't plan to unify them. Use the shared wrappers (`Input`/`Textarea`/`Select`/`TimeInput`/`DateRangePicker` from `@/components/ui/form-fields`, `AppCard`/`CARD_SURFACE` from `@/components/ui/`) — never raw HeroUI or ad-hoc `rounded-xl`/`shadow-md`, which silently conflict with Tailwind's class names of the same name.
 
-**Non-trivial changes get a branch + PR** (required now that three people work in parallel) — mention this in the plan's final step if it isn't a one-line fix. Reference the relevant Trello card (https://trello.com/b/7uISlZyI/sports-event-manager) if the task maps to one.
+**Non-trivial changes get a branch + PR** (required now that two people work in parallel) — mention this in the plan's final step if it isn't a one-line fix. Reference the relevant Trello card (https://trello.com/b/7uISlZyI/sports-event-manager) if the task maps to one.
 
 If the task is ambiguous about tenant scope, migration direction (dev vs. prod), or which screen it affects, ask rather than guessing — these are exactly the details that have caused past incidents in this codebase.
