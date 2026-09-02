@@ -10,18 +10,34 @@
 //
 // So the perf scripts get a stricter contract than seed-dev.ts:
 //
-//   1. Localhost only. The dev project is NOT on the allowlist. There is no
-//      flag to widen this — seeding volume into a shared environment is not a
-//      thing anyone should reach for by accident, and a deliberate exception
-//      belongs in a one-off command, not a permanent escape hatch.
-//   2. Config comes from .env.perf, never .env.local, so a cloud URL is never
+//   1. Localhost, or the ONE named dedicated perf project. The dev and prod
+//      projects are NOT on the allowlist and there is no flag that can add
+//      them — seeding volume into a shared environment is not a thing anyone
+//      should reach for by accident.
+//   2. Config comes from .env.perf, never .env.local, so dev's URL is never
 //      even loaded into the process.
 //   3. The database is inspected before writing: if it contains tenants this
 //      script did not create, it is not a scratch database and we stop.
 //
 // Layers 1 and 2 each independently prevent the near-miss; 3 catches the case
-// where someone points a local-looking URL at something real (a tunnel, a port
-// forward, a rewritten hosts entry).
+// where someone points an allowed-looking URL at something real (a tunnel, a
+// port forward, a rewritten hosts entry) — and it is layer 3, not layer 1,
+// that makes widening the host rule safe.
+//
+// WHY THE HOST RULE WAS WIDENED (2026-09-01)
+//
+// PERF-01 cannot be signed off from localhost. The local stack runs
+// max_connections=100 with no pooler and a PostgREST pool of 10, so every run
+// at the required 90 sessions measures connection exhaustion rather than the
+// read paths (docs/quality-requirements.md, "Environment"). The requirement's
+// own verification line asks for a load test against staging.
+//
+// The answer is a DEDICATED, DISPOSABLE project that exists only for this
+// measurement — not a relaxation of the rule. It is allowlisted by exact
+// project ref below, so the check still names one specific database rather
+// than trusting whatever is in .env.perf. Layer 3 continues to apply to it
+// unchanged: if someone points this ref at a database holding real tenants,
+// the seed still refuses.
 
 import { config } from 'dotenv'
 import path from 'path'
@@ -30,6 +46,28 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/database'
 
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1'])
+
+/**
+ * The one hosted project the perf scripts may touch: a dedicated, disposable
+ * instance created for the PERF-01 load run (2026-09-01), holding nothing but
+ * seeded volume data.
+ *
+ * This is an exact-ref allowlist, deliberately not a "isn't dev or prod" rule
+ * and not an env-var override — either of those would let a typo or a copied
+ * config reach a real database. Adding an entry here is a code change that
+ * shows up in review.
+ *
+ * Dev (lhflutwvwvzawzbcuwup) and prod must never be added.
+ */
+const ALLOWED_HOSTED_REFS = new Set(['jsusfleoufnjfrgsshmi'])
+
+const FORBIDDEN_HOSTED_REFS = new Set(['lhflutwvwvzawzbcuwup'])
+
+/** Supabase project URLs are https://<ref>.supabase.co */
+function hostedProjectRef(hostname: string): string | null {
+  const match = /^([a-z0-9]+)\.supabase\.co$/.exec(hostname)
+  return match ? match[1] : null
+}
 
 /** Slug prefix owned by the perf scripts. Shared so the guard and the cleanup agree. */
 export const PERF_SLUG_PREFIX = 'perf-tenant'
@@ -70,15 +108,31 @@ export function loadPerfEnv(): { url: string; serviceRoleKey: string } {
     )
   }
 
-  // Layer 1: localhost only.
+  // Layer 1: localhost, or the one allowlisted dedicated perf project.
   const parsed = new URL(url)
-  if (!LOOPBACK_HOSTNAMES.has(parsed.hostname)) {
+  const ref = hostedProjectRef(parsed.hostname)
+
+  if (ref && FORBIDDEN_HOSTED_REFS.has(ref)) {
+    throw new Error(
+      `Refusing to run against the dev project (${ref}).\n\n` +
+        'The perf scripts seed ~1000 assignments and ~90 auth users. That does not belong in ' +
+        'the environment colleagues test against, and officials_tenant_phone_active_uniq makes ' +
+        'it non-trivial to unpick afterwards.\n\n' +
+        'Use the dedicated perf project, or a local stack.'
+    )
+  }
+
+  const allowed =
+    LOOPBACK_HOSTNAMES.has(parsed.hostname) || (ref !== null && ALLOWED_HOSTED_REFS.has(ref))
+
+  if (!allowed) {
     throw new Error(
       `Refusing to run against ${url}.\n\n` +
-        'The perf scripts are localhost-only. They seed production-like volume, which does not ' +
-        'belong in the dev project that other people test against (nor, obviously, in prod).\n\n' +
-        'Start the local stack with `supabase start` and point PERF_SUPABASE_URL at it ' +
-        '(http://127.0.0.1:54321).'
+        'The perf scripts accept only a local stack or the dedicated perf project ' +
+        `(${[...ALLOWED_HOSTED_REFS].join(', ')}). They seed production-like volume, which does ` +
+        'not belong in any environment anyone else uses.\n\n' +
+        'For a local run: `supabase start`, then point PERF_SUPABASE_URL at ' +
+        'http://127.0.0.1:54321.'
     )
   }
 

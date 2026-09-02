@@ -62,7 +62,7 @@ varningen efter listan.
 > döpt `0033`, ett nummer kollegans PERF-02-migration redan hade tagit på dev),
 > och är den mest sannolika förklaringen till att `0008`:s `DROP COLUMN` aldrig
 > tog effekt: kolumnen återskapades förmodligen aldrig — den droppades aldrig.
-> Med tre personer som arbetar parallellt är nummerkollision normalfallet, inte
+> Med två personer som arbetar parallellt är nummerkollision normalfallet, inte
 > olyckan, och den failar tyst.
 
 ---
