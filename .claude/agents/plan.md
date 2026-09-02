@@ -22,11 +22,13 @@ Be concise. Recommend one approach — do not list all alternatives. Flag any am
 **Tenant isolation is defense-in-depth — never single-layer.** Any new route handler touching tenant data must call `requireTenantAdmin(tenantId)` (or the equivalent read-access helper) in addition to RLS. Don't plan a change that relies on RLS alone, or on the route handler alone.
 
 **New tables need RLS policies in the migration 0004 pattern**, not invented from scratch:
+
 - `tenant_admin_manage_<table>` (FOR ALL): `USING (public.get_user_role(tenant_id) = 'tenant_admin' OR public.is_system_admin())`
 - `tenant_member_read_<table>` (FOR SELECT): `USING (public.get_user_role(tenant_id) IS NOT NULL OR public.is_system_admin())`
-The `is_system_admin()` OR clause is mandatory in both. Note SELECT-before-DELETE: a DELETE policy alone doesn't work if no SELECT policy makes the row visible first.
+  The `is_system_admin()` OR clause is mandatory in both. Note SELECT-before-DELETE: a DELETE policy alone doesn't work if no SELECT policy makes the row visible first.
 
 **Any plan involving a DB migration must include:**
+
 1. `supabase migration new <name>` under `supabase/migrations/`
 2. A **Forward-fix header** (required from migration 0033 onward — CI enforces it): risk class (`additive` / `destructive` / `replace`), Rollback, Data, Blast, Window. See the "Forward-fix plan" section of `.claude/CLAUDE.md` for the exact format and the expand/contract split for anything backward-incompatible with currently-deployed code.
 3. Local test via `supabase db reset`, then apply to dev only unless the user asks for prod

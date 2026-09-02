@@ -8,7 +8,7 @@
 **v0.3 changes (from Claude Design feedback):** "timeslot unit" → "scheduling granularity" (EVT-02); SYS-02 feature tier is single-select / mutually exclusive (exactly one active in v1); SCHED-01 cell semantics clarified and double-booked flag distinct from over-capacity; EVT-01/EVT-02 publish-block rendering split (dashboard checklist vs inline errors); OFF-01 removal is a confirmation modal.
 **Process step:** 4 (developer-ready screen docs, pipe format from "Från Idé till App"). Feeds step 5 (lo-fi wireframes via Claude Design).
 **Scope this round:** system admin, event admin (race admin), official. Participant screens are deferred until their flows are written.
-**Source:** generated from docs/ia/screen-map.md and docs/flows/*. No screens, blocks, functions, or states were invented beyond that source; gaps are listed under OKLARHETER.
+**Source:** generated from docs/ia/screen-map.md and docs/flows/\*. No screens, blocks, functions, or states were invented beyond that source; gaps are listed under OKLARHETER.
 **Note on language:** section keywords follow the PDF format (Swedish: SKÄRMAR ATT GENERERA / FLÖDE / OKLARHETER); screen content is in English to match the codebase and v1 UI language.
 
 ID pattern: FLÖDESKOD-LÖPNUMMER. Format per row: `ID | Screen name | Purpose (one line) | Blocks top-to-bottom, comma-separated | States`.

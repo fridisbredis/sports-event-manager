@@ -30,11 +30,11 @@ public endpoints only.
 
 Read config from environment variables (a gitignored `.env.e2e` at repo root):
 
-| Variable          | Meaning                                                                         |
-| ----------------- | ------------------------------------------------------------------------------- |
+| Variable          | Meaning                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
 | `E2E_LOCAL_URL`   | Localhost base URL (default `http://localhost:3000` — `next dev` has no custom port configured) |
-| `E2E_LOCAL_PHONE` | Test phone number configured in Supabase Auth (E.164, e.g. `+467…`)             |
-| `E2E_LOCAL_OTP`   | The fixed test OTP configured for that number in Supabase Auth                  |
+| `E2E_LOCAL_PHONE` | Test phone number configured in Supabase Auth (E.164, e.g. `+467…`)                             |
+| `E2E_LOCAL_OTP`   | The fixed test OTP configured for that number in Supabase Auth                                  |
 
 If localhost isn't running, start it the way the repo documents (check
 `README`, `package.json` scripts, `docker-compose.yml`) before testing.

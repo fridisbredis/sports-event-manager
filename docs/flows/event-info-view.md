@@ -15,7 +15,7 @@ Sourced from the event configuration (event-creation-config):
 - **When:** dates / duration, broken out by stage (for participants, by Race stage).
 - **Where:** location and the venue per stage.
 - **Facilities:** the facilities configured for the event.
-- **Event schedule (programme):** the timetable of the event itself, organised by stage. This is the *event programme*, not the official's personal duty schedule. The personal duty schedule is a separate view (officials-scheduling). Participants see only Race stages here; officials see all stages.
+- **Event schedule (programme):** the timetable of the event itself, organised by stage. This is the _event programme_, not the official's personal duty schedule. The personal duty schedule is a separate view (officials-scheduling). Participants see only Race stages here; officials see all stages.
 - **Race Results links:** one or more embedded links out to Race Results pages. No timing or results are computed in-house.
 
 ## User flow: reading event info

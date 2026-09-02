@@ -29,11 +29,19 @@ describe('SEC-01: tenant isolation on assignments', () => {
     clientAdminA = await signInAsClient(adminA.phone, '000000')
 
     officialA1 = await createUserWithRole(tenantA.id, 'official')
-    const linkedOfficialA1 = await createOfficialLinkedToUser(tenantA.id, officialA1.userId, 'Official A1')
+    const linkedOfficialA1 = await createOfficialLinkedToUser(
+      tenantA.id,
+      officialA1.userId,
+      'Official A1'
+    )
     clientOfficialA1 = await signInAsClient(officialA1.phone, '000000')
 
     const officialA2User = await createUserWithRole(tenantA.id, 'official')
-    const linkedOfficialA2 = await createOfficialLinkedToUser(tenantA.id, officialA2User.userId, 'Official A2')
+    const linkedOfficialA2 = await createOfficialLinkedToUser(
+      tenantA.id,
+      officialA2User.userId,
+      'Official A2'
+    )
 
     const admin = serviceClient()
 
@@ -63,7 +71,11 @@ describe('SEC-01: tenant isolation on assignments', () => {
     if (assignmentA2Error) throw assignmentA2Error
 
     const officialBUser = await createUserWithRole(tenantB.id, 'official')
-    const linkedOfficialB = await createOfficialLinkedToUser(tenantB.id, officialBUser.userId, 'Official B')
+    const linkedOfficialB = await createOfficialLinkedToUser(
+      tenantB.id,
+      officialBUser.userId,
+      'Official B'
+    )
     const { data: bRow, error: bError } = await admin
       .from('assignments')
       .insert({
@@ -119,12 +131,15 @@ describe('SEC-01: tenant isolation on assignments', () => {
   })
 
   it('admin can manage its own tenant assignments', async () => {
-    const { data, error } = await clientAdminA.from('assignments').select('*').eq('tenant_id', tenantA.id)
+    const { data, error } = await clientAdminA
+      .from('assignments')
+      .select('*')
+      .eq('tenant_id', tenantA.id)
     expect(error).toBeNull()
     expect(data).toHaveLength(2)
   })
 
-  it('an official cannot read another official\'s assignment in the same tenant', async () => {
+  it("an official cannot read another official's assignment in the same tenant", async () => {
     const { data, error } = await clientOfficialA1
       .from('assignments')
       .select('*')

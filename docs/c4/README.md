@@ -2,9 +2,9 @@
 
 The `.mermaid` files in this folder are the **source of truth** for the architecture diagrams. Rendered images (PNG/SVG) are generated from them, never hand-edited.
 
-| File | Level | Purpose |
-|------|-------|---------|
-| `level1-context.mermaid` | C4 L1 (Context) | System as one box with all external actors. Scope-alignment view. |
+| File                       | Level             | Purpose                                                                                                                                                                 |
+| -------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `level1-context.mermaid`   | C4 L1 (Context)   | System as one box with all external actors. Scope-alignment view.                                                                                                       |
 | `level2-container.mermaid` | C4 L2 (Container) | Major technical building blocks (Next.js frontend, Supabase, etc.) and their relationships. Where multi-tenancy, i18n, and feature-toggling decisions are made visible. |
 
 Levels 3 and 4 are out of scope for v1.
