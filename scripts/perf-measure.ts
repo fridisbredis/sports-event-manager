@@ -35,6 +35,32 @@
 //     path's own cost rather than autoscaling behaviour.
 //   * Timings are wall-clock from the client, so they include Next.js render,
 //     the Supabase round trips, and loopback HTTP. They do not isolate the SQL.
+//
+// COMPARING TWO RUNS — read this before concluding anything from a delta:
+//   * PIN THE REPLICA COUNT AND CPU. Two runs are only comparable if the app
+//     was the same size for both. A comparison in this session was invalid
+//     because one run had 2 replicas and the other 3; the "regression" was the
+//     rig. `az containerapp show --query properties.template.scale` and
+//     `...resources` before and after, and record both alongside the numbers.
+//   * WATCH THE BASELINE, NOT JUST THE RATIO. The criterion divides by each
+//     path's own unloaded baseline, so a genuine improvement can show as a
+//     worse percentage: optimise the app and the baseline tightens too. Read
+//     the absolute p95 and the `min` column next to the ratio.
+//   * `min` IS THE HONEST PER-REQUEST COST. Under saturation p50/p95 measure
+//     queueing, not the code. If `min` falls while p50 does not, the change
+//     worked and something upstream is the constraint.
+//   * DON'T READ THE AVERAGE AGGREGATION AS THE CEILING. The 43-58% figure
+//     that led the first PERF-01 pass to rule out CPU came from
+//     `az monitor metrics list --metric CpuPercentage --aggregation Average`.
+//     Re-run with `--aggregation Maximum` on the same metric and interval and
+//     the reading is 20-30 points higher for a comparable load — verified
+//     2026-09-02 against the perf environment (PT1M Average 36-58% vs PT1M
+//     Maximum 61-69% over the same four minutes). PT1M vs PT5M interval does
+//     NOT explain a gap this size: a five-minute maximum can never exceed the
+//     maximum of the one-minute buckets it's built from (same verification —
+//     PT5M Maximum matched exactly the highest PT1M Maximum in the window).
+//     Always request `--aggregation Maximum`, and say so when quoting a CPU
+//     figure — an unlabelled percentage is ambiguous between the two.
 
 import { Agent, setGlobalDispatcher } from 'undici'
 import { loadPerfEnv, PERF_SLUG_PREFIX } from './perf-env'

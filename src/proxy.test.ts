@@ -6,11 +6,15 @@ import { NextRequest } from 'next/server'
 vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => ({
     auth: {
-      getUser: vi.fn(() => Promise.resolve({ data: { user: null } })),
+      // The proxy verifies the JWT locally via getClaims rather than calling
+      // GoTrue (PERF-01). No claims means no session, which is what every test
+      // in this file wants.
+      getClaims: vi.fn(() => Promise.resolve({ data: null, error: null })),
     },
   })),
 }))
 
+import { createServerClient } from '@supabase/ssr'
 import { proxy } from './proxy'
 
 function requestFor(pathname: string) {
@@ -110,5 +114,28 @@ describe('proxy — login OTP auth exemption', () => {
     const res = await proxy(requestFor('/api/auth/signout'))
 
     expect(res.status).toBe(401)
+  })
+})
+
+describe('proxy — malformed session cookie', () => {
+  // getClaims() can throw a plain Error instead of returning { error } — a
+  // token whose segments are valid base64url but decode to non-JSON makes
+  // JSON.parse throw, and isAuthError() doesn't recognise that as an
+  // AuthError, so the SDK rethrows it (reproduced against the real SDK with
+  // access_token: 'aaaa.bbbb.cccc'). A forged token, or more likely a
+  // truncated @supabase/ssr cookie chunk (chunking kicks in past ~3.6 KB),
+  // must be treated as "no session" — a redirect to /login — not crash the
+  // whole request with a 500 on every path including /login itself.
+  it('redirects to /login instead of throwing when getClaims rejects', async () => {
+    vi.mocked(createServerClient).mockReturnValueOnce({
+      auth: {
+        getClaims: vi.fn(() => Promise.reject(new Error('Invalid UTF-8 sequence'))),
+      },
+    } as never)
+
+    const res = await proxy(requestFor('/dashboard'))
+
+    expect(res.status).not.toBe(500)
+    expect(res.headers.get('location')).toContain('/login')
   })
 })
