@@ -41,6 +41,7 @@ describe('logAuthEvent', () => {
       phone_hash: PHONE_HASH,
       event: 'otp_verify_succeeded',
       actor_user_id: 'user-1',
+      tenant_id: null,
       error_code: null,
       detail: {},
     })
@@ -56,14 +57,31 @@ describe('logAuthEvent', () => {
     expect(JSON.stringify(inserted)).not.toContain('701234567')
   })
 
-  it('defaults actorUserId and errorCode to null and detail to {} when omitted', async () => {
+  it('defaults actorUserId, tenantId and errorCode to null and detail to {} when omitted', async () => {
     const { insert } = mockInsert({ error: null })
 
     await logAuthEvent({ phone: PHONE, event: 'otp_send_failed' })
 
     expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ actor_user_id: null, error_code: null, detail: {} })
+      expect.objectContaining({
+        actor_user_id: null,
+        tenant_id: null,
+        error_code: null,
+        detail: {},
+      })
     )
+  })
+
+  it('passes tenantId through when provided', async () => {
+    const { insert } = mockInsert({ error: null })
+
+    await logAuthEvent({
+      phone: PHONE,
+      event: 'role_granted_via_invite_confirmation',
+      tenantId: 'tenant-1',
+    })
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ tenant_id: 'tenant-1' }))
   })
 
   it('passes errorCode through for failed events', async () => {

@@ -15,10 +15,15 @@ import {
   type UserRoleWithTenant,
 } from './tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-auth-event', () => ({
+  logAuthEvent: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -192,6 +197,31 @@ describe('confirmOfficialInvite', () => {
       p_user_id: 'user-1',
       p_user_phone: '0701234567',
     })
+  })
+
+  it('logs a role_granted_via_invite_confirmation auth event after the RPC succeeds', async () => {
+    mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
+
+    await confirmOfficialInvite('user-1', '0701234567')
+
+    expect(logAuthEvent).toHaveBeenCalledWith({
+      phone: '0701234567',
+      event: 'role_granted_via_invite_confirmation',
+      actorUserId: 'user-1',
+      tenantId: TENANT_ID,
+      detail: { role: 'official' },
+    })
+  })
+
+  it('does not log an auth event when the RPC fails', async () => {
+    mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'not_found' } } })
+
+    await confirmOfficialInvite('user-1', '0701234567')
+
+    expect(logAuthEvent).not.toHaveBeenCalled()
   })
 })
 

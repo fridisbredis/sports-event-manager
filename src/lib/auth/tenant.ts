@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
 import type { User } from '@supabase/supabase-js'
 
@@ -70,6 +71,14 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
   if (error) return null
 
   const tenantId = (data as unknown as { tenant_id: string }).tenant_id
+
+  await logAuthEvent({
+    phone,
+    event: 'role_granted_via_invite_confirmation',
+    actorUserId: userId,
+    tenantId,
+    detail: { role: 'official' },
+  })
 
   const { data: tenant, error: tenantError } = await service
     .from('tenants')

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { z } from 'zod'
 
 const confirmSchema = z.object({
@@ -86,6 +87,14 @@ export async function POST(request: NextRequest) {
   }
 
   const tenantId = (data as unknown as { tenant_id: string }).tenant_id
+
+  await logAuthEvent({
+    phone: user.phone,
+    event: 'role_granted_via_invite_confirmation',
+    actorUserId: user.id,
+    tenantId,
+    detail: { role: 'official' },
+  })
 
   const { data: tenant } = await service
     .from('tenants')
