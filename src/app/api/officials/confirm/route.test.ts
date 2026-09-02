@@ -157,51 +157,39 @@ describe('POST /api/officials/confirm', () => {
     )
   })
 
-  it('the audit write blocks the HTTP response — a slow logAuthEvent delays confirmation', async () => {
-    // await logAuthEvent(...) sits directly in the request path before the
-    // response is built. logAuthEvent is fail-safe against throwing, but
-    // nothing here makes it fail-safe against being SLOW: a hung or slow
-    // auth_events insert (e.g. contention, a slow replica) adds directly to
-    // this route's latency, coupling invite-confirmation UX to audit-writer
-    // health. Fire-and-forget (no await, or an explicit .catch with no
-    // await) would decouple them; this test proves the current code does not.
+  it('does not await the audit write — a slow logAuthEvent does not delay the response', async () => {
+    // logAuthEvent is called fire-and-forget (`void logAuthEvent(...)`, not
+    // awaited), so a hung or slow auth_events insert must not add to this
+    // route's latency. This proves the response resolves before the audit
+    // write's promise ever settles.
     mockAuthedUser({ id: USER_ID, phone: PHONE })
     mockServiceClient(
       { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
       { data: { slug: 'viadal' } }
     )
 
-    let resolveAudit!: () => void
+    let auditResolved = false
     vi.mocked(logAuthEvent).mockReturnValueOnce(
       new Promise<void>((resolve) => {
-        resolveAudit = resolve
+        setTimeout(() => {
+          auditResolved = true
+          resolve()
+        }, 0)
       })
     )
 
-    let responded = false
-    const pending = POST(makeRequest(validBody)).then((res) => {
-      responded = true
-      return res
-    })
+    const res = await POST(makeRequest(validBody))
 
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(responded).toBe(false)
-
-    resolveAudit()
-    const res = await pending
-    expect(responded).toBe(true)
     expect(res.status).toBe(200)
+    expect(auditResolved).toBe(false)
   })
 
-  it('an unexpected throw from logAuthEvent turns a successful confirmation into a 500', async () => {
-    // Same missing-second-line-of-defense issue as confirmOfficialInvite in
-    // tenant.ts: logAuthEvent's own try/catch is the only thing standing
-    // between an audit-write failure and the user-visible response. There is
-    // no try/catch around this call site, so if that internal safety net
-    // ever has a gap, an official who successfully confirmed their invite
-    // (the RPC already committed) would see a 500 and have no idea whether
-    // they are actually confirmed or not.
+  it('a throw from logAuthEvent does not affect the confirmation response', async () => {
+    // logAuthEvent is fail-safe internally (try/catch, logs via
+    // logger.error), but this call site no longer awaits it either — even a
+    // rejection that somehow escaped logAuthEvent's own try/catch cannot
+    // turn a successful confirmation into a 500, because nothing here is
+    // waiting on that promise to decide the response.
     mockAuthedUser({ id: USER_ID, phone: PHONE })
     mockServiceClient(
       { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
@@ -209,6 +197,8 @@ describe('POST /api/officials/confirm', () => {
     )
     vi.mocked(logAuthEvent).mockRejectedValueOnce(new Error('audit db unreachable'))
 
-    await expect(POST(makeRequest(validBody))).rejects.toThrow('audit db unreachable')
+    const res = await POST(makeRequest(validBody))
+
+    expect(res.status).toBe(200)
   })
 })

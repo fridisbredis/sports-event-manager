@@ -265,24 +265,18 @@ describe('confirmOfficialInvite', () => {
     )
   })
 
-  it('propagates a throw from logAuthEvent instead of swallowing it (no try/catch at the call site)', async () => {
-    // logAuthEvent is internally fail-safe (try/catch around its own body,
-    // per log-auth-event.ts), so in real code this can't happen — but that
-    // safety lives entirely inside logAuthEvent. If a future refactor of
-    // logAuthEvent's signature or internals ever lets an exception through
-    // (e.g. someone "simplifies" away the try/catch), confirmOfficialInvite
-    // has no defense of its own: the bare `await logAuthEvent(...)` here
-    // would reject the whole login/confirm flow on an audit-logging failure.
-    // This test pins that absence of a second line of defense.
+  it('a throw from logAuthEvent does not affect post-login routing (fire-and-forget, not awaited)', async () => {
+    // logAuthEvent is called via `void logAuthEvent(...)`, not awaited, so
+    // even a rejection that somehow escaped logAuthEvent's own internal
+    // try/catch cannot break post-login routing — nothing here is waiting
+    // on that promise to decide the result.
     mockServiceClientWithRpc({
       rpcResult: { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
       tenantResult: { data: { slug: 'viadal' } },
     })
     vi.mocked(logAuthEvent).mockRejectedValueOnce(new Error('audit db unreachable'))
 
-    await expect(confirmOfficialInvite('user-1', '0701234567')).rejects.toThrow(
-      'audit db unreachable'
-    )
+    await expect(confirmOfficialInvite('user-1', '0701234567')).resolves.toBe('viadal')
   })
 })
 

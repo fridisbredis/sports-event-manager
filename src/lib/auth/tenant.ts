@@ -79,8 +79,13 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
   // confirm_official_invite_by_phone's insert is `on conflict do nothing`,
   // so a successful call does not always mean a grant happened (migration
   // 0043).
+  // Fire-and-forget, not awaited: logAuthEvent is already fail-safe
+  // internally (try/catch, logs via logger.error), so there is nothing
+  // useful to await here — awaiting it would couple this login redirect's
+  // latency to auth_events' write latency and let a hypothetical future
+  // throw inside logAuthEvent break post-login routing entirely.
   if (roleGranted) {
-    await logAuthEvent({
+    void logAuthEvent({
       phone,
       event: 'role_granted_via_invite_confirmation',
       actorUserId: userId,

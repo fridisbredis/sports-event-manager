@@ -94,8 +94,13 @@ export async function POST(request: NextRequest) {
   // SEC-07: only log when the RPC actually inserted a user_roles row.
   // confirm_official_invite's insert is `on conflict do nothing`, so a
   // successful call does not always mean a grant happened (migration 0043).
+  // Fire-and-forget, not awaited: logAuthEvent is already fail-safe
+  // internally (try/catch, logs via logger.error), so there is nothing
+  // useful to await here — awaiting it would couple this route's latency
+  // to auth_events' write latency and let a hypothetical future throw
+  // inside logAuthEvent turn a successful confirmation into a 500.
   if (roleGranted) {
-    await logAuthEvent({
+    void logAuthEvent({
       phone: user.phone,
       event: 'role_granted_via_invite_confirmation',
       actorUserId: user.id,
