@@ -56,9 +56,21 @@ export interface TwilioStatus {
 // not inflate a card labelled "SMS idag" (sent)). DateSent>= is a calendar
 // day in UTC, not a rolling 24h window — the closest built-in match without
 // computing our own boundary; a literal rolling window isn't worth it for a
-// status card. PageSize=1000 is one request for the volumes documented in
-// CLAUDE.md (single low hundreds/day at most) — this counts a page, it does
-// not paginate, so a real spike would undercount rather than hang.
+// status card.
+//
+// Twilio's Messages resource has no field-selection or count-only endpoint
+// (verified 2026-09-02 against the public API docs) — every message in the
+// response carries `body`/`to`/`from` regardless of what we ask for, so
+// this can't be made to request less PII on the wire than it already does.
+// What we control is how much of it we hold in the app process: pages of
+// MAX_PAGE_SIZE are counted and discarded one at a time via `next_page_uri`
+// rather than pulling up to 1000 full message resources into one array, and
+// PAGE_FETCH_LIMIT bounds worst-case latency/PII exposure on a real spike —
+// past it we stop and report what we've counted so far rather than fetching
+// indefinitely, so a spike undercounts instead of hanging the page.
+const TWILIO_MAX_PAGE_SIZE = 50
+const TWILIO_PAGE_FETCH_LIMIT = 5
+
 export async function fetchTwilioStatus(): Promise<TwilioStatus> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID
   const authToken = process.env.TWILIO_AUTH_TOKEN
@@ -71,29 +83,38 @@ export async function fetchTwilioStatus(): Promise<TwilioStatus> {
   try {
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64')
     const today = new Date().toISOString().slice(0, 10)
-    const params = new URLSearchParams({
-      From: fromNumber,
-      'DateSent>': today,
-      PageSize: '1000',
-    })
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json?${params}`,
-      {
+    const timeoutSignal = AbortSignal.timeout(PROBE_TIMEOUT_MS)
+
+    let sentToday = 0
+    let nextUrl: string | null =
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json?` +
+      new URLSearchParams({
+        From: fromNumber,
+        'DateSent>': today,
+        PageSize: String(TWILIO_MAX_PAGE_SIZE),
+      })
+
+    for (let page = 0; nextUrl && page < TWILIO_PAGE_FETCH_LIMIT; page++) {
+      const response: Response = await fetch(nextUrl, {
         headers: { Authorization: `Basic ${auth}` },
         next: { revalidate: 60 },
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-      }
-    )
-
-    if (!response.ok) {
-      logger.warn('Health dashboard: Twilio messages request failed', {
-        error: new Error(`status ${response.status}`),
+        signal: timeoutSignal,
       })
-      return { status: 'unknown' }
-    }
 
-    const data = (await response.json()) as { messages?: { direction?: string }[] }
-    const sentToday = data.messages?.filter((m) => m.direction === 'outbound-api').length ?? 0
+      if (!response.ok) {
+        logger.warn('Health dashboard: Twilio messages request failed', {
+          error: new Error(`status ${response.status}`),
+        })
+        return { status: 'unknown' }
+      }
+
+      const data = (await response.json()) as {
+        messages?: { direction?: string }[]
+        meta?: { next_page_uri?: string | null }
+      }
+      sentToday += data.messages?.filter((m) => m.direction === 'outbound-api').length ?? 0
+      nextUrl = data.meta?.next_page_uri ? `https://api.twilio.com${data.meta.next_page_uri}` : null
+    }
 
     return { status: 'ok', sentToday, fromNumber }
   } catch (error) {

@@ -152,6 +152,67 @@ describe('fetchTwilioStatus', () => {
     const result = await fetchTwilioStatus()
     expect(result.fromNumber).toBe('+46700000000')
   })
+
+  it('filters by DateSent> so a spike on a prior day cannot inflate "sent today"', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ messages: [{ direction: 'outbound-api' }] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTwilioStatus()
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toContain('DateSent%3E=')
+  })
+
+  it('pages through next_page_uri and sums counts, rather than fetching one 1000-message page', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            messages: Array(50).fill({ direction: 'outbound-api' }),
+            meta: { next_page_uri: '/2010-04-01/Accounts/sid/Messages.json?Page=1' },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            messages: [{ direction: 'outbound-api' }],
+            meta: { next_page_uri: null },
+          }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchTwilioStatus()
+
+    expect(result).toEqual({ status: 'ok', sentToday: 51, fromNumber: '+46700000000' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const [firstUrl] = fetchMock.mock.calls[0]
+    expect(firstUrl).toContain('PageSize=50')
+    const [secondUrl] = fetchMock.mock.calls[1]
+    expect(secondUrl).toBe('https://api.twilio.com/2010-04-01/Accounts/sid/Messages.json?Page=1')
+  })
+
+  it('stops after the page-fetch limit instead of following next_page_uri forever', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          messages: [{ direction: 'outbound-api' }],
+          meta: { next_page_uri: '/2010-04-01/Accounts/sid/Messages.json?Page=next' },
+        }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchTwilioStatus()
+
+    expect(result.status).toBe('ok')
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(5)
+  })
 })
 
 describe('fetchSentryStatus', () => {
