@@ -719,6 +719,23 @@ describe('getCurrentUser', () => {
 
     expect(await getCurrentUser()).toBeNull()
   })
+
+  // getClaims() can throw a plain Error instead of returning { error } — a
+  // token whose segments are valid base64url but decode to non-JSON makes
+  // JSON.parse throw, and isAuthError() doesn't recognise that as an
+  // AuthError, so the SDK rethrows it. An unparseable cookie (a forged token,
+  // or a truncated @supabase/ssr chunk) must resolve to null so every caller's
+  // existing `if (!user) redirect('/login')` guard is reached, not crash the
+  // server component.
+  it('returns null when getClaims throws instead of returning an error', async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: {
+        getClaims: vi.fn().mockRejectedValue(new Error('Invalid UTF-8 sequence')),
+      },
+    } as never)
+
+    expect(await getCurrentUser()).toBeNull()
+  })
 })
 
 describe('getAdminTenant', () => {

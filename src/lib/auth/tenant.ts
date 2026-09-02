@@ -429,7 +429,12 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
 async function resolveUserFromClaims(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
 ): Promise<User | null> {
-  const { data, error } = await supabase.auth.getClaims()
+  // getClaims() can throw instead of returning { error } — a token whose
+  // segments are valid base64url but decode to non-JSON makes JSON.parse
+  // throw a plain Error, which isAuthError() doesn't recognise. Every caller
+  // here already has an `if (!user) redirect('/login')` guard; an unparseable
+  // cookie must reach that guard as null, not crash the server component.
+  const { data, error } = await supabase.auth.getClaims().catch(() => ({ data: null, error: null }))
 
   if (error || !data?.claims?.sub) return null
 
