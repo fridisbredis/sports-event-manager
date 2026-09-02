@@ -108,6 +108,9 @@ jobs:
               "NEXT_PUBLIC_APP_URL=${{ secrets.DEV_APP_URL }}" \
               "SENTRY_DSN=${{ secrets.DEV_SENTRY_DSN }}" \
               "SENTRY_ENVIRONMENT=development" \
+              "SENTRY_ORG=${{ secrets.DEV_SENTRY_ORG }}" \
+              "SENTRY_PROJECT=${{ secrets.DEV_SENTRY_PROJECT }}" \
+              "SENTRY_AUTH_TOKEN=${{ secrets.DEV_SENTRY_AUTH_TOKEN }}" \
               "CRON_SECRET=${{ secrets.CRON_SECRET }}"
 
       - name: Verify deployment

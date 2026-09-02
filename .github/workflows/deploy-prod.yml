@@ -111,6 +111,9 @@ jobs:
               "NEXT_PUBLIC_APP_URL=${{ secrets.PROD_APP_URL }}" \
               "SENTRY_DSN=${{ secrets.PROD_SENTRY_DSN }}" \
               "SENTRY_ENVIRONMENT=production" \
+              "SENTRY_ORG=${{ secrets.PROD_SENTRY_ORG }}" \
+              "SENTRY_PROJECT=${{ secrets.PROD_SENTRY_PROJECT }}" \
+              "SENTRY_AUTH_TOKEN=${{ secrets.PROD_SENTRY_AUTH_TOKEN }}" \
               "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}"
 
       - name: Verify prod health probes survived deploy

@@ -26,8 +26,15 @@ ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT
 
 # Sentry source-map upload happens during the build step below. SENTRY_AUTH_TOKEN
-# is a build-only ARG (never an ENV), so it is not persisted into any image layer's
-# environment — the builder stage that sees it is discarded and never pushed.
+# is a build-only ARG here (never an ENV in this file), so it is not persisted
+# into any image layer's environment — the builder stage that sees it is
+# discarded and never pushed. The same secret also reaches the running
+# container at runtime, but through a completely separate channel this
+# Dockerfile has no part in: the deploy workflows pass it to
+# `az containerapp update --set-env-vars`, exactly like SUPABASE_SERVICE_ROLE_KEY
+# already is — Container Apps injects it into the process environment directly,
+# never through the image. SYS-03's health dashboard reads it that way to query
+# Sentry's API for issue counts.
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_AUTH_TOKEN

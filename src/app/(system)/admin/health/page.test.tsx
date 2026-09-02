@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SystemHealthPage from './page'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { notFound } from 'next/navigation'
-import { fetchSupabaseStatus, fetchTwilioStatus } from './_lib/fetch-status'
+import { fetchSupabaseStatus, fetchTwilioStatus, fetchSentryStatus } from './_lib/fetch-status'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireSystemAdmin: vi.fn(),
@@ -17,6 +17,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('./_lib/fetch-status', () => ({
   fetchSupabaseStatus: vi.fn(),
   fetchTwilioStatus: vi.fn(),
+  fetchSentryStatus: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -24,6 +25,7 @@ beforeEach(() => {
   vi.mocked(requireSystemAdmin).mockResolvedValue({ user: { id: 'user-1' } } as never)
   vi.mocked(fetchSupabaseStatus).mockResolvedValue({ status: 'ok' })
   vi.mocked(fetchTwilioStatus).mockResolvedValue({ status: 'ok', sentToday: 0 })
+  vi.mocked(fetchSentryStatus).mockResolvedValue({ status: 'ok', unresolvedCount: 0 })
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test-project.supabase.co'
 })
 
@@ -36,6 +38,7 @@ describe('SystemHealthPage', () => {
     expect(notFound).toHaveBeenCalled()
     expect(fetchSupabaseStatus).not.toHaveBeenCalled()
     expect(fetchTwilioStatus).not.toHaveBeenCalled()
+    expect(fetchSentryStatus).not.toHaveBeenCalled()
   })
 
   it('renders once the caller is a system admin', async () => {
@@ -44,5 +47,6 @@ describe('SystemHealthPage', () => {
     expect(result).toBeTruthy()
     expect(fetchSupabaseStatus).toHaveBeenCalled()
     expect(fetchTwilioStatus).toHaveBeenCalled()
+    expect(fetchSentryStatus).toHaveBeenCalled()
   })
 })

@@ -4,10 +4,18 @@
 
 // The Supabase project ref is the subdomain of the project's API URL, so it
 // doesn't need its own constant — this derives it instead of duplicating it.
+// Named for what it returns, not an assumed environment: this app can be
+// pointed at dev, prod, perf, or a local Docker stack via
+// NEXT_PUBLIC_SUPABASE_URL, and the health page must show whichever one it
+// actually is, not assume dev.
+//
 // A function, not a module-level constant: reading env at import time makes
 // every test importing this module (even indirectly) need the var set.
-export function devSupabaseProjectRef() {
-  return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split('.')[0]
+export function currentSupabaseProjectRef() {
+  const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!)
+  return url.hostname === '127.0.0.1' || url.hostname === 'localhost'
+    ? 'local (Docker)'
+    : url.hostname.split('.')[0]
 }
 
 // Not derivable from any env var available to this app — see CLAUDE.md's

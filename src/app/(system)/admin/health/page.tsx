@@ -2,9 +2,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { StatusCard } from './_components/status-card'
-import { fetchSupabaseStatus, fetchTwilioStatus } from './_lib/fetch-status'
+import { fetchSupabaseStatus, fetchTwilioStatus, fetchSentryStatus } from './_lib/fetch-status'
 import {
-  devSupabaseProjectRef,
+  currentSupabaseProjectRef,
   AZURE_DEV_RESOURCE_GROUP,
   AZURE_PROD_RESOURCE_GROUP,
   azurePortalResourceGroupUrl,
@@ -14,7 +14,18 @@ export default async function SystemHealthPage() {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
 
-  const [supabase, twilio] = await Promise.all([fetchSupabaseStatus(), fetchTwilioStatus()])
+  const [supabase, twilio, sentry] = await Promise.all([
+    fetchSupabaseStatus(),
+    fetchTwilioStatus(),
+    fetchSentryStatus(),
+  ])
+  const supabaseProjectRef = currentSupabaseProjectRef()
+  const isLocalSupabase = supabaseProjectRef === 'local (Docker)'
+  // process.env.SENTRY_PROJECT, not a value from fetchSentryStatus — the
+  // point is to name which project the count below is even for, so it must
+  // come from the same place fetchSentryStatus reads it from, independent of
+  // whether the probe succeeded.
+  const sentryProjectName = process.env.SENTRY_PROJECT
 
   return (
     <div className="p-8 max-w-5xl">
@@ -32,16 +43,21 @@ export default async function SystemHealthPage() {
           title="Supabase"
           status={supabase.status}
           facts={[
-            { label: 'PostgREST-fråga (dev)', value: supabase.status === 'ok' ? 'OK' : 'Fel' },
+            { label: 'Projekt', value: supabaseProjectRef },
+            { label: 'PostgREST-fråga', value: supabase.status === 'ok' ? 'OK' : 'Fel' },
           ]}
-          note="Testar bara att en enkel fråga mot dev-projektet lyckas — kan inte se prod, och ett totalt Auth-haveri hade gett en 404 innan sidan ens laddar, inte ett rött kort här."
-          links={[
-            {
-              label: 'Dev dashboard',
-              href: `https://supabase.com/dashboard/project/${devSupabaseProjectRef()}`,
-            },
-            { label: 'Alla projekt (välj prod)', href: 'https://supabase.com/dashboard/projects' },
-          ]}
+          note="Testar bara att en enkel fråga mot projektet ovan lyckas — inte något annat projekt, och ett totalt Auth-haveri hade gett en 404 innan sidan ens laddar, inte ett rött kort här."
+          links={
+            isLocalSupabase
+              ? [{ label: 'Alla projekt', href: 'https://supabase.com/dashboard/projects' }]
+              : [
+                  {
+                    label: 'Öppna i Supabase Dashboard',
+                    href: `https://supabase.com/dashboard/project/${supabaseProjectRef}`,
+                  },
+                  { label: 'Alla projekt', href: 'https://supabase.com/dashboard/projects' },
+                ]
+          }
         />
 
         <StatusCard
@@ -49,30 +65,61 @@ export default async function SystemHealthPage() {
           status={twilio.status}
           facts={
             twilio.status === 'ok'
-              ? [{ label: 'SMS idag', value: String(twilio.sentToday ?? 0) }]
+              ? [
+                  { label: 'Avsändarnummer', value: twilio.fromNumber ?? '—' },
+                  { label: 'SMS idag (detta nummer)', value: String(twilio.sentToday ?? 0) },
+                ]
               : undefined
           }
           note={
-            twilio.status === 'unknown'
-              ? 'Kunde inte hämta live-data just nu — se konsolen för aktuell status.'
-              : undefined
+            twilio.status === 'ok'
+              ? 'Dev och prod delar Twilio-konto men har egna avsändarnummer — siffran ovan gäller bara numret som visas, inte hela kontot.'
+              : twilio.status === 'unknown'
+                ? 'Kunde inte hämta live-data just nu — se konsolen för aktuell status.'
+                : undefined
           }
           links={[{ label: 'Twilio-konsol', href: 'https://console.twilio.com/' }]}
         />
 
         <StatusCard
           title="Sentry"
+          status={
+            sentry.status === 'ok' ? (sentry.unresolvedCount === 0 ? 'ok' : 'error') : 'unknown'
+          }
+          facts={
+            sentry.status === 'ok'
+              ? [
+                  { label: 'Projekt', value: sentryProjectName ?? '—' },
+                  { label: 'Olösta (24h)', value: String(sentry.unresolvedCount ?? 0) },
+                ]
+              : undefined
+          }
+          note={
+            sentry.status === 'unknown'
+              ? 'Kunde inte hämta live-data just nu — se konsolen för aktuell status.'
+              : 'Visar bara projektet denna miljö (dev eller prod) rapporterar till, inte det andra.'
+          }
           links={[
             {
-              label: 'viadal-event-dev',
+              label: sentryProjectName
+                ? `Olösta i ${sentryProjectName} ↗`
+                : 'Öppna olösta issues i Sentry',
+              // Project-scoped URL (slug-based), same base as the two
+              // overview links below — verified 2026-09-02 to resolve
+              // (200). The newer org-wide /issues/ stream filters by numeric
+              // project id, not slug, and that id isn't available from any
+              // env var this app has, so it isn't used here.
+              href: `https://extrapreneur.sentry.io/projects/${sentryProjectName ?? 'viadal-event-dev'}/?query=is%3Aunresolved&statsPeriod=24h`,
+            },
+            {
+              label: 'viadal-event-dev (projektöversikt)',
               href: 'https://extrapreneur.sentry.io/projects/viadal-event-dev/',
             },
             {
-              label: 'viadal-event-prod',
+              label: 'viadal-event-prod (projektöversikt)',
               href: 'https://extrapreneur.sentry.io/projects/viadal-event-prod/',
             },
           ]}
-          note="Live felstatistik kräver en separat Sentry API-token (nuvarande token är endast för source maps)."
         />
 
         <StatusCard
