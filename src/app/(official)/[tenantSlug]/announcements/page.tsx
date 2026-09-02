@@ -1,11 +1,14 @@
+import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
 import { AnnouncementCard } from './_components/announcement-card'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
+  searchParams: Promise<{ page?: string }>
 }
 
 function formatAnnouncementTime(ts: string): string {
@@ -41,8 +44,10 @@ function EmptyIcon() {
   )
 }
 
-export default async function AnnouncementsPage({ params }: Props) {
+export default async function AnnouncementsPage({ params, searchParams }: Props) {
   const { tenantSlug } = await params
+  const { page: pageParam } = await searchParams
+  const page = parsePageParam(pageParam)
   const t = await getServerTranslation('en', 'official')
 
   const supabase = await createSupabaseServerClient()
@@ -56,32 +61,59 @@ export default async function AnnouncementsPage({ params }: Props) {
 
   if (!tenant) notFound()
 
+  // Paged rather than capped (PERF-06): announcements only accumulate, and a
+  // bare row ceiling would silently hide the oldest ones from someone
+  // browsing. The range asks for one row past the page so `hasMore` needs no
+  // second count query.
+  const { from, to } = pageRange(page)
+
   const { data: announcements, error } = await supabase
     .from('announcements')
     .select('id, body, published_at')
     .eq('tenant_id', tenant.id)
     .eq('channel', 'officials')
     .order('published_at', { ascending: false })
+    .range(from, to)
 
   if (error) throw error
 
-  const items = announcements ?? []
+  const { items, hasMore } = splitPage(announcements ?? [])
+  const isFirstPage = page === 1
 
   return (
     <div className="px-5 pt-10 pb-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('announcements.title')}</h1>
 
       {items.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          {items.map((a) => (
-            <AnnouncementCard
-              key={a.id}
-              time={formatAnnouncementTime(a.published_at)}
-              body={a.body}
-            />
-          ))}
-        </div>
-      ) : (
+        <>
+          <div className="flex flex-col gap-3">
+            {items.map((a) => (
+              <AnnouncementCard
+                key={a.id}
+                time={formatAnnouncementTime(a.published_at)}
+                body={a.body}
+              />
+            ))}
+          </div>
+
+          {(!isFirstPage || hasMore) && (
+            <nav className="flex items-center justify-between gap-3 mt-6">
+              {isFirstPage ? (
+                <span />
+              ) : (
+                <Link href={`?page=${page - 1}`} className="text-sm font-medium text-primary py-2">
+                  {t('announcements.newer')}
+                </Link>
+              )}
+              {hasMore && (
+                <Link href={`?page=${page + 1}`} className="text-sm font-medium text-primary py-2">
+                  {t('announcements.older')}
+                </Link>
+              )}
+            </nav>
+          )}
+        </>
+      ) : isFirstPage ? (
         <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
           <EmptyIcon />
           <div>
@@ -91,6 +123,20 @@ export default async function AnnouncementsPage({ params }: Props) {
             <p className="text-sm text-gray-500 mt-1">
               {t('announcements.noAnnouncementsDescription')}
             </p>
+          </div>
+        </div>
+      ) : (
+        // Past the end of the list — a bookmarked or hand-edited ?page= — which
+        // is not the same as having no announcements at all.
+        <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
+          <EmptyIcon />
+          <div>
+            <p className="text-base font-semibold text-gray-900">
+              {t('announcements.noOlderAnnouncements')}
+            </p>
+            <Link href="?page=1" className="text-sm font-medium text-primary mt-1 inline-block">
+              {t('announcements.backToNewest')}
+            </Link>
           </div>
         </div>
       )}
