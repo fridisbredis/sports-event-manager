@@ -41,34 +41,28 @@ export default async function DashboardPage({ params }: Props) {
 
   if (!tenant) notFound()
 
+  // events and both officials head-counts are independent — none of them
+  // depend on each other's result — so all three go in one hop rather than
+  // three (PERF-01: ~70 ms per hop under load). Only the stage count
+  // genuinely depends on event.id and has to follow.
+  //
+  // The two officials queries are head-counts, not a row fetch — the row set
+  // grows with club size, the counts do not (PERF-06).
+  //
   // No event yet is a legitimate state this dashboard renders an empty view
   // for; a failed query is not, and must not look the same.
-  const { data: event, error: eventError } = await supabase
-    .from('events')
-    .select(
-      'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
-    )
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
-
-  if (eventError) throw eventError
-
-  const { count: raceStageCount, error: raceStageError } = event
-    ? await supabase
-        .from('event_stages')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', event.id)
-        .eq('stage_type', 'race')
-    : { count: 0, error: null }
-
-  if (raceStageError) throw raceStageError
-
-  // Two head-counts rather than fetching every official row to count two
-  // statuses in JS — the row set grows with club size, the counts do not.
   const [
+    { data: event, error: eventError },
     { count: invitedCount, error: invitedError },
     { count: confirmedCount, error: confirmedError },
   ] = await Promise.all([
+    supabase
+      .from('events')
+      .select(
+        'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
+      )
+      .eq('tenant_id', tenant.id)
+      .maybeSingle(),
     supabase
       .from('officials')
       .select('id', { count: 'exact', head: true })
@@ -81,8 +75,19 @@ export default async function DashboardPage({ params }: Props) {
       .eq('invite_status', 'confirmed'),
   ])
 
+  if (eventError) throw eventError
   if (invitedError) throw invitedError
   if (confirmedError) throw confirmedError
+
+  const { count: raceStageCount, error: raceStageError } = event
+    ? await supabase
+        .from('event_stages')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', event.id)
+        .eq('stage_type', 'race')
+    : { count: 0, error: null }
+
+  if (raceStageError) throw raceStageError
 
   const officialsInvited = invitedCount ?? 0
   const officialsConfirmed = confirmedCount ?? 0

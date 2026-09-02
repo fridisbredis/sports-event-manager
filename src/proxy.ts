@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { logger } from '@/lib/logger'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -59,13 +60,35 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Refresh session — required for @supabase/ssr, do not remove. Health
-  // and cron paths return above and never reach this call: both are
-  // machine-called (Azure probes, pg_cron/pg_net) and have no session to
-  // refresh, so skipping it for them is safe.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Establishes the session AND refreshes it — both still required for
+  // @supabase/ssr, do not remove. Health and cron paths return above and never
+  // reach this call: both are machine-called (Azure probes, pg_cron/pg_net) and
+  // have no session to refresh, so skipping it for them is safe.
+  //
+  // getClaims() rather than getUser(): it verifies the JWT signature locally
+  // against the project's ES256 signing keys instead of asking GoTrue, which
+  // PERF-01 measured at 130 ms p50 under load versus 3 ms. The session refresh
+  // this comment has always insisted on is preserved — getClaims() refreshes a
+  // near-expiry token before validating it, and the setAll cookie writer above
+  // is what persists the rotated cookie either way. It also falls back to the
+  // same server call getUser() makes if a project is ever on a symmetric
+  // secret, so this is a speed change, not a security one.
+  //
+  // getClaims() can throw instead of returning { error } — a token whose
+  // segments are valid base64url but decode to non-JSON makes JSON.parse
+  // throw a plain Error, which isAuthError() doesn't recognise. An
+  // unparseable cookie (a forged token, or a truncated @supabase/ssr chunk)
+  // must read as "no session", not crash the whole request.
+  //
+  // Still fail closed on any other thrown error (e.g. a network failure on
+  // getClaims()'s fallback path) — but log it, so an auth-service outage
+  // shows up as an error rate instead of looking identical to expired
+  // sessions.
+  const { data: claimsData } = await supabase.auth.getClaims().catch((thrown: unknown) => {
+    logger.error('getClaims() threw in proxy', thrown)
+    return { data: null }
+  })
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
 
   if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {
     // For API routes, return 401 JSON instead of redirecting to login HTML
