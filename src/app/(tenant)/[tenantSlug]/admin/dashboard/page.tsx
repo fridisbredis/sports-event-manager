@@ -121,6 +121,17 @@ export default async function DashboardPage({ params }: Props) {
     // Jump straight to where the earliest warning is, rather than the grid's
     // own default (getCurrentStage/today) — otherwise an admin has to hunt
     // for the flagged stage and day manually.
+    //
+    // This null check is load-bearing even though the generated types say
+    // these three fields are non-nullable. They are not: migration 0040
+    // resolves them with scalar subqueries over `earliest_overall`, which is
+    // empty whenever the event has no warnings at all — the common case. The
+    // types are wrong because Postgres records no nullability for `returns
+    // table` output columns, so `supabase gen types` emits every one of them
+    // as non-null (`over_capacity` and `double_booked` included). Hand-editing
+    // them to the truth is what broke the deploy-dev type gate for four runs;
+    // the gate demands byte-equality with the generator, so the truth lives
+    // here instead. Do not delete this guard on the strength of the types.
     if (warningCounts.earliest_day && warningCounts.earliest_stage_id) {
       const params = new URLSearchParams({
         day: warningCounts.earliest_day,
