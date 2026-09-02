@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 import { Textarea } from '@/components/ui/form-fields'
@@ -8,10 +9,25 @@ import { AppCard } from '@/components/ui/app-card'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
 
+type ByChannel<T> = Record<AnnouncementChannel, T>
+
 interface Props {
   tenantId: string
-  announcements: Announcement[]
+  page: number
+  announcements: ByChannel<Announcement[]>
+  hasMore: ByChannel<boolean>
 }
+
+/**
+ * What the guard dialog is holding back. The channel toggle is local state and
+ * stays instant; only a page change is a navigation, and both can lose an
+ * unpublished draft, so both go through the same three-way prompt.
+ */
+type PendingAction =
+  | { type: 'channel'; channel: AnnouncementChannel }
+  | { type: 'page'; page: number }
+
+const NO_PUBLISHED: ByChannel<Announcement[]> = { participants: [], officials: [] }
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -84,27 +100,55 @@ function AnnouncementGuardDialog({
   )
 }
 
-export function CommunicationPanel({ tenantId, announcements: initial }: Props) {
+export function CommunicationPanel({ tenantId, page, announcements: initial, hasMore }: Props) {
   const { t } = useTranslation('admin')
+  const router = useRouter()
 
   const [channel, setChannel] = useState<AnnouncementChannel>('participants')
   const [draft, setDraft] = useState('')
   const [publishing, setPublishing] = useState(false)
-  const [pendingChannel, setPendingChannel] = useState<AnnouncementChannel | null>(null)
-  const [localAnnouncements, setLocalAnnouncements] = useState<Announcement[]>(initial)
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
 
+  // Only the optimistically-published rows live in state; the server payload is
+  // read straight from props. Copying `initial` into state would seed it once on
+  // mount and never again — paging is a soft navigation that re-renders the
+  // server component and hands this same instance new props, so the list would
+  // stay frozen on whichever page mounted first.
+  const [published, setPublished] = useState<ByChannel<Announcement[]>>(NO_PUBLISHED)
+
+  // `initial` changes identity only when a new server payload arrives. That
+  // payload already contains anything we published, so the optimistic rows are
+  // dropped at the same moment to avoid showing them twice.
+  const [renderedPayload, setRenderedPayload] = useState(initial)
+  if (renderedPayload !== initial) {
+    setRenderedPayload(initial)
+    setPublished(NO_PUBLISHED)
+  }
+
+  const isFirstPage = page === 1
   const isDirty = draft.trim().length > 0
 
-  const handleChannelClick = useCallback(
-    (next: AnnouncementChannel) => {
-      if (next === channel) return
-      if (isDirty) {
-        setPendingChannel(next)
-      } else {
-        setChannel(next)
+  const performAction = useCallback(
+    (action: PendingAction) => {
+      if (action.type === 'channel') {
+        setChannel(action.channel)
+        return
       }
+      router.push(`?page=${action.page}`)
     },
-    [channel, isDirty]
+    [router]
+  )
+
+  const requestAction = useCallback(
+    (action: PendingAction) => {
+      if (action.type === 'channel' && action.channel === channel) return
+      if (isDirty) {
+        setPendingAction(action)
+        return
+      }
+      performAction(action)
+    },
+    [channel, isDirty, performAction]
   )
 
   const publish = useCallback(
@@ -121,50 +165,64 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
           toastError(extractErrorMessage(body, t('communication.publishError')))
           return false
         }
-        const newEntry: Announcement = {
-          id: crypto.randomUUID(),
-          tenant_id: tenantId,
-          channel: targetChannel,
-          body,
-          sms_sent: false,
-          published_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
+        // The new announcement is the newest, so it only belongs on page 1 —
+        // on any other page the prepend would put it in the wrong place. The
+        // caller navigates back to page 1 instead.
+        if (isFirstPage) {
+          const newEntry: Announcement = {
+            id: crypto.randomUUID(),
+            tenant_id: tenantId,
+            channel: targetChannel,
+            body,
+            sms_sent: false,
+            published_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          }
+          setPublished((prev) => ({
+            ...prev,
+            [targetChannel]: [newEntry, ...prev[targetChannel]],
+          }))
         }
-        setLocalAnnouncements((prev) => [newEntry, ...prev])
         return true
       } finally {
         setPublishing(false)
       }
     },
-    [tenantId, t]
+    [tenantId, t, isFirstPage]
   )
 
   const handlePublish = useCallback(async () => {
     if (!isDirty || publishing) return
     const ok = await publish(channel, draft.trim())
-    if (ok) setDraft('')
-  }, [channel, draft, isDirty, publish, publishing])
+    if (!ok) return
+    setDraft('')
+    if (!isFirstPage) router.push('?page=1')
+  }, [channel, draft, isDirty, isFirstPage, publish, publishing, router])
 
-  const handleGuardCancel = useCallback(() => setPendingChannel(null), [])
+  const handleGuardCancel = useCallback(() => setPendingAction(null), [])
 
   const handleGuardDiscard = useCallback(() => {
-    const next = pendingChannel!
-    setPendingChannel(null)
+    const action = pendingAction!
+    setPendingAction(null)
     setDraft('')
-    setChannel(next)
-  }, [pendingChannel])
+    performAction(action)
+  }, [pendingAction, performAction])
 
   const handleGuardPublish = useCallback(async () => {
-    const next = pendingChannel!
+    const action = pendingAction!
     const ok = await publish(channel, draft.trim())
-    if (ok) {
-      setPendingChannel(null)
-      setDraft('')
-      setChannel(next)
-    }
-  }, [channel, draft, pendingChannel, publish])
+    if (!ok) return
+    setPendingAction(null)
+    setDraft('')
+    // The requested navigation wins over publish's own hop back to page 1 —
+    // the user asked to go somewhere specific.
+    performAction(action)
+  }, [channel, draft, pendingAction, performAction, publish])
 
-  const filtered = localAnnouncements.filter((a) => a.channel === channel)
+  const filtered = published[channel].length
+    ? [...published[channel], ...initial[channel]]
+    : initial[channel]
+  const channelHasMore = hasMore[channel]
 
   const timelineLabel =
     channel === 'participants'
@@ -187,7 +245,7 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
               <Button
                 key={ch}
                 type="button"
-                onPress={() => handleChannelClick(ch)}
+                onPress={() => requestAction({ type: 'channel', channel: ch })}
                 color={channel === ch ? 'primary' : 'default'}
                 variant={channel === ch ? 'solid' : 'bordered'}
                 size="sm"
@@ -248,12 +306,34 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
                 </svg>
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium text-default-500">
-                  {t('communication.noAnnouncementsYet')}
-                </p>
-                <p className="text-xs text-default-400 mt-0.5">
-                  {t('communication.noAnnouncementsHint')}
-                </p>
+                {isFirstPage ? (
+                  <>
+                    <p className="text-sm font-medium text-default-500">
+                      {t('communication.noAnnouncementsYet')}
+                    </p>
+                    <p className="text-xs text-default-400 mt-0.5">
+                      {t('communication.noAnnouncementsHint')}
+                    </p>
+                  </>
+                ) : (
+                  // One ?page= drives both channels, so a channel with fewer
+                  // announcements than the other runs out first. That is not
+                  // "nothing published" — say so, and offer the way back.
+                  <>
+                    <p className="text-sm font-medium text-default-500">
+                      {t('communication.noOlderAnnouncements')}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="light"
+                      size="sm"
+                      className="mt-1"
+                      onPress={() => requestAction({ type: 'page', page: 1 })}
+                    >
+                      {t('communication.backToNewest')}
+                    </Button>
+                  </>
+                )}
               </div>
             </AppCard>
           ) : (
@@ -266,12 +346,39 @@ export function CommunicationPanel({ tenantId, announcements: initial }: Props) 
               ))}
             </AppCard>
           )}
+
+          {(!isFirstPage || channelHasMore) && (
+            <nav className="flex items-center justify-between gap-3 mt-4">
+              {isFirstPage ? (
+                <span />
+              ) : (
+                <Button
+                  type="button"
+                  variant="light"
+                  size="sm"
+                  onPress={() => requestAction({ type: 'page', page: page - 1 })}
+                >
+                  {t('communication.newer')}
+                </Button>
+              )}
+              {channelHasMore && (
+                <Button
+                  type="button"
+                  variant="light"
+                  size="sm"
+                  onPress={() => requestAction({ type: 'page', page: page + 1 })}
+                >
+                  {t('communication.older')}
+                </Button>
+              )}
+            </nav>
+          )}
         </div>
       </div>
 
       {/* Unsaved-changes guard */}
       <AnnouncementGuardDialog
-        open={pendingChannel !== null}
+        open={pendingAction !== null}
         title={t('communication.unsavedTitle')}
         body={t('communication.unsavedBody')}
         cancelLabel={t('communication.cancel')}
