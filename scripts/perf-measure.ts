@@ -49,10 +49,18 @@
 //   * `min` IS THE HONEST PER-REQUEST COST. Under saturation p50/p95 measure
 //     queueing, not the code. If `min` falls while p50 does not, the change
 //     worked and something upstream is the constraint.
-//   * AZURE CPU METRICS AVERAGE AWAY SPIKES. `az monitor metrics list` at
-//     PT1M reported 43-58% while the replica was in fact hitting 102% of its
-//     limit; PT5M caught it. Do not conclude "CPU is not saturated" from a
-//     one-minute maximum.
+//   * DON'T READ THE AVERAGE AGGREGATION AS THE CEILING. The 43-58% figure
+//     that led the first PERF-01 pass to rule out CPU came from
+//     `az monitor metrics list --metric CpuPercentage --aggregation Average`.
+//     Re-run with `--aggregation Maximum` on the same metric and interval and
+//     the reading is 20-30 points higher for a comparable load — verified
+//     2026-09-02 against the perf environment (PT1M Average 36-58% vs PT1M
+//     Maximum 61-69% over the same four minutes). PT1M vs PT5M interval does
+//     NOT explain a gap this size: a five-minute maximum can never exceed the
+//     maximum of the one-minute buckets it's built from (same verification —
+//     PT5M Maximum matched exactly the highest PT1M Maximum in the window).
+//     Always request `--aggregation Maximum`, and say so when quoting a CPU
+//     figure — an unlabelled percentage is ambiguous between the two.
 
 import { Agent, setGlobalDispatcher } from 'undici'
 import { loadPerfEnv, PERF_SLUG_PREFIX } from './perf-env'

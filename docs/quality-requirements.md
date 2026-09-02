@@ -224,6 +224,13 @@ this leaves PERF-01" below.
       the derived load, in that environment. **At 90 sessions on prod-matching
       hardware (0.5 vCPU, 1 GiB, 3 replicas): 2214-2747% of baseline.** With
       both optimisations and 2 vCPU: 685-1198%. With 4 vCPU: 693-1014%.
+      (**Retracted:** an earlier pass of this document quoted 386-516% at 2
+      vCPU. That run predates PRs #107/#108 — it measured main's code at 2
+      vCPU, not the optimised code — and was also one of the runs later found
+      to have an inconsistent replica count between comparisons (see the
+      harness header in `scripts/perf-measure.ts`). The 685-1198% figure above
+      is the one measured against the optimised code at a pinned replica
+      count and supersedes it.)
 - [x] Error rate below 1% at that load. **0.0% on every run**, including the
       failing ones. This is a latency finding, not a stability one.
 - [x] Evidence: `scripts/perf-measure.ts --json` output, summarised below.
@@ -244,10 +251,17 @@ The confirmed operational load is 90. That is the gap.
 **What the bottleneck is — corrected 2026-09-01 after acting on the first
 analysis.** The first pass concluded CPU was not saturated and the serial auth
 prologue was the cause. **Half of that was wrong, and the error is instructive
-enough to leave written down: the CPU figures came from Azure's one-minute
-maximum aggregation, which averages away sub-minute spikes.** A later reading
-at five-minute granularity caught the replica at **102% of its 0.5 vCPU limit**.
-CPU was saturated the whole time.
+enough to leave written down: the 43-58% figure came from
+`az monitor metrics list --aggregation Average`, not `Maximum`, on the same
+`CpuPercentage` metric.** Re-querying with `--aggregation Maximum` — verified
+2026-09-02 against the perf environment — reads 20-30 points higher for a
+comparable load, and a direct reading during a saturating run caught the
+replica at **102% of its 0.5 vCPU limit**. CPU was saturated the whole time.
+(An earlier draft of this correction attributed the gap to PT1M vs PT5M
+interval granularity instead of aggregation type; that reasoning doesn't hold
+— a five-minute maximum can never exceed the maximum of the one-minute buckets
+it's built from — and has been withdrawn in favour of the verified cause
+above.)
 
 Each suspect, with what the measurement actually supports:
 
@@ -293,6 +307,16 @@ ceiling lifted it is worth a great deal:
 | both PRs, 0.5 vCPU | 17     | 10863 ms      | 2583%       |
 | both PRs, 2 vCPU   | **89** | **2743 ms**   | 1198%       |
 | both PRs, 4 vCPU   | 99     | 2078 ms       | 1014%       |
+
+"worst ratio" is the highest ratio across all four read paths at that
+configuration, not dashboard's own — dashboard is not necessarily the worst
+path at every sizing. dashboard's own ratio at 2 vCPU is 2743 / its own
+unloaded baseline at that sizing, not 2743 / 168 (the `min` under load from
+the table above) — `min` and the unloaded baseline are two different
+denominators, both reported because they answer different questions (per-
+request cost without queueing vs. the PERF-01 ceiling itself). Neither table
+records the per-path unloaded baseline at 2 vCPU directly; re-run
+`perf:measure --baseline` at that sizing before quoting one.
 
 **Absolute p95 improved 4.5× (12.3 s → 2.7 s). The ratio still fails**, partly
 because the unloaded baseline improved too — a faster app has a tighter
