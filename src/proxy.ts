@@ -72,7 +72,13 @@ export async function proxy(request: NextRequest) {
   // is what persists the rotated cookie either way. It also falls back to the
   // same server call getUser() makes if a project is ever on a symmetric
   // secret, so this is a speed change, not a security one.
-  const { data: claimsData } = await supabase.auth.getClaims()
+  //
+  // getClaims() can throw instead of returning { error } — a token whose
+  // segments are valid base64url but decode to non-JSON makes JSON.parse
+  // throw a plain Error, which isAuthError() doesn't recognise. An
+  // unparseable cookie (a forged token, or a truncated @supabase/ssr chunk)
+  // must read as "no session", not crash the whole request.
+  const { data: claimsData } = await supabase.auth.getClaims().catch(() => ({ data: null }))
   const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
 
   if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {

@@ -41,26 +41,43 @@ export default async function DashboardPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  // events and officials are independent — both keyed on tenant_id alone — so
-  // they go in one hop rather than two. Only the stage count genuinely depends
-  // on event.id and has to follow (PERF-01: ~70 ms per hop under load).
+  // events and both officials head-counts are independent — none of them
+  // depend on each other's result — so all three go in one hop rather than
+  // three (PERF-01: ~70 ms per hop under load). Only the stage count
+  // genuinely depends on event.id and has to follow.
+  //
+  // The two officials queries are head-counts, not a row fetch — the row set
+  // grows with club size, the counts do not (PERF-06).
   //
   // No event yet is a legitimate state this dashboard renders an empty view
   // for; a failed query is not, and must not look the same.
-  const [{ data: event, error: eventError }, { data: officialsData, error: officialsError }] =
-    await Promise.all([
-      supabase
-        .from('events')
-        .select(
-          'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
-        )
-        .eq('tenant_id', tenant.id)
-        .maybeSingle(),
-      supabase.from('officials').select('invite_status').eq('tenant_id', tenant.id),
-    ])
+  const [
+    { data: event, error: eventError },
+    { count: invitedCount, error: invitedError },
+    { count: confirmedCount, error: confirmedError },
+  ] = await Promise.all([
+    supabase
+      .from('events')
+      .select(
+        'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
+      )
+      .eq('tenant_id', tenant.id)
+      .maybeSingle(),
+    supabase
+      .from('officials')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('invite_status', 'invited'),
+    supabase
+      .from('officials')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('invite_status', 'confirmed'),
+  ])
 
   if (eventError) throw eventError
-  if (officialsError) throw officialsError
+  if (invitedError) throw invitedError
+  if (confirmedError) throw confirmedError
 
   const { count: raceStageCount, error: raceStageError } = event
     ? await supabase
@@ -72,18 +89,46 @@ export default async function DashboardPage({ params }: Props) {
 
   if (raceStageError) throw raceStageError
 
-  const officialsInvited = officialsData?.filter((o) => o.invite_status === 'invited').length ?? 0
-  const officialsConfirmed =
-    officialsData?.filter((o) => o.invite_status === 'confirmed').length ?? 0
+  const officialsInvited = invitedCount ?? 0
+  const officialsConfirmed = confirmedCount ?? 0
 
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = (raceStageCount ?? 0) > 0
   const canPublish = hasName && hasRaceStage
   const isPublished = event?.status === 'published'
 
-  // Scheduling warning counts — real values come once scheduling is built
-  const overCapacity = 0
-  const doubleBooked = 0
+  // Scheduling warnings cover the whole event (every day, every stage) rather
+  // than the single day the scheduling grid itself shows at a time — a
+  // dashboard summary that only reflected today would hide a double-booking
+  // three days out until an admin happened to click through to that day.
+  // Aggregated in Postgres (scheduling_warning_counts, migration 0040) rather
+  // than pulling every assignment row into Node — this page's other tiles
+  // are all cheap counts, and a naive fetch-then-reduce here would make the
+  // dashboard's load time scale with total assignment count for the event.
+  let overCapacity = 0
+  let doubleBooked = 0
+  let reviewHref = `/${tenantSlug}/admin/scheduling`
+  if (event) {
+    const { data: warningCounts, error: warningCountsError } = await supabase
+      .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id, p_event_id: event.id })
+      .single()
+
+    if (warningCountsError) throw warningCountsError
+
+    overCapacity = warningCounts.over_capacity
+    doubleBooked = warningCounts.double_booked
+
+    // Jump straight to where the earliest warning is, rather than the grid's
+    // own default (getCurrentStage/today) — otherwise an admin has to hunt
+    // for the flagged stage and day manually.
+    if (warningCounts.earliest_day && warningCounts.earliest_stage_id) {
+      const params = new URLSearchParams({
+        day: warningCounts.earliest_day,
+        stage: warningCounts.earliest_stage_id,
+      })
+      reviewHref = `/${tenantSlug}/admin/scheduling?${params.toString()}`
+    }
+  }
   const totalWarnings = overCapacity + doubleBooked
 
   const tenantId = tenant.id
@@ -135,7 +180,7 @@ export default async function DashboardPage({ params }: Props) {
           doubleBookedLabel={t('dashboard.doubleBooked')}
           allClearLabel={t('dashboard.allClear')}
           issuesLabel={t('dashboard.issues', { count: totalWarnings })}
-          reviewHref={`/${tenantSlug}/admin/scheduling`}
+          reviewHref={reviewHref}
           reviewLabel={t('dashboard.reviewInScheduling')}
         />
       </div>

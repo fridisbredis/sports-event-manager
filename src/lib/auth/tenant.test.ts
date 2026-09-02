@@ -5,7 +5,6 @@ import {
   confirmOfficialInvite,
   hasAdminAccessToTenant,
   canViewOfficialSurfaces,
-  getConfirmedOfficial,
   requireSystemAdmin,
   requireTenantAdmin,
   resolveTenantForAdmin,
@@ -336,31 +335,6 @@ describe('canViewOfficialSurfaces', () => {
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
     expect(officialsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
     expect(officialsBuilder.limit).toHaveBeenCalledWith(1)
-  })
-
-  // getConfirmedOfficial exists so MYSCH-01 can reuse the row this guard
-  // resolves instead of fetching it a second time (PERF-01). The guard's
-  // behaviour is covered above; these cover what the page relies on — that the
-  // row itself comes back, and that a failure still reads as "no official"
-  // rather than throwing into the page.
-  describe('getConfirmedOfficial', () => {
-    it('returns the confirmed row so callers can use its id', async () => {
-      mockServiceClientByTable({
-        officials: { data: { id: 'off-1' }, error: null },
-      })
-
-      expect(await getConfirmedOfficial('user-1', TENANT_ID)).toEqual({ id: 'off-1' })
-    })
-
-    it('returns null and logs on error, keeping the guard fail-closed', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      mockServiceClientByTable({
-        officials: { data: null, error: { message: 'boom' } },
-      })
-
-      expect(await getConfirmedOfficial('user-1', TENANT_ID)).toBeNull()
-      expect(consoleSpy).toHaveBeenCalled()
-    })
   })
 
   it('denies an official role with no matching officials row', async () => {
@@ -714,6 +688,23 @@ describe('getCurrentUser', () => {
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: {
         getClaims: vi.fn().mockResolvedValue({ data: null, error: { message: 'bad signature' } }),
+      },
+    } as never)
+
+    expect(await getCurrentUser()).toBeNull()
+  })
+
+  // getClaims() can throw a plain Error instead of returning { error } — a
+  // token whose segments are valid base64url but decode to non-JSON makes
+  // JSON.parse throw, and isAuthError() doesn't recognise that as an
+  // AuthError, so the SDK rethrows it. An unparseable cookie (a forged token,
+  // or a truncated @supabase/ssr chunk) must resolve to null so every caller's
+  // existing `if (!user) redirect('/login')` guard is reached, not crash the
+  // server component.
+  it('returns null when getClaims throws instead of returning an error', async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: {
+        getClaims: vi.fn().mockRejectedValue(new Error('Invalid UTF-8 sequence')),
       },
     } as never)
 

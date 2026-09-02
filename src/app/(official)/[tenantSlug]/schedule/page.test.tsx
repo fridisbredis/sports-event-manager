@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SchedulePage from './page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getCurrentUser, getOfficialTenant, getConfirmedOfficial } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { ScheduleView } from './_components/schedule-view'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -14,7 +14,6 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getOfficialTenant: vi.fn(),
-  getConfirmedOfficial: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -103,7 +102,6 @@ describe('SchedulePage', () => {
   it('renders an empty assignments list when the user has no confirmed official row', async () => {
     mockResolvedTenant()
     mockUser('user-1', vi.fn().mockReturnValue(chain({ data: [] })))
-    vi.mocked(getConfirmedOfficial).mockResolvedValue(null)
 
     const result = await SchedulePage({ params: PARAMS })
 
@@ -112,29 +110,28 @@ describe('SchedulePage', () => {
     expect(view!.props.assignments).toEqual([])
   })
 
-  // The officials lookup itself moved into getConfirmedOfficial so the access
-  // check and this page share one query (PERF-01). Its filters are asserted in
-  // tenant.test.ts; what matters here is that the page asks for the right
-  // (user, tenant) pair and does not re-query the table itself.
-  it('resolves the confirmed official through the shared memoised helper', async () => {
+  it('scopes the officials lookup by user_id, tenant_id, and confirmed status', async () => {
     mockResolvedTenant()
-    const fromMock = vi.fn().mockReturnValue(chain({ data: [] }))
+    const officialsBuilder = chain({ data: [] })
+    const fromMock = vi.fn().mockReturnValue(officialsBuilder)
     mockUser('user-1', fromMock)
-    vi.mocked(getConfirmedOfficial).mockResolvedValue(null)
 
     await SchedulePage({ params: PARAMS })
 
-    expect(getConfirmedOfficial).toHaveBeenCalledWith('user-1', TENANT_ID)
-    expect(fromMock).not.toHaveBeenCalledWith('officials')
+    expect(fromMock).toHaveBeenCalledWith('officials')
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('user_id', 'user-1')
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
   })
 
   it('loads assignments scoped to the official and tenant when a confirmed official exists', async () => {
     mockResolvedTenant()
+    const officialsBuilder = chain({ data: [{ id: 'off-1' }] })
     const assignments = [{ id: 'a-1', timeslot_start: '2026-08-12T09:00:00Z' }]
     const assignmentsBuilder = chain({ data: assignments })
-    const fromMock = vi.fn().mockReturnValue(assignmentsBuilder)
+    const fromMock = vi.fn()
+    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(assignmentsBuilder)
     mockUser('user-1', fromMock)
-    vi.mocked(getConfirmedOfficial).mockResolvedValue({ id: 'off-1' })
 
     const result = await SchedulePage({ params: PARAMS })
 

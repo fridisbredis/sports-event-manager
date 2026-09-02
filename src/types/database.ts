@@ -861,6 +861,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      scheduling_warning_counts: {
+        Args: { p_event_id: string; p_tenant_id: string }
+        Returns: {
+          double_booked: number
+          earliest_day: string | null
+          earliest_stage_id: string | null
+          earliest_timeslot_start: string | null
+          over_capacity: number
+        }[]
+      }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
         Returns: undefined

@@ -118,8 +118,9 @@ const MAX_CLIENT_CONNECTIONS = 512
 setGlobalDispatcher(
   new Agent({
     connections: MAX_CLIENT_CONNECTIONS,
-    // The default 5s headers timeout would turn a slow-but-succeeding request
-    // into a false error and understate the p95 it was meant to record.
+    // undici's default is 300s for both; tightened to 120s so a truly hung
+    // request fails the run promptly instead of stalling it for 5 minutes,
+    // while still comfortably outlasting any real p95 this harness expects.
     headersTimeout: 120_000,
     bodyTimeout: 120_000,
   })
