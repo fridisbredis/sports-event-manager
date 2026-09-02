@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminAccountPage from './page'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import AdminAccountForm from './_components/admin-account-form'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  createSupabaseServiceClient: vi.fn(),
 }))
 
 // getAdminTenant resolves the tenant only after the admin access check passes,
@@ -70,17 +71,31 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 // `tenant` carries both outcomes getAdminTenant can produce: a row when the
 // caller is an authorized admin of it, or null for "no such tenant OR not
 // authorized" — the two are deliberately indistinguishable to the caller.
+//
+// The no-official-row fallback looks the user up via the service client's
+// auth.admin.getUserById rather than trusting getCurrentUser()'s claims —
+// the JWT doesn't reliably carry phone/user_metadata (PERF-01's getClaims()
+// switch), so this mocks that live lookup as the source of display data.
 function mockUser(
   userId: string | null,
   userMetadata: Record<string, unknown> = {},
   fromMock: ReturnType<typeof vi.fn> = vi.fn(),
   tenant: unknown = { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true }
 ) {
-  vi.mocked(getCurrentUser).mockResolvedValue(
-    (userId ? { id: userId, user_metadata: userMetadata, phone: '0701234567' } : null) as never
-  )
+  vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
   vi.mocked(getAdminTenant).mockResolvedValue(tenant as never)
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({
+    auth: {
+      admin: {
+        getUserById: vi.fn(() =>
+          Promise.resolve({
+            data: { user: userId ? { user_metadata: userMetadata, phone: '0701234567' } : null },
+          })
+        ),
+      },
+    },
+  } as never)
 }
 
 beforeEach(() => {
@@ -114,6 +129,40 @@ describe('AdminAccountPage', () => {
     const form = findByType(result, AdminAccountForm)
     expect(form).not.toBeNull()
     expect(form!.props).toEqual({ name: 'Peter', phone: '0701234567', tenantId: TENANT_ID })
+  })
+
+  // Regression test: getCurrentUser()'s claims-derived user is not the
+  // source of display data here, since the JWT doesn't reliably carry
+  // phone/user_metadata (PERF-01). The fallback must go to the live
+  // auth.admin.getUserById lookup instead, even when getCurrentUser()
+  // resolves a user with no metadata attached at all.
+  it('falls back to the service-client user lookup for name/phone, not the claims-derived user', async () => {
+    const fromMock = vi.fn()
+    fromMock.mockReturnValueOnce(chain({ data: null })) // officials — none
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(getAdminTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+    } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      auth: {
+        admin: {
+          getUserById: vi.fn(() =>
+            Promise.resolve({
+              data: { user: { user_metadata: { name: 'Peter' }, phone: '0709998888' } },
+            })
+          ),
+        },
+      },
+    } as never)
+
+    const result = await AdminAccountPage({ params: PARAMS })
+
+    const form = findByType(result, AdminAccountForm)
+    expect(form!.props).toEqual({ name: 'Peter', phone: '0709998888', tenantId: TENANT_ID })
   })
 
   it('renders AccountForm with the official row and assignment count when it exists', async () => {

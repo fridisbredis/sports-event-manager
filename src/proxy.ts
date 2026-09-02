@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { logger } from '@/lib/logger'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -78,7 +79,15 @@ export async function proxy(request: NextRequest) {
   // throw a plain Error, which isAuthError() doesn't recognise. An
   // unparseable cookie (a forged token, or a truncated @supabase/ssr chunk)
   // must read as "no session", not crash the whole request.
-  const { data: claimsData } = await supabase.auth.getClaims().catch(() => ({ data: null }))
+  //
+  // Still fail closed on any other thrown error (e.g. a network failure on
+  // getClaims()'s fallback path) — but log it, so an auth-service outage
+  // shows up as an error rate instead of looking identical to expired
+  // sessions.
+  const { data: claimsData } = await supabase.auth.getClaims().catch((thrown: unknown) => {
+    logger.error('getClaims() threw in proxy', thrown)
+    return { data: null }
+  })
   const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
 
   if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {
