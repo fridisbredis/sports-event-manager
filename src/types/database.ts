@@ -865,9 +865,9 @@ export type Database = {
         Args: { p_event_id: string; p_tenant_id: string }
         Returns: {
           double_booked: number
-          earliest_day: string | null
-          earliest_stage_id: string | null
-          earliest_timeslot_start: string | null
+          earliest_day: string
+          earliest_stage_id: string
+          earliest_timeslot_start: string
           over_capacity: number
         }[]
       }
