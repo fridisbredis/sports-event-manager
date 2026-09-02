@@ -1,7 +1,14 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { StatusCard } from './_components/status-card'
 import { fetchSupabaseStatus, fetchTwilioStatus } from './_lib/fetch-status'
+import {
+  devSupabaseProjectRef,
+  AZURE_DEV_RESOURCE_GROUP,
+  AZURE_PROD_RESOURCE_GROUP,
+  azurePortalResourceGroupUrl,
+} from './_lib/constants'
 
 export default async function SystemHealthPage() {
   const auth = await requireSystemAdmin()
@@ -11,7 +18,10 @@ export default async function SystemHealthPage() {
 
   return (
     <div className="p-8 max-w-5xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Systemstatus</h1>
+      <Link href="/admin" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+        ← Tenants
+      </Link>
+      <h1 className="text-xl font-semibold text-gray-900 mb-1 mt-3">Systemstatus</h1>
       <p className="text-sm text-gray-500 mb-6">
         Snabb överblick över drift dev/prod. Vissa mätvärden är live, andra länkar vidare till
         tjänstens egen konsol.
@@ -22,13 +32,13 @@ export default async function SystemHealthPage() {
           title="Supabase"
           status={supabase.status}
           facts={[
-            { label: 'Dev-projekt', value: supabase.status === 'ok' ? 'Nåbart' : 'Ej nåbart' },
+            { label: 'PostgREST-fråga (dev)', value: supabase.status === 'ok' ? 'OK' : 'Fel' },
           ]}
-          note="Prod kan inte läsas live härifrån (ingen service-role-nyckel för prod i denna miljö)."
+          note="Testar bara att en enkel fråga mot dev-projektet lyckas — kan inte se prod, och ett totalt Auth-haveri hade gett en 404 innan sidan ens laddar, inte ett rött kort här."
           links={[
             {
               label: 'Dev dashboard',
-              href: 'https://supabase.com/dashboard/project/lhflutwvwvzawzbcuwup',
+              href: `https://supabase.com/dashboard/project/${devSupabaseProjectRef()}`,
             },
             { label: 'Alla projekt (välj prod)', href: 'https://supabase.com/dashboard/projects' },
           ]}
@@ -70,11 +80,11 @@ export default async function SystemHealthPage() {
           links={[
             {
               label: 'Dev — Azure Portal',
-              href: 'https://portal.azure.com/#@/resource/subscriptions/dc64af83-c062-48db-abae-4cb73a478bb2/resourceGroups/sports-event-manager-dev-rg/overview',
+              href: azurePortalResourceGroupUrl(AZURE_DEV_RESOURCE_GROUP),
             },
             {
               label: 'Prod — Azure Portal',
-              href: 'https://portal.azure.com/#@/resource/subscriptions/dc64af83-c062-48db-abae-4cb73a478bb2/resourceGroups/sports-event-manager-prod-rg/overview',
+              href: azurePortalResourceGroupUrl(AZURE_PROD_RESOURCE_GROUP),
             },
           ]}
           note="Ingen Azure-SDK/credential finns i appen ännu — status hämtas via länk tills vidare."

@@ -7,7 +7,12 @@ import { LogoutButton } from '@/components/logout-button'
 
 export function SidebarNav() {
   const pathname = usePathname()
-  const isActive = pathname === '/admin' || pathname.startsWith('/admin/')
+  // Excludes /admin/health: it's reached via a link from the tenant list
+  // (SYS-03), not a sidebar tab, so this is the first admin route where
+  // highlighting "Tenants" would be wrong.
+  const isActive =
+    pathname === '/admin' ||
+    (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/health'))
 
   return (
     <div className="flex flex-col flex-1">

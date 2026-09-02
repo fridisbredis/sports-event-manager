@@ -1,5 +1,3 @@
-'use client'
-
 import { AppCard } from '@/components/ui/app-card'
 
 type Status = 'ok' | 'error' | 'unknown'
