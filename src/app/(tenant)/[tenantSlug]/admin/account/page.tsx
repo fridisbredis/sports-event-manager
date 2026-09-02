@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 import AdminAccountForm from './_components/admin-account-form'
@@ -38,8 +38,16 @@ export default async function AdminAccountPage({ params }: Props) {
     .maybeSingle()
 
   if (!official) {
-    const name = (user.user_metadata?.name as string | undefined) ?? ''
-    const phone = user.phone ?? ''
+    // getCurrentUser() resolves identity from the JWT's own claims (PERF-01) —
+    // fast, but the token only carries what was baked in at login and doesn't
+    // reliably include phone/user_metadata the way GoTrue's live user record
+    // does. This form needs the real values, so it looks the user up by their
+    // own id instead of trusting the claims payload for display data.
+    const {
+      data: { user: authUser },
+    } = await createSupabaseServiceClient().auth.admin.getUserById(user.id)
+    const name = (authUser?.user_metadata?.name as string | undefined) ?? ''
+    const phone = authUser?.phone ?? ''
     return (
       <div className="px-8 py-8">
         <AdminAccountForm name={name} phone={phone} tenantId={tenant.id} />

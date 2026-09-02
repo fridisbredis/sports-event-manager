@@ -64,6 +64,10 @@ const EVENT = {
 // The scheduling-warning tile is not what these tests are about, but the page
 // calls scheduling_warning_counts on every render that has an event, so the
 // RPC needs a stub or the officials assertions never get reached.
+//
+// The nulls below are the real runtime shape, not a shortcut: the generated
+// types claim these fields are non-nullable, but migration 0040 returns NULL
+// for them whenever the event has no warnings. See the call site in page.tsx.
 const WARNING_COUNTS = {
   over_capacity: 0,
   double_booked: 0,

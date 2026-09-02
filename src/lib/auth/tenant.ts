@@ -414,7 +414,15 @@ async function resolveUserFromClaims(
   // throw a plain Error, which isAuthError() doesn't recognise. Every caller
   // here already has an `if (!user) redirect('/login')` guard; an unparseable
   // cookie must reach that guard as null, not crash the server component.
-  const { data, error } = await supabase.auth.getClaims().catch(() => ({ data: null, error: null }))
+  //
+  // Still fail closed on any other thrown error (e.g. a network failure on
+  // getClaims()'s fallback path) — but log it, so an auth-service outage
+  // shows up as an error rate instead of looking identical to expired
+  // sessions.
+  const { data, error } = await supabase.auth.getClaims().catch((thrown: unknown) => {
+    logger.error('getClaims() threw', thrown)
+    return { data: null, error: null }
+  })
 
   if (error || !data?.claims?.sub) return null
 
