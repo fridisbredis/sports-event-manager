@@ -86,15 +86,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const tenantId = (data as unknown as { tenant_id: string }).tenant_id
+  const { tenant_id: tenantId, role_granted: roleGranted } = data as unknown as {
+    tenant_id: string
+    role_granted: boolean
+  }
 
-  await logAuthEvent({
-    phone: user.phone,
-    event: 'role_granted_via_invite_confirmation',
-    actorUserId: user.id,
-    tenantId,
-    detail: { role: 'official' },
-  })
+  // SEC-07: only log when the RPC actually inserted a user_roles row.
+  // confirm_official_invite's insert is `on conflict do nothing`, so a
+  // successful call does not always mean a grant happened (migration 0043).
+  if (roleGranted) {
+    await logAuthEvent({
+      phone: user.phone,
+      event: 'role_granted_via_invite_confirmation',
+      actorUserId: user.id,
+      tenantId,
+      detail: { role: 'official' },
+    })
+  }
 
   const { data: tenant } = await service
     .from('tenants')

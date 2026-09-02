@@ -70,15 +70,24 @@ export async function confirmOfficialInvite(userId: string, phone: string): Prom
 
   if (error) return null
 
-  const tenantId = (data as unknown as { tenant_id: string }).tenant_id
+  const { tenant_id: tenantId, role_granted: roleGranted } = data as unknown as {
+    tenant_id: string
+    role_granted: boolean
+  }
 
-  await logAuthEvent({
-    phone,
-    event: 'role_granted_via_invite_confirmation',
-    actorUserId: userId,
-    tenantId,
-    detail: { role: 'official' },
-  })
+  // SEC-07: only log when the RPC actually inserted a user_roles row.
+  // confirm_official_invite_by_phone's insert is `on conflict do nothing`,
+  // so a successful call does not always mean a grant happened (migration
+  // 0043).
+  if (roleGranted) {
+    await logAuthEvent({
+      phone,
+      event: 'role_granted_via_invite_confirmation',
+      actorUserId: userId,
+      tenantId,
+      detail: { role: 'official' },
+    })
+  }
 
   const { data: tenant, error: tenantError } = await service
     .from('tenants')
