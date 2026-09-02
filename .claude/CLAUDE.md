@@ -30,6 +30,17 @@ Multi-tenant sports event web platform. Each tenant is a sports organization or 
 
 ---
 
+## Subagent usage
+
+For read-only research (finding files, grepping symbols, locating patterns —
+"where is X defined"), prefer the `explore` subagent (runs on Haiku, cheaper)
+over `general-purpose`. Don't delegate at all for something answerable with
+one or two direct `grep`/`Read` calls. Reserve `general-purpose` for tasks
+that actually need broader tools (editing, multi-step reasoning) alongside
+research.
+
+---
+
 ## Source documents
 
 Peter has delivered a complete v1 specification in `docs/`. These are the source of truth — CLAUDE.md only summarizes.
