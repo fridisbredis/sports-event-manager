@@ -66,3 +66,48 @@ describe('splitPage', () => {
     expect(splitPage([], 20)).toEqual({ items: [], hasMore: false })
   })
 })
+
+// pageRange and splitPage are only correct together: the range deliberately
+// overlaps the next page's first index, because that row is the sentinel and
+// splitPage drops it. Asserting the {from, to} literals alone cannot show
+// that, so page through a fixture the way PostgREST would and check the rows
+// that actually reach the render.
+describe('pageRange + splitPage', () => {
+  // `.range(from, to)` is inclusive on both ends.
+  const fetchPage = (rows: number[], page: number, pageSize: number) => {
+    const { from, to } = pageRange(page, pageSize)
+    return splitPage(rows.slice(from, to + 1), pageSize)
+  }
+
+  const rows = Array.from({ length: 45 }, (_, i) => i)
+
+  it('serves every row exactly once across consecutive pages', () => {
+    const pages = [1, 2, 3].map((page) => fetchPage(rows, page, 20).items)
+
+    expect(pages).toEqual([rows.slice(0, 20), rows.slice(20, 40), rows.slice(40, 45)])
+    expect(pages.flat()).toEqual(rows)
+    expect(new Set(pages.flat()).size).toBe(rows.length)
+  })
+
+  it('never repeats a row across a page boundary', () => {
+    for (const page of [1, 2]) {
+      const current = fetchPage(rows, page, 20).items
+      const next = fetchPage(rows, page + 1, 20).items
+      expect(current.filter((row) => next.includes(row))).toEqual([])
+    }
+  })
+
+  it('reports an older page until the last one', () => {
+    expect([1, 2, 3].map((page) => fetchPage(rows, page, 20).hasMore)).toEqual([true, true, false])
+  })
+
+  it('renders the past-the-end state rather than repeating the last page', () => {
+    expect(fetchPage(rows, 4, 20)).toEqual({ items: [], hasMore: false })
+  })
+
+  it('reports no older page when the total is an exact multiple of the page size', () => {
+    const exact = Array.from({ length: 40 }, (_, i) => i)
+
+    expect(fetchPage(exact, 2, 20)).toEqual({ items: exact.slice(20, 40), hasMore: false })
+  })
+})
