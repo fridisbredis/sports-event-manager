@@ -73,7 +73,7 @@ export default async function SystemHealthPage() {
           }
           note={
             twilio.status === 'ok'
-              ? 'Dev och prod delar Twilio-konto men har egna avsändarnummer — siffran ovan gäller bara numret som visas, inte hela kontot.'
+              ? 'Dev och prod har egna avsändarnummer — siffran ovan gäller bara numret som visas. (Enligt CLAUDE.md delar de ett Twilio-konto, men det är inte oberoende verifierat.)'
               : twilio.status === 'unknown'
                 ? 'Kunde inte hämta live-data just nu — se konsolen för aktuell status.'
                 : undefined
@@ -83,9 +83,7 @@ export default async function SystemHealthPage() {
 
         <StatusCard
           title="Sentry"
-          status={
-            sentry.status === 'ok' ? (sentry.unresolvedCount === 0 ? 'ok' : 'error') : 'unknown'
-          }
+          status={sentry.status}
           facts={
             sentry.status === 'ok'
               ? [

@@ -35,15 +35,20 @@ export interface TwilioStatus {
   status: 'ok' | 'error' | 'unknown'
   sentToday?: number
   /** The sender number sentToday is scoped to — shown in the UI so the
-   *  count is never ambiguous between dev and prod, since both share one
-   *  Twilio subaccount (confirmed 2026-09-02, PR #110 review). */
+   *  count is never ambiguous between dev and prod. CLAUDE.md states both
+   *  environments share one Twilio subaccount, but the two
+   *  `*_TWILIO_ACCOUNT_SID` secret values have not been independently
+   *  compared (see PR #110 review) — this claim rests on that document,
+   *  not on a verified check. */
   fromNumber?: string
 }
 
 // Twilio Usage Records API is scoped to the account, not the Messaging
-// Service — and dev and prod share one Twilio subaccount (confirmed
-// 2026-09-02, see the review discussion on PR #110), so it can't tell the
-// two environments' sends apart. The Messages list can: it takes a `From`
+// Service. CLAUDE.md says dev and prod share one Twilio subaccount, which
+// would mean it can't tell the two environments' sends apart — but that has
+// not been independently confirmed (the `*_TWILIO_ACCOUNT_SID` secrets
+// haven't been compared, see PR #110 review). The Messages list sidesteps
+// the question either way: it takes a `From`
 // filter, and each environment already has its own sender number
 // (TWILIO_PHONE_NUMBER) reused here, no new secret needed.
 //

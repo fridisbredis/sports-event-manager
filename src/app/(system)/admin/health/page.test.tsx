@@ -1,3 +1,4 @@
+import type React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SystemHealthPage from './page'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
@@ -48,5 +49,30 @@ describe('SystemHealthPage', () => {
     expect(fetchSupabaseStatus).toHaveBeenCalled()
     expect(fetchTwilioStatus).toHaveBeenCalled()
     expect(fetchSentryStatus).toHaveBeenCalled()
+  })
+
+  it('shows the Sentry card as ok when the probe succeeds, even with unresolved issues', async () => {
+    vi.mocked(fetchSentryStatus).mockResolvedValue({ status: 'ok', unresolvedCount: 3 })
+
+    const result = await SystemHealthPage()
+
+    function findByTitle(node: unknown, title: string): React.ReactElement | undefined {
+      if (!node || typeof node !== 'object') return undefined
+      const el = node as React.ReactElement<{ title?: string; children?: unknown }>
+      if (el.props?.title === title) return el
+      const children = el.props?.children
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          const found = findByTitle(child, title)
+          if (found) return found
+        }
+      } else if (children) {
+        return findByTitle(children, title)
+      }
+      return undefined
+    }
+
+    const sentryCard = findByTitle(result, 'Sentry')
+    expect((sentryCard?.props as { status?: string })?.status).toBe('ok')
   })
 })
