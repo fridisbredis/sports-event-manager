@@ -113,7 +113,7 @@ jobs:
               "SENTRY_ENVIRONMENT=production" \
               "SENTRY_ORG=${{ secrets.PROD_SENTRY_ORG }}" \
               "SENTRY_PROJECT=${{ secrets.PROD_SENTRY_PROJECT }}" \
-              "SENTRY_AUTH_TOKEN=${{ secrets.PROD_SENTRY_AUTH_TOKEN }}" \
+              "SENTRY_API_TOKEN=${{ secrets.PROD_SENTRY_API_TOKEN }}" \
               "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}"
 
       - name: Verify prod health probes survived deploy

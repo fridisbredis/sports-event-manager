@@ -110,7 +110,7 @@ jobs:
               "SENTRY_ENVIRONMENT=development" \
               "SENTRY_ORG=${{ secrets.DEV_SENTRY_ORG }}" \
               "SENTRY_PROJECT=${{ secrets.DEV_SENTRY_PROJECT }}" \
-              "SENTRY_AUTH_TOKEN=${{ secrets.DEV_SENTRY_AUTH_TOKEN }}" \
+              "SENTRY_API_TOKEN=${{ secrets.DEV_SENTRY_API_TOKEN }}" \
               "CRON_SECRET=${{ secrets.CRON_SECRET }}"
 
       - name: Verify deployment

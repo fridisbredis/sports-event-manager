@@ -102,13 +102,17 @@ export interface SentryStatus {
   unresolvedCount?: number
 }
 
-// SENTRY_AUTH_TOKEN reaches this process as a runtime env var via
-// `az containerapp update --set-env-vars` in both deploy workflows — a
-// separate channel from the build-time Docker ARG of the same name used for
-// source-map upload (see the Dockerfile comment and CLAUDE.md's secrets
-// section). Falls back to 'unknown' rather than failing the page, same as
-// the Twilio probe, since a missing token (e.g. local dev, where it's never
-// set) is an expected, not exceptional, state.
+// SENTRY_API_TOKEN reaches this process as a runtime env var via
+// `az containerapp update --set-env-vars` in both deploy workflows. It is
+// deliberately a *different* secret from the build-time SENTRY_AUTH_TOKEN
+// Docker ARG used for source-map upload (see the Dockerfile comment and
+// CLAUDE.md's secrets section): that one only needs `project:releases`,
+// while this GET /issues/ call needs `project:read` (+ `org:read`) — scopes
+// a release-upload token doesn't carry. Sharing one token for both purposes
+// was tried during SYS-03 review and 403'd here. Falls back to 'unknown'
+// rather than failing the page, same as the Twilio probe, since a missing
+// token (e.g. local dev, where it's never set) is an expected, not
+// exceptional, state.
 //
 // query=is:unresolved + statsPeriod=24h answers "is anything actively wrong
 // right now", which is what a status page needs — not a lifetime issue
@@ -121,7 +125,7 @@ export interface SentryStatus {
 export async function fetchSentryStatus(): Promise<SentryStatus> {
   const org = process.env.SENTRY_ORG
   const project = process.env.SENTRY_PROJECT
-  const token = process.env.SENTRY_AUTH_TOKEN
+  const token = process.env.SENTRY_API_TOKEN
 
   if (!org || !project || !token) {
     return { status: 'unknown' }

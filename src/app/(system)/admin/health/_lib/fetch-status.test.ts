@@ -162,7 +162,7 @@ describe('fetchSentryStatus', () => {
       ...ENV,
       SENTRY_ORG: 'extrapreneur',
       SENTRY_PROJECT: 'viadal-event-dev',
-      SENTRY_AUTH_TOKEN: 'token',
+      SENTRY_API_TOKEN: 'token',
     }
   })
 
@@ -172,7 +172,7 @@ describe('fetchSentryStatus', () => {
   })
 
   it('returns unknown when the token is missing (e.g. local dev)', async () => {
-    process.env.SENTRY_AUTH_TOKEN = undefined
+    process.env.SENTRY_API_TOKEN = undefined
 
     expect(await fetchSentryStatus()).toEqual({ status: 'unknown' })
   })
