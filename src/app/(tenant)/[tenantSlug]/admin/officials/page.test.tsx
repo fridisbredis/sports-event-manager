@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import OfficialsList from './_components/officials-list'
+import { logger } from '@/lib/logger'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -31,12 +32,18 @@ vi.mock('./_components/officials-list', () => ({
   default: vi.fn(() => null),
 }))
 
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
   builder.neq = vi.fn(() => builder)
-  builder.order = vi.fn(() => Promise.resolve(result))
+  builder.order = vi.fn(() => builder)
+  // The officials read now ends at range, not order (PERF-06).
+  builder.range = vi.fn(() => Promise.resolve(result))
   builder.single = vi.fn(() => Promise.resolve(result))
   return builder
 }
@@ -132,5 +139,63 @@ describe('OfficialsPage', () => {
 
     const list = findByType(result, OfficialsList)
     expect(list!.props.officials).toEqual([])
+  })
+
+  it('bounds the read, asking for one row past the ceiling (PERF-06)', async () => {
+    const fromMock = mockServerClient(
+      'user-1',
+      { id: TENANT_ID, name: 'Viadal', slug: 'viadal' },
+      { data: [] }
+    )
+
+    await OfficialsPage({ params: PARAMS })
+
+    const officialsBuilder = fromMock.mock.results.find(
+      (r, i) => fromMock.mock.calls[i][0] === 'officials'
+    )!.value
+    // 501 rows requested for a 500 ceiling: the extra row is what makes a
+    // breach detectable instead of a silent truncation of the roster.
+    expect(officialsBuilder.range).toHaveBeenCalledWith(0, 500)
+  })
+
+  it('warns and truncates to the ceiling when the ceiling is breached', async () => {
+    const overflow = Array.from({ length: 501 }, (_, i) => ({
+      id: `off-${i}`,
+      name: `Official ${i}`,
+      invite_status: 'confirmed',
+    }))
+    mockServerClient(
+      'user-1',
+      { id: TENANT_ID, name: 'Viadal', slug: 'viadal' },
+      { data: overflow }
+    )
+
+    const result = await OfficialsPage({ params: PARAMS })
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('read ceiling'),
+      expect.objectContaining({ ceiling: 500, tenantId: TENANT_ID, page: 'admin/officials' })
+    )
+    const list = findByType(result, OfficialsList)
+    expect(list!.props.officials).toHaveLength(500)
+  })
+
+  it('does not warn when the roster sits exactly on the ceiling', async () => {
+    const atCeiling = Array.from({ length: 500 }, (_, i) => ({
+      id: `off-${i}`,
+      name: `Official ${i}`,
+      invite_status: 'confirmed',
+    }))
+    mockServerClient(
+      'user-1',
+      { id: TENANT_ID, name: 'Viadal', slug: 'viadal' },
+      { data: atCeiling }
+    )
+
+    const result = await OfficialsPage({ params: PARAMS })
+
+    expect(logger.warn).not.toHaveBeenCalled()
+    const list = findByType(result, OfficialsList)
+    expect(list!.props.officials).toHaveLength(500)
   })
 })
