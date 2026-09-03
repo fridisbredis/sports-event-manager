@@ -331,7 +331,7 @@ is read there, the new function body MUST still return that key, and the
 migration needs an integration test (in `tests/integration/`, run against
 real Postgres, not a mocked unit test) that asserts the exact keys in the
 response — not just that the call succeeds. A unit test that mocks the RPC
-result proves the *caller* handles a given shape correctly; it proves
+result proves the _caller_ handles a given shape correctly; it proves
 nothing about whether the real function still produces that shape. Only
 an integration test running the actual SQL closes that gap.
 
