@@ -55,7 +55,7 @@ Cross-cutting, non-negotiable from day one: multi-tenant isolation; i18n archite
 - Open or interactive (two-way) chat channels. v1 has admin-publish-only announcement channels for both participants and officials. Planned for a later version: per-work-area channels and two-way officials messaging with an admin "important" SMS flag.
 - Official signup waitlist.
 - **View-official detail on the Officials roster (OFF-01).** A read-only, admin-side view of a single official's captured data, planned as an inline expansion of the roster row (next version). Officials still edit their own data in their personal account (ACCT-01); the admin view is read-only.
-- **Extensible officials profile fields.** Adding more fields to the officials profile in a later version, e.g. an email address. Note: an email address as a *profile field* is distinct from *email as a communication channel*, which remains out of scope (see below).
+- **Extensible officials profile fields.** Adding more fields to the officials profile in a later version, e.g. an email address. Note: an email address as a _profile field_ is distinct from _email as a communication channel_, which remains out of scope (see below).
 - Tournament event type.
 - Email as a communication channel.
 - In-house timing or results computation (owned by Race Results).

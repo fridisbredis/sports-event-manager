@@ -19,9 +19,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error(
-    'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local'
-  )
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local')
 }
 
 const url = new URL(SUPABASE_URL)
@@ -206,7 +204,9 @@ async function main() {
     invite_status: 'removed',
   })
   if (removedError) throw removedError
-  console.log(`  official (removed, tests the SEC-05 invite_status filter): ${SEED_PHONES.officialRemoved}`)
+  console.log(
+    `  official (removed, tests the SEC-05 invite_status filter): ${SEED_PHONES.officialRemoved}`
+  )
 
   const { error: participantError } = await admin.from('participants').insert({
     tenant_id: tenant.id,

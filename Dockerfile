@@ -26,8 +26,19 @@ ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT
 
 # Sentry source-map upload happens during the build step below. SENTRY_AUTH_TOKEN
-# is a build-only ARG (never an ENV), so it is not persisted into any image layer's
-# environment — the builder stage that sees it is discarded and never pushed.
+# is a build-only ARG here (never an ENV in this file), so it is not persisted
+# into any image layer's environment — the builder stage that sees it is
+# discarded and never pushed. It only needs the `project:releases` scope.
+#
+# SENTRY_ORG and SENTRY_PROJECT are also read at runtime by SYS-03's health
+# dashboard, via the same separate `az containerapp update --set-env-vars`
+# channel SUPABASE_SERVICE_ROLE_KEY already uses — Container Apps injects
+# them into the process environment directly, never through the image. That
+# runtime read uses its own token, SENTRY_API_TOKEN, deliberately a different
+# GitHub secret from the build-time SENTRY_AUTH_TOKEN above: the health
+# dashboard's GET /issues/ call needs `project:read` (+ `org:read`), which a
+# release-upload token doesn't carry — sharing one token for both purposes
+# was tried during SYS-03 review and got a 403 from Sentry's API.
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_AUTH_TOKEN

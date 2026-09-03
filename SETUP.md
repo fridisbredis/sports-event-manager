@@ -1,6 +1,7 @@
 # Sports Event Manager — Setup Guide
 
 ## Prerequisites
+
 - Node.js 20+
 - Docker Desktop
 - Azure CLI (`az`)
@@ -98,32 +99,32 @@ Repeat step 4 with `-prod` suffixes and `swedencentral` (or your preferred regio
 
 Add these secrets to your GitHub repo (Settings → Secrets → Actions):
 
-| Secret | Description |
-|--------|-------------|
-| `REGISTRY_LOGIN_SERVER` | e.g. `sportsevtmgrdev.azurecr.io` |
-| `REGISTRY_USERNAME` | ACR username |
-| `REGISTRY_PASSWORD` | ACR password |
-| `AZURE_RESOURCE_GROUP_DEV` | `sports-event-manager-dev-rg` |
-| `AZURE_RESOURCE_GROUP_PROD` | `sports-event-manager-prod-rg` |
-| `DEV_SUPABASE_URL` | Dev project URL |
-| `DEV_SUPABASE_ANON_KEY` | Dev anon key |
-| `DEV_SUPABASE_SERVICE_ROLE_KEY` | Dev service role key |
-| `PROD_SUPABASE_URL` | Prod project URL |
-| `PROD_SUPABASE_ANON_KEY` | Prod anon key |
-| `PROD_SUPABASE_SERVICE_ROLE_KEY` | Prod service role key |
-| `TWILIO_ACCOUNT_SID` | From console.twilio.com |
-| `TWILIO_AUTH_TOKEN` | From console.twilio.com |
-| `TWILIO_PHONE_NUMBER` | Your Twilio number e.g. `+46...` |
-| `DEV_APP_URL` | Your dev Container App URL |
-| `PROD_APP_URL` | Your prod Container App URL |
+| Secret                           | Description                       |
+| -------------------------------- | --------------------------------- |
+| `REGISTRY_LOGIN_SERVER`          | e.g. `sportsevtmgrdev.azurecr.io` |
+| `REGISTRY_USERNAME`              | ACR username                      |
+| `REGISTRY_PASSWORD`              | ACR password                      |
+| `AZURE_RESOURCE_GROUP_DEV`       | `sports-event-manager-dev-rg`     |
+| `AZURE_RESOURCE_GROUP_PROD`      | `sports-event-manager-prod-rg`    |
+| `DEV_SUPABASE_URL`               | Dev project URL                   |
+| `DEV_SUPABASE_ANON_KEY`          | Dev anon key                      |
+| `DEV_SUPABASE_SERVICE_ROLE_KEY`  | Dev service role key              |
+| `PROD_SUPABASE_URL`              | Prod project URL                  |
+| `PROD_SUPABASE_ANON_KEY`         | Prod anon key                     |
+| `PROD_SUPABASE_SERVICE_ROLE_KEY` | Prod service role key             |
+| `TWILIO_ACCOUNT_SID`             | From console.twilio.com           |
+| `TWILIO_AUTH_TOKEN`              | From console.twilio.com           |
+| `TWILIO_PHONE_NUMBER`            | Your Twilio number e.g. `+46...`  |
+| `DEV_APP_URL`                    | Your dev Container App URL        |
+| `PROD_APP_URL`                   | Your prod Container App URL       |
 
 ---
 
 ## 7. Deployment flow
 
-| Trigger | Target |
-|---------|--------|
-| Push to `main` | Dev environment |
+| Trigger                             | Target           |
+| ----------------------------------- | ---------------- |
+| Push to `main`                      | Dev environment  |
 | Push a tag `v*.*.*` (e.g. `v1.0.0`) | Prod environment |
 
 ```bash
