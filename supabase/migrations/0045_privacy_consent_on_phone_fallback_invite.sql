@@ -30,24 +30,35 @@
 --   Data:     no data loss. privacy_accepted_at stays null on rows already
 --             confirmed by the old signature — same "no retroactive consent
 --             record" gap 0028 left for officials confirmed before it shipped.
---   Blast:    none — old code path (confirmOfficialInvite in tenant.ts) is
---             updated in the same PR to call the RPC with the new parameter.
---   Window:   compatible. This is additive-shaped (new required parameter on
---             a service-role-only RPC with exactly one caller, updated in the
---             same deploy) rather than a true 2-release expand/contract split
---             — service_role is the only grantee (see REVOKE below), so no
---             other caller can be mid-flight against the old signature during
---             the deploy window.
+--   Blast:    none in steady state — old code path (confirmOfficialInvite in
+--             tenant.ts) is updated in the same PR to call the RPC with the
+--             new parameter.
+--   Window:   NOT compatible without the default below. Schema pushes in
+--             step 1 of deploy-prod.yml, the Container App revision swaps in
+--             step 4 (Single revision, minReplicas: 1) — so for the length
+--             of one deploy, the previously deployed code (2-arg call in
+--             page.tsx) is still live against this schema. Flagged by
+--             Eduardo in review: dropping the 2-arg overload outright means
+--             PostgREST has no matching function for that call during the
+--             window, and confirmOfficialInvite's `if (error) return null`
+--             swallows it with no logging — every phone-fallback login
+--             fails silently for the deploy window. Fixed by giving
+--             p_privacy_accepted a `default false`: old 2-arg calls resolve
+--             to the new function with consent defaulted false, hit the
+--             existing privacy_not_accepted path, and fail closed the same
+--             way an unconfirmed consent does today. Once the new revision
+--             deploys, real 3-arg calls take over normally.
 -- ============================================================================
 
 -- Signature changes (new p_privacy_accepted param) so the old 2-arg version
--- is dropped explicitly rather than left as dead overload.
+-- is dropped explicitly rather than left as dead overload. The default below
+-- is what keeps this deploy-safe — see Window: above.
 drop function if exists public.confirm_official_invite_by_phone(uuid, text);
 
 create or replace function public.confirm_official_invite_by_phone(
   p_user_id           uuid,
   p_user_phone        text,
-  p_privacy_accepted  boolean
+  p_privacy_accepted  boolean default false
 )
 returns jsonb
 language plpgsql
