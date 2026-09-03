@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Card, CardBody, Chip } from '@heroui/react'
+import { Card, CardBody } from '@heroui/react'
 import { Button } from '@/components/ui/button'
+import { Chip } from '@/components/ui/chip'
 import { BigStat } from './big-stat'
 
 interface SchedulingWarningsCardProps {
@@ -39,7 +40,6 @@ export function SchedulingWarningsCard({
             size="sm"
             variant={totalWarnings === 0 ? 'bordered' : 'flat'}
             color={totalWarnings === 0 ? 'default' : 'warning'}
-            className={totalWarnings === 0 ? 'border-1' : undefined}
           >
             {totalWarnings === 0 ? allClearLabel : issuesLabel}
           </Chip>
