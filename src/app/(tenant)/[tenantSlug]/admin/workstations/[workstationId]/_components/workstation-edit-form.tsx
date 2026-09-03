@@ -19,8 +19,8 @@ import {
   matchStageHoursWindows,
 } from '../../_utils'
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
-import { OperatingWindowsEditor } from './operating-windows-editor'
-import { TodosEditor } from './todos-editor'
+import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
+import { TodosEditor } from '../../_components/todos-editor'
 
 interface Props {
   tenantSlug: string
