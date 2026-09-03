@@ -25,7 +25,6 @@ import { ByWorkAreaGrid } from './by-work-area-grid'
 import { useSchedulingGridInteraction } from './use-scheduling-grid-interaction'
 import { useSchedulingAutosave } from './use-scheduling-autosave'
 import { CellActionPopup } from './cell-action-popup'
-import { WsPersonPicker } from './ws-person-picker'
 import { DragOfficialPicker } from './drag-official-picker'
 import { WsSlotModal } from './ws-slot-modal'
 import type {
@@ -94,8 +93,6 @@ export function SchedulingGrid({
     closeCellActionCell,
     expandedWorkAreas,
     toggleExpandedWorkArea,
-    wsPickerCell,
-    closeWsPickerCell,
     pendingCells,
     beginPending,
     endPending,
@@ -330,13 +327,6 @@ export function SchedulingGrid({
   async function handleCellAction(action: 'remove' | 'assigned', assignment: LocalAssignment) {
     closeCellActionCell()
     await autosave.handleCellAction(action, assignment)
-  }
-
-  async function handleWsPersonPick(officialId: string) {
-    if (!wsPickerCell) return
-    const cell = wsPickerCell
-    closeWsPickerCell()
-    await autosave.handleWsPersonPick(cell, officialId)
   }
 
   function handleOverflowClick(overflowAssignments: LocalAssignment[], anchor: HTMLElement) {
@@ -634,16 +624,6 @@ export function SchedulingGrid({
           officials={officials}
           workstations={workstations}
           onAction={handleCellAction}
-        />
-      )}
-
-      {/* Person picker for by-work-area expanded view */}
-      {wsPickerCell && (
-        <WsPersonPicker
-          wsPickerCell={wsPickerCell}
-          activeAssignments={activeAssignments}
-          officials={officials}
-          onPick={handleWsPersonPick}
         />
       )}
 

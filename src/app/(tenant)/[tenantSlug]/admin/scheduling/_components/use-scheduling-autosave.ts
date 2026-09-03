@@ -7,7 +7,7 @@ import { slotEndTime } from '@/lib/scheduling/grid-logic'
 import { toastError } from '@/lib/toast'
 import { toLocalAssignments, applyCellAction } from './grid-helpers'
 import type { AssignmentData, LocalAssignment } from './scheduling-types'
-import type { WsPickerCell, DragOfficialPicker } from './use-scheduling-grid-interaction'
+import type { DragOfficialPicker } from './use-scheduling-grid-interaction'
 
 function toLocalAssignmentsFromInitial(initialAssignments: AssignmentData[]): LocalAssignment[] {
   return initialAssignments
@@ -126,25 +126,6 @@ export function useSchedulingAutosave({
     router.refresh()
   }
 
-  async function handleWsPersonPick(wsPickerCell: NonNullable<WsPickerCell>, officialId: string) {
-    const { workstationId, slotIndex, slotStart } = wsPickerCell
-    const slot = new Date(slotStart)
-    const slotEnd = slotEndTime(slot, granularityMin).toISOString()
-
-    const key = wsCellKey(workstationId, slotIndex, slotStart)
-    beginPending(key)
-    await persistAdditions([
-      {
-        official_id: officialId,
-        workstation_id: workstationId,
-        timeslot_start: slotStart,
-        timeslot_end: slotEnd,
-        slot_index: slotIndex,
-      },
-    ])
-    endPending(key)
-  }
-
   async function addAssignment(
     workstationId: string,
     slotIndex: number,
@@ -232,7 +213,6 @@ export function useSchedulingAutosave({
     nextLocalFreeSlot,
     persistAdditions,
     handleCellAction,
-    handleWsPersonPick,
     addAssignment,
     handleDragOfficialPick,
     handleWsSlotRemove,

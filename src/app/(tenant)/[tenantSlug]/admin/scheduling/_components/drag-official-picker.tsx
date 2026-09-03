@@ -18,13 +18,20 @@ export function DragOfficialPicker({
 }: DragOfficialPickerProps) {
   const { t } = useTranslation('admin')
 
+  const PICKER_WIDTH = 208 // px, matches w-52
+  const opensLeft =
+    typeof window !== 'undefined' &&
+    dragOfficialPicker.anchorLeft + PICKER_WIDTH > window.innerWidth
+
   return (
     <div
       className="fixed w-52 bg-white border border-gray-200 rounded-md shadow-lg z-50"
       style={{
         top: dragOfficialPicker.anchorTop,
         left: dragOfficialPicker.anchorLeft,
-        transform: 'translateY(calc(-100% - 4px))',
+        transform: opensLeft
+          ? 'translate(-100%, calc(-100% - 4px))'
+          : 'translateY(calc(-100% - 4px))',
       }}
       data-drag-official-picker
     >

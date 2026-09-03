@@ -308,42 +308,6 @@ describe('useSchedulingAutosave', () => {
     })
   })
 
-  describe('handleWsPersonPick', () => {
-    it('builds an addition from the picker cell and persists it', async () => {
-      mockRouter()
-      vi.mocked(saveAssignments).mockResolvedValue({ inserted: [] })
-      const { result } = renderHook(() => useSchedulingAutosave(BASE_ARGS))
-
-      await act(async () => {
-        await result.current.handleWsPersonPick(
-          {
-            workstationId: 'ws1',
-            slotIndex: 2,
-            slotStart: '2026-08-31T09:00:00.000Z',
-            anchorTop: 0,
-            anchorLeft: 0,
-          },
-          'o3'
-        )
-      })
-
-      expect(saveAssignments).toHaveBeenCalledWith(
-        'acme',
-        'tenant-1',
-        [
-          {
-            official_id: 'o3',
-            workstation_id: 'ws1',
-            timeslot_start: '2026-08-31T09:00:00.000Z',
-            timeslot_end: '2026-08-31T09:15:00.000Z',
-            slot_index: 2,
-          },
-        ],
-        []
-      )
-    })
-  })
-
   describe('handleDragOfficialPick', () => {
     it('builds one addition per cell start and persists them as a batch', async () => {
       mockRouter()
