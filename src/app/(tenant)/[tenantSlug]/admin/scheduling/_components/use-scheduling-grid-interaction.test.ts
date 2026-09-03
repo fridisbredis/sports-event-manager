@@ -67,27 +67,6 @@ describe('useSchedulingGridInteraction', () => {
     })
   })
 
-  describe('wsPickerCell', () => {
-    it('starts null, opens, and closes', () => {
-      const { result } = renderHook(() => useSchedulingGridInteraction())
-      expect(result.current.wsPickerCell).toBeNull()
-
-      act(() =>
-        result.current.openWsPickerCell({
-          workstationId: 'ws1',
-          slotIndex: 1,
-          slotStart: '2026-08-31T09:00:00.000Z',
-          anchorTop: 1,
-          anchorLeft: 2,
-        })
-      )
-      expect(result.current.wsPickerCell?.workstationId).toBe('ws1')
-
-      act(() => result.current.closeWsPickerCell())
-      expect(result.current.wsPickerCell).toBeNull()
-    })
-  })
-
   describe('pendingCells', () => {
     it('adds and removes keys, tolerating duplicates and missing keys', () => {
       const { result } = renderHook(() => useSchedulingGridInteraction())

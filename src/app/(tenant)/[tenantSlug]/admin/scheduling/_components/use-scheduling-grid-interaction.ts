@@ -18,14 +18,6 @@ export type CellActionCell = {
   anchorBottom: number
 } | null
 
-export type WsPickerCell = {
-  workstationId: string
-  slotIndex: number
-  slotStart: string
-  anchorTop: number
-  anchorLeft: number
-} | null
-
 export type WsSlotModal = {
   workstationId: string
   wsName: string
@@ -75,17 +67,6 @@ export function useSchedulingGridInteraction() {
       return next
     })
   }, [])
-
-  // No open call site exists yet anywhere in the scheduling grid — the
-  // by-work-area person picker is only ever read/closed, never opened, so
-  // its popup JSX is currently unreachable dead code. Preserved as-is;
-  // fixing it is out of scope for this state-extraction (MNT-05a).
-  const [wsPickerCell, setWsPickerCell] = useState<WsPickerCell>(null)
-  const openWsPickerCell = useCallback(
-    (data: NonNullable<WsPickerCell>) => setWsPickerCell(data),
-    []
-  )
-  const closeWsPickerCell = useCallback(() => setWsPickerCell(null), [])
 
   const [pendingCells, setPendingCells] = useState<Set<string>>(new Set())
   const beginPending = useCallback((key: string) => {
@@ -144,18 +125,15 @@ export function useSchedulingGridInteraction() {
       if (cellActionCell && !(e.target as HTMLElement).closest('[data-cell-action]')) {
         setCellActionCell(null)
       }
-      if (wsPickerCell && !(e.target as HTMLElement).closest('[data-ws-picker]')) {
-        setWsPickerCell(null)
-      }
       if (dragOfficialPicker && !(e.target as HTMLElement).closest('[data-drag-official-picker]')) {
         setDragOfficialPicker(null)
       }
     }
-    if (pickerCell || cellActionCell || wsPickerCell || dragOfficialPicker) {
+    if (pickerCell || cellActionCell || dragOfficialPicker) {
       document.addEventListener('mousedown', handleClick)
     }
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [pickerCell, cellActionCell, wsPickerCell, dragOfficialPicker])
+  }, [pickerCell, cellActionCell, dragOfficialPicker])
 
   return {
     pickerCell,
@@ -168,10 +146,6 @@ export function useSchedulingGridInteraction() {
 
     expandedWorkAreas,
     toggleExpandedWorkArea,
-
-    wsPickerCell,
-    openWsPickerCell,
-    closeWsPickerCell,
 
     pendingCells,
     beginPending,
