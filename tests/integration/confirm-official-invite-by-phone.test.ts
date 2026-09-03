@@ -94,7 +94,18 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
 
     const { data, error } = await confirmByPhone(admin, userData.user.id, phone, true)
     expect(error).toBeNull()
-    expect((data as unknown as { tenant_id: string }).tenant_id).toBe(tenant.id)
+    const result = data as unknown as { tenant_id: string; role_granted: boolean }
+    expect(result.tenant_id).toBe(tenant.id)
+    // Regression test for migration 0046: 0045 rewrote this RPC to add
+    // consent enforcement and dropped the `role_granted` key that 0043 had
+    // added — silently breaking the SEC-07 audit write in tenant.ts/route.ts,
+    // which both destructure `data.role_granted` to decide whether to log
+    // role_granted_via_invite_confirmation. The mocked unit tests for those
+    // callers kept passing throughout, because they assert against a
+    // hand-written mock response rather than this real function body. Only
+    // this integration test, run against real Postgres, would have caught
+    // the regression — that's why it belongs here, not just in tenant.test.ts.
+    expect(result.role_granted).toBe(true)
 
     const { data: row } = await admin
       .from('officials')
@@ -113,6 +124,53 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
       .eq('tenant_id', tenant.id)
       .maybeSingle()
     expect(roleRow?.role).toBe('official')
+  })
+
+  // Documents a real gap (not introduced by 0046, inherited from 0043): the
+  // user_roles insert's conflict target is (user_id, tenant_id), not
+  // (user_id, tenant_id, role). If the confirming user already has ANY role
+  // in this tenant — not necessarily 'official' — the insert no-ops and
+  // role_granted comes back false, even though this is the person's first
+  // time becoming an official here. SEC-07's audit trail misses that
+  // transition. Pinned here so it's a known, tracked gap rather than a
+  // surprise found again from scratch later.
+  it('reports role_granted=false when the user already has a different role in the tenant (known SEC-07 gap)', async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('SEC-09 Existing Role Conflict')
+    createdTenantIds.push(tenant.id)
+    const phone = `+46703${Math.floor(Math.random() * 1_000_000)}`
+    await createPendingOfficial(tenant.id, phone)
+
+    // This user already has a 'participant' role in the same tenant before
+    // ever being confirmed as an official.
+    const { userId } = await createUserWithRole(tenant.id, 'participant')
+    createdUserIds.push(userId)
+
+    const { data, error } = await confirmByPhone(admin, userId, phone, true)
+    expect(error).toBeNull()
+    const result = data as unknown as { tenant_id: string; role_granted: boolean }
+
+    // The official row and privacy consent are still recorded correctly...
+    const { data: officialRow } = await admin
+      .from('officials')
+      .select('invite_status, user_id')
+      .eq('tenant_id', tenant.id)
+      .eq('phone', phone)
+      .single()
+    expect(officialRow!.invite_status).toBe('confirmed')
+    expect(officialRow!.user_id).toBe(userId)
+
+    // ...but the pre-existing user_roles row (still 'participant', never
+    // overwritten to 'official') means the insert's ON CONFLICT DO NOTHING
+    // fires, and role_granted under-reports this as "nothing granted".
+    const { data: roleRow } = await admin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('tenant_id', tenant.id)
+      .single()
+    expect(roleRow!.role).toBe('participant')
+    expect(result.role_granted).toBe(false)
   })
 
   // Adversarial: the app layer's row-lock protection claim (SELECT ... FOR
