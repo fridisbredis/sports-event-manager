@@ -12,6 +12,7 @@ Existing code:
 {{selection}}
 
 Rules:
+
 - Follow existing project patterns (Server Components by default, Server Actions for mutations)
 - Admin screens: web-first. Official/participant screens: mobile-first
 - All UI strings through t() — add keys to public/locales/en/ as needed
@@ -19,6 +20,7 @@ Rules:
 - Don't add features beyond what was asked for
 
 Process:
+
 1. Analyze the feature request
 2. Ask clarifying questions if anything is unclear
 3. Propose a short implementation plan (steps + affected files)
@@ -33,6 +35,7 @@ EVT-01/02, WS-01/02, OFF-01, SCHED-01, COMM-01, ACCT-01, AUTH-01/02,
 HOME-01, INFO-01, MYSCH-01, ANN-01, SYS-01/02
 
 Tests (Vitest):
+
 - Co-locate as `<filename>.test.ts` next to the source file, following `src/lib/scheduling/grid-logic.test.ts` as the convention
 - Test pure logic (calculations, validation, data shaping) directly — no mocking needed
 - For components/hooks with logic beyond JSX rendering, use @testing-library/react
@@ -40,6 +43,7 @@ Tests (Vitest):
 - Skip tests for trivial passthrough JSX or Server Actions that are pure Supabase glue with no branching logic
 
 Output:
+
 - Working implementation
 - Tests for new logic
 - Short explanation per step

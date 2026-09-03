@@ -7,6 +7,7 @@
 **Purpose:** ready-to-paste prompts for step 5 (lo-fi wireframes), adapted from the "Från Idé till App" prompt. Two runs because our UI-delivery decision splits the app into a **mobile-first official shell** and a **web-first admin shell**. Screens and flows are filled from `docs/screens/screen-documentation.md`.
 
 Notes:
+
 - Written in English to match the codebase and v1 UI language.
 - Sign in (AUTH-01) is **not** generated: it reuses Frida's "Nattvandrarna" sign-in design. It is omitted from the flow chains below; assume every authenticated flow starts after AUTH-01.
 - Known gap to revisit (not for this run): the scheduler on mobile is view-only per the UI-delivery decision, but no read-only mobile schedule screen is defined yet (an admin checking a station's coverage on site). SCHED-01 is wireframed as the desktop editing screen only. Flag for a later round.
