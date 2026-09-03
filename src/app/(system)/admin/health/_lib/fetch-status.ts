@@ -53,7 +53,7 @@ export interface TwilioStatus {
 // (TWILIO_PHONE_NUMBER) reused here, no new secret needed.
 //
 // direction === 'outbound-api' excludes inbound (an inbound STOP reply must
-// not inflate a card labelled "SMS idag" (sent)). DateSent>= is a calendar
+// not inflate a card labelled "SMS idag" (sent)). DateSent> is a calendar
 // day in UTC, not a rolling 24h window — the closest built-in match without
 // computing our own boundary; a literal rolling window isn't worth it for a
 // status card.
@@ -90,7 +90,10 @@ export async function fetchTwilioStatus(): Promise<TwilioStatus> {
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json?` +
       new URLSearchParams({
         From: fromNumber,
-        'DateSent>': today,
+        // A bare date's inclusivity on `DateSent>` isn't documented by
+        // Twilio — an exclusive boundary would silently read 0 every day
+        // and look like a healthy card. Midnight UTC removes the ambiguity.
+        'DateSent>': `${today}T00:00:00Z`,
         PageSize: String(TWILIO_MAX_PAGE_SIZE),
       })
 

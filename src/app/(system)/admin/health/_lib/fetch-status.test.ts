@@ -166,6 +166,24 @@ describe('fetchTwilioStatus', () => {
     expect(url).toContain('DateSent%3E=')
   })
 
+  it('sends DateSent> as midnight UTC, not a bare date, so an exclusive boundary cannot read 0 all day', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-02T15:30:00Z'))
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ messages: [{ direction: 'outbound-api' }] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTwilioStatus()
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(decodeURIComponent(url as string)).toContain('DateSent>=2026-09-02T00:00:00Z')
+
+    vi.useRealTimers()
+  })
+
   it('pages through next_page_uri and sums counts, rather than fetching one 1000-message page', async () => {
     const fetchMock = vi
       .fn()
