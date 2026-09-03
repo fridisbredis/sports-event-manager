@@ -39,6 +39,7 @@ export function SchedulingWarningsCard({
             size="sm"
             variant={totalWarnings === 0 ? 'bordered' : 'flat'}
             color={totalWarnings === 0 ? 'default' : 'warning'}
+            className={totalWarnings === 0 ? 'border-1' : undefined}
           >
             {totalWarnings === 0 ? allClearLabel : issuesLabel}
           </Chip>
