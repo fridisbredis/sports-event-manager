@@ -3,6 +3,7 @@ import {
   getUserRoles,
   resolvePostLoginRedirect,
   confirmOfficialInvite,
+  hasPendingOfficialInviteByPhone,
   hasAdminAccessToTenant,
   canViewOfficialSurfaces,
   requireSystemAdmin,
@@ -154,10 +155,11 @@ describe('confirmOfficialInvite', () => {
       rpcResult: { data: null, error: { message: 'not_found' } },
     })
 
-    expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
+    expect(await confirmOfficialInvite('user-1', '0701234567', true)).toBeNull()
     expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
       p_user_id: 'user-1',
       p_user_phone: '0701234567',
+      p_privacy_accepted: true,
     })
   })
 
@@ -167,7 +169,17 @@ describe('confirmOfficialInvite', () => {
     // flipped invite_status to 'confirmed'.
     mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'already_confirmed' } } })
 
-    expect(await confirmOfficialInvite('user-2', '0701234567')).toBeNull()
+    expect(await confirmOfficialInvite('user-2', '0701234567', true)).toBeNull()
+  })
+
+  it('returns null when the RPC reports consent was not given', async () => {
+    // SEC-09: the RPC itself rejects p_privacy_accepted = false (migration
+    // 0045), independent of whatever the caller passes through.
+    mockServiceClientWithRpc({
+      rpcResult: { data: null, error: { message: 'privacy_not_accepted' } },
+    })
+
+    expect(await confirmOfficialInvite('user-1', '0701234567', false)).toBeNull()
   })
 
   it('returns null and does not confirm when the tenant lookup finds no slug', async () => {
@@ -176,7 +188,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: null },
     })
 
-    expect(await confirmOfficialInvite('user-1', '0701234567')).toBeNull()
+    expect(await confirmOfficialInvite('user-1', '0701234567', true)).toBeNull()
   })
 
   it('confirms the official via RPC, assigns the role, and returns the tenant slug', async () => {
@@ -185,13 +197,40 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567')
+    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567', true)
 
     expect(tenantSlug).toBe('viadal')
     expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
       p_user_id: 'user-1',
       p_user_phone: '0701234567',
+      p_privacy_accepted: true,
     })
+  })
+})
+
+describe('hasPendingOfficialInviteByPhone', () => {
+  function mockServiceClientWithOfficialsLookup(result: unknown) {
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(chain(result)),
+    } as never)
+  }
+
+  it('returns true when a matching invited official with no token is found', async () => {
+    mockServiceClientWithOfficialsLookup({ data: { id: 'official-1' }, error: null })
+
+    expect(await hasPendingOfficialInviteByPhone('0701234567')).toBe(true)
+  })
+
+  it('returns false when no matching official is found', async () => {
+    mockServiceClientWithOfficialsLookup({ data: null, error: null })
+
+    expect(await hasPendingOfficialInviteByPhone('0701234567')).toBe(false)
+  })
+
+  it('returns false and logs when the lookup query errors', async () => {
+    mockServiceClientWithOfficialsLookup({ data: null, error: { message: 'boom' } })
+
+    expect(await hasPendingOfficialInviteByPhone('0701234567')).toBe(false)
   })
 })
 

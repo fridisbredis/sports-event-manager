@@ -1,6 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getUserRoles, resolvePostLoginRedirect, confirmOfficialInvite } from '@/lib/auth/tenant'
+import {
+  getUserRoles,
+  resolvePostLoginRedirect,
+  hasPendingOfficialInviteByPhone,
+} from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { formatPhoneForDisplay } from '@/lib/phone'
 import { LogoutButton } from '@/components/logout-button'
@@ -18,10 +22,12 @@ export default async function RootPage() {
 
   if (destination) redirect(destination)
 
-  // No roles yet — check if this is an official completing their invite
-  if (user.phone) {
-    const tenantSlug = await confirmOfficialInvite(user.id, user.phone)
-    if (tenantSlug) redirect(`/${tenantSlug}/assignments`)
+  // No roles yet — check if this is an official completing their invite via
+  // the phone-fallback path (no invite link visited). SEC-09: consent must be
+  // shown before confirmOfficialInvite is called, so route to the
+  // interstitial instead of confirming here directly.
+  if (user.phone && (await hasPendingOfficialInviteByPhone(user.phone))) {
+    redirect('/confirm-invite')
   }
 
   const t = await getServerTranslation('en')
