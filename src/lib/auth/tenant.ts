@@ -56,16 +56,47 @@ export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | 
   }
 }
 
-export async function confirmOfficialInvite(userId: string, phone: string): Promise<string | null> {
+// Read-only lookup used to decide whether to route a freshly-logged-in user
+// with no user_roles row to the /confirm-invite consent interstitial, without
+// confirming anything yet — confirmOfficialInvite (below) still does the
+// actual confirm-with-consent write via the RPC. Kept a plain existence
+// check (no lock) since nothing here mutates state; the RPC's row lock is
+// still what prevents a confirm-time race.
+export async function hasPendingOfficialInviteByPhone(phone: string): Promise<boolean> {
+  const service = await createSupabaseServiceClient()
+  const { data, error } = await service
+    .from('officials')
+    .select('id')
+    .eq('phone', phone)
+    .eq('invite_status', 'invited')
+    .is('invite_token', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    logger.error('Failed to check for pending phone-fallback official invite', error)
+    return false
+  }
+
+  return data !== null
+}
+
+export async function confirmOfficialInvite(
+  userId: string,
+  phone: string,
+  privacyAccepted: boolean
+): Promise<string | null> {
   const service = await createSupabaseServiceClient()
 
-  // SEC-04/F-SEC-11: confirm_official_invite_by_phone (migration 0018) does
-  // the lookup, the atomic status-guarded update, and the user_roles insert
-  // in one transaction, so concurrent logins for the same invited phone
-  // can't both succeed.
+  // SEC-04/F-SEC-11/SEC-09: confirm_official_invite_by_phone (migration 0018,
+  // consent added in 0045) does the lookup, the atomic status-guarded update,
+  // the privacy_accepted_at write, and the user_roles insert in one
+  // transaction, so concurrent logins for the same invited phone can't both
+  // succeed.
   const { data, error } = await service.rpc('confirm_official_invite_by_phone', {
     p_user_id: userId,
     p_user_phone: phone,
+    p_privacy_accepted: privacyAccepted,
   })
 
   if (error) return null
