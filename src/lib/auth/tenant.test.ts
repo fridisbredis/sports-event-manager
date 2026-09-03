@@ -218,7 +218,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    await confirmOfficialInvite('user-1', '0701234567')
+    await confirmOfficialInvite('user-1', '0701234567', true)
 
     expect(logAuthEvent).toHaveBeenCalledWith({
       phone: '0701234567',
@@ -232,7 +232,7 @@ describe('confirmOfficialInvite', () => {
   it('does not log an auth event when the RPC fails', async () => {
     mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
-    await confirmOfficialInvite('user-1', '0701234567')
+    await confirmOfficialInvite('user-1', '0701234567', true)
 
     expect(logAuthEvent).not.toHaveBeenCalled()
   })
@@ -249,7 +249,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567')
+    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567', true)
 
     // The tenant resolution / redirect still succeeds — role_granted only
     // gates the audit write, not the caller-visible result.
@@ -270,7 +270,7 @@ describe('confirmOfficialInvite', () => {
     const fromMock = vi.fn().mockReturnValue(chain({ data: null, error: { message: 'db down' } }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
 
-    const result = await confirmOfficialInvite('user-1', '0701234567')
+    const result = await confirmOfficialInvite('user-1', '0701234567', true)
 
     expect(result).toBeNull()
     expect(logAuthEvent).toHaveBeenCalledWith(
@@ -289,7 +289,7 @@ describe('confirmOfficialInvite', () => {
     })
     vi.mocked(logAuthEvent).mockRejectedValueOnce(new Error('audit db unreachable'))
 
-    await expect(confirmOfficialInvite('user-1', '0701234567')).resolves.toBe('viadal')
+    await expect(confirmOfficialInvite('user-1', '0701234567', true)).resolves.toBe('viadal')
   })
 })
 
