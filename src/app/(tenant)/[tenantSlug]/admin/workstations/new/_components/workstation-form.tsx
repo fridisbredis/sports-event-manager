@@ -2,6 +2,8 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@heroui/react'
+import { Input, Textarea } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 import { createWorkstation } from '../../actions'
@@ -14,6 +16,8 @@ import {
   matchStageHoursWindows,
 } from '../../_utils'
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
+import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
+import { TodosEditor } from '../../_components/todos-editor'
 
 interface Props {
   tenantSlug: string
@@ -93,8 +97,35 @@ export default function WorkstationForm({
     setWindows((prev) => prev.filter((_, i) => i !== index))
   }
 
+  function clearWindowError(index: number) {
+    if (errors.windows?.[index]) {
+      setErrors((prev) => ({
+        ...prev,
+        windows: { ...prev.windows, [index]: undefined as unknown as string },
+      }))
+    }
+  }
+
   function updateWindow(index: number, field: 'start' | 'end', value: string) {
     setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
+    clearWindowError(index)
+  }
+
+  function toggleLimitToDay(index: number) {
+    setWindows((prev) =>
+      prev.map((win, j) =>
+        j === index
+          ? win.limitToDay !== null
+            ? { ...win, limitToDay: null }
+            : clampToDay(win, stageDays[0])
+          : win
+      )
+    )
+  }
+
+  function setLimitDay(index: number, day: string) {
+    setWindows((prev) => prev.map((win, j) => (j === index ? clampToDay(win, day) : win)))
+    clearWindowError(index)
   }
 
   function addTodo() {
@@ -175,40 +206,35 @@ export default function WorkstationForm({
     })
   }
 
-  const inputClass = (hasError?: boolean) =>
-    `w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10 ${
-      hasError ? 'border-red-300 focus:ring-red-400/20' : 'border-gray-200'
-    }`
-
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <button
-            onClick={() => router.push(`/${tenantSlug}/admin/workstations`)}
-            className="mb-1 flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          <Button
+            variant="light"
+            size="sm"
+            onPress={() => router.push(`/${tenantSlug}/admin/workstations`)}
+            className="mb-1 px-0 text-default-400"
+            startContent={<span>←</span>}
           >
-            <span>←</span>
-            <span>{t('workstations.backToList')}</span>
-          </button>
+            {t('workstations.backToList')}
+          </Button>
           <h1 className="text-2xl font-semibold text-gray-900">{t('workstations.addTitle')}</h1>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-            saveSuccess
-              ? 'border border-green-200 bg-white text-green-600'
-              : 'bg-gray-900 text-white hover:bg-gray-700'
-          } disabled:opacity-40 disabled:cursor-not-allowed`}
+        <Button
+          color={saveSuccess ? 'success' : 'primary'}
+          variant={saveSuccess ? 'flat' : 'solid'}
+          onPress={handleSave}
+          isDisabled={isSaving}
+          isLoading={isSaving}
         >
           {isSaving
             ? t('workstations.saving')
             : saveSuccess
               ? t('workstations.saved')
               : t('workstations.save')}
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
@@ -232,160 +258,46 @@ export default function WorkstationForm({
               {t('workstations.identity')}
             </h2>
             <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  {t('workstations.nameLabel')}
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
-                  }}
-                  placeholder={t('workstations.namePlaceholder')}
-                  className={inputClass(!!errors.name)}
-                />
-                {errors.name && <p className="mt-1.5 text-xs text-red-500">{errors.name}</p>}
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  {t('workstations.descriptionLabel')}
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  className={inputClass()}
-                />
-              </div>
+              <Input
+                label={t('workstations.nameLabel')}
+                value={name}
+                onValueChange={(val) => {
+                  setName(val)
+                  if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
+                }}
+                placeholder={t('workstations.namePlaceholder')}
+                isInvalid={!!errors.name}
+                errorMessage={errors.name}
+              />
+              <Textarea
+                label={t('workstations.descriptionLabel')}
+                value={description}
+                onValueChange={setDescription}
+                minRows={3}
+              />
             </div>
           </section>
 
-          {/* Operating windows */}
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                {t('workstations.operatingWindowsLabel')}
-              </h2>
-              {!!preselectedStage &&
-                !!stageStartHHMM &&
-                !!stageEndHHMM &&
-                windows.every((w) => !w.start && !w.end) && (
-                  <button
-                    onClick={matchStageHours}
-                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                  >
-                    {t('workstations.matchStageHours')}
-                  </button>
-                )}
-            </div>
-            <p className="mb-3 text-xs text-gray-400">
-              {t('workstations.operatingWindowMidnightHint')}
-            </p>
-            <div className="space-y-3">
-              {windows.map((w, i) => (
-                <div
-                  key={i}
-                  className={`rounded-lg border p-3 ${errors.windows?.[i] ? 'border-red-300' : 'border-gray-200'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="time"
-                      value={w.start}
-                      min={minStartFor}
-                      onChange={(e) => {
-                        updateWindow(i, 'start', e.target.value)
-                        if (errors.windows?.[i])
-                          setErrors((prev) => ({
-                            ...prev,
-                            windows: { ...prev.windows, [i]: undefined as unknown as string },
-                          }))
-                      }}
-                      className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-                    />
-                    <span className="text-gray-400">–</span>
-                    <input
-                      type="time"
-                      value={w.end}
-                      max={maxEndFor(w.limitToDay)}
-                      onChange={(e) => {
-                        updateWindow(i, 'end', e.target.value)
-                        if (errors.windows?.[i])
-                          setErrors((prev) => ({
-                            ...prev,
-                            windows: { ...prev.windows, [i]: undefined as unknown as string },
-                          }))
-                      }}
-                      className="flex-1 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-                    />
-                    <button
-                      onClick={() => removeWindow(i)}
-                      className="text-sm text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
-                    >
-                      {t('workstations.removeWindow')}
-                    </button>
-                  </div>
-                  {errors.windows?.[i] && (
-                    <p className="mt-1.5 text-xs text-red-500">{errors.windows[i]}</p>
-                  )}
-                  {isMultiDay && (
-                    <div className="mt-2.5 space-y-2">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-600 select-none">
-                        <input
-                          type="checkbox"
-                          checked={w.limitToDay !== null}
-                          onChange={() =>
-                            setWindows((prev) =>
-                              prev.map((win, j) =>
-                                j === i
-                                  ? win.limitToDay !== null
-                                    ? { ...win, limitToDay: null }
-                                    : clampToDay(win, stageDays[0])
-                                  : win
-                              )
-                            )
-                          }
-                          className="h-4 w-4 rounded border-gray-300 text-gray-900"
-                        />
-                        {t('workstations.limitToOneDay')}
-                      </label>
-                      {w.limitToDay !== null && (
-                        <select
-                          value={w.limitToDay}
-                          onChange={(e) => {
-                            setWindows((prev) =>
-                              prev.map((win, j) =>
-                                j === i ? clampToDay(win, e.target.value) : win
-                              )
-                            )
-                            if (errors.windows?.[i])
-                              setErrors((prev) => ({
-                                ...prev,
-                                windows: { ...prev.windows, [i]: undefined as unknown as string },
-                              }))
-                          }}
-                          className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 shadow-xs outline-none focus:ring-2 focus:ring-gray-900/10"
-                        >
-                          {stageDays.map((day) => (
-                            <option key={day} value={day}>
-                              {day}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={addWindow}
-                className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-              >
-                {t('workstations.addWindow')}
-              </button>
-            </div>
-          </section>
+          <OperatingWindowsEditor
+            windows={windows}
+            errors={errors.windows}
+            isMultiDay={isMultiDay}
+            stageDays={stageDays}
+            canMatchStageHours={
+              !!preselectedStage &&
+              !!stageStartHHMM &&
+              !!stageEndHHMM &&
+              windows.every((w) => !w.start && !w.end)
+            }
+            onUpdateWindow={updateWindow}
+            onRemoveWindow={removeWindow}
+            onAddWindow={addWindow}
+            onToggleLimitToDay={toggleLimitToDay}
+            onSetLimitDay={setLimitDay}
+            onMatchStageHours={matchStageHours}
+            minStartFor={minStartFor}
+            maxEndFor={maxEndFor}
+          />
         </div>
 
         {/* Right column */}
@@ -395,69 +307,22 @@ export default function WorkstationForm({
             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
               {t('workstations.colCapacity')}
             </h2>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                {t('workstations.capacityLabel')}
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={capacity}
-                onChange={(e) => setCapacity(Math.max(1, parseInt(e.target.value) || 1))}
-                className={inputClass()}
-              />
-            </div>
+            <Input
+              type="number"
+              label={t('workstations.capacityLabel')}
+              value={String(capacity)}
+              onValueChange={(val) => setCapacity(Math.max(1, parseInt(val) || 1))}
+              min={1}
+            />
           </section>
 
-          {/* Checklists / To-dos */}
-          <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.todosLabel')}
-            </h2>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
-              <div className="divide-y divide-gray-100">
-                {todos.map((todo, i) => (
-                  <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      disabled
-                      className="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
-                    />
-                    <input
-                      ref={(el) => {
-                        todoRefs.current[i] = el
-                      }}
-                      type="text"
-                      value={todo}
-                      onChange={(e) => updateTodo(i, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          addTodo()
-                        }
-                      }}
-                      placeholder={t('workstations.todoPlaceholder')}
-                      className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-                    />
-                    <button
-                      onClick={() => removeTodo(i)}
-                      className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      {t('workstations.removeTodo')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="px-3 py-2.5 border-t border-gray-100">
-                <button
-                  onClick={addTodo}
-                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                >
-                  {t('workstations.addTodo')}
-                </button>
-              </div>
-            </div>
-          </section>
+          <TodosEditor
+            todos={todos}
+            todoRefs={todoRefs}
+            onAddTodo={addTodo}
+            onRemoveTodo={removeTodo}
+            onUpdateTodo={updateTodo}
+          />
         </div>
       </div>
     </div>
