@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef } from 'react'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
