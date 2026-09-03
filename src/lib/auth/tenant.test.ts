@@ -33,9 +33,18 @@ function chain(result: unknown) {
   return builder
 }
 
+// getCurrentUser resolves identity from verified JWT claims (getClaims), while
+// requireSystemAdmin/requireTenantAdmin are route-handler guards that still call
+// getUser. Both are mocked from the same `user` so a test does not have to know
+// which mechanism the code under test happens to use.
 function mockServerClient(user: { id: string } | null) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user } }),
+      getClaims: vi
+        .fn()
+        .mockResolvedValue({ data: user ? { claims: { sub: user.id } } : null, error: null }),
+    },
   } as never)
 }
 
@@ -665,10 +674,41 @@ describe('getCurrentUser', () => {
     expect(await getCurrentUser()).toBeNull()
   })
 
-  it('returns the session user', async () => {
+  // Identity comes from the verified `sub` claim. Assert on id rather than the
+  // whole object: the rest of the User shape is filled from claims for type
+  // compatibility, and no caller reads it — pinning it here would break on any
+  // future claim change without protecting anything.
+  it('returns the user identified by the verified sub claim', async () => {
     mockServerClient({ id: 'user-1' })
 
-    expect(await getCurrentUser()).toEqual({ id: 'user-1' })
+    expect((await getCurrentUser())?.id).toBe('user-1')
+  })
+
+  it('returns null when the claims cannot be verified', async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: {
+        getClaims: vi.fn().mockResolvedValue({ data: null, error: { message: 'bad signature' } }),
+      },
+    } as never)
+
+    expect(await getCurrentUser()).toBeNull()
+  })
+
+  // getClaims() can throw a plain Error instead of returning { error } — a
+  // token whose segments are valid base64url but decode to non-JSON makes
+  // JSON.parse throw, and isAuthError() doesn't recognise that as an
+  // AuthError, so the SDK rethrows it. An unparseable cookie (a forged token,
+  // or a truncated @supabase/ssr chunk) must resolve to null so every caller's
+  // existing `if (!user) redirect('/login')` guard is reached, not crash the
+  // server component.
+  it('returns null when getClaims throws instead of returning an error', async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: {
+        getClaims: vi.fn().mockRejectedValue(new Error('Invalid UTF-8 sequence')),
+      },
+    } as never)
+
+    expect(await getCurrentUser()).toBeNull()
   })
 })
 

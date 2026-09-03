@@ -280,7 +280,11 @@
     "unsavedBody": "You have an unpublished announcement.",
     "discardAndContinue": "Discard and continue",
     "cancel": "Cancel",
-    "publishError": "Couldn't publish the announcement. Try again."
+    "publishError": "Couldn't publish the announcement. Try again.",
+    "older": "Older",
+    "newer": "Newer",
+    "noOlderAnnouncements": "No older announcements on this channel",
+    "backToNewest": "Back to newest"
   },
   "account": {
     "title": "Account",

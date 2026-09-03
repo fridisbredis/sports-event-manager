@@ -48,7 +48,11 @@
   "announcements": {
     "title": "Announcements",
     "noAnnouncements": "No announcements",
-    "noAnnouncementsDescription": "Updates from the organizer will appear here."
+    "noAnnouncementsDescription": "Updates from the organizer will appear here.",
+    "older": "Older announcements",
+    "newer": "Newer announcements",
+    "noOlderAnnouncements": "No older announcements",
+    "backToNewest": "Back to newest"
   },
   "account": {
     "title": "Account",

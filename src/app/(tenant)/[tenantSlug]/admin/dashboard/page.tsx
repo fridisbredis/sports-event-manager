@@ -41,17 +41,43 @@ export default async function DashboardPage({ params }: Props) {
 
   if (!tenant) notFound()
 
+  // events and both officials head-counts are independent — none of them
+  // depend on each other's result — so all three go in one hop rather than
+  // three (PERF-01: ~70 ms per hop under load). Only the stage count
+  // genuinely depends on event.id and has to follow.
+  //
+  // The two officials queries are head-counts, not a row fetch — the row set
+  // grows with club size, the counts do not (PERF-06).
+  //
   // No event yet is a legitimate state this dashboard renders an empty view
   // for; a failed query is not, and must not look the same.
-  const { data: event, error: eventError } = await supabase
-    .from('events')
-    .select(
-      'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
-    )
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
+  const [
+    { data: event, error: eventError },
+    { count: invitedCount, error: invitedError },
+    { count: confirmedCount, error: confirmedError },
+  ] = await Promise.all([
+    supabase
+      .from('events')
+      .select(
+        'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
+      )
+      .eq('tenant_id', tenant.id)
+      .maybeSingle(),
+    supabase
+      .from('officials')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('invite_status', 'invited'),
+    supabase
+      .from('officials')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('invite_status', 'confirmed'),
+  ])
 
   if (eventError) throw eventError
+  if (invitedError) throw invitedError
+  if (confirmedError) throw confirmedError
 
   const { count: raceStageCount, error: raceStageError } = event
     ? await supabase
@@ -63,16 +89,8 @@ export default async function DashboardPage({ params }: Props) {
 
   if (raceStageError) throw raceStageError
 
-  const { data: officialsData, error: officialsError } = await supabase
-    .from('officials')
-    .select('invite_status')
-    .eq('tenant_id', tenant.id)
-
-  if (officialsError) throw officialsError
-
-  const officialsInvited = officialsData?.filter((o) => o.invite_status === 'invited').length ?? 0
-  const officialsConfirmed =
-    officialsData?.filter((o) => o.invite_status === 'confirmed').length ?? 0
+  const officialsInvited = invitedCount ?? 0
+  const officialsConfirmed = confirmedCount ?? 0
 
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = (raceStageCount ?? 0) > 0
@@ -103,6 +121,17 @@ export default async function DashboardPage({ params }: Props) {
     // Jump straight to where the earliest warning is, rather than the grid's
     // own default (getCurrentStage/today) — otherwise an admin has to hunt
     // for the flagged stage and day manually.
+    //
+    // This null check is load-bearing even though the generated types say
+    // these three fields are non-nullable. They are not: migration 0040
+    // resolves them with scalar subqueries over `earliest_overall`, which is
+    // empty whenever the event has no warnings at all — the common case. The
+    // types are wrong because Postgres records no nullability for `returns
+    // table` output columns, so `supabase gen types` emits every one of them
+    // as non-null (`over_capacity` and `double_booked` included). Hand-editing
+    // them to the truth is what broke the deploy-dev type gate for four runs;
+    // the gate demands byte-equality with the generator, so the truth lives
+    // here instead. Do not delete this guard on the strength of the types.
     if (warningCounts.earliest_day && warningCounts.earliest_stage_id) {
       const params = new URLSearchParams({
         day: warningCounts.earliest_day,
