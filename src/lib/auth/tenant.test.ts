@@ -15,10 +15,15 @@ import {
   type UserRoleWithTenant,
 } from './tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-auth-event', () => ({
+  logAuthEvent: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -192,6 +197,86 @@ describe('confirmOfficialInvite', () => {
       p_user_id: 'user-1',
       p_user_phone: '0701234567',
     })
+  })
+
+  it('logs a role_granted_via_invite_confirmation auth event when the RPC actually granted the role', async () => {
+    mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
+
+    await confirmOfficialInvite('user-1', '0701234567')
+
+    expect(logAuthEvent).toHaveBeenCalledWith({
+      phone: '0701234567',
+      event: 'role_granted_via_invite_confirmation',
+      actorUserId: 'user-1',
+      tenantId: TENANT_ID,
+      detail: { role: 'official' },
+    })
+  })
+
+  it('does not log an auth event when the RPC fails', async () => {
+    mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'not_found' } } })
+
+    await confirmOfficialInvite('user-1', '0701234567')
+
+    expect(logAuthEvent).not.toHaveBeenCalled()
+  })
+
+  // SEC-07 gap, fixed by migration 0043: confirm_official_invite_by_phone
+  // (0018) does `insert into user_roles (...) on conflict (user_id,
+  // tenant_id) do nothing` — a successful RPC call does not always mean a
+  // grant happened. 0043 makes the RPC return `role_granted` (via `get
+  // diagnostics .. row_count` on the insert) so the caller can tell a real
+  // grant apart from a no-op conflict instead of logging unconditionally.
+  it('does NOT log an audit event when the RPC succeeds but role_granted is false (on-conflict-do-nothing)', async () => {
+    mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID, role_granted: false }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
+
+    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567')
+
+    // The tenant resolution / redirect still succeeds — role_granted only
+    // gates the audit write, not the caller-visible result.
+    expect(tenantSlug).toBe('viadal')
+    expect(logAuthEvent).not.toHaveBeenCalled()
+  })
+
+  it('logs the event when the RPC granted the role, even if the tenant slug lookup fails afterward', async () => {
+    // confirmOfficialInvite returns null here (tenantError path), but the RPC
+    // already committed the role grant in its own transaction — the audit
+    // write happens before the tenant lookup, so it should still fire even
+    // though the caller-visible result is a failure. This is the intended
+    // trade-off: the UI reports failure while auth_events correctly records
+    // that a grant did happen.
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { tenant_id: TENANT_ID, role_granted: true }, error: null })
+    const fromMock = vi.fn().mockReturnValue(chain({ data: null, error: { message: 'db down' } }))
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
+
+    const result = await confirmOfficialInvite('user-1', '0701234567')
+
+    expect(result).toBeNull()
+    expect(logAuthEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'role_granted_via_invite_confirmation' })
+    )
+  })
+
+  it('a throw from logAuthEvent does not affect post-login routing (fire-and-forget, not awaited)', async () => {
+    // logAuthEvent is called via `void logAuthEvent(...)`, not awaited, so
+    // even a rejection that somehow escaped logAuthEvent's own internal
+    // try/catch cannot break post-login routing — nothing here is waiting
+    // on that promise to decide the result.
+    mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
+    vi.mocked(logAuthEvent).mockRejectedValueOnce(new Error('audit db unreachable'))
+
+    await expect(confirmOfficialInvite('user-1', '0701234567')).resolves.toBe('viadal')
   })
 })
 

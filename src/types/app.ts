@@ -103,6 +103,8 @@ export type AuthEventType =
   | 'otp_verify_failed'
   | 'otp_verify_rate_limited'
   | 'otp_verify_rate_limit_error'
+  // Match migration 0042's extended CHECK constraint (SEC-07 role-grant gap).
+  | 'role_granted_via_invite_confirmation'
 
 // Useful aggregate types for queries that join data
 export type WorkstationWithDetails = Workstation & {

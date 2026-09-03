@@ -44,9 +44,14 @@ export function TenantList({ tenants }: Props) {
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Tenants</h1>
-          <Button color="primary" onPress={() => setModalOpen(true)}>
-            Create tenant
-          </Button>
+          <div className="flex items-center gap-4">
+            <Link href="/admin/health" className="text-sm text-blue-600 hover:underline">
+              Systemstatus
+            </Link>
+            <Button color="primary" onPress={() => setModalOpen(true)}>
+              Create tenant
+            </Button>
+          </div>
         </div>
 
         {tenants.length === 0 ? (

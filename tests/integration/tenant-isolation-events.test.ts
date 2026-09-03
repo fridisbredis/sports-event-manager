@@ -36,7 +36,10 @@ describe('SEC-01: tenant isolation on events', () => {
   })
 
   it('cannot read tenant B events', async () => {
-    const { data, error } = await clientAdminA.from('events').select('*').eq('tenant_id', tenantB.id)
+    const { data, error } = await clientAdminA
+      .from('events')
+      .select('*')
+      .eq('tenant_id', tenantB.id)
     expect(error).toBeNull()
     expect(data).toEqual([])
   })
@@ -51,7 +54,11 @@ describe('SEC-01: tenant isolation on events', () => {
     expect(data).toEqual([])
 
     const admin = serviceClient()
-    const { data: unchanged } = await admin.from('events').select('name').eq('id', eventB.id).single()
+    const { data: unchanged } = await admin
+      .from('events')
+      .select('name')
+      .eq('id', eventB.id)
+      .single()
     expect(unchanged?.name).toBe('Tenant B Championship')
   })
 
@@ -61,7 +68,11 @@ describe('SEC-01: tenant isolation on events', () => {
     expect(data).toEqual([])
 
     const admin = serviceClient()
-    const { data: stillThere } = await admin.from('events').select('id').eq('id', eventB.id).maybeSingle()
+    const { data: stillThere } = await admin
+      .from('events')
+      .select('id')
+      .eq('id', eventB.id)
+      .maybeSingle()
     expect(stillThere).not.toBeNull()
   })
 
