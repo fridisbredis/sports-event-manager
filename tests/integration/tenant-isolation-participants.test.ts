@@ -31,7 +31,7 @@ describe('SEC-01: tenant isolation on participants', () => {
     const linkedA = await createParticipantLinkedToUser(
       tenantA.id,
       participantUserA.userId,
-      'Own Participant A',
+      'Own Participant A'
     )
     ownParticipantA = { id: linkedA.id, userId: participantUserA.userId }
     clientParticipantA = await signInAsClient(participantUserA.phone, '000000')

@@ -23,31 +23,31 @@ After sign-in, the user's role determines their landing screen:
 ## 0. Shared / pre-authentication
 
 - **Sign in** — phone/OTP sign-in (Supabase auth, SMS via Twilio). Entry point for all authenticated roles.
-- **Invite confirmation** — reached from the SMS invite link. The official verifies their mobile number and confirms availability, sets name, sees notification default. On completion they become Confirmed. *(Source: officials-management-registration)*
+- **Invite confirmation** — reached from the SMS invite link. The official verifies their mobile number and confirms availability, sets name, sees notification default. On completion they become Confirmed. _(Source: officials-management-registration)_
 
 ## 1. System admin
 
-- **Tenant management (list)** — all tenants across the platform; create a tenant (provisions the event draft shell), activate/deactivate, see status. *(Source: scope item 6; event-creation-config references the provisioned draft shell)*
-- **Tenant detail** — per-tenant activation/deactivation and **feature toggling** by tier (standard/premium/professional; tiers are mutually exclusive, exactly one active per tenant in v1, so this is a single-select). *(Source: scope item 6, feature-toggle non-negotiable)*
+- **Tenant management (list)** — all tenants across the platform; create a tenant (provisions the event draft shell), activate/deactivate, see status. _(Source: scope item 6; event-creation-config references the provisioned draft shell)_
+- **Tenant detail** — per-tenant activation/deactivation and **feature toggling** by tier (standard/premium/professional; tiers are mutually exclusive, exactly one active per tenant in v1, so this is a single-select). _(Source: scope item 6, feature-toggle non-negotiable)_
 
 ## 2. Event admin (tenant admin)
 
-- **Event dashboard** — home for the tenant's single event; entry to all admin areas; shows draft/published state. *(Source: event-creation-config)*
-- **Event configuration** — identity (name, type, logo, description), dates/duration, **stages** (list + type-aware add/edit modal + read-only expander; each stage is Race or Non-race, with start/end time, optional venue, and, for Race stages, distance(s)), facilities, scheduling granularity, and **publish** (draft → published; requires at least one Race stage). *(Source: event-creation-config)*
-- **Work areas (list)** (ID WS-01) — all work areas for the event, each shown with its stage. *(Source: workstation-checklist-config)*
-- **Work area configuration** (ID WS-02) — stage, identity, one or more operating windows (within the stage's allocable range), capacity ("up to X"), and checklists/to-dos with instruction text. *(Source: workstation-checklist-config)*
-- **Officials roster** — add/remove officials, send/re-send SMS invite, see Invited/Confirmed state. *(Source: officials-management-registration)* (Post-MVP: a read-only "view official" detail, planned as an inline row expansion; not in v1. See problem-statement-mvp-scope.md.)
-- **Scheduling** — **stage selector** plus a single assignment model in two editable, synced views via a persistent toggle: **By person** and **By work area**. A **day selector** (top-right) shows one day at a time, scoped to the selected stage's allocable range, so multi-day stages avoid long horizontal scrolling. In By person view, allocating an hour opens a popup listing only the work areas open that hour; the by-person cell shows work area name + assigned/ceiling count. By work area is a per-work-area row showing assigned-vs-ceiling, with an **expand** control that reveals numbered slot rows #1..#X (X = capacity ceiling) plus an overflow row if over-capacity; editing is only in the expanded state, via a popup of officials available that hour. Out-of-window cells disabled; only Confirmed officials listed; over-capacity warns. *(Source: officials-scheduling v0.6)*
-- **Communication** — publish-only announcements to two separate channels: **participant channel** and **officials channel**. *(Source: communication v0.2)*
-- **Personal account** — the admin's own account (shared screen). *(Source: scope item 7)*
+- **Event dashboard** — home for the tenant's single event; entry to all admin areas; shows draft/published state. _(Source: event-creation-config)_
+- **Event configuration** — identity (name, type, logo, description), dates/duration, **stages** (list + type-aware add/edit modal + read-only expander; each stage is Race or Non-race, with start/end time, optional venue, and, for Race stages, distance(s)), facilities, scheduling granularity, and **publish** (draft → published; requires at least one Race stage). _(Source: event-creation-config)_
+- **Work areas (list)** (ID WS-01) — all work areas for the event, each shown with its stage. _(Source: workstation-checklist-config)_
+- **Work area configuration** (ID WS-02) — stage, identity, one or more operating windows (within the stage's allocable range), capacity ("up to X"), and checklists/to-dos with instruction text. _(Source: workstation-checklist-config)_
+- **Officials roster** — add/remove officials, send/re-send SMS invite, see Invited/Confirmed state. _(Source: officials-management-registration)_ (Post-MVP: a read-only "view official" detail, planned as an inline row expansion; not in v1. See problem-statement-mvp-scope.md.)
+- **Scheduling** — **stage selector** plus a single assignment model in two editable, synced views via a persistent toggle: **By person** and **By work area**. A **day selector** (top-right) shows one day at a time, scoped to the selected stage's allocable range, so multi-day stages avoid long horizontal scrolling. In By person view, allocating an hour opens a popup listing only the work areas open that hour; the by-person cell shows work area name + assigned/ceiling count. By work area is a per-work-area row showing assigned-vs-ceiling, with an **expand** control that reveals numbered slot rows #1..#X (X = capacity ceiling) plus an overflow row if over-capacity; editing is only in the expanded state, via a popup of officials available that hour. Out-of-window cells disabled; only Confirmed officials listed; over-capacity warns. _(Source: officials-scheduling v0.6)_
+- **Communication** — publish-only announcements to two separate channels: **participant channel** and **officials channel**. _(Source: communication v0.2)_
+- **Personal account** — the admin's own account (shared screen). _(Source: scope item 7)_
 
 ## 3. Official (funktionär)
 
-- **Official home** — entry to the screens below. *(Landing)*
-- **Event info** — shared read-only "about the event": identity, dates, location/venues, facilities, event programme, and Race Results links (officials can follow competition status). *(Source: event-info-view)*
-- **My schedule** — the official's own assignments in **two views**: time view (chronological) and work area view (grouped per work area with that work area's checklist). Read-only, across all stages. *(Source: officials-scheduling v0.6)*
-- **Announcements (officials channel)** — read-only officials announcement channel. *(Source: communication v0.2)*
-- **Personal account** — name, mobile number (read-only in v1), SMS notification opt-out, link to My schedule. *(Source: official-personal-account)*
+- **Official home** — entry to the screens below. _(Landing)_
+- **Event info** — shared read-only "about the event": identity, dates, location/venues, facilities, event programme, and Race Results links (officials can follow competition status). _(Source: event-info-view)_
+- **My schedule** — the official's own assignments in **two views**: time view (chronological) and work area view (grouped per work area with that work area's checklist). Read-only, across all stages. _(Source: officials-scheduling v0.6)_
+- **Announcements (officials channel)** — read-only officials announcement channel. _(Source: communication v0.2)_
+- **Personal account** — name, mobile number (read-only in v1), SMS notification opt-out, link to My schedule. _(Source: official-personal-account)_
 
 ## 4. Participant (deltagare) — placeholders ☐
 
@@ -61,7 +61,7 @@ Included so the map is complete; flows to be written next.
 
 ## 5. External
 
-- **Race Results** — external pages, reached via embedded links from Event info and the participant personal view. No in-house timing/results. *(Source: scope items 3–4)*
+- **Race Results** — external pages, reached via embedded links from Event info and the participant personal view. No in-house timing/results. _(Source: scope items 3–4)_
 
 ## Open questions
 

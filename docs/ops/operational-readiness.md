@@ -2,8 +2,8 @@
 
 This is a runbook, not a design doc. It is written for whoever is paging
 through a production incident and did not write any of this — so it leads
-with what to do, and explains *why* each piece is wired the way it is,
-rather than only *what* is wired.
+with what to do, and explains _why_ each piece is wired the way it is,
+rather than only _what_ is wired.
 
 **Contents**
 
@@ -54,7 +54,7 @@ section claimed they were the same:
   receivers than it is about to set.
 - `az monitor metrics alert create` **does not** upsert. It errors on an
   existing alert name; changing an existing alert needs `az monitor metrics
-  alert update`.
+alert update`.
 
 Each metric alert is therefore guarded by an existence check that **skips**
 an alert that already exists, so a re-run no longer aborts partway: it
@@ -103,7 +103,7 @@ workflow, and the Dockerfile `HEALTHCHECK` instruction is **not** a
 production probe — see below.
 
 **Why probes target `/api/health/live` and not `/api/health`:** in Azure
-Container Apps, a **readiness** probe failure *restarts the replica* — it
+Container Apps, a **readiness** probe failure _restarts the replica_ — it
 does not just pull it out of rotation the way a failed readiness probe
 would in vanilla Kubernetes. If probes were pointed at the DB-backed
 `/api/health`, a Supabase outage would fail readiness on every replica at
@@ -195,7 +195,7 @@ Practical guidance until then: if the restart alert fires, correlate the
 restart timestamps against revision-creation time and recent deploy
 timestamps before concluding it is a crash loop. A cluster of restarts that
 lines up with a deploy is more likely to be deploy churn (or worth a second
-look at *why* single-revision mode produced restarts instead of a clean new
+look at _why_ single-revision mode produced restarts instead of a clean new
 revision); a cluster with no nearby deploy is more likely to be a genuine
 crash loop.
 
@@ -266,12 +266,12 @@ partial write is most likely.
 
 **Exit codes to expect:**
 
-| Exit | Meaning | What to do |
-| ---- | ------- | ---------- |
-| `0` | Probes applied; secret names and registry block unchanged. | Nothing. |
-| `1` | Something is gone, and it is named in the output. | Restore it — see below. |
-| `2` | The live config could not be read back. State is **unknown**. | Check by hand before the next deploy. Do not assume either way. |
-| `130` | Interrupted. The report reflects the state at the interrupt. | Re-read the config before deciding anything. |
+| Exit  | Meaning                                                       | What to do                                                      |
+| ----- | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `0`   | Probes applied; secret names and registry block unchanged.    | Nothing.                                                        |
+| `1`   | Something is gone, and it is named in the output.             | Restore it — see below.                                         |
+| `2`   | The live config could not be read back. State is **unknown**. | Check by hand before the next deploy. Do not assume either way. |
+| `130` | Interrupted. The report reflects the state at the interrupt.  | Re-read the config before deciding anything.                    |
 
 **To restore the ACR pull credential:**
 
@@ -283,23 +283,23 @@ Credentials are in 1Password as **"ACR sportsevtmgrprod"**. The script prints
 the path to its pre-change backup on every exit path; that file is the exact
 prior configuration.
 
-**Two limits on what a `0` proves.** It compares secret *names*, because
+**Two limits on what a `0` proves.** It compares secret _names_, because
 values are never returned — a blanked value under a surviving name would pass.
 And it is a diff against the state a few seconds earlier, not an assertion
-that the credential is *valid*. If a deploy fails at image pull despite a
+that the credential is _valid_. If a deploy fails at image pull despite a
 clean run here, that is the case to suspect.
 
 **Why probes are not set inside the deploy workflow:** Azure Container Apps
 has no dedicated CLI flags for health probes — they can only be set by
 supplying a full resource definition via `--yaml`. `az containerapp create
---yaml <file>` is documented to say *"All other parameters will be
-ignored."* If a deploy job ever ran something like `az containerapp create
+--yaml <file>` is documented to say _"All other parameters will be
+ignored."_ If a deploy job ever ran something like `az containerapp create
 --yaml probes.yaml --image myimage:$SHA` in that shape, the `--image` value
 would be silently dropped and the job could exit 0 without actually
 deploying the new image — a green deploy that did not deploy.
 
 **Word this precisely, because it matters for anyone extending this
-script:** that "all other parameters ignored" behaviour is *documented* for
+script:** that "all other parameters ignored" behaviour is _documented_ for
 `az containerapp create --yaml`. It is **unverified** for
 `az containerapp update --yaml` — the `update` reference page was never
 checked while this was written, so do not treat it as a known `update`
@@ -321,10 +321,10 @@ This targets a **different** endpoint than the probes, deliberately — note
 the difference so the next person does not "fix" this into consistency and
 silently delete the database alarm in the process:
 
-- **Probes** hit `/api/health/live` because a probe failure *restarts a
-  replica* (section 4) — they must never depend on the database.
-- **The cron** hits `/api/health` because a check failure here is *only a
-  signal*, not an action — nothing restarts because this workflow fails.
+- **Probes** hit `/api/health/live` because a probe failure _restarts a
+  replica_ (section 4) — they must never depend on the database.
+- **The cron** hits `/api/health` because a check failure here is _only a
+  signal_, not an action — nothing restarts because this workflow fails.
 
 Three curls per run exist so that a **single** cron run can clear the "≥ 2
 in 15 minutes" 5xx alert threshold on its own — the alert does not depend
@@ -369,7 +369,7 @@ prod with no outage detector at all until someone notices.
 
 **Failure owner:** Frida Bredberg — named as the required reviewer on the
 prod deploy approval gate (`environment: production` in
-`deploy-prod.yml`) — *confirm with the team*. Assigning operational
+`deploy-prod.yml`) — _confirm with the team_. Assigning operational
 on-call ownership is a human decision this document cannot make on its
 own; this is a starting proposal, not a settled assignment.
 
@@ -379,7 +379,7 @@ somewhere a person reads — GitHub's default failed-workflow email, most
 likely — but that path has not been confirmed for this repository or for
 whoever ends up as failure owner. Treat "the cron will fail loudly" as
 unverified until someone checks, same as the failure-owner assignment
-above — *confirm with the team*.
+above — _confirm with the team_.
 
 ## 9. Replica configuration
 
@@ -437,7 +437,7 @@ inputs cover work areas, assignments, concurrent read-only
 official/participant sessions, and the announcement audience.
 
 **Passing PERF-01 will not mean the app is fast.** The criterion measures
-*degradation under load relative to that test case's own baseline*, not
+_degradation under load relative to that test case's own baseline_, not
 absolute latency. A test case with a slow unloaded baseline can stay
 within 300% of itself and still be slow in absolute terms.
 
@@ -478,7 +478,7 @@ second read:
   existence gate is correct either way, so this is no longer load-bearing
   for re-run safety, but the claim in section 2 is still unconfirmed.
 - `set-probes.sh` reports secret **names** only, because `az containerapp
-  show` never returns values (section 7). A blanked value under a surviving
+show` never returns values (section 7). A blanked value under a surviving
   name passes its check. Not fixable without printing secrets to the
   terminal; the limit is documented rather than closed.
 - The exact dimension-filter keyword (`includes`) for the 5xx
