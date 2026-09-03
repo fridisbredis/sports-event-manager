@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import {
-  Button,
   Chip,
   Table,
   TableHeader,
@@ -17,6 +16,7 @@ import {
   ModalFooter,
   SelectItem,
 } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'

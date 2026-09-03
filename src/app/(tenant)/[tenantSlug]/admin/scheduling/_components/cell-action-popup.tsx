@@ -1,5 +1,5 @@
-import { useTranslation } from '@/lib/i18n/client'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/lib/i18n/client'
 import { resolveCellActionLabel } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 import type { CellActionCell } from './use-scheduling-grid-interaction'

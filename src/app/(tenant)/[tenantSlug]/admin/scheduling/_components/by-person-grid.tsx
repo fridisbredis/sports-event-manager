@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { ScrollShadow, Skeleton } from '@heroui/react'
-import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { Button } from '@/components/ui/button'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'

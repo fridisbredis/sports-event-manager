@@ -1,7 +1,7 @@
 import { ScrollShadow } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { Button } from '@/components/ui/button'
 import type { OfficialData, LocalAssignment } from './scheduling-types'
 import type { WsPickerCell } from './use-scheduling-grid-interaction'
 

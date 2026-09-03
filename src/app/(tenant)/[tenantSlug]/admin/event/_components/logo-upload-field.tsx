@@ -1,6 +1,6 @@
 import type { ChangeEvent, RefObject } from 'react'
-import { useTranslation } from '@/lib/i18n/client'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   logoUrl: string
