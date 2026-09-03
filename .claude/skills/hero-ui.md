@@ -43,27 +43,27 @@ If any of these are missing, stop and report — do not scaffold setup unless ex
 
 Search the catalog before writing custom markup.
 
-| Need                         | HeroUI v2 component                                           |
-| ---------------------------- | ------------------------------------------------------------- |
-| Button, icon button          | `Button`                                                      |
-| Text input, password, search | `Input`                                                       |
-| Select                       | `Select` + `SelectItem`                                       |
-| Autocomplete                 | `Autocomplete` + `AutocompleteItem`                           |
-| Modal / dialog               | `Modal` + `ModalContent` + `ModalHeader` + `ModalBody` + `ModalFooter` |
+| Need                         | HeroUI v2 component                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| Button, icon button          | `Button`                                                                         |
+| Text input, password, search | `Input`                                                                          |
+| Select                       | `Select` + `SelectItem`                                                          |
+| Autocomplete                 | `Autocomplete` + `AutocompleteItem`                                              |
+| Modal / dialog               | `Modal` + `ModalContent` + `ModalHeader` + `ModalBody` + `ModalFooter`           |
 | Tabular data                 | `Table` + `TableHeader` + `TableColumn` + `TableBody` + `TableRow` + `TableCell` |
-| Card layout                  | `Card` + `CardHeader` + `CardBody` + `CardFooter`             |
-| Tabs                         | `Tabs` + `Tab`                                                |
-| Tooltip                      | `Tooltip`                                                     |
-| Popover                      | `Popover` + `PopoverTrigger` + `PopoverContent`               |
-| Loading state                | `Spinner`, `Skeleton`                                         |
-| Toast notification           | No built-in toast in v2 — use a third-party library           |
-| Navigation bar               | `Navbar` + `NavbarBrand` + `NavbarContent` + `NavbarItem`     |
-| Tag / label                  | `Chip`                                                        |
-| User avatar                  | `Avatar`, `AvatarGroup`                                       |
-| Dropdown menu                | `Dropdown` + `DropdownTrigger` + `DropdownMenu` + `DropdownItem` |
-| Collapsible sections         | `Accordion` + `AccordionItem`                                 |
-| Page navigation              | `Pagination`                                                  |
-| Divider                      | `Divider`                                                     |
+| Card layout                  | `Card` + `CardHeader` + `CardBody` + `CardFooter`                                |
+| Tabs                         | `Tabs` + `Tab`                                                                   |
+| Tooltip                      | `Tooltip`                                                                        |
+| Popover                      | `Popover` + `PopoverTrigger` + `PopoverContent`                                  |
+| Loading state                | `Spinner`, `Skeleton`                                                            |
+| Toast notification           | No built-in toast in v2 — use a third-party library                              |
+| Navigation bar               | `Navbar` + `NavbarBrand` + `NavbarContent` + `NavbarItem`                        |
+| Tag / label                  | `Chip`                                                                           |
+| User avatar                  | `Avatar`, `AvatarGroup`                                                          |
+| Dropdown menu                | `Dropdown` + `DropdownTrigger` + `DropdownMenu` + `DropdownItem`                 |
+| Collapsible sections         | `Accordion` + `AccordionItem`                                                    |
+| Page navigation              | `Pagination`                                                                     |
+| Divider                      | `Divider`                                                                        |
 
 If no component fits, use raw JSX with Tailwind.
 
@@ -91,8 +91,12 @@ function Example() {
               <ModalHeader>Title</ModalHeader>
               <ModalBody>Body content.</ModalBody>
               <ModalFooter>
-                <Button variant="light" onPress={onClose}>Cancel</Button>
-                <Button color="primary" onPress={onClose}>Confirm</Button>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button color="primary" onPress={onClose}>
+                  Confirm
+                </Button>
               </ModalFooter>
             </>
           )}
@@ -107,14 +111,15 @@ function Example() {
 
 ```tsx
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button } from '@heroui/react'
-
-<Dropdown>
+;<Dropdown>
   <DropdownTrigger>
     <Button variant="bordered">Actions</Button>
   </DropdownTrigger>
   <DropdownMenu onAction={(key) => console.log(key)}>
     <DropdownItem key="edit">Edit</DropdownItem>
-    <DropdownItem key="delete" className="text-danger" color="danger">Delete</DropdownItem>
+    <DropdownItem key="delete" className="text-danger" color="danger">
+      Delete
+    </DropdownItem>
   </DropdownMenu>
 </Dropdown>
 ```
@@ -123,8 +128,7 @@ import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button } from '@
 
 ```tsx
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react'
-
-<Table isStriped aria-label="Officials">
+;<Table isStriped aria-label="Officials">
   <TableHeader>
     <TableColumn>Name</TableColumn>
     <TableColumn>Status</TableColumn>
@@ -211,20 +215,20 @@ Use `onValueChange` (not `onChange`) for controlled inputs — it receives the s
 
 ## 7. Component mapping for this project
 
-| App pattern            | HeroUI v2                                          |
-| ---------------------- | -------------------------------------------------- |
-| Primary action button  | `Button color="primary"`                           |
-| Secondary / cancel     | `Button variant="light"`                           |
-| Destructive action     | `Button color="danger"`                            |
-| Status badge           | `Chip` with appropriate `color`                    |
-| Data table             | `Table isStriped` + `emptyContent` for empty state |
-| Form input             | `Input` with `label`, `isInvalid`, `errorMessage`  |
-| Select / dropdown field| `Select` + `SelectItem`                            |
-| Modal / dialog         | `Modal` compound tree                              |
-| Tabs                   | `Tabs` + `Tab`                                     |
-| Collapsible section    | `Accordion` + `AccordionItem`                      |
-| Loading                | `Spinner` centered in flex container               |
-| Row actions menu       | `Dropdown` compound tree                           |
+| App pattern             | HeroUI v2                                          |
+| ----------------------- | -------------------------------------------------- |
+| Primary action button   | `Button color="primary"`                           |
+| Secondary / cancel      | `Button variant="light"`                           |
+| Destructive action      | `Button color="danger"`                            |
+| Status badge            | `Chip` with appropriate `color`                    |
+| Data table              | `Table isStriped` + `emptyContent` for empty state |
+| Form input              | `Input` with `label`, `isInvalid`, `errorMessage`  |
+| Select / dropdown field | `Select` + `SelectItem`                            |
+| Modal / dialog          | `Modal` compound tree                              |
+| Tabs                    | `Tabs` + `Tab`                                     |
+| Collapsible section     | `Accordion` + `AccordionItem`                      |
+| Loading                 | `Spinner` centered in flex container               |
+| Row actions menu        | `Dropdown` compound tree                           |
 
 ## 8. Before finishing
 

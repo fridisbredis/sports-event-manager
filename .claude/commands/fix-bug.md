@@ -16,6 +16,7 @@ Expected:
 {{expected}}
 
 Rules:
+
 - Find root cause — don't patch symptoms
 - Fix with minimal changes
 - Do not rewrite unrelated code
@@ -24,10 +25,11 @@ Rules:
 - Run `npm test` to confirm the new test passes and nothing else broke
 
 Common root causes in this project:
+
 - Missing tenant_id check in route handler or query
 - Wrong Supabase client (browser client used in Server Component or vice versa)
 - getSession() used instead of getUser()
 - RLS blocking a query because is_system_admin() is missing from policy
-- i18n key missing in public/locales/en/*.json
+- i18n key missing in public/locales/en/\*.json
 - Types out of sync — run npm run db:types if DB schema changed recently
 - Azure deploy showing old version — image tagged with 'latest' instead of git SHA

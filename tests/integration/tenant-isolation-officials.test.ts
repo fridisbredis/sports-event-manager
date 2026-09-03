@@ -36,7 +36,10 @@ describe('SEC-01: tenant isolation on officials', () => {
   })
 
   it('cannot read tenant B officials', async () => {
-    const { data, error } = await clientAdminA.from('officials').select('*').eq('tenant_id', tenantB.id)
+    const { data, error } = await clientAdminA
+      .from('officials')
+      .select('*')
+      .eq('tenant_id', tenantB.id)
     expect(error).toBeNull()
     expect(data).toEqual([])
   })
@@ -51,17 +54,29 @@ describe('SEC-01: tenant isolation on officials', () => {
     expect(data).toEqual([])
 
     const admin = serviceClient()
-    const { data: unchanged } = await admin.from('officials').select('name').eq('id', officialB.id).single()
+    const { data: unchanged } = await admin
+      .from('officials')
+      .select('name')
+      .eq('id', officialB.id)
+      .single()
     expect(unchanged?.name).toBe('Tenant B Official')
   })
 
   it('cannot delete a tenant B official', async () => {
-    const { data, error } = await clientAdminA.from('officials').delete().eq('id', officialB.id).select()
+    const { data, error } = await clientAdminA
+      .from('officials')
+      .delete()
+      .eq('id', officialB.id)
+      .select()
     expect(error).toBeNull()
     expect(data).toEqual([])
 
     const admin = serviceClient()
-    const { data: stillThere } = await admin.from('officials').select('id').eq('id', officialB.id).maybeSingle()
+    const { data: stillThere } = await admin
+      .from('officials')
+      .select('id')
+      .eq('id', officialB.id)
+      .maybeSingle()
     expect(stillThere).not.toBeNull()
   })
 
