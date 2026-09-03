@@ -8,6 +8,10 @@ export type LogAuthEventInput = {
   phone: string
   event: AuthEventType
   actorUserId?: string | null
+  // Nullable because most auth_events writes (OTP send/verify) don't know a
+  // tenant yet — see migration 0038's header. role_granted_via_invite_confirmation
+  // (0042) is the first event that does, and populates it.
+  tenantId?: string | null
   errorCode?: string | null
   detail?: Record<string, unknown>
 }
@@ -37,6 +41,7 @@ export async function logAuthEvent(input: LogAuthEventInput): Promise<void> {
       phone_hash: hashPhone(input.phone),
       event: input.event,
       actor_user_id: input.actorUserId ?? null,
+      tenant_id: input.tenantId ?? null,
       error_code: input.errorCode ?? null,
       detail: (input.detail ?? {}) as Json,
     })

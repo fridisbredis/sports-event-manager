@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { z } from 'zod'
 
 const confirmSchema = z.object({
@@ -85,7 +86,28 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const tenantId = (data as unknown as { tenant_id: string }).tenant_id
+  const { tenant_id: tenantId, role_granted: roleGranted } = data as unknown as {
+    tenant_id: string
+    role_granted: boolean
+  }
+
+  // SEC-07: only log when the RPC actually inserted a user_roles row.
+  // confirm_official_invite's insert is `on conflict do nothing`, so a
+  // successful call does not always mean a grant happened (migration 0043).
+  // Fire-and-forget, not awaited: logAuthEvent is already fail-safe
+  // internally (try/catch, logs via logger.error), so there is nothing
+  // useful to await here — awaiting it would couple this route's latency
+  // to auth_events' write latency and let a hypothetical future throw
+  // inside logAuthEvent turn a successful confirmation into a 500.
+  if (roleGranted) {
+    void logAuthEvent({
+      phone: user.phone,
+      event: 'role_granted_via_invite_confirmation',
+      actorUserId: user.id,
+      tenantId,
+      detail: { role: 'official' },
+    })
+  }
 
   const { data: tenant } = await service
     .from('tenants')
