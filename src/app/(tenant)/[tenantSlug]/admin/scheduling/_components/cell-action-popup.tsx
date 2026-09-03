@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n/client'
 import { resolveCellActionLabel } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'

@@ -1,4 +1,5 @@
-import { Button, ScrollShadow } from '@heroui/react'
+import { ScrollShadow } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import type { OfficialData, LocalAssignment } from './scheduling-types'

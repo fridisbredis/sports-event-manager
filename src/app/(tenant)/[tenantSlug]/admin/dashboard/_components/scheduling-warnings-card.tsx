@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Card, CardBody, Chip, Button } from '@heroui/react'
+import { Card, CardBody } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Chip } from '@/components/ui/chip'
 import { BigStat } from './big-stat'
 
 interface SchedulingWarningsCardProps {

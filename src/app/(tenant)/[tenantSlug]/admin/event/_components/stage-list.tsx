@@ -5,7 +5,7 @@ import type { StageInput } from '../actions'
 import StageModal from './stage-modal'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from '@gravity-ui/icons'
 
 interface Props {

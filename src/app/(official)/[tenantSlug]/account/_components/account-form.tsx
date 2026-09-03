@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button, Switch } from '@heroui/react'
+import { Switch } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'

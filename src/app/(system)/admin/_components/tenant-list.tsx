@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  Button,
   Table,
   TableHeader,
   TableColumn,
@@ -12,6 +11,7 @@ import {
   TableCell,
   Chip,
 } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'

@@ -2,8 +2,8 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@heroui/react'
 import { Input, Textarea } from '@/components/ui/form-fields'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 import { createWorkstation } from '../../actions'

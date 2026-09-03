@@ -1,5 +1,6 @@
 import type { MutableRefObject } from 'react'
-import { Button, Input } from '@heroui/react'
+import { Input } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
