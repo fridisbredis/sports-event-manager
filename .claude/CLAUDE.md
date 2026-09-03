@@ -154,21 +154,25 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 
 ### GitHub Secrets
 
-**18 secrets per environment.** Re-verified 2026-08-27 by listing every
-`secrets.*` reference in each workflow — the earlier count of 12 predated the
-Sentry split and `CRON_SECRET`. Read the workflow rather than this list if they
-ever disagree again.
+**19 secrets per environment as of SYS-03 (2026-09-02)**, up from 18 — the
+`*_SENTRY_API_TOKEN` addition below. Read the workflow rather than this list
+if they ever disagree again.
 
-**Dev (18) — naming is NOT uniformly prefixed, unlike prod. Verified against `deploy-dev.yml`:**
-`DEV_SUPABASE_URL`, `DEV_SUPABASE_ANON_KEY`, `DEV_SUPABASE_SERVICE_ROLE_KEY`, `DEV_APP_URL`, `DEV_SENTRY_DSN`, `DEV_SENTRY_ORG`, `DEV_SENTRY_PROJECT`, `DEV_SENTRY_AUTH_TOKEN` (these eight have the `DEV_` prefix), plus `AZURE_RESOURCE_GROUP_DEV` (suffix, not prefix), and `AZURE_CREDENTIALS`, `REGISTRY_LOGIN_SERVER`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `CRON_SECRET`, `SUPABASE_ACCESS_TOKEN` (no prefix at all).
+**Dev (19) — naming is NOT uniformly prefixed, unlike prod. Verified against `deploy-dev.yml`:**
+`DEV_SUPABASE_URL`, `DEV_SUPABASE_ANON_KEY`, `DEV_SUPABASE_SERVICE_ROLE_KEY`, `DEV_APP_URL`, `DEV_SENTRY_DSN`, `DEV_SENTRY_ORG`, `DEV_SENTRY_PROJECT`, `DEV_SENTRY_AUTH_TOKEN`, `DEV_SENTRY_API_TOKEN` (these nine have the `DEV_` prefix), plus `AZURE_RESOURCE_GROUP_DEV` (suffix, not prefix), and `AZURE_CREDENTIALS`, `REGISTRY_LOGIN_SERVER`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `CRON_SECRET`, `SUPABASE_ACCESS_TOKEN` (no prefix at all).
 
-**Prod (18):** Consistently `PROD_`-prefixed — `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY`, `PROD_SUPABASE_SERVICE_ROLE_KEY`, `PROD_APP_URL`, `PROD_AZURE_CREDENTIALS`, `PROD_AZURE_RESOURCE_GROUP`, `PROD_REGISTRY_LOGIN_SERVER`, `PROD_REGISTRY_USERNAME`, `PROD_REGISTRY_PASSWORD`, `PROD_TWILIO_ACCOUNT_SID`, `PROD_TWILIO_AUTH_TOKEN`, `PROD_TWILIO_PHONE_NUMBER`, `PROD_SENTRY_DSN`, `PROD_SENTRY_ORG`, `PROD_SENTRY_PROJECT`, `PROD_SENTRY_AUTH_TOKEN`, `PROD_CRON_SECRET` — with one exception: `SUPABASE_ACCESS_TOKEN`.
+**Prod (19):** Consistently `PROD_`-prefixed — `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY`, `PROD_SUPABASE_SERVICE_ROLE_KEY`, `PROD_APP_URL`, `PROD_AZURE_CREDENTIALS`, `PROD_AZURE_RESOURCE_GROUP`, `PROD_REGISTRY_LOGIN_SERVER`, `PROD_REGISTRY_USERNAME`, `PROD_REGISTRY_PASSWORD`, `PROD_TWILIO_ACCOUNT_SID`, `PROD_TWILIO_AUTH_TOKEN`, `PROD_TWILIO_PHONE_NUMBER`, `PROD_SENTRY_DSN`, `PROD_SENTRY_ORG`, `PROD_SENTRY_PROJECT`, `PROD_SENTRY_AUTH_TOKEN`, `PROD_SENTRY_API_TOKEN`, `PROD_CRON_SECRET` — with one exception: `SUPABASE_ACCESS_TOKEN`.
 
 **`SUPABASE_ACCESS_TOKEN` is the only genuinely shared secret.** Same unprefixed name in both workflows; it authenticates the Supabase CLI for `db push` and `db:types`. Everything else is per-environment.
 
 **Note:** `*_APP_URL` is the Azure Container App URL, `*_SUPABASE_URL` is the Supabase API URL — they are NOT the same thing and have caused confusion in the past. Double-check before pasting. When adding a new dev secret, match the existing (inconsistent) name in `deploy-dev.yml` rather than assuming a `DEV_` prefix.
 
-**Sentry (4 per environment, `DEV_`/`PROD_`-prefixed like everything else):** `*_SENTRY_DSN`, `*_SENTRY_ORG`, `*_SENTRY_PROJECT`, `*_SENTRY_AUTH_TOKEN`. Two separate Sentry projects (`viadal-event-dev`, `viadal-event-prod`), so the DSN differs per environment — an earlier version of this section claimed one shared project and unprefixed names, which was wrong. `SENTRY_ENVIRONMENT` (`development`/`production`) is hardcoded per workflow, not a secret. `*_SENTRY_AUTH_TOKEN` is only used at build time for source-map upload — passed as a Docker `ARG`, never an `ENV`, so it isn't persisted into the pushed image's runtime environment.
+**Sentry (5 per environment, `DEV_`/`PROD_`-prefixed like everything else):** `*_SENTRY_DSN`, `*_SENTRY_ORG`, `*_SENTRY_PROJECT`, `*_SENTRY_AUTH_TOKEN`, `*_SENTRY_API_TOKEN`. Two separate Sentry projects (`viadal-event-dev`, `viadal-event-prod`), so the DSN differs per environment — an earlier version of this section claimed one shared project and unprefixed names, which was wrong. `SENTRY_ENVIRONMENT` (`development`/`production`) is hardcoded per workflow, not a secret.
+
+**`*_SENTRY_AUTH_TOKEN` and `*_SENTRY_API_TOKEN` are two separate secrets with two separate scopes — do not merge them.**
+`*_SENTRY_AUTH_TOKEN` is build-only: a Docker `ARG` (never a Dockerfile `ENV`, so never persisted into the pushed image's filesystem layers) used only for source-map upload during `next build`. It needs only the `project:releases` scope.
+`*_SENTRY_API_TOKEN` is runtime-only: both deploy workflows pass it to `az containerapp update --set-env-vars`, the same mechanism `SUPABASE_SERVICE_ROLE_KEY` already uses — Container Apps injects it straight into the running process's environment, with no image involved. SYS-03's `/admin/health` reads it there (`process.env.SENTRY_API_TOKEN`) to query Sentry's `GET /issues/` API for live unresolved-issue counts, which needs `project:read` (+ `org:read`) — scopes a release-upload token does not carry.
+This split exists because SYS-03 originally tried to reuse `*_SENTRY_AUTH_TOKEN` for both purposes (2026-09-02) and got a 403 from Sentry's API at runtime — the existing token only had `project:releases`. If either token's scope ever needs widening, keep the two purposes on separate tokens rather than reaching for a shared superset again.
 
 **`CRON_SECRET` / `PROD_CRON_SECRET`** guard the scheduled route handlers (`api/cron/sms-worker`, `api/cron/gdpr-warning` — SEC-09). The same value must also exist in that environment's Supabase Vault, since pg_cron reads its own copy to make the call (see migration 0029). The handlers fail closed with 401 when the env var is unset.
 
