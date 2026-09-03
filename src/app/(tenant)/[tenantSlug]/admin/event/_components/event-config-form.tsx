@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { Button, Chip, Card, CardBody } from '@heroui/react'
+import { Chip, Card, CardBody } from '@heroui/react'
 import { Input, Textarea } from '@/components/ui/form-fields'
+import { Button } from '@/components/ui/button'
 import {
   saveEvent,
   uploadEventLogo,

@@ -1,7 +1,7 @@
 'use client'
 
-import { Button } from '@heroui/react'
 import { AppCard } from '@/components/ui/app-card'
+import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 
 type Todo = { id: string; instruction_text: string; position: number }

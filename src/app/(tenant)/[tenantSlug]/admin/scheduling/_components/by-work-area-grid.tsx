@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
-import { Button, Skeleton } from '@heroui/react'
+import { Skeleton } from '@heroui/react'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { Button } from '@/components/ui/button'
 import { isWithinWindow, formatSlotLabel, shortName } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot } from './grid-helpers'

@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button, Switch } from '@heroui/react'
+import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'

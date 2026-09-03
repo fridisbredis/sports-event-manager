@@ -1,5 +1,6 @@
-import { Button, Modal, ModalContent, ModalHeader, ModalBody, ScrollShadow } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ScrollShadow } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
+import { Button } from '@/components/ui/button'
 import { formatSlotLabel } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import type { OfficialData, LocalAssignment } from './scheduling-types'

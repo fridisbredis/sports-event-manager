@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
+import { Button } from '@/components/ui/button'
 import { createTenant } from '../actions'
 import { toSlug } from '../_utils'
 import { toastError } from '@/lib/toast'

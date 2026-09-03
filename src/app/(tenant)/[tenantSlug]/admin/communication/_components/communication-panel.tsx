@@ -3,9 +3,10 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
-import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 import { Textarea } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { Button } from '@/components/ui/button'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
 

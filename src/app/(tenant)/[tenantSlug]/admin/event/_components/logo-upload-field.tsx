@@ -1,6 +1,6 @@
 import type { ChangeEvent, RefObject } from 'react'
-import { Button } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   logoUrl: string
