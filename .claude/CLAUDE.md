@@ -309,6 +309,32 @@ would ever return.
 | `destructive` | drop or rename a column, tighten a CHECK, backfill or UPDATE existing rows | Must name where the original data lives — the PITR window, an export file, or an explicit "not recoverable". Snapshot the affected rows with a `select` **before** pushing, or state outright that the loss is accepted. |
 | `replace`     | changed RPC definition, changed RLS policy, changed trigger                | "Restore the definition from migration 00MM", with the filename. Always cheap, because the `create or replace` / `drop policy if exists` pattern is already the norm here.                                               |
 
+### RPC return-shape contracts (mandatory for `replace` on an RPC)
+
+Every RPC here returns `jsonb`, and `supabase gen types` cannot see inside
+that — the generated signature is always `Returns: Json`, never the actual
+keys (F-REL-16). That means a `replace` migration can silently drop or
+rename a key the app reads out of a `.rpc(...)` response, and nothing —
+not TypeScript, not `db:types`, not a mocked unit test — will catch it.
+This already happened once: migration 0045 rewrote
+`confirm_official_invite_by_phone` to add consent enforcement, based the
+new body on an older pre-0043 shape, and dropped the `role_granted` key
+0043 had added. The SEC-07 audit write in `tenant.ts`/`route.ts` that
+depended on it went silently dark — no error, no failed request, just a
+quiet gap in the audit trail that shipped to dev undetected. Fixed by 0046
+(PR #123).
+
+**Before writing a `replace` migration for an RPC, grep the call sites**
+(`.rpc('function_name'`) for how the response is destructured — the
+pattern to look for is `data as unknown as { ... }` or similar. If any key
+is read there, the new function body MUST still return that key, and the
+migration needs an integration test (in `tests/integration/`, run against
+real Postgres, not a mocked unit test) that asserts the exact keys in the
+response — not just that the call succeeds. A unit test that mocks the RPC
+result proves the *caller* handles a given shape correctly; it proves
+nothing about whether the real function still produces that shape. Only
+an integration test running the actual SQL closes that gap.
+
 ### The ordering guarantee (why `Window:` exists)
 
 **Schema goes first, and the app follows minutes later.** `deploy-prod.yml`
