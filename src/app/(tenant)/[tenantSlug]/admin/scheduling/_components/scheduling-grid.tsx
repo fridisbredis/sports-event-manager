@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
   generateSlotsForDay,

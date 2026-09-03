@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { useEffect, useState } from 'react'
 

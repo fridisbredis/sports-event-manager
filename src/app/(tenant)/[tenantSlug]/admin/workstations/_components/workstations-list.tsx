@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation'
 import {
   Accordion,
   AccordionItem,
-  Button,
   Chip,
   Table,
   TableHeader,
@@ -13,6 +12,7 @@ import {
   TableRow,
   TableCell,
 } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
 

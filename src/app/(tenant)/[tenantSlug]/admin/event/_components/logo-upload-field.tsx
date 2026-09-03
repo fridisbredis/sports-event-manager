@@ -1,5 +1,5 @@
 import type { ChangeEvent, RefObject } from 'react'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {

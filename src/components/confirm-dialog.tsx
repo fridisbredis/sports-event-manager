@@ -1,6 +1,7 @@
 'use client'
 
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 
 export interface ConfirmDialogProps {
   open: boolean

@@ -1,6 +1,7 @@
-import { Button, ScrollShadow } from '@heroui/react'
+import { ScrollShadow } from '@heroui/react'
 import { initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { Button } from '@/components/ui/button'
 import type { OfficialData } from './scheduling-types'
 import type { DragOfficialPicker as DragOfficialPickerState } from './use-scheduling-grid-interaction'
 

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Button, ScrollShadow, Skeleton } from '@heroui/react'
+import { ScrollShadow, Skeleton } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
