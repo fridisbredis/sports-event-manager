@@ -44,7 +44,7 @@ under the matching key, without re-running the query or its RLS check at
 all. If the key used to store or look up a cached result doesn't include
 `tenant_id`, two different tenants hitting the same code path can be
 served each other's data — a real cross-tenant leak, and one that would
-show *no* trace in RLS policy logic, because RLS is never consulted on a
+show _no_ trace in RLS policy logic, because RLS is never consulted on a
 cache hit. So the mechanism decision and the key-shape decision are the
 same decision, not two.
 
@@ -61,7 +61,7 @@ authenticate as the calling user, which is what makes RLS evaluate
 called from inside a cached function at all** — that part is a hard
 constraint from the framework, not a choice.
 
-What *is* a choice is what runs instead, and there are two materially
+What _is_ a choice is what runs instead, and there are two materially
 different answers, not one:
 
 1. **Service-role client, manual `.eq('tenant_id', ...)` filter, no RLS
@@ -248,33 +248,35 @@ unstable_cache(
     // error (see src/lib/auth/tenant.ts, src/lib/rate-limit.ts). Skipping
     // that here would let a Postgres-level error get cached as a
     // "successful" result for the full revalidate window below.
-    const { data, error } = await supabaseServiceRole.rpc('get_event_info_cached', { tenant_id: tenantId })
+    const { data, error } = await supabaseServiceRole.rpc('get_event_info_cached', {
+      tenant_id: tenantId,
+    })
     if (error) throw error
     return data
   },
-  ['event-info'],           // cache namespace, data-shape only — NOT
-                            // tenant-scoped; tenant scoping here comes
-                            // entirely from the `tenantId` closure
-                            // argument reaching both the RPC call above
-                            // and the `tags` array below
+  ['event-info'], // cache namespace, data-shape only — NOT
+  // tenant-scoped; tenant scoping here comes
+  // entirely from the `tenantId` closure
+  // argument reaching both the RPC call above
+  // and the `tags` array below
   {
     tags: [`tenant-${tenantId}-event-info`], // scoped per tenant AND per
-                            // data shape — a write to a different Group 1
-                            // table (e.g. workstations) must not flush
-                            // this entry; see Invalidation below
-    revalidate: 60,         // required, not tuning left open: bounds
-                            // staleness at 60s on a replica that a
-                            // write's revalidateTag didn't reach (see
-                            // Consequences and Alternatives — Redis),
-                            // without meaningfully increasing DB load
-                            // for data that changes on the order of
-                            // minutes, not seconds
+    // data shape — a write to a different Group 1
+    // table (e.g. workstations) must not flush
+    // this entry; see Invalidation below
+    revalidate: 60, // required, not tuning left open: bounds
+    // staleness at 60s on a replica that a
+    // write's revalidateTag didn't reach (see
+    // Consequences and Alternatives — Redis),
+    // without meaningfully increasing DB load
+    // for data that changes on the order of
+    // minutes, not seconds
   }
 )(tenantId)
 ```
 
 **This only stays fail-closed if the RPC itself cannot be called
-directly by an arbitrary client, and if the role that *does* call it
+directly by an arbitrary client, and if the role that _does_ call it
 still gets RLS enforced against it.** The whole mechanism trusts the
 `tenant_id` argument — that's unavoidable, per the Context discussion
 above — but that trust is only sound when the argument comes from this
@@ -318,7 +320,7 @@ degrade into the fail-open one this ADR explicitly rejected.
 
 **Fix: the RPC must be `SECURITY DEFINER`, owned by a dedicated role that
 has `NOBYPASSRLS`.** `SECURITY DEFINER` on its own does nothing — it only
-matters *combined with* the owner's role attributes, since Postgres runs
+matters _combined with_ the owner's role attributes, since Postgres runs
 the function's RLS checks as `current_user`, which becomes the owner for
 the duration of the call. Owning it by a role that still has `BYPASSRLS`
 (the obvious mistake: `postgres` is the default local-dev connection role
@@ -326,7 +328,7 @@ and it has `BYPASSRLS = true` too) reproduces the exact leak this design
 exists to close — see the empirical proof below. `EXECUTE` is then
 granted to `service_role` only (still excluding `anon`/`authenticated`),
 and the definer role needs an explicit `GRANT SELECT` on the table —
-`SECURITY DEFINER` changes whose *identity* a check runs as, it does not
+`SECURITY DEFINER` changes whose _identity_ a check runs as, it does not
 grant privileges by itself.
 
 `FORCE ROW LEVEL SECURITY` on the table stays **mandatory**, but not for
@@ -350,7 +352,7 @@ attempts to disprove it, not just the version that was expected to
 work** — matching ADR-0002's "direct SQL query, not an assertion" style:
 
 - `select rolname, rolbypassrls from pg_roles where rolname in
-  ('anon','authenticated','service_role','postgres')` confirms
+('anon','authenticated','service_role','postgres')` confirms
   `service_role` has `rolbypassrls = true`; so does `postgres`, the
   default local-dev connection role — a fact that matters below.
   `anon`/`authenticated` do not.
@@ -384,14 +386,13 @@ work** — matching ADR-0002's "direct SQL query, not an assertion" style:
     identical `42501 permission denied for function` (HTTP 401) on the
     plain RPC, the `postgres`-owned definer, and the fixed variant alike.
     This confirms the `EXECUTE`-grant check and the RLS-posture check are
-    genuinely independent controls: a broken RLS posture (variants 1 and
-    2) does not also weaken the grant exclusion, and a correct posture
+    genuinely independent controls: a broken RLS posture (variants 1 and 2) does not also weaken the grant exclusion, and a correct posture
     doesn't mask a grant mistake either. Both must be checked; neither
     stands in for the other.
   - One real mistake the test itself surfaced along the way: the first
     run of variant 3 failed with `permission denied for table` because
     the definer role had no `SELECT` grant on the table yet — `SECURITY
-    DEFINER` changes whose identity a check runs as, it does not supply
+DEFINER` changes whose identity a check runs as, it does not supply
     privileges. Confirms the grant must be explicit, not implied.
 
 The rule a reviewer can actually check, either way:
@@ -403,13 +404,13 @@ The rule a reviewer can actually check, either way:
    (`resolveTenantBySlug`) and never a raw `params.tenantSlug` taken
    straight from the URL. Once the value reaches the RPC, RLS only
    checks that the value is internally consistent — it has no way to
-   check *who* supplied it. Group 1 reads therefore depend on two
+   check _who_ supplied it. Group 1 reads therefore depend on two
    enforcement layers, this caller-side check and the RLS policy above,
    not on RLS alone; that's worth stating explicitly rather than
    leaving implicit.
 1. `tenant_id` must be a literal argument passed into the cached
    function and the RPC — never read from a cookie, session, or ambient
-   context *inside* either (it can't be, inside the cached function —
+   context _inside_ either (it can't be, inside the cached function —
    see Context above — and the RPC has no session to read from
    regardless). This prohibition is scoped to inside the cached
    function and the RPC themselves; it does not prohibit, and in fact
@@ -441,20 +442,20 @@ The rule a reviewer can actually check, either way:
    verification set must also include three tests a single isolated
    call cannot surface:
    a. a **sequential** test — call the RPC for tenant A, then issue a
-      second, unrelated request on a connection likely to be reused
-      from the pool, asserting no leakage of tenant A's
-      `app.tenant_id` setting into that second request (the primary
-      failure mode if the GUC is ever set session-scoped instead of
-      transaction-local, see rule 5);
+   second, unrelated request on a connection likely to be reused
+   from the pool, asserting no leakage of tenant A's
+   `app.tenant_id` setting into that second request (the primary
+   failure mode if the GUC is ever set session-scoped instead of
+   transaction-local, see rule 5);
    b. an **anon-key `SELECT` directly against the Group 1 table** while
-      `app.tenant_id` is set on that same connection, asserting zero
-      rows returned — the anon-key test above only proves the
-      function-grant path denies `anon`, not that `anon` is denied
-      direct table access while the GUC happens to be set;
+   `app.tenant_id` is set on that same connection, asserting zero
+   rows returned — the anon-key test above only proves the
+   function-grant path denies `anon`, not that `anon` is denied
+   direct table access while the GUC happens to be set;
    c. the "as actually deployed" requirement extended beyond the
-      definer's ownership to also cover the grants, the policy's `TO`
-      clause, and `search_path` — model all three tests on the existing
-      `tests/integration/tenant-isolation-*.test.ts` suite.
+   definer's ownership to also cover the grants, the policy's `TO`
+   clause, and `search_path` — model all three tests on the existing
+   `tests/integration/tenant-isolation-*.test.ts` suite.
 5. The GUC must be set transaction-locally, not session-scoped —
    verified by reading the function body for
    `set_config('app.tenant_id', p_tenant_id::text, true)` with the
@@ -573,7 +574,7 @@ its data is sensitive enough that the extra setup isn't worth it for
 that page's traffic — if the RPC/policy overhead doesn't pay for itself,
 the page may belong in Group 3 instead of Group 1.
 
-This obligation also covers *replacing* the RPC, not just adding a new
+This obligation also covers _replacing_ the RPC, not just adding a new
 page. `create or replace function` preserves existing grants, but a
 migration that instead does `drop function` + `create function` does
 not — it silently restores the default `PUBLIC` execute grant plus
@@ -585,10 +586,10 @@ that touches this function — not only when a new Group 1 page is added.
 
 **The integration test's assertion shape is part of this obligation, not
 an implementation detail left to whoever writes it:** it must assert
-that another tenant's data is *absent* from the response, not merely
+that another tenant's data is _absent_ from the response, not merely
 that the call succeeded or returned no error. "Calling it with the
 anon key returns a permission error" is a valid no-error-shaped
-assertion because denial *is* the correct behavior there — but for the
+assertion because denial _is_ the correct behavior there — but for the
 service-role/cross-tenant case, "no error" is not evidence of anything:
 a `SECURITY DEFINER` RPC owned by a role that still has `BYPASSRLS`
 returns `200` with a real payload, just one containing every tenant's
@@ -679,7 +680,7 @@ just documentation.
   follow-up decision; not a silent fallback.
 
 - **Adopt Cache Components (`cacheComponents: true`) and use `use
-  cache` instead of the deprecated `unstable_cache`.** Rejected for this
+cache` instead of the deprecated `unstable_cache`.** Rejected for this
   ADR: the flag is app-wide, not per-page — it changes default rendering
   behavior (Partial Prerendering, dynamic-API restrictions, Activity-based
   navigation) for every route, not just the 17 pages this ADR assigns an
