@@ -239,6 +239,37 @@ jobs:
             exit 1
           fi
 
+  rpc-return-shape:
+    name: RPC return-shape check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so the base-ref diff below can resolve.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check no RPC silently drops a jsonb return key
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${BASE_SHA:-}" ]; then
+            base="$BASE_SHA"
+          else
+            # push/workflow_dispatch: compare against the previous commit.
+            base="HEAD^"
+          fi
+
+          node scripts/check-rpc-shape.mjs "$base" HEAD
+
   migration-number-collision:
     name: Migration number collision
     runs-on: ubuntu-latest
