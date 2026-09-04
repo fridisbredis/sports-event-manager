@@ -809,7 +809,11 @@ export type Database = {
         Returns: Json
       }
       confirm_official_invite_by_phone: {
-        Args: { p_privacy_accepted: boolean; p_user_id: string; p_user_phone: string }
+        Args: {
+          p_privacy_accepted?: boolean
+          p_user_id: string
+          p_user_phone: string
+        }
         Returns: Json
       }
       create_workstation: {
