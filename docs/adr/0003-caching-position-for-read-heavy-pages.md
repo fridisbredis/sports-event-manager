@@ -528,19 +528,33 @@ a read-only subset of `events` plus `event_facilities` but neither
 at all — it reads the `officials` table (filtered to the caller's own
 confirmed row) and only the event's `name`.
 
-**Precondition for implementation, not for accepting this ADR:** no
-baseline has actually been measured for the Group 1 reads yet — the
-"every page hits the database, always" framing above is the known
-current behavior, not a measured cost. Before implementation begins, run
-the existing perf harness (`npm run perf:measure`,
-`scripts/perf-measure.ts`) against the Group 1 reads, using the three
-parallelized `.select()` calls in
-`src/app/(official)/[tenantSlug]/event-info/page.tsx` as the reference
-case, to get a current p95. If that measurement shows read volume or
-latency low enough that the RPC + RLS-policy + cache-invalidation build
-cost above isn't repaid, the page in question should move to Group 3
-instead of Group 1 — this is the same escape hatch already stated under
-Ongoing obligation below, not a new one.
+**Precondition for implementation, not for accepting this ADR:**
+measured 2026-09-04 against the local stack — `supabase start`,
+`npm run build && npm start` (not `next dev`, whose on-demand compilation
+would land in the p95), `npm run seed:perf` (5 tenants), then
+`npm run perf:measure -- --baseline` (90 signed-in sessions, 30 serial
+samples per path). Unloaded baseline for `event-info` — the reference
+case named above — is p50 70.8 ms, p95 112.4 ms.
+`admin/dashboard` was measured incidentally by the same harness run: p50
+85.2 ms, p95 136.1 ms. (The harness's other two paths, `scheduling` and
+`own-schedule`, are Group 2, not additional Group 1 data.)
+
+Read this result with the same caveats the harness prints: it's a local
+stack, unloaded number, not a prod figure, and no loaded/300%-ceiling
+comparison was run — that needs the dedicated perf environment, which
+this precondition doesn't require. It also doesn't cover `admin/event`
+or the `admin/workstations` list, which aren't in the harness's
+`READ_PATHS` at all, nor `home` (HOME-01). No "isn't repaid" threshold
+was ever stated for this check, and 112 ms unloaded on a page every
+official loads repeatedly through an event day doesn't read as a page
+that belongs in Group 3 instead. So this result is taken as confirming
+the Group 1 candidate set as specified above, not as grounds to move
+anything out of it. If a future measurement (e.g. once `admin/event` or
+`admin/workstations` exist in the harness, or a loaded run against the
+perf environment) shows read volume or latency low enough that the RPC +
+RLS-policy + cache-invalidation build cost above isn't repaid for a given
+page, that page should move to Group 3 instead — this is the same escape
+hatch already stated under Ongoing obligation below, not a new one.
 
 **Ongoing obligation:** any new page added to Group 1 in the future (or
 any existing page whose data changes from "stable" to "changes often")
