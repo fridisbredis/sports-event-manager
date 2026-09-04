@@ -41,13 +41,13 @@ export function DragOfficialPicker({
       {availableOfficials.length === 0 ? (
         <p className="px-3 py-2 text-sm text-gray-400">{t('scheduling.noConfirmedOfficials')}</p>
       ) : (
-        <ScrollShadow className="flex flex-col max-h-64">
+        <ScrollShadow className="flex flex-col max-h-64 overflow-y-auto">
           {availableOfficials.map((off) => (
             <Button
               key={off.id}
               variant="light"
               size="sm"
-              className="w-full justify-start rounded-none px-3 hover:bg-gray-50"
+              className="w-full h-8 shrink-0 justify-start rounded-none px-3 hover:bg-gray-50"
               onPress={() => onPick(off.id)}
             >
               <span className="flex items-center gap-2 truncate">
