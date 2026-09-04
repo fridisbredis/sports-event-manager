@@ -204,7 +204,6 @@ the numbers, the excluded suspects, and the two routes forward.
       stack could not: `max_connections = 100` with no pooler made GoTrue fail
       with `SQLSTATE 53300` at 90 sessions, and a PostgREST pool of 10 meant
       even a 20-session run measured pool queueing rather than the read paths.
-
       The environment is a disposable Supabase project (`jsusfleoufnjfrgsshmi`,
       eu-north-1, ~10 USD/month) plus a Container App
       (`sports-event-manager-perf` in `kanban-env`) sized to match prod exactly
