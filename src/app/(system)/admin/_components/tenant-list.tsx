@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Tenant {
   id: string
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export function TenantList({ tenants }: Props) {
+  const { t } = useTranslation('admin')
   const [modalOpen, setModalOpen] = useState(false)
   const [pending, setPending] = useState<string | null>(null)
 
@@ -43,13 +45,13 @@ export function TenantList({ tenants }: Props) {
     <>
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Tenants</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{t('systemAdmin.tenants')}</h1>
           <div className="flex items-center gap-4">
             <Link href="/admin/health" className="text-sm text-blue-600 hover:underline">
-              Systemstatus
+              {t('systemAdmin.systemStatus')}
             </Link>
             <Button color="primary" onPress={() => setModalOpen(true)}>
-              Create tenant
+              {t('systemAdmin.createTenant')}
             </Button>
           </div>
         </div>
@@ -67,19 +69,21 @@ export function TenantList({ tenants }: Props) {
               <line x1="16" y1="24" x2="32" y2="24" />
               <line x1="24" y1="16" x2="24" y2="32" />
             </svg>
-            <p className="text-base font-medium text-gray-900 mb-1">No tenants yet</p>
-            <p className="text-sm text-gray-500 mb-6">Create a tenant to get started.</p>
+            <p className="text-base font-medium text-gray-900 mb-1">
+              {t('systemAdmin.noTenantsYet')}
+            </p>
+            <p className="text-sm text-gray-500 mb-6">{t('systemAdmin.noTenantsHint')}</p>
             <Button color="primary" onPress={() => setModalOpen(true)}>
-              Create tenant
+              {t('systemAdmin.createTenant')}
             </Button>
           </AppCard>
         ) : (
-          <Table isStriped aria-label="Tenants">
+          <Table isStriped aria-label={t('systemAdmin.tenants')}>
             <TableHeader>
-              <TableColumn>Tenant</TableColumn>
-              <TableColumn>Status</TableColumn>
-              <TableColumn>Tier</TableColumn>
-              <TableColumn>Actions</TableColumn>
+              <TableColumn>{t('systemAdmin.tenantColumn')}</TableColumn>
+              <TableColumn>{t('systemAdmin.statusColumn')}</TableColumn>
+              <TableColumn>{t('systemAdmin.tierColumn')}</TableColumn>
+              <TableColumn>{t('systemAdmin.actionsColumn')}</TableColumn>
             </TableHeader>
             <TableBody>
               {tenants.map((tenant) => (
@@ -95,7 +99,7 @@ export function TenantList({ tenants }: Props) {
                   </TableCell>
                   <TableCell>
                     <Chip size="sm" color={tenant.is_active ? 'success' : 'default'} variant="flat">
-                      {tenant.is_active ? 'Active' : 'Inactive'}
+                      {tenant.is_active ? t('systemAdmin.active') : t('systemAdmin.inactive')}
                     </Chip>
                   </TableCell>
                   <TableCell className="capitalize text-gray-500">{tenant.tier}</TableCell>
@@ -106,7 +110,7 @@ export function TenantList({ tenants }: Props) {
                       isLoading={pending === tenant.id}
                       onPress={() => handleToggleActive(tenant)}
                     >
-                      {tenant.is_active ? 'Deactivate' : 'Activate'}
+                      {tenant.is_active ? t('systemAdmin.deactivate') : t('systemAdmin.activate')}
                     </Button>
                   </TableCell>
                 </TableRow>

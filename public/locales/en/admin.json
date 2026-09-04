@@ -294,7 +294,8 @@
     "readOnlyHint": "Read-only",
     "notificationsHeading": "Notifications",
     "smsUpdatesLabel": "SMS updates",
-    "smsUpdatesHint": "Opt out of non-urgent SMS",
+    "smsUpdatesHintOn": "You'll receive non-urgent SMS updates",
+    "smsUpdatesHintOff": "Opted out of non-urgent SMS",
     "scheduleHeading": "Your schedule",
     "assignmentCount_one": "{{count}} assignment",
     "assignmentCount_other": "{{count}} assignments",
@@ -304,14 +305,91 @@
     "saved": "Saved",
     "saveError": "Something went wrong. Please try again."
   },
+  "adminAccount": {
+    "title": "Account",
+    "nameLabel": "Name",
+    "nameEditableHint": "Editable",
+    "mobileNumberLabel": "Mobile number",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveError": "Something went wrong. Please try again."
+  },
   "systemAdmin": {
-    "tenants": "Tenant Management",
+    "tenants": "Tenants",
+    "systemStatus": "System status",
     "createTenant": "Create tenant",
+    "noTenantsYet": "No tenants yet",
+    "noTenantsHint": "Create a tenant to get started.",
+    "tenantColumn": "Tenant",
+    "statusColumn": "Status",
+    "tierColumn": "Tier",
+    "actionsColumn": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
     "activate": "Activate",
     "deactivate": "Deactivate",
+    "raceName": "Race name",
+    "createTenantHint": "This provisions an empty event draft for the tenant.",
+    "cancel": "Cancel",
+    "create": "Create",
+    "activation": "Activation",
+    "tenantCanAccess": "The tenant can access its event workspace.",
+    "tenantCannotAccess": "The tenant cannot access its event workspace.",
     "featureTier": "Feature tier",
     "standard": "Standard",
     "premium": "Premium",
-    "professional": "Professional"
+    "professional": "Professional",
+    "tierHint": "Exactly one tier is active per tenant in v1. Selecting one clears the others."
+  },
+  "health": {
+    "backToTenants": "← Tenants",
+    "title": "System status",
+    "subtitle": "Quick overview of dev/prod operations. Some metrics are live, others link out to the service's own console.",
+    "status": {
+      "ok": "Up",
+      "error": "Down",
+      "unknown": "Unknown"
+    },
+    "supabase": {
+      "title": "Supabase",
+      "project": "Project",
+      "postgrestQuery": "PostgREST query",
+      "ok": "OK",
+      "error": "Error",
+      "note": "Only tests that a simple query against the project above succeeds — not any other project, and a total Auth outage would give a 404 before the page even loads, not a red card here.",
+      "allProjects": "All projects",
+      "openInDashboard": "Open in Supabase Dashboard"
+    },
+    "twilio": {
+      "title": "Twilio",
+      "fromNumber": "Sender number",
+      "sentToday": "SMS sent today (this number)",
+      "noteOk": "Dev and prod have their own sender numbers — the count above is only for the number shown. (Per CLAUDE.md they share one Twilio account, but that hasn't been independently verified.)",
+      "noteUnknown": "Couldn't fetch live data right now — check the console for current status.",
+      "console": "Twilio console"
+    },
+    "sentry": {
+      "title": "Sentry",
+      "project": "Project",
+      "unresolved24h": "Unresolved (24h)",
+      "noteUnknown": "Couldn't fetch live data right now — check the console for current status.",
+      "noteOk": "Only shows the project this environment (dev or prod) reports to, not the other one.",
+      "unresolvedIn": "Unresolved in {{project}} ↗",
+      "openUnresolved": "Open unresolved issues in Sentry",
+      "devProjectOverview": "viadal-event-dev (project overview)",
+      "prodProjectOverview": "viadal-event-prod (project overview)"
+    },
+    "azure": {
+      "title": "Azure Container Apps",
+      "devPortal": "Dev — Azure Portal",
+      "prodPortal": "Prod — Azure Portal",
+      "note": "No Azure SDK/credential exists in the app yet — status is fetched via link for now."
+    },
+    "githubActions": {
+      "title": "GitHub Actions",
+      "deployRuns": "Deploy runs",
+      "note": "Latest run for deploy-dev.yml / deploy-prod.yml."
+    }
   }
 }
