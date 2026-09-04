@@ -78,10 +78,14 @@ export function SchedulingGrid({
   // The assignments the server sent are scoped to `initialSelectedDay` — when the
   // user picks a different day, push it into the URL so the server re-fetches
   // that day's assignments instead of the client trying to slice a broader set
-  // it never received.
-  function changeDay(day: string) {
+  // it never received. `stage` is always carried along too: page.tsx falls
+  // back to getCurrentStage()/stages[0] whenever `?stage=` is absent, and for
+  // an event whose dates have already passed, getCurrentStage() never matches
+  // anything — so a `day`-only URL silently reverts to the wrong stage (and,
+  // via its allocable days, the wrong day too) on any full reload.
+  function changeDay(day: string, stageId: string = selectedStageId) {
     setSelectedDay(day)
-    router.push(`?day=${day}`, { scroll: false })
+    router.push(`?stage=${stageId}&day=${day}`, { scroll: false })
   }
 
   const {
@@ -445,7 +449,7 @@ export function SchedulingGrid({
                 setSelectedStageId(id)
                 closePickerCell()
                 closeCellActionCell()
-                changeDay(getAllocableDays(stage)[0] ?? '')
+                changeDay(getAllocableDays(stage)[0] ?? '', id)
               }
             }}
           >
