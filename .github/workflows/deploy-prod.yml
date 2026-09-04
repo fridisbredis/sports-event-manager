@@ -181,18 +181,37 @@ jobs:
           fi
           echo "Ingress targetPort is 3000 as expected."
 
-          PROBES_JSON=$(az containerapp show \
+          # `az ... --query` on a key that is entirely absent from the resource
+          # (not present, vs. present-but-empty-array) prints nothing at all -
+          # not the literal "null", not "[]". That happened on the first real
+          # run of this step: prod's container has no `probes` key yet (it has
+          # never been set), so PROBES_JSON came back as an empty string, `jq
+          # length` on empty stdin failed, and the failure fell through to the
+          # hard-failure branches below instead of the empty-array warning
+          # branch above them. Normalize to the literal "null" first so jq
+          # always has valid, parseable input regardless of which of the three
+          # shapes (absent key / null / []) Azure hands back.
+          PROBES_RAW=$(az containerapp show \
             --name sports-event-manager-prod \
             --resource-group ${{ secrets.PROD_AZURE_RESOURCE_GROUP }} \
             --query "properties.template.containers[0].probes" \
             --output json)
+          PROBES_JSON=$(echo "${PROBES_RAW:-null}" | jq -c 'if . == null then [] else . end')
           echo "Probes on sports-event-manager-prod after this deploy:"
           echo "$PROBES_JSON" | jq .
 
+          # scripts/ops/set-probes.sh was run successfully against prod on
+          # 2026-09-04 (verified: all three probe types present, targeting
+          # /api/health/live:3000, ACR credential and registry wiring
+          # confirmed intact by that script's own post-apply check). Probes
+          # are no longer expected to be empty - flip this to a hard failure
+          # per the TODO that used to be here, so a deploy that silently
+          # drops the probes array again is caught instead of just warned
+          # about.
           PROBE_COUNT=$(echo "$PROBES_JSON" | jq 'length')
           if [ "$PROBE_COUNT" -eq 0 ]; then
-            echo "::warning::No health probes are configured on sports-event-manager-prod (empty probes array). This is expected until scripts/ops/set-probes.sh has been run successfully against prod. Once it has, this branch must become a hard failure instead of a warning - see the TODO in this step's script."
-            exit 0
+            echo "::error::No health probes are configured on sports-event-manager-prod (empty probes array). Probes were confirmed present via scripts/ops/set-probes.sh on 2026-09-04, so this deploy dropped them - re-run that script to restore them."
+            exit 1
           fi
 
           BAD_PROBE_COUNT=$(echo "$PROBES_JSON" | jq '[.[] | select(.httpGet.path != "/api/health/live")] | length')
