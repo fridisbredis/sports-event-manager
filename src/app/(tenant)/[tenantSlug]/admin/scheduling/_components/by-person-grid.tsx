@@ -192,7 +192,7 @@ export function ByPersonGrid({
               <div className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
                 {t('scheduling.assignTo')}
               </div>
-              <ScrollShadow className="flex flex-col max-h-64">
+              <ScrollShadow className="flex flex-col max-h-64 overflow-y-auto">
                 {openWorkstations.map((ws) => {
                   const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
                   return (
@@ -200,7 +200,7 @@ export function ByPersonGrid({
                       key={ws.id}
                       variant="light"
                       size="sm"
-                      className="w-full justify-between rounded-none px-3"
+                      className="w-full h-8 shrink-0 justify-between rounded-none px-3"
                       onPress={() => onCellClick(pickerCell.officialId, slot, ws)}
                     >
                       <span className="truncate">{ws.name}</span>
