@@ -146,7 +146,9 @@ export default function AccountForm({
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-gray-900">{t('account.smsUpdatesLabel')}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{t('account.smsUpdatesHint')}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {smsOptOut ? t('account.smsUpdatesHintOff') : t('account.smsUpdatesHintOn')}
+              </p>
             </div>
             {/* isSelected=true means SMS ON (smsOptOut=false) */}
             <Switch

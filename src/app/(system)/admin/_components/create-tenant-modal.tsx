@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/form-fields'
 import { createTenant } from '../actions'
 import { toSlug } from '../_utils'
 import { toastError } from '@/lib/toast'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   open: boolean
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function CreateTenantModal({ open, onClose }: Props) {
+  const { t } = useTranslation('admin')
   const [name, setName] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,11 +44,11 @@ export function CreateTenantModal({ open, onClose }: Props) {
       classNames={{ base: 'bg-gray-50' }}
     >
       <ModalContent>
-        <ModalHeader>Create tenant</ModalHeader>
+        <ModalHeader>{t('systemAdmin.createTenant')}</ModalHeader>
         <ModalBody>
           <Input
-            label="Race name"
-            placeholder="Race name"
+            label={t('systemAdmin.raceName')}
+            placeholder={t('systemAdmin.raceName')}
             value={name}
             onValueChange={setName}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
@@ -58,14 +60,14 @@ export function CreateTenantModal({ open, onClose }: Props) {
                   URL slug: <span className="font-mono">{slug}</span>
                 </>
               ) : (
-                'This provisions an empty event draft for the tenant.'
+                t('systemAdmin.createTenantHint')
               )
             }
           />
         </ModalBody>
         <ModalFooter>
           <Button variant="light" onPress={onClose}>
-            Cancel
+            {t('systemAdmin.cancel')}
           </Button>
           <Button
             color="primary"
@@ -73,7 +75,7 @@ export function CreateTenantModal({ open, onClose }: Props) {
             isLoading={pending}
             onPress={handleSubmit}
           >
-            Create
+            {t('systemAdmin.create')}
           </Button>
         </ModalFooter>
       </ModalContent>
