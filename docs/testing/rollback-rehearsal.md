@@ -252,6 +252,62 @@ kan köras utan att först städa raderna.
 
 ---
 
+## Del 5 — Rehearsal: snapshot och restore (F-REL-20)
+
+Del 1–4 övar på **schemat** — att migrationssviten är sanningskällan och att
+recovery går framåt. De skyddar inte **datan**: en `destructive` migration som
+kör felfritt men mot fel rader (en för bred `UPDATE`, en `DROP COLUMN` på en
+kolumn som inte var färdig-backfillad) förlorar innehåll som ingen forward-fix
+kan ge tillbaka, eftersom en forward-fix bara ändrar schema framåt — inte
+återskapar vad en tidigare sats redan skrivit över. PITR är avstängt av
+kostnadsskäl och Supabase branching utvärderades och avfärdades som ersättning
+(en branch replayar migrationer mot en tom/seedad databas, den håller aldrig
+prods egna rader) — se F-REL-20 för hela resonemanget. Den här övningen
+verifierar att `scripts/ops/snapshot-prod-db.sh` och
+`scripts/ops/restore-prod-db.sh` faktiskt fungerar, **innan** de behövs under
+en incident.
+
+**Kör aldrig detta mot den riktiga prod-databasen.** Övningen tar en snapshot
+av prod (läsning, ofarligt) men återställer alltid till lokal stack eller en
+Supabase-branch — aldrig tillbaka till prod. `restore-prod-db.sh` vägrar
+själv ett mål som innehåller prods projekt-ref (`rauvaxuypujbeintnnoe`), utan
+någon override-flagga.
+
+- [ ] Förutsättningar: Docker igång, `op` inloggad, fältet
+      `db connection string` finns på 1Password-posten
+      `Supabase Sports Event Manager prod` (Session pooler-strängen från
+      prod-projektets Dashboard → Connect — läggs in manuellt, scriptet
+      gissar aldrig på den).
+- [ ] Ta en riktig snapshot av prod: `scripts/ops/snapshot-prod-db.sh 9999`
+      (ett testnummer som inte kolliderar med en riktig migration — se
+      `Migration number collision`-jobbet i `quality.yml` för varför
+      kollisioner är farliga). Notera blob-namnet som skrivs ut på slutet.
+- [ ] Verifiera i Azure att blobben faktiskt landade:
+      `az storage blob list --account-name sportsevtmgrprodsnaps --container-name db-snapshots --output table`
+- [ ] Starta lokal stack: `supabase start` (eller `supabase db reset` om den
+      redan är igång, för en ren baslinje).
+- [ ] Hämta lokal stackens connection string:
+      `supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['DB_URL'])"`
+- [ ] Återställ snapshotten till lokal stack:
+      `scripts/ops/restore-prod-db.sh <blob-namn-från-steg-2> "<lokal-DB_URL>"`
+      — bekräfta med `restore` när scriptet frågar.
+- [ ] Verifiera att datan faktiskt kom med, inte bara att kommandot exit-ade 0:
+      räkna rader i minst en tabell med känt innehåll (t.ex.
+      `select count(*) from tenants;`) och jämför mot vad du vet finns i prod.
+- [ ] Testa guarden: försök köra
+      `scripts/ops/restore-prod-db.sh <blob-namn> "postgresql://x:x@db.rauvaxuypujbeintnnoe.supabase.co:5432/postgres"`
+      och bekräfta att scriptet vägrar direkt, innan någon lösenordsprompt ens
+      visas.
+- [ ] Ta tid på hela kedjan (snapshot → nedladdning → restore → verifiering).
+- [ ] Skriv upp i loggen: vad tog tid, vad saknade dokumentation, och om
+      1Password-fältet redan fanns eller behövde läggas till för första
+      gången.
+
+Det som ska komma ut av övningen: att den som faktiskt behöver göra detta
+under en incident inte gör det för första gången då.
+
+---
+
 ## Logg
 
 Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
