@@ -39,9 +39,33 @@
 # The migration number is required so the snapshot filename can be referenced
 # from that migration's Forward-fix `Data:` line — the connective tissue this
 # script exists to provide.
+#
+# WINDOWS / GIT BASH:
+# This is the same risk class as F-MNT-18 (docs/quality-requirements.md):
+# Git Bash's MSYS runtime auto-converts any command-line argument starting
+# with "/" into a Windows filesystem path before it reaches a non-MSYS
+# binary — `az` and `op` are both real Windows binaries, not MSYS tools.
+# This script passes several such arguments (op:// references,
+# --container-name/--name values, --dbname connection strings). Unlike
+# F-MNT-18 — where the fix was applied by hand at run time — this script
+# sets MSYS2_ARG_CONV_EXCL itself below (see MSYS GUARD), so it should be
+# safe to run unmodified from Git Bash. That guard has NOT been verified
+# against a real Git Bash environment; if a downloaded snapshot or restore
+# looks wrong on Windows, suspect silent path conversion first and compare
+# against WSL2 or macOS/Linux before assuming the data itself is bad.
 # ==============================================================================
 
 set -euo pipefail
+
+# MSYS GUARD: on Git Bash (MSYS), stop auto-conversion of "/"-leading
+# arguments into Windows paths before they reach az/op. Harmless outside
+# MSYS — the variable is simply unused. "*" excludes conversion for every
+# argument rather than a narrow prefix, since this script's "/"-leading
+# arguments (op:// references, blob names, connection strings) don't share
+# a common prefix the way F-MNT-18's did.
+if [[ -n "${MSYSTEM:-}" ]]; then
+  export MSYS2_ARG_CONV_EXCL="*"
+fi
 
 MIGRATION_NUMBER="${1:-}"
 

@@ -303,6 +303,16 @@ någon override-flagga.
       1Password-fältet redan fanns eller behövde läggas till för första
       gången.
 
+**Kör igenom hela Del 5 minst en gång från Git Bash på Windows (Eduardo).**
+Båda scripten sätter `MSYS2_ARG_CONV_EXCL="*"` när de upptäcker `MSYSTEM`
+(samma riskklass som F-MNT-18 — Git Bashs MSYS-runtime konverterar
+`/`-inledda argument till Windows-sökvägar innan de når `az`/`op`, som är
+riktiga Windows-binärer). Det skyddet är skrivet men **inte verifierat mot
+en riktig Git Bash-miljö** — bara resonerat fram från samma mönster som
+`set-probes.sh`. Om en nedladdad snapshot eller en restore ser konstig ut på
+Windows: misstänk tyst path-conversion först, jämför mot en körning från WSL2
+eller macOS, innan datan i sig antas vara trasig.
+
 Det som ska komma ut av övningen: att den som faktiskt behöver göra detta
 under en incident inte gör det för första gången då.
 

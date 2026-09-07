@@ -34,9 +34,23 @@
 # the prod project ref (rauvaxuypujbeintnnoe) or hostname pattern — see the
 # GUARD below. There is no override flag. If you genuinely need to restore
 # onto prod, do it by hand with psql, deliberately, not through this script.
+#
+# WINDOWS / GIT BASH:
+# Same risk class as F-MNT-18 (docs/quality-requirements.md) and
+# snapshot-prod-db.sh's header — Git Bash's MSYS runtime can silently rewrite
+# "/"-leading arguments (op:// references, connection strings) into Windows
+# paths before they reach az/op, which are real Windows binaries, not MSYS
+# tools. The MSYS GUARD below sets MSYS2_ARG_CONV_EXCL to cover this, but
+# that guard has NOT been verified against a real Git Bash environment.
 # ==============================================================================
 
 set -euo pipefail
+
+# MSYS GUARD: see snapshot-prod-db.sh's header for why this exists and its
+# verification status. Harmless outside MSYS.
+if [[ -n "${MSYSTEM:-}" ]]; then
+  export MSYS2_ARG_CONV_EXCL="*"
+fi
 
 BLOB_NAME="${1:-}"
 TARGET_DB_URL="${2:-}"
