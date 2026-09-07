@@ -10,6 +10,9 @@ node_modules
 .next/
 out/
 
+# test coverage
+coverage/
+
 # env files — never commit real secrets
 .env
 .env.local

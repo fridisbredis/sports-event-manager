@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { TenantList } from './_components/tenant-list'
-import { logger } from '@/lib/logger'
+import { checkReadCeiling } from '@/lib/db/bounded-read'
 
 // This is a guard-rail, not pagination: the list grows with the customer
 // count, so it must not be unbounded, but it is nowhere near the ceiling.
@@ -23,13 +23,11 @@ export default async function SystemAdminPage() {
 
   if (error) throw error
 
-  const rows = tenants ?? []
-  if (rows.length > TENANT_CEILING) {
-    logger.warn('Tenant list hit its read ceiling — the list is truncated', {
-      ceiling: TENANT_CEILING,
-      page: '(system)/admin',
-    })
-  }
+  const rows = checkReadCeiling(tenants ?? [], {
+    ceiling: TENANT_CEILING,
+    page: '(system)/admin',
+    message: 'Tenant list hit its read ceiling — the list is truncated',
+  })
 
-  return <TenantList tenants={rows.slice(0, TENANT_CEILING)} />
+  return <TenantList tenants={rows} />
 }
