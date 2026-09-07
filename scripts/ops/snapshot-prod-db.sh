@@ -22,7 +22,7 @@
 #   - Docker running (supabase db dump runs pg_dump inside a container)
 #   - 1Password CLI (`op`), signed in
 #   - A "db connection string" field on the "Supabase Sports Event Manager
-#     prod" item in the "Sports Event Manager" vault — the Session pooler
+#     prod" item in the "Viadal Event Manager" vault — the Session pooler
 #     connection string from the prod project's Dashboard → Connect page.
 #     This script does not derive or guess that value; it must already be
 #     stored there.
@@ -90,16 +90,16 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-DB_URL="$(op read "op://Sports Event Manager/Supabase Sports Event Manager prod/db connection string" 2>&1)" || {
+DB_URL="$(op read "op://Viadal Event Manager/Supabase Sports Event Manager prod/db connection string" 2>&1)" || {
   echo "ERROR: could not read the prod DB connection string from 1Password." >&2
   echo "Expected a field named 'db connection string' on the item" >&2
-  echo "'Supabase Sports Event Manager prod' in the 'Sports Event Manager' vault." >&2
+  echo "'Supabase Sports Event Manager prod' in the 'Viadal Event Manager' vault." >&2
   echo "Get it from the Supabase Dashboard (prod project -> Connect -> Session pooler)" >&2
   echo "and add it there first — this script does not derive or guess it." >&2
   exit 1
 }
 
-BLOB_CONN_STR="$(op read "op://Sports Event Manager/Azure Blob sportsevtmgrprodsnaps/password" 2>&1)" || {
+BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" 2>&1)" || {
   echo "ERROR: could not read the Azure Blob connection string from 1Password." >&2
   exit 1
 }

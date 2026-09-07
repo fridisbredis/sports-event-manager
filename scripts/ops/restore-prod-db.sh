@@ -79,7 +79,7 @@ if ! command -v psql >/dev/null 2>&1; then
   exit 1
 fi
 
-BLOB_CONN_STR="$(op read "op://Sports Event Manager/Azure Blob sportsevtmgrprodsnaps/password" 2>&1)" || {
+BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" 2>&1)" || {
   echo "ERROR: could not read the Azure Blob connection string from 1Password." >&2
   exit 1
 }
