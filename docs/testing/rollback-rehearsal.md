@@ -331,7 +331,7 @@ samma session (macOS, Frida):
    före restore.
 3. `data.sql`s `COPY` in i `storage.buckets` kolliderade med `logos`-raden
    — roten är att **migration 0015 gör en INSERT direkt**, inte bara DDL,
-   så *varje* miljö som kört migrationssviten redan har raden. Fix:
+   så _varje_ miljö som kört migrationssviten redan har raden. Fix:
    `TRUNCATE storage.buckets CASCADE` riktat mot den enda tabellen, innan
    restore.
 4. `data.sql`s `COPY` in i `storage.buckets_vectors` gav "permission
