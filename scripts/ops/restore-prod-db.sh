@@ -114,6 +114,18 @@ if [[ -z "${BLOB_NAME}" || -z "${TARGET_DB_URL}" ]]; then
   exit 1
 fi
 
+# GUARD: blob names come from scripts/ops/snapshot-prod-db.sh's own output
+# (<migration-number>_pre-migration_<timestamp>.tar.gz) and are otherwise
+# operator-typed, but BLOB_NAME is used unsanitized below as both an `az`
+# argument and a path component under WORKDIR — a name containing "/" (e.g.
+# a "../"-style value) could escape the tempdir. Restrict it to the actual
+# expected shape rather than trying to blocklist "..".
+if [[ "${BLOB_NAME}" == */* || ! "${BLOB_NAME}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "ERROR: blob-name must contain only letters, digits, '.', '_', '-' — no path separators." >&2
+  echo "Got: ${BLOB_NAME}" >&2
+  exit 1
+fi
+
 # GUARD: refuse anything that looks like the prod project. No override.
 if [[ "${TARGET_DB_URL}" == *"rauvaxuypujbeintnnoe"* ]]; then
   echo "ERROR: target-db-url looks like the PROD Supabase project (rauvaxuypujbeintnnoe)." >&2
@@ -132,7 +144,10 @@ if ! command -v psql >/dev/null 2>&1; then
   exit 1
 fi
 
-BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" --account extrapreneurab.1password.com 2>&1)" || {
+# stderr is NOT merged into this capture (no 2>&1) — see the matching note
+# in snapshot-prod-db.sh for why: a stray op warning must not silently end
+# up concatenated into the connection string.
+BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" --account extrapreneurab.1password.com)" || {
   echo "ERROR: could not read the Azure Blob connection string from 1Password." >&2
   exit 1
 }
