@@ -43,8 +43,9 @@ export default async function DashboardPage({ params }: Props) {
 
   // events and both officials head-counts are independent — none of them
   // depend on each other's result — so all three go in one hop rather than
-  // three (PERF-01: ~70 ms per hop under load). Only the stage count
-  // genuinely depends on event.id and has to follow.
+  // three (PERF-01: ~70 ms per hop under load). The stage count and
+  // scheduling warnings both genuinely depend on event.id and have to
+  // follow, but not on each other — see the next Promise.all below.
   //
   // The two officials queries are head-counts, not a row fetch — the row set
   // grows with club size, the counts do not (PERF-06).
@@ -79,42 +80,42 @@ export default async function DashboardPage({ params }: Props) {
   if (invitedError) throw invitedError
   if (confirmedError) throw confirmedError
 
-  const { count: raceStageCount, error: raceStageError } = event
-    ? await supabase
-        .from('event_stages')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', event.id)
-        .eq('stage_type', 'race')
-    : { count: 0, error: null }
-
-  if (raceStageError) throw raceStageError
-
-  const officialsInvited = invitedCount ?? 0
-  const officialsConfirmed = confirmedCount ?? 0
-
-  const hasName = Boolean(event?.name?.trim())
-  const hasRaceStage = (raceStageCount ?? 0) > 0
-  const canPublish = hasName && hasRaceStage
-  const isPublished = event?.status === 'published'
-
-  // Scheduling warnings cover the whole event (every day, every stage) rather
-  // than the single day the scheduling grid itself shows at a time — a
-  // dashboard summary that only reflected today would hide a double-booking
-  // three days out until an admin happened to click through to that day.
-  // Aggregated in Postgres (scheduling_warning_counts, migration 0040) rather
-  // than pulling every assignment row into Node — this page's other tiles
-  // are all cheap counts, and a naive fetch-then-reduce here would make the
-  // dashboard's load time scale with total assignment count for the event.
+  // Both of these depend only on event.id/tenant.id, which are already known
+  // at this point, and neither depends on the other's result — so they go in
+  // one hop rather than two serial round-trips (PERF-01).
+  let raceStageCount = 0
   let overCapacity = 0
   let doubleBooked = 0
   let reviewHref = `/${tenantSlug}/admin/scheduling`
   if (event) {
-    const { data: warningCounts, error: warningCountsError } = await supabase
-      .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id, p_event_id: event.id })
-      .single()
+    const [
+      { count: raceStageCountResult, error: raceStageError },
+      { data: warningCounts, error: warningCountsError },
+    ] = await Promise.all([
+      supabase
+        .from('event_stages')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', event.id)
+        .eq('stage_type', 'race'),
+      // Scheduling warnings cover the whole event (every day, every stage)
+      // rather than the single day the scheduling grid itself shows at a
+      // time — a dashboard summary that only reflected today would hide a
+      // double-booking three days out until an admin happened to click
+      // through to that day. Aggregated in Postgres
+      // (scheduling_warning_counts, migration 0040) rather than pulling
+      // every assignment row into Node — this page's other tiles are all
+      // cheap counts, and a naive fetch-then-reduce here would make the
+      // dashboard's load time scale with total assignment count for the
+      // event.
+      supabase
+        .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id, p_event_id: event.id })
+        .single(),
+    ])
 
+    if (raceStageError) throw raceStageError
     if (warningCountsError) throw warningCountsError
 
+    raceStageCount = raceStageCountResult ?? 0
     overCapacity = warningCounts.over_capacity
     doubleBooked = warningCounts.double_booked
 
@@ -141,6 +142,14 @@ export default async function DashboardPage({ params }: Props) {
     }
   }
   const totalWarnings = overCapacity + doubleBooked
+
+  const officialsInvited = invitedCount ?? 0
+  const officialsConfirmed = confirmedCount ?? 0
+
+  const hasName = Boolean(event?.name?.trim())
+  const hasRaceStage = raceStageCount > 0
+  const canPublish = hasName && hasRaceStage
+  const isPublished = event?.status === 'published'
 
   const tenantId = tenant.id
 
