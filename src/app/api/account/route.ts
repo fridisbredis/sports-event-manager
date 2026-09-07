@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
 
 const officialSchema = z.object({
@@ -71,6 +73,24 @@ export async function PATCH(request: NextRequest) {
   if (error || !official) {
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
+
+  // PERF-06 / F-PERF-04 Phase 1: the `name` just written here is exactly what
+  // HOME-01's cached read returns (migration 0050 — get_official_home_cached
+  // selects officials.name, and home/page.tsx renders it as the greeting and
+  // the avatar initials). Without this, an official renames themselves on
+  // ACCT-01 and the home screen keeps greeting them by the old name for up to
+  // the 60s revalidate window.
+  //
+  // Only the official branch needs it. The admin branch above writes
+  // auth user_metadata, which no cached RPC reads.
+  //
+  // { expire: 0 }, not the docs' recommended profile="max": ACCT-01 is a
+  // read-your-own-writes screen and "max" would serve the pre-rename value on
+  // the very next /home load. updateTag isn't available — this is a Route
+  // Handler, not a Server Action. Per ADR-0003, this clears only the replica
+  // that served this request; the other 1-2 prod replicas expire on their own
+  // 60s window.
+  revalidateTag(officialHomeCacheTag(parsed.data.tenantId, user.id), { expire: 0 })
 
   return NextResponse.json({ ok: true })
 }
