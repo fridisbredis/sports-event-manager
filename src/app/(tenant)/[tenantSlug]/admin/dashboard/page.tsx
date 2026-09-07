@@ -180,7 +180,7 @@ export default async function DashboardPage({ params }: Props) {
           hasRaceStage={hasRaceStage}
           tenantSlug={tenantSlug}
           tenantId={tenantId}
-          eventId={event!.id}
+          eventId={event?.id ?? null}
         />
         <OfficialsCard
           title={t('dashboard.officials')}
