@@ -156,6 +156,60 @@ describe('confirm_official_invite RPC (migration 0047 role_granted fix)', () => 
     expect(roleRow!.role).toBe('official')
   })
 
+  // Migration 0047's upsert only overwrites the existing role when it is
+  // 'participant', deliberately narrower than "overwrite whenever the role
+  // differs". Nothing in the invite-creation path
+  // (src/app/api/officials/route.ts) checks user_roles before allowing an
+  // invite for a given phone, so an official invite can target a phone
+  // that currently belongs to a tenant_admin in the same tenant
+  // (self-invite, roster mixup, or a malicious invite from another admin).
+  // Confirming it must never demote that role. (system_admin is not
+  // reachable through this path: its user_roles row always has
+  // tenant_id = null, and the unique (user_id, tenant_id) constraint never
+  // matches null against the real tenant_id this upsert inserts, so it
+  // can't be the conflict target here — tenant_admin is the actual gap.)
+  it('does not demote an existing tenant_admin role and reports role_granted=false', async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('SEC-07 Token No Demote tenant_admin')
+    createdTenantIds.push(tenant.id)
+    const phone = `+46703${Math.floor(Math.random() * 1_000_000)}`
+    const { token } = await createTokenInvite(tenant.id, phone)
+
+    const { userId } = await createUserWithRole(tenant.id, 'tenant_admin')
+    createdUserIds.push(userId)
+
+    const { data, error } = await confirmByToken(
+      admin,
+      token,
+      userId,
+      phone,
+      'Confirmed Name',
+      true
+    )
+    expect(error).toBeNull()
+    const result = data as unknown as { tenant_id: string; role_granted: boolean }
+    expect(result.role_granted).toBe(false)
+
+    const { data: roleRow } = await admin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('tenant_id', tenant.id)
+      .single()
+    expect(roleRow!.role).toBe('tenant_admin')
+
+    // confirmation and role-grant are decoupled: the officials row still
+    // confirms and links user_id even though no role was granted
+    const { data: confirmedOfficial } = await admin
+      .from('officials')
+      .select('user_id, invite_status')
+      .eq('tenant_id', tenant.id)
+      .eq('phone', phone)
+      .single()
+    expect(confirmedOfficial!.user_id).toBe(userId)
+    expect(confirmedOfficial!.invite_status).toBe('confirmed')
+  })
+
   // Shape-contract guard, same reasoning as the phone-fallback file: a
   // future `replace` migration on this function could silently drop or
   // rename a key route.ts / tenant.ts destructure without any type error,

@@ -206,6 +206,51 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     expect(result.role_granted).toBe(false)
   })
 
+  // Migration 0047's upsert only overwrites the existing role when it is
+  // 'participant', deliberately narrower than "overwrite whenever the role
+  // differs". The invite-creation path (src/app/api/officials/route.ts)
+  // only checks for a duplicate `officials` row per tenant+phone — it
+  // never checks user_roles — so an official invite can target a phone
+  // that currently belongs to a tenant_admin in the same tenant.
+  // Confirming it must not demote that role. (system_admin can't be the
+  // conflict target here: its user_roles row always has tenant_id = null,
+  // which the unique (user_id, tenant_id) constraint never matches
+  // against the real tenant_id this upsert inserts.)
+  it('does not demote an existing tenant_admin role and reports role_granted=false', async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('SEC-09 No Demote tenant_admin')
+    createdTenantIds.push(tenant.id)
+    const phone = `+46703${Math.floor(Math.random() * 1_000_000)}`
+    await createPendingOfficial(tenant.id, phone)
+
+    const { userId } = await createUserWithRole(tenant.id, 'tenant_admin')
+    createdUserIds.push(userId)
+
+    const { data, error } = await confirmByPhone(admin, userId, phone, true)
+    expect(error).toBeNull()
+    const result = data as unknown as { tenant_id: string; role_granted: boolean }
+    expect(result.role_granted).toBe(false)
+
+    const { data: roleRow } = await admin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('tenant_id', tenant.id)
+      .single()
+    expect(roleRow!.role).toBe('tenant_admin')
+
+    // confirmation and role-grant are decoupled: the officials row still
+    // confirms and links user_id even though no role was granted
+    const { data: officialRow } = await admin
+      .from('officials')
+      .select('invite_status, user_id')
+      .eq('tenant_id', tenant.id)
+      .eq('phone', phone)
+      .single()
+    expect(officialRow!.invite_status).toBe('confirmed')
+    expect(officialRow!.user_id).toBe(userId)
+  })
+
   // Adversarial, mirrors the same-phone race test above but for the
   // cross-role case this migration fixes: concurrent confirms where the
   // confirmer already holds a different role must still serialize to

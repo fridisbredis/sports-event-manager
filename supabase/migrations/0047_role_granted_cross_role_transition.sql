@@ -28,24 +28,40 @@
 -- fix that test was written to eventually require.
 --
 -- Fix: replace the `insert ... on conflict do nothing` with a single
--- atomic upsert that updates the role when it differs, and reports
--- role_granted whenever either (a) the row was newly inserted or (b) an
--- existing row's role was actually changed. Deliberately NOT a separate
--- `select role ...` followed by an `insert`/`update` — two statements
--- would open a TOCTOU window: two concurrent confirms for the same
--- (user_id, tenant_id) could both read the same stale "old role" before
--- either writes, and both report role_granted = true for what should be
--- one grant. A single statement lets Postgres's own row-level locking on
--- the conflicting row serialize concurrent callers, the same guarantee
--- the existing SELECT ... FOR UPDATE on the officials row already relies
--- on elsewhere in these functions.
+-- atomic upsert that reports role_granted whenever either (a) the row was
+-- newly inserted or (b) an existing row's role was actually changed.
+-- Deliberately NOT a separate `select role ...` followed by an
+-- `insert`/`update` — two statements would open a TOCTOU window: two
+-- concurrent confirms for the same (user_id, tenant_id) could both read
+-- the same stale "old role" before either writes, and both report
+-- role_granted = true for what should be one grant. A single statement
+-- lets Postgres's own row-level locking on the conflicting row serialize
+-- concurrent callers, the same guarantee the existing SELECT ... FOR
+-- UPDATE on the officials row already relies on elsewhere in these
+-- functions.
 --
--- The `where user_roles.role is distinct from excluded.role` clause on
--- the DO UPDATE means: if the existing role already equals 'official',
--- the update predicate is false, so ON CONFLICT does not touch the row at
--- all and the RETURNING clause yields no row — preserving 0043's original
--- fix (idempotent re-confirm must still report role_granted = false, not
--- regress into over-reporting a grant that didn't happen).
+-- The upsert is deliberately narrower than "overwrite whenever the role
+-- differs". officials.phone has no uniqueness constraint against
+-- user_roles at all (see src/app/api/officials/route.ts — the only
+-- duplicate check is against other `officials` rows for the same tenant,
+-- never against user_roles). Nothing stops an official invite from being
+-- created — deliberately or by roster mixup — for a phone number that
+-- currently belongs to a tenant_admin in the same tenant. An upsert that
+-- overwrote any differing role would let confirming that invite silently
+-- demote a tenant_admin down to 'official' — trading the original
+-- SEC-07 audit-log gap for a silent privilege-demotion bug, which is
+-- worse than the gap it fixes. So the DO UPDATE only fires when the
+-- existing role is 'participant': that is the one transition this
+-- migration is actually meant to catch. Any other existing role
+-- (tenant_admin, or already 'official') is left untouched — role_granted
+-- is then false, and the official row still gets user_id attached via
+-- the separate `update officials` above (confirmation and role-grant are
+-- decoupled), but no role is granted or changed.
+--
+-- (system_admin can never be the conflict target here regardless: migration
+-- 0021 gives every system_admin row tenant_id = null, and the unique
+-- (user_id, tenant_id) constraint never matches null against the concrete
+-- tenant_id this upsert inserts.)
 --
 -- Forward-fix: replace
 --   Rollback: restore the function bodies from migration 0043
@@ -134,7 +150,7 @@ begin
     values (p_user_id, v_official.tenant_id, 'official')
     on conflict (user_id, tenant_id) do update
       set role = excluded.role
-      where user_roles.role is distinct from excluded.role
+      where user_roles.role = 'participant'
     returning 1
   )
   select exists (select 1 from upsert) into v_role_granted;
@@ -149,10 +165,12 @@ comment on function public.confirm_official_invite is
   'official row (SELECT ... FOR UPDATE) and re-checks invite_status in the '
   'UPDATE WHERE clause so concurrent callers cannot both succeed. Grants '
   'the official role via an atomic upsert that also catches a user who '
-  'already held a DIFFERENT role in this tenant (migration 0047) — '
-  'role_granted is true whenever the row was newly inserted or an '
-  'existing row''s role actually changed, false only when the role was '
-  'already ''official'' (idempotent re-confirm). Raises not_found / '
+  'already held ''participant'' in this tenant (migration 0047) but never '
+  'overwrites any OTHER existing role (tenant_admin) — those are left '
+  'untouched and role_granted is false. role_granted is true on fresh '
+  'insert or a participant->official transition, false when the role was '
+  'already ''official'' (idempotent re-confirm) or belongs to an admin '
+  'role this function must never touch. Raises not_found / '
   'already_confirmed / expired / phone_mismatch / privacy_not_accepted '
   '(errcode P0001) on failure.';
 
@@ -205,7 +223,7 @@ begin
     values (p_user_id, v_official.tenant_id, 'official')
     on conflict (user_id, tenant_id) do update
       set role = excluded.role
-      where user_roles.role is distinct from excluded.role
+      where user_roles.role = 'participant'
     returning 1
   )
   select exists (select 1 from upsert) into v_role_granted;
@@ -220,12 +238,14 @@ comment on function public.confirm_official_invite_by_phone is
   'play). Requires p_privacy_accepted = true. Locks the official row '
   '(SELECT ... FOR UPDATE) and re-checks invite_status in the UPDATE WHERE '
   'clause so concurrent callers cannot both succeed. Grants the official '
-  'role via an atomic upsert that also catches a user who already held a '
-  'DIFFERENT role in this tenant (migration 0047) — role_granted is true '
-  'whenever the row was newly inserted or an existing row''s role actually '
-  'changed, false only when the role was already ''official'' (idempotent '
-  're-confirm). Raises not_found / already_confirmed / privacy_not_accepted '
-  '(errcode P0001) on failure.';
+  'role via an atomic upsert that also catches a user who already held '
+  '''participant'' in this tenant (migration 0047) but never overwrites '
+  'any OTHER existing role (tenant_admin) — those are left untouched and '
+  'role_granted is false. role_granted is true on fresh insert or a '
+  'participant->official transition, false when the role was already '
+  '''official'' (idempotent re-confirm) or belongs to an admin role this '
+  'function must never touch. Raises not_found / already_confirmed / '
+  'privacy_not_accepted (errcode P0001) on failure.';
 
 -- ============================================================================
 -- DONE
@@ -233,5 +253,6 @@ comment on function public.confirm_official_invite_by_phone is
 -- Verify with:
 --   select prosrc from pg_proc where proname = 'confirm_official_invite';
 --   select prosrc from pg_proc where proname = 'confirm_official_invite_by_phone';
---   -- both should contain the `on conflict (user_id, tenant_id) do update`
---   -- upsert, not `do nothing`.
+--   -- both should contain `where user_roles.role = 'participant'`, not
+--   -- `do nothing` and not `is distinct from excluded.role`.
+-- ============================================================================
