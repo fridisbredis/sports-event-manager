@@ -78,7 +78,7 @@ describe('DELETE /api/officials/[id]', () => {
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    const rpc = mockRpc({ data: { ok: true }, error: null })
+    const rpc = mockRpc({ data: { ok: true, user_id: 'user-1' }, error: null })
 
     const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
     const body = await res.json()
@@ -116,12 +116,12 @@ describe('DELETE /api/officials/[id]', () => {
   })
 
   // SEC-07
-  it('logs a role_revoked audit event after remove_official succeeds', async () => {
+  it('logs a role_revoked audit event with the revoked user_id after remove_official succeeds', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    mockRpc({ data: { ok: true }, error: null })
+    mockRpc({ data: { ok: true, user_id: 'user-1' }, error: null })
 
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
@@ -131,9 +131,27 @@ describe('DELETE /api/officials/[id]', () => {
       actorRole: 'tenant_admin',
       action: 'role_revoked',
       targetType: 'user_role',
-      targetId: null,
+      targetId: 'user-1',
       detail: { officialId: OFFICIAL_ID },
     })
+  })
+
+  // SEC-07-rest (migration 0047): an official who never accepted their
+  // invite has no user_id to revoke — remove_official returns user_id: null
+  // in that case, and the audit event's targetId must reflect that rather
+  // than crashing on a missing key.
+  it('logs targetId: null when the removed official never had a user_id', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: { ok: true, user_id: null }, error: null })
+
+    await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ targetId: null })
+    )
   })
 
   it('does not log an audit event when remove_official fails', async () => {
