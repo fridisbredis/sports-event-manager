@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
+import { getServerTranslation } from '@/lib/i18n/server'
 import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
 
@@ -15,6 +16,7 @@ export default async function TenantDetailPage({ params }: Props) {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
 
+  const t = await getServerTranslation('en', 'admin')
   const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')
@@ -32,7 +34,7 @@ export default async function TenantDetailPage({ params }: Props) {
           className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1"
         >
           <span>←</span>
-          <span>Tenants</span>
+          <span>{t('systemAdmin.tenants')}</span>
         </Link>
       </div>
 

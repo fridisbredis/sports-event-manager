@@ -7,6 +7,7 @@ import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface AdminAccountFormProps {
   name: string
@@ -19,6 +20,7 @@ export default function AdminAccountForm({
   phone,
   tenantId,
 }: AdminAccountFormProps) {
+  const { t } = useTranslation('admin')
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
 
   const [name, setName] = useState(initialName)
@@ -46,11 +48,16 @@ export default function AdminAccountForm({
       setSaveState('saved')
     } catch {
       setSaveState('idle')
-      toastError('Något gick fel. Försök igen.')
+      toastError(t('adminAccount.saveError'))
     }
   }
 
-  const saveLabel = saveState === 'saving' ? 'Sparar…' : saveState === 'saved' ? 'Sparat' : 'Spara'
+  const saveLabel =
+    saveState === 'saving'
+      ? t('adminAccount.saving')
+      : saveState === 'saved'
+        ? t('adminAccount.saved')
+        : t('adminAccount.save')
 
   const initials = name
     .split(' ')
@@ -62,7 +69,7 @@ export default function AdminAccountForm({
   return (
     <>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold text-gray-900">Account</h1>
+        <h1 className="text-xl font-semibold text-gray-900">{t('adminAccount.title')}</h1>
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -89,8 +96,8 @@ export default function AdminAccountForm({
 
           <div className="mb-8">
             <Input
-              label="Name"
-              description="Editable"
+              label={t('adminAccount.nameLabel')}
+              description={t('adminAccount.nameEditableHint')}
               value={name}
               onValueChange={handleNameChange}
               labelPlacement="outside"
@@ -98,7 +105,9 @@ export default function AdminAccountForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Mobile number</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              {t('adminAccount.mobileNumberLabel')}
+            </label>
             <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
               {phone ? formatPhoneForDisplay(phone) : '—'}
             </div>

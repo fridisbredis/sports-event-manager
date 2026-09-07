@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
+import { getServerTranslation } from '@/lib/i18n/server'
 import { StatusCard } from './_components/status-card'
 import { fetchSupabaseStatus, fetchTwilioStatus, fetchSentryStatus } from './_lib/fetch-status'
 import {
@@ -13,6 +14,13 @@ import {
 export default async function SystemHealthPage() {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
+
+  const t = await getServerTranslation('en', 'admin')
+  const statusLabels = {
+    ok: t('health.status.ok'),
+    error: t('health.status.error'),
+    unknown: t('health.status.unknown'),
+  }
 
   const [supabase, twilio, sentry] = await Promise.all([
     fetchSupabaseStatus(),
@@ -30,78 +38,94 @@ export default async function SystemHealthPage() {
   return (
     <div className="p-8 max-w-5xl">
       <Link href="/admin" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
-        ← Tenants
+        {t('health.backToTenants')}
       </Link>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1 mt-3">Systemstatus</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Snabb överblick över drift dev/prod. Vissa mätvärden är live, andra länkar vidare till
-        tjänstens egen konsol.
-      </p>
+      <h1 className="text-xl font-semibold text-gray-900 mb-1 mt-3">{t('health.title')}</h1>
+      <p className="text-sm text-gray-500 mb-6">{t('health.subtitle')}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatusCard
-          title="Supabase"
+          title={t('health.supabase.title')}
           status={supabase.status}
+          statusLabels={statusLabels}
           facts={[
-            { label: 'Projekt', value: supabaseProjectRef },
-            { label: 'PostgREST-fråga', value: supabase.status === 'ok' ? 'OK' : 'Fel' },
+            { label: t('health.supabase.project'), value: supabaseProjectRef },
+            {
+              label: t('health.supabase.postgrestQuery'),
+              value:
+                supabase.status === 'ok' ? t('health.supabase.ok') : t('health.supabase.error'),
+            },
           ]}
-          note="Testar bara att en enkel fråga mot projektet ovan lyckas — inte något annat projekt, och ett totalt Auth-haveri hade gett en 404 innan sidan ens laddar, inte ett rött kort här."
+          note={t('health.supabase.note')}
           links={
             isLocalSupabase
-              ? [{ label: 'Alla projekt', href: 'https://supabase.com/dashboard/projects' }]
+              ? [
+                  {
+                    label: t('health.supabase.allProjects'),
+                    href: 'https://supabase.com/dashboard/projects',
+                  },
+                ]
               : [
                   {
-                    label: 'Öppna i Supabase Dashboard',
+                    label: t('health.supabase.openInDashboard'),
                     href: `https://supabase.com/dashboard/project/${supabaseProjectRef}`,
                   },
-                  { label: 'Alla projekt', href: 'https://supabase.com/dashboard/projects' },
+                  {
+                    label: t('health.supabase.allProjects'),
+                    href: 'https://supabase.com/dashboard/projects',
+                  },
                 ]
           }
         />
 
         <StatusCard
-          title="Twilio"
+          title={t('health.twilio.title')}
           status={twilio.status}
+          statusLabels={statusLabels}
           facts={
             twilio.status === 'ok'
               ? [
-                  { label: 'Avsändarnummer', value: twilio.fromNumber ?? '—' },
-                  { label: 'SMS idag (detta nummer)', value: String(twilio.sentToday ?? 0) },
+                  { label: t('health.twilio.fromNumber'), value: twilio.fromNumber ?? '—' },
+                  {
+                    label: t('health.twilio.sentToday'),
+                    value: String(twilio.sentToday ?? 0),
+                  },
                 ]
               : undefined
           }
           note={
             twilio.status === 'ok'
-              ? 'Dev och prod har egna avsändarnummer — siffran ovan gäller bara numret som visas. (Enligt CLAUDE.md delar de ett Twilio-konto, men det är inte oberoende verifierat.)'
+              ? t('health.twilio.noteOk')
               : twilio.status === 'unknown'
-                ? 'Kunde inte hämta live-data just nu — se konsolen för aktuell status.'
+                ? t('health.twilio.noteUnknown')
                 : undefined
           }
-          links={[{ label: 'Twilio-konsol', href: 'https://console.twilio.com/' }]}
+          links={[{ label: t('health.twilio.console'), href: 'https://console.twilio.com/' }]}
         />
 
         <StatusCard
-          title="Sentry"
+          title={t('health.sentry.title')}
           status={sentry.status}
+          statusLabels={statusLabels}
           facts={
             sentry.status === 'ok'
               ? [
-                  { label: 'Projekt', value: sentryProjectName ?? '—' },
-                  { label: 'Olösta (24h)', value: String(sentry.unresolvedCount ?? 0) },
+                  { label: t('health.sentry.project'), value: sentryProjectName ?? '—' },
+                  {
+                    label: t('health.sentry.unresolved24h'),
+                    value: String(sentry.unresolvedCount ?? 0),
+                  },
                 ]
               : undefined
           }
           note={
-            sentry.status === 'unknown'
-              ? 'Kunde inte hämta live-data just nu — se konsolen för aktuell status.'
-              : 'Visar bara projektet denna miljö (dev eller prod) rapporterar till, inte det andra.'
+            sentry.status === 'unknown' ? t('health.sentry.noteUnknown') : t('health.sentry.noteOk')
           }
           links={[
             {
               label: sentryProjectName
-                ? `Olösta i ${sentryProjectName} ↗`
-                : 'Öppna olösta issues i Sentry',
+                ? t('health.sentry.unresolvedIn', { project: sentryProjectName })
+                : t('health.sentry.openUnresolved'),
               // Project-scoped URL (slug-based), same base as the two
               // overview links below — verified 2026-09-02 to resolve
               // (200). The newer org-wide /issues/ stream filters by numeric
@@ -110,40 +134,40 @@ export default async function SystemHealthPage() {
               href: `https://extrapreneur.sentry.io/projects/${sentryProjectName ?? 'viadal-event-dev'}/?query=is%3Aunresolved&statsPeriod=24h`,
             },
             {
-              label: 'viadal-event-dev (projektöversikt)',
+              label: t('health.sentry.devProjectOverview'),
               href: 'https://extrapreneur.sentry.io/projects/viadal-event-dev/',
             },
             {
-              label: 'viadal-event-prod (projektöversikt)',
+              label: t('health.sentry.prodProjectOverview'),
               href: 'https://extrapreneur.sentry.io/projects/viadal-event-prod/',
             },
           ]}
         />
 
         <StatusCard
-          title="Azure Container Apps"
+          title={t('health.azure.title')}
           links={[
             {
-              label: 'Dev — Azure Portal',
+              label: t('health.azure.devPortal'),
               href: azurePortalResourceGroupUrl(AZURE_DEV_RESOURCE_GROUP),
             },
             {
-              label: 'Prod — Azure Portal',
+              label: t('health.azure.prodPortal'),
               href: azurePortalResourceGroupUrl(AZURE_PROD_RESOURCE_GROUP),
             },
           ]}
-          note="Ingen Azure-SDK/credential finns i appen ännu — status hämtas via länk tills vidare."
+          note={t('health.azure.note')}
         />
 
         <StatusCard
-          title="GitHub Actions"
+          title={t('health.githubActions.title')}
           links={[
             {
-              label: 'Deploy-körningar',
+              label: t('health.githubActions.deployRuns'),
               href: 'https://github.com/fridisbredis/sports-event-manager/actions',
             },
           ]}
-          note="Senaste körning för deploy-dev.yml / deploy-prod.yml."
+          note={t('health.githubActions.note')}
         />
       </div>
     </div>
