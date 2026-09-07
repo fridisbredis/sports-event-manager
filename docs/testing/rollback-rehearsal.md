@@ -316,6 +316,50 @@ eller macOS, innan datan i sig antas vara trasig.
 Det som ska komma ut av övningen: att den som faktiskt behöver göra detta
 under en incident inte gör det för första gången då.
 
+### Körning 2026-09-07 — Del 5, första fullständiga genomkörningen
+
+**PASS efter fyra fynd**, alla fixade i scripts/ops/restore-prod-db.sh under
+samma session (macOS, Frida):
+
+1. `roles.sql` mot `ALTER ROLE supabase_admin` — reserverad roll, ingen
+   icke-superuser-anslutning kan ändra den. Fix: roller hoppas över som
+   default (`--include-roles` för den som ändå behöver det, mot en riktig
+   superuser-anslutning).
+2. `schema.sql`s `ADD CONSTRAINT` kolliderade med redan-migrerat
+   `public`-schema (samma fel oavsett om lokal stack precis startats om
+   utan seed). Fix: `DROP SCHEMA public CASCADE` + `CREATE SCHEMA public`
+   före restore.
+3. `data.sql`s `COPY` in i `storage.buckets` kolliderade med `logos`-raden
+   — roten är att **migration 0015 gör en INSERT direkt**, inte bara DDL,
+   så *varje* miljö som kört migrationssviten redan har raden. Fix:
+   `TRUNCATE storage.buckets CASCADE` riktat mot den enda tabellen, innan
+   restore.
+4. `data.sql`s `COPY` in i `storage.buckets_vectors` gav "permission
+   denied" — även ett superuser-`GRANT` gav tyst "no privileges were
+   granted". Root cause ej vidare utredd (skulle kräva att gräva i
+   Supabases egna platform-migrationer). Bekräftat 0 rader i
+   `buckets_vectors`/`vector_indexes` på prod (ingen vector-search-
+   användning), så COPY-blocken för de två tabellerna stryks ur
+   `data.sql` med `sed` innan restore körs.
+
+Efter fix 1–4: full kedja (snapshot → guard-vägran mot prod-mål → restore
+mot lokal stack → radräkning) **PASS**. Verifierat: `tenants` 5, `events` 5,
+`officials` 25 — matchar prod exakt vid mättillfället.
+
+**Vad som saknade dokumentation:** att `data.sql`/`schema.sql` är byggda
+för att restoreras mot en helt tom databas (Supabases egen guide antar en
+aldrig-körd self-hosted instans), medan det enda praktiskt tillgängliga
+testmålet (lokal stack) alltid redan kört migrationssviten — vilket i sig
+introducerar kollisioner som inte går att undvika genom miljöval allena,
+eftersom minst en av dem (migration 0015) kommer från DML i migrationen
+själv, inte från seed-data.
+
+**Säkerhetsincident under samma session:** ett felsökningskommando läckte
+av misstag ut prods fullständiga DB-connection-string (inklusive lösenord)
+i klartext. Lösenordet roterades direkt via Supabase Dashboard. Efter det:
+allt hemlighetskänsligt output omdirigerades till fil och filtrerades
+innan det visades.
+
 ---
 
 ## Logg
