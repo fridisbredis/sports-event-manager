@@ -39,7 +39,7 @@ describe('get_official_home_cached RPC (PERF-06 Phase 1 fail-closed boundary)', 
     await Promise.all(createdTenantIds.map((id) => cleanupTenant(id)))
   })
 
-  it('returns the confirmed official\'s name for the matching (tenant, user) pair', async () => {
+  it("returns the confirmed official's name for the matching (tenant, user) pair", async () => {
     const admin = serviceClient()
     const tenant = await createTenant('PERF-06 Home Cache Happy Path')
     createdTenantIds.push(tenant.id)
@@ -65,7 +65,7 @@ describe('get_official_home_cached RPC (PERF-06 Phase 1 fail-closed boundary)', 
     expect((data as { name: string | null }).name).toBeNull()
   })
 
-  it('does not leak another tenant\'s row when called with the wrong tenant_id for a real user_id', async () => {
+  it("does not leak another tenant's row when called with the wrong tenant_id for a real user_id", async () => {
     const admin = serviceClient()
     const tenantA = await createTenant('PERF-06 Home Cache Tenant A')
     const tenantB = await createTenant('PERF-06 Home Cache Tenant B')
@@ -82,7 +82,7 @@ describe('get_official_home_cached RPC (PERF-06 Phase 1 fail-closed boundary)', 
     expect((data as { name: string | null }).name).toBeNull()
   })
 
-  it('does not leak another user\'s row when called with the wrong user_id for the real tenant_id', async () => {
+  it("does not leak another user's row when called with the wrong user_id for the real tenant_id", async () => {
     const admin = serviceClient()
     const tenant = await createTenant('PERF-06 Home Cache Own-Row Filter')
     createdTenantIds.push(tenant.id)

@@ -229,7 +229,9 @@ describe('updateWorkstation', () => {
 
   it('returns the workstation update error and stops before touching windows/todos', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi.fn().mockReturnValueOnce(chainResult({ error: { message: 'ws update failed' } }))
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(chainResult({ error: { message: 'ws update failed' } }))
     mockFromClient(fromMock)
 
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
@@ -427,7 +429,9 @@ describe('deleteWorkstation', () => {
 
   it('returns the delete error and skips revalidation when the delete fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi.fn().mockReturnValueOnce(chainResult({ error: { message: 'delete failed' } }))
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(chainResult({ error: { message: 'delete failed' } }))
     mockFromClient(fromMock)
 
     const result = await deleteWorkstation(DELETE_BASE_INPUT)

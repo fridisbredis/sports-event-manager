@@ -1,7 +1,13 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInAsClient } from './helpers'
+import {
+  serviceClient,
+  createTenant,
+  createUserWithRole,
+  cleanupTenant,
+  signInAsClient,
+} from './helpers'
 
 // PERF-06 / F-PERF-04 Phase 3 (ADR-0003): get_admin_dashboard_cached
 // (migration 0054). Same fail-closed construction and same reasoning for the

@@ -1,7 +1,13 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInAsClient } from './helpers'
+import {
+  serviceClient,
+  createTenant,
+  createUserWithRole,
+  cleanupTenant,
+  signInAsClient,
+} from './helpers'
 
 // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): get_admin_event_cached (migration
 // 0052), second of the three Group 1 tenant-only caching RPCs. Same
@@ -162,7 +168,7 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     expect(payload.facilities).toEqual([])
   })
 
-  it('does not leak another tenant\'s event, stages, distances, or facilities', async () => {
+  it("does not leak another tenant's event, stages, distances, or facilities", async () => {
     const admin = serviceClient()
     const tenantA = await createTenant('PERF-06 Admin Event Tenant A')
     const tenantB = await createTenant('PERF-06 Admin Event Tenant B')

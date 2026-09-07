@@ -193,11 +193,11 @@ describe('DashboardPage', () => {
 
     const result = await DashboardPage({ params: PARAMS })
 
-    const card = findByType(result, (await import('./_components/scheduling-warnings-card'))
-      .SchedulingWarningsCard)
-    expect(card!.props.reviewHref).toBe(
-      `/viadal/admin/scheduling?day=2026-06-01&stage=stage-1`
+    const card = findByType(
+      result,
+      (await import('./_components/scheduling-warnings-card')).SchedulingWarningsCard
     )
+    expect(card!.props.reviewHref).toBe(`/viadal/admin/scheduling?day=2026-06-01&stage=stage-1`)
     expect(card!.props.overCapacity).toBe(2)
     expect(card!.props.doubleBooked).toBe(1)
   })
@@ -207,8 +207,10 @@ describe('DashboardPage', () => {
 
     const result = await DashboardPage({ params: PARAMS })
 
-    const card = findByType(result, (await import('./_components/scheduling-warnings-card'))
-      .SchedulingWarningsCard)
+    const card = findByType(
+      result,
+      (await import('./_components/scheduling-warnings-card')).SchedulingWarningsCard
+    )
     expect(card!.props.reviewHref).toBe('/viadal/admin/scheduling')
   })
 

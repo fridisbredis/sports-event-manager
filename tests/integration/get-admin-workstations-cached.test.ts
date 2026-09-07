@@ -1,7 +1,13 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInAsClient } from './helpers'
+import {
+  serviceClient,
+  createTenant,
+  createUserWithRole,
+  cleanupTenant,
+  signInAsClient,
+} from './helpers'
 
 // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): get_admin_workstations_cached
 // (migration 0053), last of the three Group 1 tenant-only caching RPCs. Same
@@ -164,7 +170,7 @@ describe('get_admin_workstations_cached RPC (PERF-06 Phase 2 fail-closed boundar
   })
 
   it(
-    'does not leak another tenant\'s stages, workstations, or operating windows — ' +
+    "does not leak another tenant's stages, workstations, or operating windows — " +
       'including through the EXISTS-subquery policy on workstation_operating_windows',
     async () => {
       const admin = serviceClient()

@@ -114,7 +114,7 @@ describe('DELETE /api/officials/[id]', () => {
   })
 
   // PERF-06 / F-PERF-04 Phase 1
-  it('invalidates the removed official\'s HOME-01 cache tag on success', async () => {
+  it("invalidates the removed official's HOME-01 cache tag on success", async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
@@ -123,10 +123,9 @@ describe('DELETE /api/officials/[id]', () => {
 
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
-    expect(revalidateTag).toHaveBeenCalledWith(
-      officialHomeCacheTag(TENANT_ID, 'official-user-1'),
-      { expire: 0 }
-    )
+    expect(revalidateTag).toHaveBeenCalledWith(officialHomeCacheTag(TENANT_ID, 'official-user-1'), {
+      expire: 0,
+    })
   })
 
   // PERF-06 / F-PERF-04 Phase 3
