@@ -75,6 +75,7 @@ describe('OfficialHomePage', () => {
       slug: 'viadal',
       color_palette: 'default',
       is_active: true,
+      officialId: null,
     })
     const officialsBuilder = chain({ data: { name: 'Anna' } })
     const eventsBuilder = chain({ data: { name: 'Viadal 2026' } })
@@ -97,6 +98,7 @@ describe('OfficialHomePage', () => {
       slug: 'viadal',
       color_palette: 'default',
       is_active: true,
+      officialId: null,
     })
     mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
 
