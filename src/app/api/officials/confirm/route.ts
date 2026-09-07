@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
-import { officialHomeCacheTag } from '@/lib/cache/tags'
+import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
 
 const confirmSchema = z.object({
@@ -103,6 +103,11 @@ export async function POST(request: NextRequest) {
   // of what invalidating here is for. updateTag isn't available — this is a
   // Route Handler, not a Server Action.
   revalidateTag(officialHomeCacheTag(tenantId, user.id), { expire: 0 })
+
+  // PERF-06 / F-PERF-04 Phase 3: this confirm just moved one official from
+  // invited to confirmed on the dashboard's officials counts. Same
+  // { expire: 0 } / Route-Handler reasoning as the HOME-01 tag above.
+  revalidateTag(adminDashboardCacheTag(tenantId), { expire: 0 })
 
   // SEC-07: only log when the RPC actually inserted a user_roles row.
   // confirm_official_invite's insert is `on conflict do nothing`, so a

@@ -11,6 +11,7 @@ const rpc = vi.fn()
 const getUser = vi.fn()
 const hasAdminAccessToTenant = vi.fn()
 const revalidatePath = vi.fn()
+const updateTag = vi.fn()
 const loggerWarn = vi.fn()
 const loggerError = vi.fn()
 
@@ -20,7 +21,10 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/auth/tenant', () => ({
   hasAdminAccessToTenant: (...args: unknown[]) => hasAdminAccessToTenant(...args),
 }))
-vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePath(...args) }))
+vi.mock('next/cache', () => ({
+  revalidatePath: (...args: unknown[]) => revalidatePath(...args),
+  updateTag: (...args: unknown[]) => updateTag(...args),
+}))
 vi.mock('next/navigation', () => ({
   redirect: () => {
     throw new Error('REDIRECT')
@@ -122,6 +126,10 @@ describe('saveAssignments RPC error mapping', () => {
     expect(result.error).toBeUndefined()
     expect(result.inserted).toEqual(inserted)
     expect(revalidatePath).toHaveBeenCalledWith('/acme/admin/scheduling')
+    // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached scheduling-warning
+    // counts read assignments transitively, so a successful save invalidates
+    // that tag too.
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 })
 

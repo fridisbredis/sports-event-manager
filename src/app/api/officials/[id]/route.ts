@@ -3,7 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
-import { officialHomeCacheTag } from '@/lib/cache/tags'
+import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
 
@@ -76,6 +76,12 @@ export async function DELETE(
       expire: 0,
     })
   }
+
+  // PERF-06 / F-PERF-04 Phase 3: unconditional, unlike the tag above —
+  // remove_official (step 1 in the comment above) frees this official's
+  // assignments regardless of whether they ever had a user_id, and the
+  // dashboard's officials counts change either way.
+  revalidateTag(adminDashboardCacheTag(parsed.data.tenantId), { expire: 0 })
 
   await logAuditEvent({
     tenantId: parsed.data.tenantId,

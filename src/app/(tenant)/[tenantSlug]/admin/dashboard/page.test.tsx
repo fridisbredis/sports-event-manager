@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import DashboardPage from './page'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { OfficialsCard } from './_components/officials-card'
 import { PublishSection } from './_components/publish-section'
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(),
+  createSupabaseServiceClient: vi.fn(),
+}))
+
+// PERF-06 / F-PERF-04 Phase 3: unstable_cache would otherwise need a real
+// Next.js request/cache context (same "static generation store missing"
+// problem revalidateTag hits in these unit tests) — mocked as a passthrough
+// so the wrapped function runs directly and these tests exercise it without
+// caching or its context requirements getting in the way.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }))
 
 // getAdminTenant resolves the tenant only after the admin access check passes,
@@ -62,20 +71,6 @@ const EVENT = {
   logo_url: null,
 }
 
-// The scheduling-warning tile is not what these tests are about, but the page
-// calls scheduling_warning_counts on every render that has an event, so the
-// RPC needs a stub or the officials assertions never get reached.
-//
-// The nulls below are the real runtime shape, not a shortcut: the generated
-// types claim these fields are non-nullable, but migration 0040 returns NULL
-// for them whenever the event has no warnings. See the call site in page.tsx.
-const WARNING_COUNTS = {
-  over_capacity: 0,
-  double_booked: 0,
-  earliest_day: null,
-  earliest_stage_id: null,
-}
-
 function findByType(node: unknown, target: unknown): { props: Record<string, unknown> } | null {
   if (!node || typeof node !== 'object') return null
   const el = node as { type?: unknown; props?: { children?: unknown } }
@@ -92,83 +87,38 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
   return null
 }
 
-interface OfficialsCounts {
-  invited?: { count: number | null; error?: unknown }
-  confirmed?: { count: number | null; error?: unknown }
-  event?: typeof EVENT | null
+// PERF-06 / F-PERF-04 Phase 3: the event read, both officials head-counts,
+// the race-stage count, and the scheduling-warning counts all moved onto
+// get_admin_dashboard_cached (migration 0052) via the service-role client —
+// see the page's own comment for why.
+function mockDashboardRpc(result: { data: unknown; error: unknown }) {
+  const rpc = vi.fn().mockResolvedValue(result)
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc } as never)
+  return rpc
 }
 
-/**
- * The two officials reads are head-counts distinguished only by their
- * `invite_status` filter, so the mock records each chain's `.eq` arguments and
- * resolves the matching result. That is what makes a swapped or dropped filter
- * visible — the counts would otherwise both pass with one shared stub.
- */
-function mockServerClient(counts: OfficialsCounts = {}) {
-  const eventResult = counts.event === undefined ? EVENT : counts.event
-  const officialsCalls: Array<Record<string, unknown>> = []
-
-  const fromMock = vi.fn((table: string) => {
-    if (table === 'officials') {
-      const filters: Record<string, unknown> = {}
-      officialsCalls.push(filters)
-      const builder: Record<string, unknown> = {}
-      builder.select = vi.fn((cols: string, opts?: unknown) => {
-        filters.select = cols
-        filters.selectOpts = opts
-        return builder
-      })
-      builder.eq = vi.fn((col: string, val: unknown) => {
-        filters[col] = val
-        // Resolve once the status filter — the last link in the chain — lands.
-        if (col === 'invite_status') {
-          const which = val === 'invited' ? counts.invited : counts.confirmed
-          return Promise.resolve(which ?? { count: 0, error: null })
-        }
-        return builder
-      })
-      return builder
-    }
-
-    if (table === 'event_stages') {
-      const builder: Record<string, unknown> = {}
-      builder.select = vi.fn(() => builder)
-      let eqCount = 0
-      builder.eq = vi.fn(() => {
-        eqCount += 1
-        return eqCount < 2 ? builder : Promise.resolve({ count: 1, error: null })
-      })
-      return builder
-    }
-
-    // events
-    const builder: Record<string, unknown> = {}
-    builder.select = vi.fn(() => builder)
-    builder.eq = vi.fn(() => builder)
-    builder.maybeSingle = vi.fn(() => Promise.resolve({ data: eventResult, error: null }))
-    return builder
-  })
-
-  vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
-  vi.mocked(getAdminTenant).mockResolvedValue(TENANT as never)
-  const rpcMock = vi.fn(() => ({
-    single: vi.fn(() => Promise.resolve({ data: WARNING_COUNTS, error: null })),
-  }))
-
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({
-    from: fromMock,
-    rpc: rpcMock,
-  } as never)
-  return { fromMock, rpcMock, officialsCalls }
+function dashboardPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    event: EVENT,
+    officials_invited: 4,
+    officials_confirmed: 11,
+    race_stage_count: 1,
+    over_capacity: 0,
+    double_booked: 0,
+    earliest_day: null,
+    earliest_stage_id: null,
+    ...overrides,
+  }
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+  vi.mocked(getAdminTenant).mockResolvedValue(TENANT as never)
 })
 
 describe('DashboardPage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    mockServerClient()
     vi.mocked(getCurrentUser).mockResolvedValue(null as never)
 
     await expect(DashboardPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
@@ -177,34 +127,26 @@ describe('DashboardPage', () => {
   })
 
   it('calls notFound when the user lacks admin access to the tenant', async () => {
-    mockServerClient()
     vi.mocked(getAdminTenant).mockResolvedValue(null as never)
 
     await expect(DashboardPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('counts officials with two head-counts rather than fetching rows (PERF-06)', async () => {
-    const { officialsCalls } = mockServerClient({
-      invited: { count: 4, error: null },
-      confirmed: { count: 11, error: null },
-    })
+  it('reads the dashboard summary via the cached RPC scoped by tenant_id', async () => {
+    const rpc = mockDashboardRpc({ data: dashboardPayload(), error: null })
 
     await DashboardPage({ params: PARAMS })
 
-    expect(officialsCalls).toHaveLength(2)
-    for (const call of officialsCalls) {
-      // head: true means no rows cross the wire — the point of the change.
-      expect(call.selectOpts).toEqual({ count: 'exact', head: true })
-      expect(call.tenant_id).toBe(TENANT_ID)
-    }
-    expect(officialsCalls.map((c) => c.invite_status)).toEqual(['invited', 'confirmed'])
+    expect(rpc).toHaveBeenCalledWith('get_admin_dashboard_cached', {
+      p_tenant_id: TENANT_ID,
+    })
   })
 
-  it('passes each status count to OfficialsCard without transposing them', async () => {
-    mockServerClient({
-      invited: { count: 4, error: null },
-      confirmed: { count: 11, error: null },
+  it('passes each officials status count to OfficialsCard without transposing them', async () => {
+    mockDashboardRpc({
+      data: dashboardPayload({ officials_invited: 4, officials_confirmed: 11 }),
+      error: null,
     })
 
     const result = await DashboardPage({ params: PARAMS })
@@ -215,10 +157,14 @@ describe('DashboardPage', () => {
     expect(card!.props.confirmed).toBe(11)
   })
 
-  it('treats a null count as zero rather than rendering undefined', async () => {
-    mockServerClient({
-      invited: { count: null, error: null },
-      confirmed: { count: null, error: null },
+  it('renders successfully with zero officials and race-stage counts', async () => {
+    mockDashboardRpc({
+      data: dashboardPayload({
+        officials_invited: 0,
+        officials_confirmed: 0,
+        race_stage_count: 0,
+      }),
+      error: null,
     })
 
     const result = await DashboardPage({ params: PARAMS })
@@ -228,29 +174,58 @@ describe('DashboardPage', () => {
     expect(card!.props.confirmed).toBe(0)
   })
 
-  it('throws when either count query fails instead of reporting zero officials', async () => {
-    mockServerClient({
-      invited: { count: null, error: new Error('invited count failed') },
-      confirmed: { count: 11, error: null },
-    })
+  it('throws when the RPC returns an error', async () => {
+    mockDashboardRpc({ data: null, error: new Error('rpc failed') })
 
-    await expect(DashboardPage({ params: PARAMS })).rejects.toThrow('invited count failed')
+    await expect(DashboardPage({ params: PARAMS })).rejects.toThrow('rpc failed')
   })
 
-  it('throws when the confirmed count fails, not only the invited one', async () => {
-    mockServerClient({
-      invited: { count: 4, error: null },
-      confirmed: { count: null, error: new Error('confirmed count failed') },
+  it('builds the scheduling review link from the earliest warning when present', async () => {
+    mockDashboardRpc({
+      data: dashboardPayload({
+        over_capacity: 2,
+        double_booked: 1,
+        earliest_day: '2026-06-01',
+        earliest_stage_id: 'stage-1',
+      }),
+      error: null,
     })
 
-    await expect(DashboardPage({ params: PARAMS })).rejects.toThrow('confirmed count failed')
+    const result = await DashboardPage({ params: PARAMS })
+
+    const card = findByType(result, (await import('./_components/scheduling-warnings-card'))
+      .SchedulingWarningsCard)
+    expect(card!.props.reviewHref).toBe(
+      `/viadal/admin/scheduling?day=2026-06-01&stage=stage-1`
+    )
+    expect(card!.props.overCapacity).toBe(2)
+    expect(card!.props.doubleBooked).toBe(1)
   })
 
+  it('falls back to the plain scheduling link when there is no warning yet', async () => {
+    mockDashboardRpc({ data: dashboardPayload(), error: null })
+
+    const result = await DashboardPage({ params: PARAMS })
+
+    const card = findByType(result, (await import('./_components/scheduling-warnings-card'))
+      .SchedulingWarningsCard)
+    expect(card!.props.reviewHref).toBe('/viadal/admin/scheduling')
+  })
+
+  // Regression coverage for #132 (fix(dashboard): stop crashing when a
+  // tenant has no event yet), carried over from the pre-Phase-3 direct-query
+  // tests: PublishSection reads `eventId={event?.id ?? null}`, not a
+  // non-null assertion, so a null `event` in the cached payload must not
+  // throw.
   it('renders without throwing when the tenant has no event yet, passing eventId: null', async () => {
-    mockServerClient({
-      event: null,
-      invited: { count: 0, error: null },
-      confirmed: { count: 0, error: null },
+    mockDashboardRpc({
+      data: dashboardPayload({
+        event: null,
+        officials_invited: 0,
+        officials_confirmed: 0,
+        race_stage_count: 0,
+      }),
+      error: null,
     })
 
     const result = await DashboardPage({ params: PARAMS })

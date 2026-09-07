@@ -1,7 +1,9 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
 import { OfficialsCard } from './_components/officials-card'
@@ -10,6 +12,26 @@ import { AdminAreasGrid } from './_components/admin-areas-grid'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
+}
+
+interface AdminDashboardCached {
+  event: {
+    id: string
+    name: string | null
+    event_type: string | null
+    start_date: string | null
+    end_date: string | null
+    status: string
+    scheduling_granularity_min: number
+    logo_url: string | null
+  } | null
+  officials_invited: number
+  officials_confirmed: number
+  race_stage_count: number
+  over_capacity: number
+  double_booked: number
+  earliest_day: string | null
+  earliest_stage_id: string | null
 }
 
 function formatDateRange(start: string | null, end: string | null) {
@@ -29,7 +51,6 @@ export default async function DashboardPage({ params }: Props) {
   const { tenantSlug } = await params
   const t = await getServerTranslation('en', 'admin')
 
-  const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
@@ -41,115 +62,65 @@ export default async function DashboardPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  // events and both officials head-counts are independent — none of them
-  // depend on each other's result — so all three go in one hop rather than
-  // three (PERF-01: ~70 ms per hop under load). The stage count and
-  // scheduling warnings both genuinely depend on event.id and have to
-  // follow, but not on each other — see the next Promise.all below.
-  //
-  // The two officials queries are head-counts, not a row fetch — the row set
-  // grows with club size, the counts do not (PERF-06).
-  //
-  // No event yet is a legitimate state this dashboard renders an empty view
-  // for; a failed query is not, and must not look the same.
-  const [
-    { data: event, error: eventError },
-    { count: invitedCount, error: invitedError },
-    { count: confirmedCount, error: confirmedError },
-  ] = await Promise.all([
-    supabase
-      .from('events')
-      .select(
-        'id, name, event_type, start_date, end_date, status, scheduling_granularity_min, logo_url'
-      )
-      .eq('tenant_id', tenant.id)
-      .maybeSingle(),
-    supabase
-      .from('officials')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenant.id)
-      .eq('invite_status', 'invited'),
-    supabase
-      .from('officials')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenant.id)
-      .eq('invite_status', 'confirmed'),
-  ])
-
-  if (eventError) throw eventError
-  if (invitedError) throw invitedError
-  if (confirmedError) throw confirmedError
-
-  // Both of these depend only on event.id/tenant.id, which are already known
-  // at this point, and neither depends on the other's result — so they go in
-  // one hop rather than two serial round-trips (PERF-01).
-  let raceStageCount = 0
-  let overCapacity = 0
-  let doubleBooked = 0
-  let reviewHref = `/${tenantSlug}/admin/scheduling`
-  if (event) {
-    const [
-      { count: raceStageCountResult, error: raceStageError },
-      { data: warningCounts, error: warningCountsError },
-    ] = await Promise.all([
-      supabase
-        .from('event_stages')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', event.id)
-        .eq('stage_type', 'race'),
-      // Scheduling warnings cover the whole event (every day, every stage)
-      // rather than the single day the scheduling grid itself shows at a
-      // time — a dashboard summary that only reflected today would hide a
-      // double-booking three days out until an admin happened to click
-      // through to that day. Aggregated in Postgres
-      // (scheduling_warning_counts, migration 0040) rather than pulling
-      // every assignment row into Node — this page's other tiles are all
-      // cheap counts, and a naive fetch-then-reduce here would make the
-      // dashboard's load time scale with total assignment count for the
-      // event.
-      supabase
-        .rpc('scheduling_warning_counts', { p_tenant_id: tenant.id, p_event_id: event.id })
-        .single(),
-    ])
-
-    if (raceStageError) throw raceStageError
-    if (warningCountsError) throw warningCountsError
-
-    raceStageCount = raceStageCountResult ?? 0
-    overCapacity = warningCounts.over_capacity
-    doubleBooked = warningCounts.double_booked
-
-    // Jump straight to where the earliest warning is, rather than the grid's
-    // own default (getCurrentStage/today) — otherwise an admin has to hunt
-    // for the flagged stage and day manually.
-    //
-    // This null check is load-bearing even though the generated types say
-    // these three fields are non-nullable. They are not: migration 0040
-    // resolves them with scalar subqueries over `earliest_overall`, which is
-    // empty whenever the event has no warnings at all — the common case. The
-    // types are wrong because Postgres records no nullability for `returns
-    // table` output columns, so `supabase gen types` emits every one of them
-    // as non-null (`over_capacity` and `double_booked` included). Hand-editing
-    // them to the truth is what broke the deploy-dev type gate for four runs;
-    // the gate demands byte-equality with the generator, so the truth lives
-    // here instead. Do not delete this guard on the strength of the types.
-    if (warningCounts.earliest_day && warningCounts.earliest_stage_id) {
-      const params = new URLSearchParams({
-        day: warningCounts.earliest_day,
-        stage: warningCounts.earliest_stage_id,
+  // PERF-06 / F-PERF-04 Phase 3 (ADR-0003): the event read, both officials
+  // head-counts, the race-stage count, and the scheduling-warning counts
+  // (previously five separate round trips, one of them a Postgres RPC) all
+  // moved behind get_admin_dashboard_cached (migration 0052). Must be the
+  // service-role client — unstable_cache can't reach cookies(), and this is
+  // only safe because the RPC is SECURITY DEFINER owned by cache_rpc_reader
+  // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
+  const getAdminDashboardCached = unstable_cache(
+    async (tenantId: string) => {
+      const service = createSupabaseServiceClient()
+      // TODO(PERF-06 Phase 3): temporary `any` cast —
+      // get_admin_dashboard_cached (migration 0052) isn't in
+      // src/types/database.ts yet because that's generated from dev's schema
+      // and this migration hasn't been pushed there. Remove the cast once
+      // db:types is regenerated post-push.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (service.rpc as any)('get_admin_dashboard_cached', {
+        p_tenant_id: tenantId,
       })
-      reviewHref = `/${tenantSlug}/admin/scheduling?${params.toString()}`
+      if (error) throw error
+      return data as unknown as AdminDashboardCached
+    },
+    ['admin-dashboard'], // cache namespace, data-shape only — tenant scoping
+    // comes entirely from the tenantId closure argument reaching both the
+    // RPC call above and the tags array below
+    {
+      tags: [adminDashboardCacheTag(tenant.id)],
+      revalidate: 60,
     }
-  }
-  const totalWarnings = overCapacity + doubleBooked
+  )
 
-  const officialsInvited = invitedCount ?? 0
-  const officialsConfirmed = confirmedCount ?? 0
+  const {
+    event,
+    officials_invited: officialsInvited,
+    officials_confirmed: officialsConfirmed,
+    race_stage_count: raceStageCount,
+    over_capacity: overCapacity,
+    double_booked: doubleBooked,
+    earliest_day: earliestDay,
+    earliest_stage_id: earliestStageId,
+  } = await getAdminDashboardCached(tenant.id)
 
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = raceStageCount > 0
   const canPublish = hasName && hasRaceStage
   const isPublished = event?.status === 'published'
+
+  // Jump straight to where the earliest warning is, rather than the grid's
+  // own default (getCurrentStage/today) — otherwise an admin has to hunt for
+  // the flagged stage and day manually.
+  let reviewHref = `/${tenantSlug}/admin/scheduling`
+  if (earliestDay && earliestStageId) {
+    const params = new URLSearchParams({
+      day: earliestDay,
+      stage: earliestStageId,
+    })
+    reviewHref = `/${tenantSlug}/admin/scheduling?${params.toString()}`
+  }
+  const totalWarnings = overCapacity + doubleBooked
 
   const tenantId = tenant.id
 

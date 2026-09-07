@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
+import { revalidateTag } from 'next/cache'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -183,6 +185,19 @@ describe('POST /api/officials/confirm', () => {
 
     expect(res.status).toBe(200)
     expect(body).toEqual({ ok: true, tenantSlug: undefined })
+  })
+
+  // PERF-06 / F-PERF-04 Phase 3
+  it('invalidates the dashboard cache tag on a successful confirm', async () => {
+    mockAuthedUser({ id: USER_ID, phone: PHONE })
+    mockServiceClient(
+      { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+      { data: null }
+    )
+
+    await POST(makeRequest(validBody))
+
+    expect(revalidateTag).toHaveBeenCalledWith(adminDashboardCacheTag(TENANT_ID), { expire: 0 })
   })
 
   it('logs a role_granted_via_invite_confirmation auth event when the RPC actually granted the role', async () => {

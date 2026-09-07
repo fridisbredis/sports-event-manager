@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
-import { eventInfoCacheTag, adminEventCacheTag } from '@/lib/cache/tags'
+import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -78,6 +78,10 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   // revalidateTag) so the admin who just published sees it immediately.
   updateTag(eventInfoCacheTag(parsedTenantId.data))
   updateTag(adminEventCacheTag(parsedTenantId.data))
+
+  // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached summary also reads
+  // events.status (the published/draft badge and canPublish/isPublished).
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return {}
 }

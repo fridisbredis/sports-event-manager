@@ -161,6 +161,8 @@ describe('publishEvent', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-event`)
     expect(updateTag).not.toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
+    // PERF-06 / F-PERF-04 Phase 3
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
   it('returns the db error message and skips revalidation when the update fails', async () => {

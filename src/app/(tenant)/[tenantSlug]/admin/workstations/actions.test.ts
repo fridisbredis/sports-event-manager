@@ -144,6 +144,8 @@ describe('createWorkstation', () => {
     })
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
+    // PERF-06 / F-PERF-04 Phase 3
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
   it('returns the rpc error message and skips revalidation when the rpc call fails', async () => {
@@ -359,6 +361,8 @@ describe('updateWorkstation', () => {
 
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
+    // PERF-06 / F-PERF-04 Phase 3
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
   it('skips the windows/todos insert calls when both are empty', async () => {
@@ -376,6 +380,8 @@ describe('updateWorkstation', () => {
     expect(fromMock).toHaveBeenCalledTimes(3)
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
+    // PERF-06 / F-PERF-04 Phase 3
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 })
 
@@ -445,5 +451,7 @@ describe('deleteWorkstation', () => {
     expect(wsChain.eq).toHaveBeenNthCalledWith(2, 'tenant_id', TENANT_ID)
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
+    // PERF-06 / F-PERF-04 Phase 3
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 })

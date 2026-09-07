@@ -7,7 +7,12 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 import { logger } from '@/lib/logger'
-import { eventInfoCacheTag, adminEventCacheTag, workstationsCacheTag } from '@/lib/cache/tags'
+import {
+  eventInfoCacheTag,
+  adminEventCacheTag,
+  workstationsCacheTag,
+  adminDashboardCacheTag,
+} from '@/lib/cache/tags'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -143,6 +148,11 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
   updateTag(eventInfoCacheTag(input.tenantId))
   updateTag(adminEventCacheTag(input.tenantId))
   updateTag(workstationsCacheTag(input.tenantId))
+
+  // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached summary reads events
+  // (name, dates, status) and event_stages (race-stage count) — both changed
+  // by this same write.
+  updateTag(adminDashboardCacheTag(input.tenantId))
 
   return {}
 }

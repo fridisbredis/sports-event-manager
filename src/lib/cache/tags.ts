@@ -18,3 +18,7 @@ export function adminEventCacheTag(tenantId: string): string {
 export function workstationsCacheTag(tenantId: string): string {
   return `tenant-${tenantId}-admin-workstations`
 }
+
+export function adminDashboardCacheTag(tenantId: string): string {
+  return `tenant-${tenantId}-admin-dashboard`
+}

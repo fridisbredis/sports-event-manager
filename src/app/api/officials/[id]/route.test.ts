@@ -5,7 +5,7 @@ import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { revalidateTag } from 'next/cache'
-import { officialHomeCacheTag } from '@/lib/cache/tags'
+import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -129,11 +129,25 @@ describe('DELETE /api/officials/[id]', () => {
     )
   })
 
+  // PERF-06 / F-PERF-04 Phase 3
+  it('invalidates the dashboard cache tag on success regardless of user_id', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: { ok: true }, error: null }, 'official-user-1')
+
+    await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(revalidateTag).toHaveBeenCalledWith(adminDashboardCacheTag(TENANT_ID), { expire: 0 })
+  })
+
   // PERF-06 / F-PERF-04 Phase 1: officials invited but never confirmed have
   // no user_id at all (set at invite time in POST, but a removal here could
   // still target one before that write ever landed in some edge case) — no
-  // tag to invalidate, and this must not throw trying to build one from null.
-  it('does not invalidate any cache tag when the official had no user_id', async () => {
+  // HOME-01 tag to invalidate, and this must not throw trying to build one
+  // from null.
+  it('does not invalidate the HOME-01 tag when the official had no user_id, but still invalidates the dashboard tag', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
@@ -143,7 +157,11 @@ describe('DELETE /api/officials/[id]', () => {
     const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
     expect(res.status).toBe(200)
-    expect(revalidateTag).not.toHaveBeenCalled()
+    expect(revalidateTag).not.toHaveBeenCalledWith(
+      expect.stringContaining('-home'),
+      expect.anything()
+    )
+    expect(revalidateTag).toHaveBeenCalledWith(adminDashboardCacheTag(TENANT_ID), { expire: 0 })
   })
 
   it('returns 404 when remove_official raises not_found', async () => {

@@ -152,6 +152,8 @@ describe('saveEvent', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-event`)
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
+    // PERF-06 / F-PERF-04 Phase 3
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
   it('inserts non-blank facilities and returns the db error when the insert fails', async () => {
