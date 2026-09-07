@@ -149,9 +149,7 @@ describe('DELETE /api/officials/[id]', () => {
 
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
-    expect(logAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ targetId: null })
-    )
+    expect(logAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ targetId: null }))
   })
 
   it('does not log an audit event when remove_official fails', async () => {

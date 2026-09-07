@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createTenant, createUserWithRole, signInAsClient, serviceClient, cleanupTenant } from './helpers'
+import {
+  createTenant,
+  createUserWithRole,
+  signInAsClient,
+  serviceClient,
+  cleanupTenant,
+} from './helpers'
 
 // SEC-07-rest (migration 0047): remove_official's jsonb return shape is
 // consumed via `data as unknown as { user_id: string | null }` in
@@ -22,7 +28,7 @@ describe('remove_official RPC: response shape contract', () => {
     await cleanupTenant(tenant.id)
   })
 
-  it('returns { ok: true, user_id } with the removed official\'s user_id when they had accepted their invite', async () => {
+  it("returns { ok: true, user_id } with the removed official's user_id when they had accepted their invite", async () => {
     const official = await createUserWithRole(tenant.id, 'official')
     const admin = serviceClient()
     const { data: officialRow } = await admin
