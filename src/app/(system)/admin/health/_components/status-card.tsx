@@ -8,12 +8,6 @@ const STATUS_STYLES: Record<Status, string> = {
   unknown: 'bg-gray-100 text-gray-600',
 }
 
-const STATUS_LABELS: Record<Status, string> = {
-  ok: 'Uppe',
-  error: 'Nere',
-  unknown: 'Okänt',
-}
-
 interface StatusCardLink {
   label: string
   href: string
@@ -22,21 +16,22 @@ interface StatusCardLink {
 interface StatusCardProps {
   title: string
   status?: Status
+  statusLabels?: Record<Status, string>
   facts?: { label: string; value: string }[]
   links: StatusCardLink[]
   note?: string
 }
 
-export function StatusCard({ title, status, facts, links, note }: StatusCardProps) {
+export function StatusCard({ title, status, statusLabels, facts, links, note }: StatusCardProps) {
   return (
     <AppCard>
       <div className="flex items-start justify-between gap-4">
         <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        {status && (
+        {status && statusLabels && (
           <span
             className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
           >
-            {STATUS_LABELS[status]}
+            {statusLabels[status]}
           </span>
         )}
       </div>
