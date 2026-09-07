@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import OfficialsList from './_components/officials-list'
-import { logger } from '@/lib/logger'
+import { checkReadCeiling } from '@/lib/db/bounded-read'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -40,21 +40,19 @@ export default async function OfficialsPage({ params }: Props) {
 
   if (error) throw error
 
-  const rows = officials ?? []
-  if (rows.length > OFFICIALS_CEILING) {
-    logger.warn('Officials roster hit its read ceiling — the list is truncated', {
-      ceiling: OFFICIALS_CEILING,
-      tenantId: tenant.id,
-      page: 'admin/officials',
-    })
-  }
+  const rows = checkReadCeiling(officials ?? [], {
+    ceiling: OFFICIALS_CEILING,
+    page: 'admin/officials',
+    message: 'Officials roster hit its read ceiling — the list is truncated',
+    context: { tenantId: tenant.id },
+  })
 
   return (
     <div className="px-8 py-8">
       <OfficialsList
         tenantSlug={tenantSlug}
         tenantId={tenant.id}
-        officials={rows.slice(0, OFFICIALS_CEILING)}
+        officials={rows}
         currentUserId={user.id}
       />
     </div>
