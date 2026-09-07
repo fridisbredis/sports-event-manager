@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { OfficialsCard } from './_components/officials-card'
+import { PublishSection } from './_components/publish-section'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -94,6 +95,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 interface OfficialsCounts {
   invited?: { count: number | null; error?: unknown }
   confirmed?: { count: number | null; error?: unknown }
+  event?: typeof EVENT | null
 }
 
 /**
@@ -103,6 +105,7 @@ interface OfficialsCounts {
  * visible — the counts would otherwise both pass with one shared stub.
  */
 function mockServerClient(counts: OfficialsCounts = {}) {
+  const eventResult = counts.event === undefined ? EVENT : counts.event
   const officialsCalls: Array<Record<string, unknown>> = []
 
   const fromMock = vi.fn((table: string) => {
@@ -142,7 +145,7 @@ function mockServerClient(counts: OfficialsCounts = {}) {
     const builder: Record<string, unknown> = {}
     builder.select = vi.fn(() => builder)
     builder.eq = vi.fn(() => builder)
-    builder.maybeSingle = vi.fn(() => Promise.resolve({ data: EVENT, error: null }))
+    builder.maybeSingle = vi.fn(() => Promise.resolve({ data: eventResult, error: null }))
     return builder
   })
 
@@ -241,5 +244,19 @@ describe('DashboardPage', () => {
     })
 
     await expect(DashboardPage({ params: PARAMS })).rejects.toThrow('confirmed count failed')
+  })
+
+  it('renders without throwing when the tenant has no event yet, passing eventId: null', async () => {
+    mockServerClient({
+      event: null,
+      invited: { count: 0, error: null },
+      confirmed: { count: 0, error: null },
+    })
+
+    const result = await DashboardPage({ params: PARAMS })
+
+    const section = findByType(result, PublishSection)
+    expect(section).not.toBeNull()
+    expect(section!.props.eventId).toBeNull()
   })
 })
