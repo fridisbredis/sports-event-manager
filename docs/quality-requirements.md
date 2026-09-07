@@ -750,8 +750,20 @@ itself.
    `format`/`format:check` now run `prettier .` against the whole repo
    instead of `src/**`, and the 47 previously-ungated files (docs/,
    `.github/workflows/`, root config) were reformatted so CI does not
-   immediately fail on merge. Remaining: add real-database RLS and role
-   tests. Land MNT-08 (F-MNT-06) before the integration tests it blocks.
+   immediately fail on merge. **Resolved 2026-09-07:** this item as
+   originally written ("add real-database RLS and role tests; land MNT-08
+   before them") was stale — `tests/integration/` already existed with a
+   mature real-Postgres suite (helpers, a local-only loopback guard, its
+   own `vitest.integration.config.mts`, wired into `quality.yml`) and
+   MNT-08/F-MNT-06 had already been closed 2026-08-28. An audit of RLS
+   policies against that suite found only two tables — the child tables
+   `workstation_operating_windows` and `workstation_todos`, which have no
+   `tenant_id` column and inherit isolation only through an indirect
+   `EXISTS` join to `workstations.tenant_id` — genuinely lacked a dedicated
+   tenant-isolation test; every other table either already had one or is
+   safe by construction (service-role-only, or a global admin table with no
+   per-tenant RLS to test). Added
+   `tests/integration/tenant-isolation-workstations.test.ts` covering both.
    Decide the participant question (F-REL-07). (The retention position
    behind SEC-09/F-SEC-10 is resolved as of 2026-08-25 — no longer an open
    decision.)
