@@ -767,11 +767,14 @@ describe('resolveTenantForOfficial', () => {
     expect(await resolveTenantForOfficial('viadal', 'user-1')).toBeNull()
   })
 
-  it('returns the tenant row when the caller passes the official surfaces check', async () => {
+  // officialId rides along on the tenant so the caller (MYSCH-01's schedule
+  // page) can skip a second, RLS-scoped `officials` query for the same row
+  // this access check already fetched under the service client.
+  it('returns the tenant row with the confirmed official id when the caller passes the check', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      officials: { data: { invite_status: 'confirmed' }, error: null },
+      officials: { data: { id: 'off-1' }, error: null },
     })
 
     expect(await resolveTenantForOfficial('viadal', 'user-1')).toEqual({
@@ -779,7 +782,152 @@ describe('resolveTenantForOfficial', () => {
       slug: 'viadal',
       color_palette: 'blue',
       is_active: true,
+      officialId: 'off-1',
     })
+  })
+
+  it('returns officialId null for a tenant_admin, who passes without an officials row', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+    })
+
+    expect(await resolveTenantForOfficial('viadal', 'user-1')).toEqual({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+      officialId: null,
+    })
+  })
+})
+
+// Adversarial coverage for the officialId dedup added on top of
+// resolveOfficialSurfaceAccess. The goal here is to break the assumption
+// that "the row the access check fetched under the service client is safe
+// to hand to a page as officialId" — soft-deleted rows, cross-tenant rows,
+// and malformed ids are exactly the shapes where that assumption could
+// quietly leak the wrong id into an RLS-scoped assignments query.
+describe('resolveTenantForOfficial — officialId adversarial cases', () => {
+  // Mirrors the existing canViewOfficialSurfaces re-invited-official test,
+  // but at the layer that actually matters for MYSCH-01: does the SAME
+  // dedup path that decided access also hand back the confirmed row's id,
+  // and not the removed row's id from the same (user_id, tenant_id) pair?
+  it('returns the confirmed row id, not the removed row, for a re-invited official', async () => {
+    // A naive re-implementation of "take the first row" without the
+    // invite_status filter would just return whichever row Postgrest orders
+    // first — which is unspecified without an explicit order(). Simulating
+    // that failure mode: if the eq('invite_status', 'confirmed') filter were
+    // ever dropped, this mock would return the *removed* row's id instead.
+    const officialsBuilder = chain({ data: { id: 'off-confirmed' }, error: null })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'officials') return officialsBuilder
+        if (table === 'user_roles') {
+          return chain({ data: [{ role: 'official', tenant_id: TENANT_ID }], error: null })
+        }
+        if (table === 'tenants') {
+          return chain({
+            data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true },
+          })
+        }
+        return chain({ data: { is_active: true }, error: null })
+      }),
+    } as never)
+
+    const result = await resolveTenantForOfficial('viadal', 'user-1')
+
+    expect(result?.officialId).toBe('off-confirmed')
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
+  })
+
+  // The officials query is scoped by tenantId internally, but nothing at the
+  // resolveTenantForOfficial layer re-checks that the returned officialId
+  // actually belongs to the tenant being resolved. If tenant resolution and
+  // the officials lookup ever used two different tenant ids (e.g. a future
+  // refactor threading the wrong variable through), this dedup would hand a
+  // page an officialId scoped to the WRONG tenant with no test catching it
+  // today. This test pins the current (correct) wiring so that regression
+  // cannot land silently.
+  it('scopes the officials lookup to the same tenant that was resolved, not just any tenant', async () => {
+    const officialsBuilder = chain({ data: { id: 'off-1' }, error: null })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'officials') return officialsBuilder
+        if (table === 'user_roles') {
+          return chain({ data: [{ role: 'official', tenant_id: TENANT_ID }], error: null })
+        }
+        if (table === 'tenants') {
+          return chain({
+            data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true },
+          })
+        }
+        return chain({ data: { is_active: true }, error: null })
+      }),
+    } as never)
+
+    await resolveTenantForOfficial('viadal', 'user-1')
+
+    // Must be scoped to the resolved tenant (TENANT_ID), never OTHER_TENANT_ID
+    // or an unscoped query.
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(officialsBuilder.eq).not.toHaveBeenCalledWith('tenant_id', OTHER_TENANT_ID)
+  })
+
+  // A hybrid user holding both tenant_admin and official rows for the SAME
+  // tenant hits the tenant_admin early-return branch in
+  // resolveOfficialSurfaceAccess, which never queries `officials` at all.
+  // officialId is therefore null even though a confirmed officials row
+  // exists for them — a real official row is "hidden" by this short-circuit.
+  // This was true before the refactor too (canViewOfficialSurfaces never
+  // fetched officials for tenant_admin), so this test pins existing
+  // behavior rather than flagging a new bug — but it is exactly the kind of
+  // assumption a future caller of officialId could get burned by if they
+  // expect it to reflect "does this user have an officials row" rather than
+  // "did the official-role branch run".
+  it('does not surface officialId for a hybrid tenant_admin+official user, even with a confirmed row', async () => {
+    const officialsBuilder = chain({ data: { id: 'off-1' }, error: null })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'officials') return officialsBuilder
+        if (table === 'user_roles') {
+          return chain({
+            data: [
+              { role: 'tenant_admin', tenant_id: TENANT_ID },
+              { role: 'official', tenant_id: TENANT_ID },
+            ],
+            error: null,
+          })
+        }
+        if (table === 'tenants') {
+          return chain({
+            data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true },
+          })
+        }
+        return chain({ data: { is_active: true }, error: null })
+      }),
+    } as never)
+
+    const result = await resolveTenantForOfficial('viadal', 'user-1')
+
+    expect(result?.officialId).toBeNull()
+    expect(officialsBuilder.select).not.toHaveBeenCalled()
+  })
+
+  // A present-but-falsy official id (empty string) is not a real Postgres
+  // shape — id is a non-null uuid PK — but the guard must not trust that by
+  // construction. Fails closed: access is denied rather than returning
+  // allowed:true paired with an officialId that would silently fail a
+  // caller's `if (officialId)` check downstream.
+  it('fails closed when the officials row has a falsy id instead of treating it as valid', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
+      officials: { data: { id: '' }, error: null },
+    })
+
+    expect(await resolveTenantForOfficial('viadal', 'user-1')).toBeNull()
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
   })
 })
 
@@ -900,12 +1048,12 @@ describe('getOfficialTenant', () => {
     expect(await getOfficialTenant('viadal')).toBeNull()
   })
 
-  it('returns the tenant row when the caller passes the official surfaces check', async () => {
+  it('returns the tenant row with the confirmed official id when the caller passes the check', async () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      officials: { data: { invite_status: 'confirmed' }, error: null },
+      officials: { data: { id: 'off-1' }, error: null },
     })
 
     expect(await getOfficialTenant('viadal')).toEqual({
@@ -913,6 +1061,7 @@ describe('getOfficialTenant', () => {
       slug: 'viadal',
       color_palette: 'blue',
       is_active: true,
+      officialId: 'off-1',
     })
   })
 })
