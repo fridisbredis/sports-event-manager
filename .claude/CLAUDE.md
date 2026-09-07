@@ -518,6 +518,22 @@ Use `DROP POLICY IF EXISTS` + `CREATE POLICY` for defensive re-runs. Avoid `DO $
 3. Remove any temporary `any` casts that were placed pending types
 4. Run the migration on **both dev and prod** Supabase projects
 
+**`--local` vs dev types will never be byte-identical.** The local Docker
+stack's PostgREST version isn't pinned to dev's, and dev's own version has
+flipped on its own (14.5 ↔ 14.17) with no migration involved — the
+`PostgrestVersion` field in `src/types/database.ts` is infrastructure, not
+schema. The CI types gate (`scripts/check-db-types-current.sh`, from PR #93)
+already masks that one field so it doesn't block deploys on a cosmetic diff.
+
+That only fixes the gate, not pre-merge verification — nothing applies the
+migration against dev from a PR, so there's no way to get a byte-identical
+file before merge. **Workflow:** run `supabase gen types --local` to see what
+the migration changes (new columns, nullability), then hand-apply that same
+surgical change to the dev-generated `src/types/database.ts` rather than
+committing the `--local` output wholesale. This is how the
+`audit_events.actor_user_id` nullability bug (PR #90) should have been
+caught — compare the two outputs manually, don't trust either one alone.
+
 ---
 
 ## Lessons learned (from real debugging sessions)
