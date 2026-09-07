@@ -68,12 +68,13 @@ function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 }
 
-function mockResolvedTenant() {
+function mockResolvedTenant(officialId: string | null = 'off-1') {
   vi.mocked(getOfficialTenant).mockResolvedValue({
     id: TENANT_ID,
     slug: 'viadal',
     color_palette: 'default',
     is_active: true,
+    officialId,
   })
 }
 
@@ -100,46 +101,72 @@ describe('SchedulePage', () => {
   })
 
   it('renders an empty assignments list when the user has no confirmed official row', async () => {
-    mockResolvedTenant()
-    mockUser('user-1', vi.fn().mockReturnValue(chain({ data: [] })))
+    // officialId is null: getOfficialTenant's access check (tenant_admin/
+    // system_admin branch, or simply no confirmed row) found no officials row
+    // to attach. The page must not query assignments at all in that case.
+    mockResolvedTenant(null)
+    const fromMock = vi.fn()
+    mockUser('user-1', fromMock)
 
     const result = await SchedulePage({ params: PARAMS })
 
+    expect(fromMock).not.toHaveBeenCalled()
     const view = findByType(result, ScheduleView)
     expect(view).not.toBeNull()
     expect(view!.props.assignments).toEqual([])
   })
 
-  it('scopes the officials lookup by user_id, tenant_id, and confirmed status', async () => {
-    mockResolvedTenant()
-    const officialsBuilder = chain({ data: [] })
-    const fromMock = vi.fn().mockReturnValue(officialsBuilder)
-    mockUser('user-1', fromMock)
-
-    await SchedulePage({ params: PARAMS })
-
-    expect(fromMock).toHaveBeenCalledWith('officials')
-    expect(officialsBuilder.eq).toHaveBeenCalledWith('user_id', 'user-1')
-    expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
-    expect(officialsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
-  })
-
   it('loads assignments scoped to the official and tenant when a confirmed official exists', async () => {
-    mockResolvedTenant()
-    const officialsBuilder = chain({ data: [{ id: 'off-1' }] })
+    // officialId comes straight from getOfficialTenant now — the page no
+    // longer queries `officials` itself (F-PERF-07-style dedup with the
+    // access check, which already ran this lookup under the service client).
+    mockResolvedTenant('off-1')
     const assignments = [{ id: 'a-1', timeslot_start: '2026-08-12T09:00:00Z' }]
     const assignmentsBuilder = chain({ data: assignments })
-    const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(assignmentsBuilder)
+    const fromMock = vi.fn().mockReturnValue(assignmentsBuilder)
     mockUser('user-1', fromMock)
 
     const result = await SchedulePage({ params: PARAMS })
 
+    expect(fromMock).toHaveBeenCalledWith('assignments')
+    expect(fromMock).not.toHaveBeenCalledWith('officials')
     expect(assignmentsBuilder.eq).toHaveBeenCalledWith('official_id', 'off-1')
     expect(assignmentsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
     expect(assignmentsBuilder.eq).toHaveBeenCalledWith('status', 'assigned')
 
     const view = findByType(result, ScheduleView)
     expect(view!.props.assignments).toEqual(assignments)
+  })
+
+  // Adversarial: nothing previously asserted that an assignments query error
+  // actually propagates rather than being silently swallowed into an empty
+  // list — which would be indistinguishable from "no assignments" to an
+  // official checking their schedule on event day.
+  it('throws when the assignments query errors, rather than rendering an empty schedule', async () => {
+    mockResolvedTenant('off-1')
+    const assignmentsBuilder = chain({ data: null, error: { message: 'boom' } })
+    mockUser('user-1', vi.fn().mockReturnValue(assignmentsBuilder))
+
+    await expect(SchedulePage({ params: PARAMS })).rejects.toEqual({ message: 'boom' })
+  })
+
+  // Adversarial: officialId must scope the assignments query even when the
+  // tenant id and official id happen to collide in shape (both plausible
+  // uuid-looking strings) — pins that official_id and tenant_id are always
+  // two independent .eq() calls, not a single combined filter that could be
+  // satisfied by either value alone.
+  it('filters by both official_id and tenant_id independently, not by either alone', async () => {
+    mockResolvedTenant('off-1')
+    const assignmentsBuilder = chain({ data: [] })
+    const fromMock = vi.fn().mockReturnValue(assignmentsBuilder)
+    mockUser('user-1', fromMock)
+
+    await SchedulePage({ params: PARAMS })
+
+    const eqCalls = (assignmentsBuilder.eq as ReturnType<typeof vi.fn>).mock.calls
+    expect(eqCalls).toContainEqual(['official_id', 'off-1'])
+    expect(eqCalls).toContainEqual(['tenant_id', TENANT_ID])
+    expect(eqCalls).toContainEqual(['status', 'assigned'])
+    expect(eqCalls.length).toBe(3)
   })
 })

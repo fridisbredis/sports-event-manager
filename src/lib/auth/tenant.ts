@@ -200,6 +200,13 @@ export async function hasAdminAccessToTenant(userId: string, tenantId: string): 
   return hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])
 }
 
+// Result of the official-surface access check, carrying the confirmed
+// official row's id alongside the verdict so a caller that already needs it
+// (resolveTenantForOfficial) does not have to re-run the same query with a
+// second, RLS-scoped client. `officialId` is null for the tenant_admin/
+// system_admin branches, which pass without an officials row at all.
+type OfficialSurfaceAccess = { allowed: boolean; officialId: string | null }
+
 // Official surfaces — the mobile screens under (official)/[tenantSlug] — are
 // visible to officials, tenant admins and system admins. Named for the surface
 // rather than the role because three roles pass; "isOfficial" would read as a
@@ -209,18 +216,25 @@ export async function hasAdminAccessToTenant(userId: string, tenantId: string): 
 // Per docs/flows/officials-management-registration.md, an official only gains
 // sign-in and access to these screens once Confirmed — Invited is SMS-link-only.
 // tenant_admin/system_admin have no officials row and are exempt from this check.
-export async function canViewOfficialSurfaces(userId: string, tenantId: string): Promise<boolean> {
-  if (!tenantIdSchema.safeParse(tenantId).success) return false
+async function resolveOfficialSurfaceAccess(
+  userId: string,
+  tenantId: string
+): Promise<OfficialSurfaceAccess> {
+  const deny: OfficialSurfaceAccess = { allowed: false, officialId: null }
+
+  if (!tenantIdSchema.safeParse(tenantId).success) return deny
 
   const context = await fetchAccessContext(userId, tenantId)
-  if (!context) return false
+  if (!context) return deny
 
-  if (isGlobalSystemAdmin(context.roleRows)) return true
-  if (!context.tenantIsActive) return false
+  if (isGlobalSystemAdmin(context.roleRows)) return { allowed: true, officialId: null }
+  if (!context.tenantIsActive) return deny
 
-  if (hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])) return true
+  if (hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])) {
+    return { allowed: true, officialId: null }
+  }
 
-  if (!hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return false
+  if (!hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return deny
 
   // Ask for a confirmed row and take the first, rather than asking for "the" row:
   // removal is a soft delete, so a re-invited official has both a 'removed' row and a
@@ -241,10 +255,21 @@ export async function canViewOfficialSurfaces(userId: string, tenantId: string):
 
   if (error) {
     logger.error('Failed to fetch official invite status', error)
-    return false
+    return deny
   }
 
-  return official !== null
+  // official.id is a non-null uuid primary key in practice, but this guard
+  // decides access — treat a falsy id (e.g. an empty string) as absent
+  // rather than trusting the shape, so `allowed: true` can never pair with
+  // an officialId that would silently fail a caller's `if (officialId)`
+  // check downstream.
+  if (!official?.id) return deny
+
+  return { allowed: true, officialId: official.id }
+}
+
+export async function canViewOfficialSurfaces(userId: string, tenantId: string): Promise<boolean> {
+  return (await resolveOfficialSurfaceAccess(userId, tenantId)).allowed
 }
 
 export async function requireSystemAdmin(): Promise<{ user: User } | AuthFailure> {
@@ -342,6 +367,12 @@ export type ResolvedTenant = {
   is_active: boolean
 }
 
+// Official-surface counterpart of ResolvedTenant, carrying the confirmed
+// official row's id alongside the tenant so pages don't have to re-query
+// `officials` themselves. null for tenant_admin/system_admin, who pass
+// canViewOfficialSurfaces without an officials row.
+export type ResolvedOfficialTenant = ResolvedTenant & { officialId: string | null }
+
 async function resolveTenantBySlug(tenantSlug: string): Promise<ResolvedTenant | null> {
   const service = createSupabaseServiceClient()
   const { data, error } = await service
@@ -375,17 +406,21 @@ export async function resolveTenantForAdmin(
 }
 
 // Same guarded-resolve pattern as resolveTenantForAdmin, gated by
-// canViewOfficialSurfaces instead.
+// resolveOfficialSurfaceAccess instead. Returns the confirmed official's id
+// alongside the tenant (see ResolvedOfficialTenant) so pages that need it —
+// MYSCH-01's schedule page — can skip a second, RLS-scoped `officials` query
+// for data the access check already fetched under the service client.
 export async function resolveTenantForOfficial(
   tenantSlug: string,
   userId: string
-): Promise<ResolvedTenant | null> {
+): Promise<ResolvedOfficialTenant | null> {
   const tenant = await resolveTenantBySlug(tenantSlug)
   if (!tenant) return null
 
-  if (!(await canViewOfficialSurfaces(userId, tenant.id))) return null
+  const access = await resolveOfficialSurfaceAccess(userId, tenant.id)
+  if (!access.allowed) return null
 
-  return tenant
+  return { ...tenant, officialId: access.officialId }
 }
 
 // ---------------------------------------------------------------------------
@@ -511,7 +546,7 @@ export const getAdminTenant = cache(async (tenantSlug: string): Promise<Resolved
 // Official-surface counterpart. The official pages already went through
 // resolveTenantForOfficial, so this only adds the memoisation.
 export const getOfficialTenant = cache(
-  async (tenantSlug: string): Promise<ResolvedTenant | null> => {
+  async (tenantSlug: string): Promise<ResolvedOfficialTenant | null> => {
     const user = await getCurrentUser()
     if (!user) return null
     return resolveTenantForOfficial(tenantSlug, user.id)
