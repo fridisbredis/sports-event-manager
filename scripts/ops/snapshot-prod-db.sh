@@ -90,7 +90,7 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-DB_URL="$(op read "op://Viadal Event Manager/Supabase Sports Event Manager prod/db connection string" 2>&1)" || {
+DB_URL="$(op read "op://Viadal Event Manager/Supabase Sports Event Manager prod/db connection string" --account extrapreneurab.1password.com 2>&1)" || {
   echo "ERROR: could not read the prod DB connection string from 1Password." >&2
   echo "Expected a field named 'db connection string' on the item" >&2
   echo "'Supabase Sports Event Manager prod' in the 'Viadal Event Manager' vault." >&2
@@ -99,7 +99,7 @@ DB_URL="$(op read "op://Viadal Event Manager/Supabase Sports Event Manager prod/
   exit 1
 }
 
-BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" 2>&1)" || {
+BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" --account extrapreneurab.1password.com 2>&1)" || {
   echo "ERROR: could not read the Azure Blob connection string from 1Password." >&2
   exit 1
 }
