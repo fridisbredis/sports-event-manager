@@ -10,7 +10,7 @@ interface PublishSectionProps {
   hasRaceStage: boolean
   tenantSlug: string
   tenantId: string
-  eventId: string
+  eventId: string | null
 }
 
 export async function PublishSection({
@@ -26,6 +26,7 @@ export async function PublishSection({
 
   async function handlePublish() {
     'use server'
+    if (!eventId) return
     await publishEvent({ tenantSlug, tenantId, eventId })
   }
 
