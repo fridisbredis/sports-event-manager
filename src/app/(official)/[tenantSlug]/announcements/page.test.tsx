@@ -75,6 +75,7 @@ function mockResolvedTenant() {
     slug: 'viadal',
     color_palette: 'default',
     is_active: true,
+    officialId: null,
   })
 }
 
