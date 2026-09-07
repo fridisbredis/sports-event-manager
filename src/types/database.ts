@@ -831,6 +831,10 @@ export type Database = {
         Returns: string
       }
       get_last_sign_in_at: { Args: { p_user_id: string }; Returns: string }
+      get_official_home_cached: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: Json
+      }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       is_system_admin: { Args: never; Returns: boolean }

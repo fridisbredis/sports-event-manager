@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
+import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
 
 const confirmSchema = z.object({
@@ -90,6 +92,17 @@ export async function POST(request: NextRequest) {
     tenant_id: string
     role_granted: boolean
   }
+
+  // PERF-06 / F-PERF-04 Phase 1: this confirm just flipped invite_status to
+  // 'confirmed' and set officials.name — HOME-01's cached read (migration
+  // 0048) would otherwise keep serving the stale pre-confirm shape (no name,
+  // treated as not-yet-confirmed) for up to the 60s revalidate window.
+  // { expire: 0 } (immediate), not the docs' recommended profile="max": this
+  // route redirects straight to /home right after, and "max" would still
+  // serve the stale pre-confirm shape on that very next load — the opposite
+  // of what invalidating here is for. updateTag isn't available — this is a
+  // Route Handler, not a Server Action.
+  revalidateTag(officialHomeCacheTag(tenantId, user.id), { expire: 0 })
 
   // SEC-07: only log when the RPC actually inserted a user_roles row.
   // confirm_official_invite's insert is `on conflict do nothing`, so a

@@ -4,6 +4,8 @@ import { DELETE } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import { revalidateTag } from 'next/cache'
+import { officialHomeCacheTag } from '@/lib/cache/tags'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -17,6 +19,10 @@ vi.mock('@/lib/audit/log-audit-event', () => ({
   logAuditEvent: vi.fn(),
 }))
 
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
+}))
+
 function makeRequest(tenantId?: string) {
   const url = tenantId
     ? `http://localhost/api/officials/off-1?tenantId=${encodeURIComponent(tenantId)}`
@@ -28,9 +34,25 @@ function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
 }
 
-function mockRpc(result: { data: unknown; error: unknown }) {
+// PERF-06 / F-PERF-04 Phase 1: the route now reads officials.user_id (via
+// .from(), before calling remove_official) to know which HOME-01 cache tag
+// to invalidate — remove_official itself nulls out user_id, so this is the
+// only chance to capture it. Defaults to a fixed id so the pre-existing
+// tests below don't each need to know about this; officialUserId lets a
+// test override it (e.g. to null, covering the "never invited" case).
+function mockRpc(
+  result: { data: unknown; error: unknown },
+  officialUserId: string | null = 'official-user-1'
+) {
   const rpc = vi.fn().mockResolvedValue(result)
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({ rpc } as never)
+  const maybeSingle = vi
+    .fn()
+    .mockResolvedValue({ data: officialUserId ? { user_id: officialUserId } : null })
+  const eqTenant = vi.fn().mockReturnValue({ maybeSingle })
+  const eqId = vi.fn().mockReturnValue({ eq: eqTenant })
+  const select = vi.fn().mockReturnValue({ eq: eqId })
+  const from = vi.fn().mockReturnValue({ select })
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({ rpc, from } as never)
   return rpc
 }
 
@@ -89,6 +111,39 @@ describe('DELETE /api/officials/[id]', () => {
       p_official_id: OFFICIAL_ID,
       p_tenant_id: TENANT_ID,
     })
+  })
+
+  // PERF-06 / F-PERF-04 Phase 1
+  it('invalidates the removed official\'s HOME-01 cache tag on success', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: { ok: true }, error: null }, 'official-user-1')
+
+    await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(revalidateTag).toHaveBeenCalledWith(
+      officialHomeCacheTag(TENANT_ID, 'official-user-1'),
+      { expire: 0 }
+    )
+  })
+
+  // PERF-06 / F-PERF-04 Phase 1: officials invited but never confirmed have
+  // no user_id at all (set at invite time in POST, but a removal here could
+  // still target one before that write ever landed in some edge case) — no
+  // tag to invalidate, and this must not throw trying to build one from null.
+  it('does not invalidate any cache tag when the official had no user_id', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: { ok: true }, error: null }, null)
+
+    const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(res.status).toBe(200)
+    expect(revalidateTag).not.toHaveBeenCalled()
   })
 
   it('returns 404 when remove_official raises not_found', async () => {

@@ -1,8 +1,10 @@
 import { cache } from 'react'
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
+import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { logger } from '@/lib/logger'
 import type { User } from '@supabase/supabase-js'
 
@@ -105,6 +107,13 @@ export async function confirmOfficialInvite(
     tenant_id: string
     role_granted: boolean
   }
+
+  // PERF-06 / F-PERF-04 Phase 1: same reasoning as the token-flow confirm
+  // route — this just flipped invite_status to 'confirmed', so HOME-01's
+  // cached read (migration 0048) must not keep serving the stale pre-confirm
+  // shape. { expire: 0 }, not profile="max": this is the post-login redirect
+  // path straight to /home, same immediacy requirement as the confirm route.
+  revalidateTag(officialHomeCacheTag(tenantId, userId), { expire: 0 })
 
   // SEC-07: only log when the RPC actually inserted a user_roles row.
   // confirm_official_invite_by_phone's insert is `on conflict do nothing`,

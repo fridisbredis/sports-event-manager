@@ -27,6 +27,10 @@ vi.mock('@/lib/audit/log-auth-event', () => ({
   logAuthEvent: vi.fn(),
 }))
 
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
+}))
+
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
   for (const method of ['select', 'eq', 'or', 'limit', 'is', 'update', 'insert']) {

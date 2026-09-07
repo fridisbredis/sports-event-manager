@@ -1,9 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { officialHomeCacheTag } from '@/lib/cache/tags'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -114,23 +116,42 @@ export default async function OfficialHomePage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const [{ data: official }, { data: event }] = await Promise.all([
-    // Confirmed rows only, newest first: a re-invited official also has the old
-    // soft-deleted row on this (user_id, tenant_id), and maybeSingle() errors on the
-    // pair — which would blank the greeting name for a legitimate official.
-    supabase
-      .from('officials')
-      .select('name')
-      .eq('user_id', user.id)
-      .eq('tenant_id', tenant.id)
-      .eq('invite_status', 'confirmed')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  // PERF-06 / F-PERF-04 Phase 1 (ADR-0003): officials read moved behind
+  // get_official_home_cached (migration 0048) instead of a direct
+  // .from('officials') call. Must be the service-role client — the anon
+  // client can't reach this RPC (grant excludes it, see the migration), and
+  // the session-cookie client can't run inside unstable_cache at all (no
+  // cookies() access there). Safe here only because the RPC is SECURITY
+  // DEFINER owned by cache_rpc_reader, a NOBYPASSRLS role — service_role's
+  // own BYPASSRLS never applies inside it. Confirmed rows only, newest
+  // first, same "re-invited official keeps the old soft-deleted row"
+  // reasoning as before — now enforced by the RPC's own WHERE clause rather
+  // than this query.
+  const getOfficialHomeCached = unstable_cache(
+    async (tenantId: string, userId: string) => {
+      const service = createSupabaseServiceClient()
+      const { data, error } = await service.rpc('get_official_home_cached', {
+        p_tenant_id: tenantId,
+        p_user_id: userId,
+      })
+      if (error) throw error
+      return data as { name: string | null }
+    },
+    ['official-home'], // cache namespace, data-shape only — tenant/user
+    // scoping comes entirely from the (tenantId, userId) closure arguments
+    // reaching both the RPC call above and the tags array below
+    {
+      tags: [officialHomeCacheTag(tenant.id, user.id)],
+      revalidate: 60,
+    }
+  )
+
+  const [officialHome, { data: event }] = await Promise.all([
+    getOfficialHomeCached(tenant.id, user.id),
     supabase.from('events').select('name').eq('tenant_id', tenant.id).maybeSingle(),
   ])
 
-  const name = official?.name ?? ''
+  const name = officialHome?.name ?? ''
   const eventName = event?.name ?? tenantSlug
   const initials = name
     .split(' ')
