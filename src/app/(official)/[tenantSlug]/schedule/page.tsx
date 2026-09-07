@@ -23,21 +23,14 @@ export default async function SchedulePage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const { data: officialsRows, error: officialsError } = await supabase
-    .from('officials')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('tenant_id', tenant.id)
-    .eq('invite_status', 'confirmed')
-    .limit(1)
-
-  if (officialsError) throw officialsError
-
-  const official = officialsRows?.[0] ?? null
+  // officialId comes from getOfficialTenant's access check (F-PERF-07-style
+  // dedup): it already ran this exact lookup under the service client to
+  // decide access, so the page doesn't repeat it with the RLS client.
+  const officialId = tenant.officialId
 
   let assignments: AssignmentRow[] = []
 
-  if (official) {
+  if (officialId) {
     const { data, error: assignmentsError } = await supabase
       .from('assignments')
       .select(
@@ -54,7 +47,7 @@ export default async function SchedulePage({ params }: Props) {
         )
       `
       )
-      .eq('official_id', official.id)
+      .eq('official_id', officialId)
       .eq('tenant_id', tenant.id)
       .eq('status', 'assigned')
       .not('workstation_id', 'is', null)
