@@ -18,6 +18,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history + tags: the snapshot-gate step below needs
+          # `git describe --tags` and a diff against the previous tag to
+          # find pending migrations, which a shallow clone can't do.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
@@ -31,6 +37,78 @@ jobs:
         run: |
           supabase link --project-ref rauvaxuypujbeintnnoe
           supabase db push --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Require a prod snapshot for destructive migrations (F-REL-20)
+        run: |
+          set -euo pipefail
+
+          # Ask prod's own migration ledger which migrations are actually
+          # pending, rather than diffing against a git tag — this repo's
+          # tags are not reliably kept in sync with what's actually been
+          # pushed to prod (confirmed 2026-09-07: the latest tag at the
+          # time predated 24 already-applied migrations, which a tag-based
+          # diff would have wrongly flagged as newly pending). This is the
+          # same source of truth `supabase db push` itself uses.
+          list_json=$(supabase migration list --linked --output-format json 2>/dev/null | grep '^{')
+
+          pending_migrations=$(echo "$list_json" \
+            | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for m in data.get('migrations', []):
+              if m.get('local') and not m.get('remote'):
+                  print(m['local'])
+          ")
+
+          if [ -z "$pending_migrations" ]; then
+            echo "No pending migrations in this release."
+            exit 0
+          fi
+
+          missing=""
+          for version in $pending_migrations; do
+            file=$(ls supabase/migrations/"${version}"_*.sql 2>/dev/null | head -1)
+            if [ -z "$file" ]; then
+              echo "WARN could not find a migration file for pending version ${version} — skipping check for it"
+              continue
+            fi
+
+            if grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*destructive\b' "$file"; then
+              # A destructive migration must reference a real snapshot
+              # filename in its Data: line — the exact format
+              # scripts/ops/snapshot-prod-db.sh prints on success. This does
+              # not verify the blob still exists in Storage (this job has
+              # no Blob credentials, deliberately — see that script's
+              # header), only that a human ran it and pasted the filename,
+              # which is the point: it forces the manual step to have
+              # already happened before this push can proceed.
+              if grep -qE '^--[[:space:]]*Data:.*[0-9]{4}_pre-migration_[0-9TZ:-]+\.tar\.gz' "$file"; then
+                echo "OK   $file — snapshot filename present"
+              else
+                echo "FAIL $file — destructive migration with no snapshot filename in its Data: line"
+                missing="$missing $file"
+              fi
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            cat <<'EOF'
+
+          A destructive migration is about to be pushed to prod without a
+          referenced snapshot. Run scripts/ops/snapshot-prod-db.sh <migration
+          number> first, then add the printed blob filename to that
+          migration's Forward-fix 'Data:' line, e.g.:
+
+            -- Data:     see 0048_pre-migration_2026-09-08T14-30-00Z.tar.gz
+
+          See F-REL-20 in docs/quality-requirements.md for why this exists:
+          neither PITR nor Supabase branching cover recovering prod's actual
+          row data after a destructive migration runs against the wrong rows.
+          EOF
+            exit 1
+          fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
