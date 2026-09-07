@@ -12,6 +12,11 @@ export default defineConfig({
     pool: 'threads',
     maxWorkers: 2,
     minWorkers: 1,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      exclude: ['tests/integration/**', 'scripts/**', 'src/types/database.ts'],
+    },
   },
   resolve: {
     alias: {
