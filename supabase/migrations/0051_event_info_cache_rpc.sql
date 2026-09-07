@@ -1,11 +1,11 @@
 -- ============================================================================
--- Migration 0049: get_event_info_cached RPC (PERF-06 / F-PERF-04, Phase 2)
+-- Migration 0051: get_event_info_cached RPC (PERF-06 / F-PERF-04, Phase 2)
 -- ============================================================================
 --
 -- Sibling migrations, all in this one PR. If these prefixes shift on
 -- rebase, the cross-references below shift with them -- update this key
 -- and they all resolve again:
---   0049 event-info  |  0050 admin/event  |  0051 admin/workstations
+--   0051 event-info  |  0052 admin/event  |  0053 admin/workstations
 --
 -- First of the three Group 1 (tenant-scoped) caching RPCs from ADR-0003
 -- (docs/adr/0003-caching-position-for-read-heavy-pages.md, PR #129 — still
@@ -15,19 +15,19 @@
 -- `event_stages`, and `event_facilities` (both tenant-filtered, ordered by
 -- `position`).
 --
--- Same fail-closed construction as the Phase 1 pilot (0048), for the same
+-- Same fail-closed construction as the Phase 1 pilot (0050), for the same
 -- reason: `unstable_cache` cannot read `cookies()`, so the cached function
 -- must call this RPC through the service-role client — and service_role has
 -- rolbypassrls = true in this Supabase setup, so a plain RPC would skip RLS
 -- entirely. This function is SECURITY DEFINER owned by cache_rpc_reader
--- (0047, rolbypassrls = false), so RLS is evaluated against that
+-- (0049, rolbypassrls = false), so RLS is evaluated against that
 -- low-privilege owner no matter which client calls it.
 --
 -- THREE tables, not two. The ADR's own per-page shape summary describes
 -- event-info as "a read-only subset of `events` plus `event_facilities`"
 -- and omits `event_stages`, but the page does read it. `event_stages` is in
 -- fact read by all three Group 1 pages, so its policy and grant land here,
--- in the first migration of the group, and 0050/0051 reuse them rather than
+-- in the first migration of the group, and 0052/0053 reuse them rather than
 -- re-issuing. Likewise `event_facilities`, which admin/event also reads.
 --
 -- POLICY PREDICATE — do not "fix" these to match migration 0004. All three
@@ -61,19 +61,19 @@
 -- migration whose `set_config('app.…` third argument is not `true`.
 --
 -- search_path = '' with every non-pg_catalog reference schema-qualified,
--- matching 0048 (and deliberately NOT the `set search_path = public` used by
--- this project's older SECURITY DEFINER functions — see 0048's header for
+-- matching 0050 (and deliberately NOT the `set search_path = public` used by
+-- this project's older SECURITY DEFINER functions — see 0050's header for
 -- why that divergence is intentional). `jsonb_build_object`, `jsonb_agg` and
 -- `coalesce` are pg_catalog and resolve regardless of search_path.
 --
 -- Per this project's RPC guard convention (grants control callability, not
--- Zod): the two-statement revoke/grant form from 0026 and 0048 — revoke from
+-- Zod): the two-statement revoke/grant form from 0026 and 0050 — revoke from
 -- public + anon + authenticated, then grant to service_role. A bare
 -- `revoke ... from public` would leave Supabase's automatic per-role grants
 -- in place, the exact gap that previously re-exposed check_rate_limit,
 -- get_last_sign_in_at, anonymize_inactive_users and claim_sms_queue_batch.
 --
--- Ownership reassignment relies on the two grants 0048 already issued
+-- Ownership reassignment relies on the two grants 0050 already issued
 -- (`grant cache_rpc_reader to postgres`, `grant create on schema public to
 -- cache_rpc_reader`). Migrations are strictly ordered, so they are in place
 -- by the time this runs; they are not re-issued here.
@@ -97,7 +97,7 @@
 --             alter table public.events no force row level security;
 --             alter table public.event_stages no force row level security;
 --             alter table public.event_facilities no force row level security;
---             (0050 and 0051 depend on the event_stages / event_facilities
+--             (0052 and 0053 depend on the event_stages / event_facilities
 --             policies and grants — if either has already been applied, roll
 --             those back first or this rollback breaks their RPCs.)
 --   Data:     No data loss — read-only function, no table contents change.
@@ -128,7 +128,7 @@ alter table public.events force row level security;
 
 -- ---- event_stages ----
 -- Read by all three Group 1 pages (event-info, admin/event,
--- admin/workstations). Added once, here; 0050 and 0051 reuse it.
+-- admin/workstations). Added once, here; 0052 and 0053 reuse it.
 drop policy if exists "cache_rpc_reader_read_event_stages" on public.event_stages;
 create policy "cache_rpc_reader_read_event_stages"
   on public.event_stages for select
@@ -138,7 +138,7 @@ create policy "cache_rpc_reader_read_event_stages"
 alter table public.event_stages force row level security;
 
 -- ---- event_facilities ----
--- Read by event-info and admin/event. Added once, here; 0050 reuses it.
+-- Read by event-info and admin/event. Added once, here; 0052 reuses it.
 drop policy if exists "cache_rpc_reader_read_event_facilities" on public.event_facilities;
 create policy "cache_rpc_reader_read_event_facilities"
   on public.event_facilities for select

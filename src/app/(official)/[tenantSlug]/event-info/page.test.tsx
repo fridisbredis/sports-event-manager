@@ -55,7 +55,7 @@ function mockResolvedTenant() {
 }
 
 // PERF-06 / F-PERF-04 Phase 2: the event/stages/facilities reads moved off
-// the session client onto get_event_info_cached (migration 0049) via the
+// the session client onto get_event_info_cached (migration 0051) via the
 // service-role client — see the page's own comment for why.
 function mockEventInfoRpc(result: { data: unknown; error: unknown }) {
   const rpc = vi.fn().mockResolvedValue(result)

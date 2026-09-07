@@ -11,9 +11,9 @@ import {
 } from './helpers'
 
 // PERF-06 / F-PERF-04 Phase 1 (ADR-0003): get_official_home_cached (migration
-// 0048) is the pilot for the caching design's fail-closed claim — a
+// 0050) is the pilot for the caching design's fail-closed claim — a
 // SECURITY DEFINER RPC owned by cache_rpc_reader (NOBYPASSRLS, migration
-// 0047), called only via the service-role client from inside unstable_cache.
+// 0049), called only via the service-role client from inside unstable_cache.
 // This exercises the real function against real Postgres, not a mocked
 // return value — matching the project convention that RPC replace/rewrite
 // migrations need an integration test asserting the exact response shape

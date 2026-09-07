@@ -4,7 +4,7 @@
 // third argument literally `true`.
 //
 // Why this is a guard and not a code-review habit: the Group 1 caching RPCs
-// (0048 onward) reach RLS by setting `app.tenant_id` and having a policy
+// (0050 onward) reach RLS by setting `app.tenant_id` and having a policy
 // compare it. If that GUC is ever set session-scoped instead — a `false` or
 // omitted third argument, or a bare `SET app.tenant_id = ...` — it survives
 // past the transaction on a pooled PostgREST/Supavisor connection and

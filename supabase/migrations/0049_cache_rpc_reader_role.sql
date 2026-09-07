@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 0047: cache_rpc_reader role (PERF-06 / F-PERF-04, Phase 0)
+-- Migration 0049: cache_rpc_reader role (PERF-06 / F-PERF-04, Phase 0)
 -- ============================================================================
 --
 -- Phase 0 of the ADR-0003 caching design (docs/adr/0003-caching-position-for

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 0052: get_admin_dashboard_cached RPC (PERF-06 / F-PERF-04, Phase 3)
+-- Migration 0054: get_admin_dashboard_cached RPC (PERF-06 / F-PERF-04, Phase 3)
 -- ============================================================================
 --
 -- Backs the tenant admin dashboard
@@ -9,17 +9,17 @@
 -- existing `scheduling_warning_counts` RPC (migration 0040).
 --
 -- WIDER SURFACE THAN GROUP 1: unlike event-info/admin-event/admin-workstations
--- (Group 1, migrations 0049-0051), which each read only their own event
+-- (Group 1, migrations 0051-0053), which each read only their own event
 -- sub-tables, this page also reads `officials` (two count aggregates) and,
 -- transitively through scheduling_warning_counts, `assignments` and
 -- `workstations`. `workstations` already has a cache_rpc_reader policy from
--- 0051 and is reused unchanged; `officials` and `assignments` are new here.
+-- 0053 and is reused unchanged; `officials` and `assignments` are new here.
 --
--- Same fail-closed construction as 0048-0051: SECURITY DEFINER owned by
--- cache_rpc_reader (0047, rolbypassrls = false), search_path = '', every
+-- Same fail-closed construction as 0050-0053: SECURITY DEFINER owned by
+-- cache_rpc_reader (0049, rolbypassrls = false), search_path = '', every
 -- non-pg_catalog reference schema-qualified, transaction-local GUC (third
 -- `set_config` argument literally `true`, reset to '' before returning),
--- grants excluding anon/authenticated. See 0049's header for the full
+-- grants excluding anon/authenticated. See 0051's header for the full
 -- reasoning; not repeated here.
 --
 -- POLICY PREDICATE — `officials` and `assignments` both carry their own
@@ -73,7 +73,7 @@
 --             alter table public.officials no force row level security;
 --             alter table public.assignments no force row level security;
 --             (Do NOT touch the `workstations` policy/grant/force-RLS from
---             0051 — that migration owns it and 0051's own RPC still depends
+--             0053 — that migration owns it and 0053's own RPC still depends
 --             on it.)
 --   Data:     No data loss — read-only function, no table contents change.
 --   Blast:    None until the app code in this same PR switches
@@ -121,7 +121,7 @@ alter table public.assignments force row level security;
 grant select on public.assignments to cache_rpc_reader;
 
 -- `workstations` already has a cache_rpc_reader select policy and FORCE RLS
--- from migration 0051 — reused unchanged, not reissued here.
+-- from migration 0053 — reused unchanged, not reissued here.
 
 grant execute on function public.scheduling_warning_counts(uuid, uuid) to cache_rpc_reader;
 

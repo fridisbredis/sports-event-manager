@@ -67,19 +67,14 @@ export default async function EventInfoPage({ params }: Props) {
   if (!tenant) notFound()
 
   // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): reads moved behind
-  // get_event_info_cached (migration 0049). Must be the service-role
+  // get_event_info_cached (migration 0051). Must be the service-role
   // client — unstable_cache can't reach cookies(), and this is only safe
   // because the RPC is SECURITY DEFINER owned by cache_rpc_reader
   // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
   const getEventInfoCached = unstable_cache(
     async (tenantId: string) => {
       const service = createSupabaseServiceClient()
-      // TODO(PERF-06 Phase 2): temporary `any` cast — get_event_info_cached
-      // (migration 0049) isn't in src/types/database.ts yet because that's
-      // generated from dev's schema and this migration hasn't been pushed
-      // there. Remove the cast once db:types is regenerated post-push.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (service.rpc as any)('get_event_info_cached', {
+      const { data, error } = await service.rpc('get_event_info_cached', {
         p_tenant_id: tenantId,
       })
       if (error) throw error

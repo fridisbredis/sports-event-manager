@@ -31,7 +31,7 @@ export async function DELETE(
   // PERF-06 / F-PERF-04 Phase 1: remove_official below nulls out user_id
   // (see step 2 in the comment further down) — captured here, before the
   // call, since it's the only chance to know which HOME-01 cache tag
-  // (migration 0048) needs invalidating. Null means this official had no
+  // (migration 0050) needs invalidating. Null means this official had no
   // user_id yet (never invited to a confirmed state), so there is nothing
   // to invalidate.
   const { data: officialBeforeRemoval } = await supabase

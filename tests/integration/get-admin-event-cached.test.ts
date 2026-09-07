@@ -4,7 +4,7 @@ import type { Database } from '@/types/database'
 import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInAsClient } from './helpers'
 
 // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): get_admin_event_cached (migration
-// 0050), second of the three Group 1 tenant-only caching RPCs. Same
+// 0052), second of the three Group 1 tenant-only caching RPCs. Same
 // construction and same reasoning for the cross-tenant assertions as
 // get-event-info-cached.test.ts — see that file's header for why "tenant B's
 // rows are absent" is the check that actually exercises ownership, not just
@@ -18,7 +18,7 @@ import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInA
 
 function callRpc(client: SupabaseClient<Database>, tenantId: string) {
   // TODO(PERF-06 Phase 2): temporary `any` cast — get_admin_event_cached
-  // (migration 0050) isn't in src/types/database.ts yet because that's
+  // (migration 0052) isn't in src/types/database.ts yet because that's
   // generated from dev's schema and this migration hasn't been pushed there.
   // Remove the cast once db:types is regenerated post-push (same convention
   // as admin/event/page.tsx's own cast).

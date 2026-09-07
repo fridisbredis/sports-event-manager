@@ -117,7 +117,7 @@ export default async function OfficialHomePage({ params }: Props) {
   if (!tenant) notFound()
 
   // PERF-06 / F-PERF-04 Phase 1 (ADR-0003): officials read moved behind
-  // get_official_home_cached (migration 0048) instead of a direct
+  // get_official_home_cached (migration 0050) instead of a direct
   // .from('officials') call. Must be the service-role client — the anon
   // client can't reach this RPC (grant excludes it, see the migration), and
   // the session-cookie client can't run inside unstable_cache at all (no

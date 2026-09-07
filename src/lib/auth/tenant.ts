@@ -110,7 +110,7 @@ export async function confirmOfficialInvite(
 
   // PERF-06 / F-PERF-04 Phase 1: same reasoning as the token-flow confirm
   // route — this just flipped invite_status to 'confirmed', so HOME-01's
-  // cached read (migration 0048) must not keep serving the stale pre-confirm
+  // cached read (migration 0050) must not keep serving the stale pre-confirm
   // shape. { expire: 0 }, not profile="max": this is the post-login redirect
   // path straight to /home, same immediacy requirement as the confirm route.
   revalidateTag(officialHomeCacheTag(tenantId, userId), { expire: 0 })

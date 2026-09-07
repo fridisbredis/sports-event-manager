@@ -58,7 +58,7 @@ function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi
 }
 
 // PERF-06 / F-PERF-04 Phase 1: the officials read moved off the session
-// client onto get_official_home_cached (migration 0048) via the
+// client onto get_official_home_cached (migration 0050) via the
 // service-role client — see the page's own comment for why.
 function mockOfficialHomeRpc(result: { data: unknown; error: unknown }) {
   const rpc = vi.fn().mockResolvedValue(result)

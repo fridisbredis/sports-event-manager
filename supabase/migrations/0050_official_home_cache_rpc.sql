@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 0048: get_official_home_cached RPC (PERF-06 / F-PERF-04, Phase 1)
+-- Migration 0050: get_official_home_cached RPC (PERF-06 / F-PERF-04, Phase 1)
 -- ============================================================================
 --
 -- Phase 1 pilot of the ADR-0003 caching design (docs/adr/0003-caching-
@@ -16,7 +16,7 @@
 -- cookies()), so it has to call this RPC through the service-role client —
 -- and service_role has rolbypassrls = true in this Supabase setup, so a
 -- plain RPC would skip RLS entirely. This RPC is SECURITY DEFINER, owned by
--- cache_rpc_reader (migration 0047, rolbypassrls = false, empirically
+-- cache_rpc_reader (migration 0049, rolbypassrls = false, empirically
 -- verified against this exact leak in the ADR's local-stack testing), so RLS
 -- is evaluated against that low-privilege owner regardless of which client
 -- calls it.
@@ -52,7 +52,7 @@
 --             drop policy if exists "cache_rpc_reader_read_own_officials" on public.officials;
 --             alter table public.officials no force row level security;
 --             (leaves cache_rpc_reader itself, and its membership grant to
---             postgres, in place — 0047 owns the role's own rollback, and
+--             postgres, in place — 0049 owns the role's own rollback, and
 --             the membership grant is inert with no function left owned by
 --             cache_rpc_reader to act through)
 --   Data:     No data loss — read-only function, no table contents change.

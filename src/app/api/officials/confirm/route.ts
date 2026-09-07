@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   // PERF-06 / F-PERF-04 Phase 1: this confirm just flipped invite_status to
   // 'confirmed' and set officials.name — HOME-01's cached read (migration
-  // 0048) would otherwise keep serving the stale pre-confirm shape (no name,
+  // 0050) would otherwise keep serving the stale pre-confirm shape (no name,
   // treated as not-yet-confirmed) for up to the 60s revalidate window.
   // { expire: 0 } (immediate), not the docs' recommended profile="max": this
   // route redirects straight to /home right after, and "max" would still

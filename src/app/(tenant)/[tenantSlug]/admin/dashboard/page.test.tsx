@@ -89,7 +89,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 
 // PERF-06 / F-PERF-04 Phase 3: the event read, both officials head-counts,
 // the race-stage count, and the scheduling-warning counts all moved onto
-// get_admin_dashboard_cached (migration 0052) via the service-role client —
+// get_admin_dashboard_cached (migration 0054) via the service-role client —
 // see the page's own comment for why.
 function mockDashboardRpc(result: { data: unknown; error: unknown }) {
   const rpc = vi.fn().mockResolvedValue(result)

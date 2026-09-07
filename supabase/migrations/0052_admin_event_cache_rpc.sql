@@ -1,38 +1,38 @@
 -- ============================================================================
--- Migration 0050: get_admin_event_cached RPC (PERF-06 / F-PERF-04, Phase 2)
+-- Migration 0052: get_admin_event_cached RPC (PERF-06 / F-PERF-04, Phase 2)
 -- ============================================================================
 --
 -- Sibling migrations, all in this one PR. If these prefixes shift on
 -- rebase, the cross-references below shift with them -- update this key
 -- and they all resolve again:
---   0049 event-info  |  0050 admin/event  |  0051 admin/workstations
+--   0051 event-info  |  0052 admin/event  |  0053 admin/workstations
 --
 -- Second of the three Group 1 (tenant-scoped) caching RPCs from ADR-0003.
 -- Backs EVT-01 (src/app/(tenant)/[tenantSlug]/admin/event/page.tsx), which
 -- today issues one `events` read followed by three parallel child reads
 -- (`event_stages`, `event_distances`, `event_facilities`).
 --
--- Construction is identical to 0049 — SECURITY DEFINER owned by
--- cache_rpc_reader (0047, rolbypassrls = false), search_path = '',
--- transaction-local GUC, grants excluding anon/authenticated. See 0049's
+-- Construction is identical to 0051 — SECURITY DEFINER owned by
+-- cache_rpc_reader (0049, rolbypassrls = false), search_path = '',
+-- transaction-local GUC, grants excluding anon/authenticated. See 0051's
 -- header for the full reasoning; it is not repeated here.
 --
 -- ONLY ONE NEW TABLE. `events`, `event_stages` and `event_facilities`
 -- already have their cache_rpc_reader policy, their SELECT grant and their
--- FORCE ROW LEVEL SECURITY flag from 0049 — this migration adds those three
+-- FORCE ROW LEVEL SECURITY flag from 0051 — this migration adds those three
 -- things for `event_distances` only, and reuses the rest. Migrations are
--- strictly ordered, so 0049's objects are in place by the time this runs.
+-- strictly ordered, so 0051's objects are in place by the time this runs.
 -- Do not re-issue them here: a second `create policy` with the same name on
 -- the same table would fail, and the `drop policy if exists` needed to make
--- it re-runnable would briefly remove a policy 0049 owns.
+-- it re-runnable would briefly remove a policy 0051 owns.
 --
--- WIDER COLUMN LISTS THAN 0049, DELIBERATELY. This page is the editor, not
+-- WIDER COLUMN LISTS THAN 0051, DELIBERATELY. This page is the editor, not
 -- the read-only official view, so it reads more of each row than
 -- `get_event_info_cached` does:
 --   events        + id, location, scheduling_granularity_min
 --   event_stages  + race_type
---   event_distances (0049 does not read this table at all)
---   event_facilities  label, position only — no id, unlike 0049
+--   event_distances (0051 does not read this table at all)
+--   event_facilities  label, position only — no id, unlike 0051
 -- The two RPCs therefore return different shapes for the same tables. That
 -- is the ADR's "cost is paid once per data shape, not once per call site"
 -- working as intended, not duplication to be collapsed. A
@@ -43,17 +43,17 @@
 -- because the session-cookie client's RLS scopes by tenant. Inside this RPC
 -- the cache_rpc_reader policy is the only thing that would scope them, so
 -- every child query below filters on BOTH `event_id` and `tenant_id`. Same
--- defense-in-depth stance as 0049: the WHERE clause is not the security
+-- defense-in-depth stance as 0051: the WHERE clause is not the security
 -- boundary, but it is what survives a mis-edited policy.
 --
--- Empirically verified against the local stack for 0049's equivalent
+-- Empirically verified against the local stack for 0051's equivalent
 -- policies, and the check applies unchanged here: with the GUC set and NO
 -- WHERE clause at all, cache_rpc_reader sees exactly one tenant's rows; with
 -- the GUC unset it sees zero. The policy is load-bearing, not decorative.
 --
--- Same deterministic-event-pick deviation as 0049: the page uses
+-- Same deterministic-event-pick deviation as 0051: the page uses
 -- `.maybeSingle()` (which errors on more than one row); this RPC uses
--- `order by created_at asc limit 1`. See 0049's header for why a
+-- `order by created_at asc limit 1`. See 0051's header for why a
 -- deterministic pick is required once the result is cached.
 --
 -- The page calls `notFound()` when the `events` read returns nothing, so
@@ -66,8 +66,8 @@
 --             revoke select on public.event_distances from cache_rpc_reader;
 --             alter table public.event_distances no force row level security;
 --             (Do NOT roll back the events / event_stages / event_facilities
---             policies or grants — 0049 owns those, and 0049's own RPC and
---             0051 still depend on them.)
+--             policies or grants — 0051 owns those, and 0051's own RPC and
+--             0053 still depend on them.)
 --   Data:     No data loss — read-only function, no table contents change.
 --   Blast:    None until the app code in this same PR switches
 --             admin/event/page.tsx to call this RPC. The existing
@@ -89,7 +89,7 @@
 -- The only table this migration adds. Has its own `tenant_id`, so the
 -- predicate is a direct GUC compare — NOT migration 0004's
 -- `get_user_role(tenant_id)` style, which returns NULL for a NOLOGIN role
--- with no user_roles row and would deny every row (see 0049's header).
+-- with no user_roles row and would deny every row (see 0051's header).
 drop policy if exists "cache_rpc_reader_read_event_distances" on public.event_distances;
 create policy "cache_rpc_reader_read_event_distances"
   on public.event_distances for select

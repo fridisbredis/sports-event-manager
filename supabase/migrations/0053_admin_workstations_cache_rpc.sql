@@ -1,26 +1,26 @@
 -- ============================================================================
--- Migration 0051: get_admin_workstations_cached RPC (PERF-06 / F-PERF-04,
+-- Migration 0053: get_admin_workstations_cached RPC (PERF-06 / F-PERF-04,
 --                 Phase 2)
 -- ============================================================================
 --
 -- Sibling migrations, all in this one PR. If these prefixes shift on
 -- rebase, the cross-references below shift with them -- update this key
 -- and they all resolve again:
---   0049 event-info  |  0050 admin/event  |  0051 admin/workstations
+--   0051 event-info  |  0052 admin/event  |  0053 admin/workstations
 --
 -- Third and last of the Group 1 (tenant-scoped) caching RPCs from ADR-0003.
 -- Backs WS-01 (src/app/(tenant)/[tenantSlug]/admin/workstations/page.tsx),
 -- which today reads `events` (for the id), `event_stages`, and `workstations`
 -- with `workstation_operating_windows` embedded via PostgREST.
 --
--- Construction is identical to 0049 and 0050 — SECURITY DEFINER owned by
--- cache_rpc_reader (0047, rolbypassrls = false), search_path = '',
--- transaction-local GUC, grants excluding anon/authenticated. See 0049's
+-- Construction is identical to 0051 and 0052 — SECURITY DEFINER owned by
+-- cache_rpc_reader (0049, rolbypassrls = false), search_path = '',
+-- transaction-local GUC, grants excluding anon/authenticated. See 0051's
 -- header for the full reasoning; it is not repeated here.
 --
 -- TWO NEW TABLES: `workstations` and `workstation_operating_windows`.
 -- `events` and `event_stages` already have their policy, grant and
--- FORCE ROW LEVEL SECURITY from 0049 and are not re-issued here.
+-- FORCE ROW LEVEL SECURITY from 0051 and are not re-issued here.
 --
 -- ============================================================================
 -- THE ONE POLICY IN THIS PHASE THAT IS NOT A DIRECT GUC COMPARE
@@ -70,7 +70,7 @@
 -- start_time, end_time` — no `venue`, no `position`, no `race_type` — while
 -- ordering by `position`, which it does not select. So all three Group 1 RPCs
 -- return a different `event_stages` shape. Intentional, per the ADR; see
--- 0050's header.
+-- 0052's header.
 --
 -- DETERMINISTIC ORDERING ADDED for the nested windows. The PostgREST embed
 -- specifies no order for the nested array, so its order is unspecified today.
@@ -78,14 +78,14 @@
 -- an arbitrary arrangement into a cache entry for the whole revalidate window
 -- and could differ between two identical requests. `order by o.window_start`
 -- is therefore a deliberate addition, not a transcription. Same reasoning as
--- the `order by created_at asc limit 1` event pick in 0049.
+-- the `order by created_at asc limit 1` event pick in 0051.
 --
 -- CHILD FILTERS: unlike admin/event, this page already filters both child
 -- reads by `tenant_id` as well as `event_id`,
 -- so the RPC's WHERE clauses match the page exactly here rather than
 -- tightening it.
 --
--- Same deterministic-event-pick deviation as 0049 and 0050: the page uses
+-- Same deterministic-event-pick deviation as 0051 and 0052: the page uses
 -- `.maybeSingle()` (which errors on more than one row); this RPC uses
 -- `order by created_at asc limit 1`.
 --
@@ -100,7 +100,7 @@
 --             alter table public.workstations no force row level security;
 --             (Drop the operating-windows policy BEFORE the workstations one
 --             — the former's EXISTS reads the latter's table. Do NOT roll
---             back the events / event_stages policies or grants: 0049 owns
+--             back the events / event_stages policies or grants: 0051 owns
 --             those and its own RPC still depends on them.)
 --   Data:     No data loss — read-only function, no table contents change.
 --   Blast:    None until the app code in this same PR switches
@@ -119,7 +119,7 @@
 -- ============================================================================
 
 -- ---- workstations ----
--- Has its own `tenant_id`, so a direct GUC compare, same as 0049's three.
+-- Has its own `tenant_id`, so a direct GUC compare, same as 0051's three.
 drop policy if exists "cache_rpc_reader_read_workstations" on public.workstations;
 create policy "cache_rpc_reader_read_workstations"
   on public.workstations for select

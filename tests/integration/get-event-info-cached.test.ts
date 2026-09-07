@@ -4,10 +4,10 @@ import type { Database } from '@/types/database'
 import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInAsClient } from './helpers'
 
 // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): get_event_info_cached (migration
-// 0049) is the first of the three Group 1 tenant-only caching RPCs. Same
-// fail-closed construction as the Phase 1 pilot (0048, see
+// 0051) is the first of the three Group 1 tenant-only caching RPCs. Same
+// fail-closed construction as the Phase 1 pilot (0050, see
 // get-official-home-cached.test.ts) — a SECURITY DEFINER RPC owned by
-// cache_rpc_reader (NOBYPASSRLS, migration 0047), called only via the
+// cache_rpc_reader (NOBYPASSRLS, migration 0049), called only via the
 // service-role client from inside unstable_cache.
 //
 // The cross-tenant assertions below are the substantive "does ownership
@@ -23,7 +23,7 @@ import { serviceClient, createTenant, createUserWithRole, cleanupTenant, signInA
 
 function callRpc(client: SupabaseClient<Database>, tenantId: string) {
   // TODO(PERF-06 Phase 2): temporary `any` cast — get_event_info_cached
-  // (migration 0049) isn't in src/types/database.ts yet because that's
+  // (migration 0051) isn't in src/types/database.ts yet because that's
   // generated from dev's schema and this migration hasn't been pushed there.
   // Remove the cast once db:types is regenerated post-push (same convention
   // as event-info/page.tsx's own cast).
