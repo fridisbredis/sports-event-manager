@@ -69,7 +69,14 @@ describe('confirm_official_invite RPC (migration 0047 role_granted fix)', () => 
     const { userId } = await createUserWithRole(tenant.id, 'participant')
     createdUserIds.push(userId)
 
-    const { data, error } = await confirmByToken(admin, token, userId, phone, 'Confirmed Name', true)
+    const { data, error } = await confirmByToken(
+      admin,
+      token,
+      userId,
+      phone,
+      'Confirmed Name',
+      true
+    )
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
     expect(result.role_granted).toBe(true)
@@ -93,7 +100,14 @@ describe('confirm_official_invite RPC (migration 0047 role_granted fix)', () => 
     const { userId } = await createUserWithRole(tenant.id, 'official')
     createdUserIds.push(userId)
 
-    const { data, error } = await confirmByToken(admin, token, userId, phone, 'Confirmed Name', true)
+    const { data, error } = await confirmByToken(
+      admin,
+      token,
+      userId,
+      phone,
+      'Confirmed Name',
+      true
+    )
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
     expect(result.role_granted).toBe(false)
