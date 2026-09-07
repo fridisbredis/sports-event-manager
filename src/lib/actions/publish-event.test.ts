@@ -3,7 +3,7 @@ import { publishEvent } from './publish-event'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -21,6 +21,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
+  updateTag: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -97,6 +98,7 @@ describe('publishEvent', () => {
     expect(result).toEqual({})
     expect(fromMock).toHaveBeenCalledTimes(1)
     expect(revalidatePath).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
   })
 
   it('returns an error when the event name is empty or only whitespace', async () => {
@@ -156,6 +158,9 @@ describe('publishEvent', () => {
     expect(updateBuilder.eq).toHaveBeenCalledWith('id', EVENT_ID)
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/dashboard')
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-event`)
+    expect(updateTag).not.toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
   })
 
   it('returns the db error message and skips revalidation when the update fails', async () => {
@@ -174,5 +179,6 @@ describe('publishEvent', () => {
 
     expect(result).toEqual({ error: 'db is down' })
     expect(revalidatePath).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
   })
 })

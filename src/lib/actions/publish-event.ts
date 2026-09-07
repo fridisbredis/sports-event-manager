@@ -1,11 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { eventInfoCacheTag, adminEventCacheTag } from '@/lib/cache/tags'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -70,6 +71,13 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
 
   revalidatePath(`/${input.tenantSlug}/admin/event`)
   revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
+
+  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): publishing only changes
+  // events.status, which event-info and admin/event both read (workstations
+  // doesn't read status, so no tag for it here). updateTag (not
+  // revalidateTag) so the admin who just published sees it immediately.
+  updateTag(eventInfoCacheTag(parsedTenantId.data))
+  updateTag(adminEventCacheTag(parsedTenantId.data))
 
   return {}
 }

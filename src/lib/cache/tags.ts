@@ -6,3 +6,15 @@
 export function officialHomeCacheTag(tenantId: string, userId: string): string {
   return `tenant-${tenantId}-official-${userId}-home`
 }
+
+export function eventInfoCacheTag(tenantId: string): string {
+  return `tenant-${tenantId}-event-info`
+}
+
+export function adminEventCacheTag(tenantId: string): string {
+  return `tenant-${tenantId}-admin-event`
+}
+
+export function workstationsCacheTag(tenantId: string): string {
+  return `tenant-${tenantId}-admin-workstations`
+}

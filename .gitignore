@@ -36,6 +36,8 @@ next-env.d.ts
 
 # supabase
 supabase/.temp/
+# Studio SQL-editor autosaves — per-developer scratch, not source
+supabase/snippets/
 DEVELOPMENT.md
 
 # Personal Claude context — not committed

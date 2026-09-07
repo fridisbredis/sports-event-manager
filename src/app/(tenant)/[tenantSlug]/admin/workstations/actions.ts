@@ -1,11 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { workstationsCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
 
 const tenantIdSchema = z.string().uuid()
@@ -88,6 +89,9 @@ export async function createWorkstation(
   if (rpcError) return { error: rpcError.message }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
+  // updateTag (not revalidateTag) so the admin who just created this
+  // workstation sees it immediately on next render.
+  updateTag(workstationsCacheTag(parsedTenantId.data))
 
   return {}
 }
@@ -186,6 +190,9 @@ export async function updateWorkstation(
   }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
+  // updateTag (not revalidateTag) so the admin who just updated this
+  // workstation sees the change immediately on next render.
+  updateTag(workstationsCacheTag(parsedTenantId.data))
 
   return {}
 }
@@ -228,6 +235,9 @@ export async function deleteWorkstation(
   if (error) return { error: error.message }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
+  // updateTag (not revalidateTag) so the admin who just deleted this
+  // workstation sees it gone immediately on next render.
+  updateTag(workstationsCacheTag(parsedTenantId.data))
 
   return {}
 }
