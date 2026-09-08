@@ -85,6 +85,17 @@ Go through in this order — security and data integrity before style.
       too. A collision is practically impossible under the timestamp scheme;
       the job existing is belt-and-braces, not a manual step for reviewers
       to redo.
+- [ ] **Ordering with any still-open sequential (`00NN`) migration PR:**
+      every `YYYYMMDDHHMMSS` prefix sorts above every `00NN` prefix, and
+      `supabase db push` runs without `--include-all` in both deploy
+      workflows. A `00NN` migration merged *after* the first timestamped one
+      lands below that environment's ledger ceiling and is silently skipped
+      by `db push` — not a merge-order annoyance you can retry past, but a
+      permanently stranded file. Before merging the first timestamped
+      migration, confirm every `00NN` migration PR still pending review is
+      either merged first or explicitly abandoned. With two people merging
+      in parallel this needs an active check at review time, not an
+      assumption.
 - [ ] No `RENAME COLUMN` or CHECK tightening that old code could violate
 
 ### 2.3 Types and data model
