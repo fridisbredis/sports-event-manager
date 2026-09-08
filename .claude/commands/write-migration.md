@@ -5,7 +5,7 @@ Context:
 Context:
 
 - PostgreSQL via Supabase
-- Migrations in supabase/migrations/ — numbered NNNN_description.sql (next: 0033)
+- Migrations in supabase/migrations/ — existing files use sequential NNNN_description.sql (legacy, never renumbered); new migrations use the Supabase CLI's YYYYMMDDHHMMSS_description.sql timestamp format (run `supabase migration new <name>` to generate the filename, don't hand-pick a number). Before merging a new timestamped migration, confirm no other open PR still carries an unmerged NNNN file — see .claude/CLAUDE.md "Migration naming" for why mixing the two after a timestamped migration has been pushed strands the older one.
 - Existing production database — do NOT recreate schema, use ALTER TABLE
 - RLS enabled on all tables
 - Both dev (lhflutwvwvzawzbcuwup) and prod must receive the migration
@@ -48,7 +48,9 @@ destructive — drop or rename a column, tighten a CHECK, backfill or
               UPDATE existing rows. Data MUST name where the original
               lives (PITR window, export file) or say "not recoverable".
 replace     — changed RPC / RLS policy / trigger. Rollback is "restore the
-              definition from migration 00MM", naming the file.
+              definition from migration <version>", naming the file (the
+              version is whatever prefix that file actually has — 00NN or
+              a timestamp).
 ```
 
 - Never leave a placeholder or a guess in these lines — an unfilled Data line
@@ -90,4 +92,6 @@ Output:
 - SQL only, starting with the comment header described above
 - No prose outside the SQL comment header
 - No markdown fences
-- Suggested filename: 0033\_<short_description>.sql
+- Suggested filename: run `supabase migration new <short_description>` to get
+  the correct YYYYMMDDHHMMSS\_<short_description>.sql name — don't hand-pick
+  a sequential number
