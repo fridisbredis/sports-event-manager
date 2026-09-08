@@ -309,14 +309,15 @@ jobs:
           # supabase db push matches migrations by their numeric prefix, not
           # filename. Two files sharing a prefix silently skip one as
           # "up to date" instead of erroring — this is what actually caused
-          # F-REL-09 (see .claude/CLAUDE.md "db push matchar på nummer").
+          # F-REL-09 (see .claude/CLAUDE.md "Migration naming").
           #
-          # Migrations 0059+ use the Supabase CLI's YYYYMMDDHHMMSS timestamp
-          # format instead of sequential 00NN numbers (see .claude/CLAUDE.md
-          # "Migration naming"), which in practice can't collide. This check
-          # stays anyway: the regex below matches both formats (any leading
-          # digit run), so it still catches an accidental reused 00NN prefix
-          # among the 58 legacy files, which are never renamed.
+          # Migrations written after 2026-09-08 use the Supabase CLI's
+          # YYYYMMDDHHMMSS timestamp format instead of sequential 00NN
+          # numbers (see .claude/CLAUDE.md "Migration naming"), which in
+          # practice can't collide. This check stays anyway: the regex below
+          # matches both formats (any leading digit run), so it still catches
+          # an accidental reused 00NN prefix among the 58 legacy files, which
+          # are never renamed.
           cd supabase/migrations
 
           duplicates=$(ls -1 *.sql \
