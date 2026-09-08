@@ -35,7 +35,7 @@ vi.mock('./_components/schedule-view', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'not', 'order', 'limit']) {
+  for (const method of ['select', 'eq', 'not', 'order', 'limit', 'range']) {
     builder[method] = vi.fn(() => builder)
   }
   builder.single = vi.fn(() => Promise.resolve(result))
