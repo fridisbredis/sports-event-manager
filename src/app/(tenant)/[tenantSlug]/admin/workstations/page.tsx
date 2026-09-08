@@ -1,16 +1,35 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
+import { workstationsCacheTag } from '@/lib/cache/tags'
 import WorkstationsList from './_components/workstations-list'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
+interface AdminWorkstationsCached {
+  event: { id: string } | null
+  stages: Array<{
+    id: string
+    name: string
+    stage_type: string
+    start_time: string | null
+    end_time: string | null
+  }>
+  workstations: Array<{
+    id: string
+    name: string
+    capacity_ceiling: number
+    stage_id: string | null
+    workstation_operating_windows: Array<{ window_start: string; window_end: string }>
+  }>
+}
+
 export default async function WorkstationsPage({ params }: Props) {
   const { tenantSlug } = await params
 
-  const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
 
   if (!user) redirect('/login')
@@ -23,40 +42,37 @@ export default async function WorkstationsPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('id')
-    .eq('tenant_id', tenant.id)
-    .maybeSingle()
+  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): reads moved behind
+  // get_admin_workstations_cached (migration 0053). Must be the
+  // service-role client — unstable_cache can't reach cookies(), and this
+  // is only safe because the RPC is SECURITY DEFINER owned by
+  // cache_rpc_reader (NOBYPASSRLS), so service_role's own BYPASSRLS never
+  // applies inside it.
+  const getAdminWorkstationsCached = unstable_cache(
+    async (tenantId: string) => {
+      const service = createSupabaseServiceClient()
+      const { data, error } = await service.rpc('get_admin_workstations_cached', {
+        p_tenant_id: tenantId,
+      })
+      if (error) throw error
+      return data as unknown as AdminWorkstationsCached
+    },
+    ['admin-workstations'], // cache namespace, data-shape only — tenant
+    // scoping comes entirely from the tenantId closure argument reaching
+    // both the RPC call above and the tags array below
+    {
+      tags: [workstationsCacheTag(tenant.id)],
+      revalidate: 60,
+    }
+  )
+
+  const { event, stages, workstations } = await getAdminWorkstationsCached(tenant.id)
 
   if (!event) notFound()
 
-  const { data: stages, error: stagesError } = await supabase
-    .from('event_stages')
-    .select('id, name, stage_type, start_time, end_time')
-    .eq('event_id', event.id)
-    .eq('tenant_id', tenant.id)
-    .order('position', { ascending: true })
-
-  const { data: workstations, error: workstationsError } = await supabase
-    .from('workstations')
-    .select(
-      'id, name, capacity_ceiling, stage_id, workstation_operating_windows(window_start, window_end)'
-    )
-    .eq('event_id', event.id)
-    .eq('tenant_id', tenant.id)
-    .order('created_at', { ascending: true })
-
-  const queryError = stagesError ?? workstationsError
-  if (queryError) throw queryError
-
   return (
     <div className="px-8 py-8">
-      <WorkstationsList
-        tenantSlug={tenantSlug}
-        stages={stages ?? []}
-        workstations={workstations ?? []}
-      />
+      <WorkstationsList tenantSlug={tenantSlug} stages={stages} workstations={workstations} />
     </div>
   )
 }

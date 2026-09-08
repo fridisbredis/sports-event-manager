@@ -1,10 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import EventInfoPage from './page'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(),
+  createSupabaseServiceClient: vi.fn(),
+}))
+
+// PERF-06 / F-PERF-04 Phase 2: unstable_cache would otherwise need a real
+// Next.js request/cache context (same "static generation store missing"
+// problem revalidateTag hits in these unit tests) — mocked as a passthrough
+// so the wrapped function runs directly and these tests exercise it without
+// caching or its context requirements getting in the way.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }))
 
 // getOfficialTenant resolves the tenant only after the official-surface
@@ -28,24 +37,11 @@ vi.mock('@/lib/i18n/server', () => ({
   getServerTranslation: vi.fn().mockResolvedValue((key: string) => key),
 }))
 
-function chain(result: unknown) {
-  const builder: Record<string, unknown> = {}
-  builder.select = vi.fn(() => builder)
-  builder.eq = vi.fn(() => builder)
-  builder.order = vi.fn(() => builder)
-  builder.single = vi.fn(() => Promise.resolve(result))
-  builder.maybeSingle = vi.fn(() => Promise.resolve(result))
-  builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-    Promise.resolve(result).then(resolve, reject)
-  return builder
-}
-
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
-function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
+function mockUser(userId: string | null) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 }
 
 function mockResolvedTenant() {
@@ -58,18 +54,25 @@ function mockResolvedTenant() {
   })
 }
 
+// PERF-06 / F-PERF-04 Phase 2: the event/stages/facilities reads moved off
+// the session client onto get_event_info_cached (migration 0051) via the
+// service-role client — see the page's own comment for why.
+function mockEventInfoRpc(result: { data: unknown; error: unknown }) {
+  const rpc = vi.fn().mockResolvedValue(result)
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc } as never)
+  return rpc
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 describe('EventInfoPage', () => {
   it('redirects to /login when there is no authenticated user', async () => {
-    const fromMock = vi.fn()
-    mockUser(null, fromMock)
+    mockUser(null)
 
     await expect(EventInfoPage({ params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
     expect(getOfficialTenant).not.toHaveBeenCalled()
-    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('calls notFound when getOfficialTenant denies access or the tenant is missing', async () => {
@@ -80,34 +83,40 @@ describe('EventInfoPage', () => {
     expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('scopes events, event_stages, and event_facilities queries by tenant_id', async () => {
+  it('reads event, stages, and facilities via the cached RPC scoped by tenant_id', async () => {
     mockResolvedTenant()
-    const eventBuilder = chain({ data: { name: 'Viadal 2026' } })
-    const stagesBuilder = chain({ data: [] })
-    const facilitiesBuilder = chain({ data: [] })
-    const fromMock = vi.fn()
-    fromMock
-      .mockReturnValueOnce(eventBuilder)
-      .mockReturnValueOnce(stagesBuilder)
-      .mockReturnValueOnce(facilitiesBuilder)
-    mockUser('user-1', fromMock)
+    mockUser('user-1')
+    const rpc = mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [],
+        facilities: [],
+      },
+      error: null,
+    })
 
     await EventInfoPage({ params: PARAMS })
 
-    expect(fromMock).toHaveBeenCalledWith('events')
-    expect(eventBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
-    expect(fromMock).toHaveBeenCalledWith('event_stages')
-    expect(stagesBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
-    expect(fromMock).toHaveBeenCalledWith('event_facilities')
-    expect(facilitiesBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(rpc).toHaveBeenCalledWith('get_event_info_cached', {
+      p_tenant_id: TENANT_ID,
+    })
   })
 
   it('renders successfully with empty stages and facilities lists', async () => {
     mockResolvedTenant()
-    mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
+    mockUser('user-1')
+    mockEventInfoRpc({ data: { event: null, stages: [], facilities: [] }, error: null })
 
     const result = await EventInfoPage({ params: PARAMS })
 
     expect(result).toBeTruthy()
+  })
+
+  it('throws when the RPC returns an error', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({ data: null, error: new Error('rpc failed') })
+
+    await expect(EventInfoPage({ params: PARAMS })).rejects.toThrow('rpc failed')
   })
 })

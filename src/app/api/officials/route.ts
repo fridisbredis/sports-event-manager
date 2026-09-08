@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { normalizePhoneToE164, PHONE_COUNTRIES, stripE164Plus, toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { AuditActorRole } from '@/types/app'
 import twilio from 'twilio'
 import { z } from 'zod'
@@ -176,6 +178,14 @@ export async function POST(request: NextRequest) {
     targetId: official.id,
     detail: { phoneLast4: phone.slice(-4) },
   })
+
+  // PERF-06 / F-PERF-04 Phase 3: the row is already committed at this point
+  // (see the comment on the SMS try/catch below) — the dashboard's cached
+  // invited-officials count is stale from here regardless of whether the SMS
+  // send below succeeds. { expire: 0 } (immediate), not the docs' recommended
+  // profile="max": updateTag isn't available — this is a Route Handler, not a
+  // Server Action.
+  revalidateTag(adminDashboardCacheTag(tenantId), { expire: 0 })
 
   const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
 

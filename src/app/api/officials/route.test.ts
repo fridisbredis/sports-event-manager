@@ -6,11 +6,17 @@ import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import { revalidateTag } from 'next/cache'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Database } from '@/types/database'
 import twilio from 'twilio'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
+}))
+
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -495,6 +501,21 @@ describe('POST /api/officials', () => {
       targetId: 'off-1',
       detail: { phoneLast4: '4567' },
     })
+  })
+
+  // PERF-06 / F-PERF-04 Phase 3
+  it('invalidates the dashboard cache tag after the insert succeeds', async () => {
+    asAdmin()
+    mockService(
+      chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+      chain({ data: { name: 'Viadal 2026' } })
+    )
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(revalidateTag).toHaveBeenCalledWith(adminDashboardCacheTag(TENANT_ID), { expire: 0 })
   })
 
   it('does not log an audit event when the insert fails', async () => {

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
 
@@ -54,12 +56,32 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to remove official' }, { status: 500 })
   }
 
-  // Migration 0048: remove_official now returns the revoked official's
-  // user_id, so the audit trail can point at a real target_id instead of
-  // null (SEC-07-rest). Optional key + null-safe access: on a database where
-  // this migration hasn't been applied yet, user_id is absent from the jsonb
-  // response rather than present-and-null.
+  // Migration 0048: remove_official returns the revoked official's user_id,
+  // captured before the UPDATE nulls the officials row's own copy. Single
+  // source for both the audit target below and the HOME-01 cache tag — this
+  // route previously re-read it with its own pre-call select, which 0048
+  // made redundant. Optional key + null-safe access: on a database where
+  // 0048 has not been applied, user_id is absent from the jsonb response
+  // rather than present-and-null.
   const revokedUserId = (data as unknown as { user_id?: string | null } | null)?.user_id ?? null
+
+  if (revokedUserId) {
+    // PERF-06 / F-PERF-04 Phase 1: { expire: 0 }, not profile="max" — a
+    // removed official's cached greeting name (migration 0050) should not
+    // keep showing for up to 60s after removal. Null means they never had a
+    // user_id, so no HOME-01 cache entry exists to invalidate. On a database
+    // predating 0048 this degrades to the 60s revalidate rather than going
+    // stale indefinitely; 0048 is already on main, so that window is closed.
+    revalidateTag(officialHomeCacheTag(parsed.data.tenantId, revokedUserId), {
+      expire: 0,
+    })
+  }
+
+  // PERF-06 / F-PERF-04 Phase 3: unconditional, unlike the tag above —
+  // remove_official (step 1 in the comment above) frees this official's
+  // assignments regardless of whether they ever had a user_id, and the
+  // dashboard's officials counts change either way.
+  revalidateTag(adminDashboardCacheTag(parsed.data.tenantId), { expire: 0 })
 
   await logAuditEvent({
     tenantId: parsed.data.tenantId,
