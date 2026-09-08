@@ -12,8 +12,6 @@
 
 import { execFileSync } from 'node:child_process'
 
-const MIGRATIONS_GLOB = 'supabase/migrations/*.sql'
-
 function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' })
 }
