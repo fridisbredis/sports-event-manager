@@ -252,6 +252,116 @@ kan köras utan att först städa raderna.
 
 ---
 
+## Del 5 — Rehearsal: snapshot och restore (F-REL-20)
+
+Del 1–4 övar på **schemat** — att migrationssviten är sanningskällan och att
+recovery går framåt. De skyddar inte **datan**: en `destructive` migration som
+kör felfritt men mot fel rader (en för bred `UPDATE`, en `DROP COLUMN` på en
+kolumn som inte var färdig-backfillad) förlorar innehåll som ingen forward-fix
+kan ge tillbaka, eftersom en forward-fix bara ändrar schema framåt — inte
+återskapar vad en tidigare sats redan skrivit över. PITR är avstängt av
+kostnadsskäl och Supabase branching utvärderades och avfärdades som ersättning
+(en branch replayar migrationer mot en tom/seedad databas, den håller aldrig
+prods egna rader) — se F-REL-20 för hela resonemanget. Den här övningen
+verifierar att `scripts/ops/snapshot-prod-db.sh` och
+`scripts/ops/restore-prod-db.sh` faktiskt fungerar, **innan** de behövs under
+en incident.
+
+**Kör aldrig detta mot den riktiga prod-databasen.** Övningen tar en snapshot
+av prod (läsning, ofarligt) men återställer alltid till lokal stack eller en
+Supabase-branch — aldrig tillbaka till prod. `restore-prod-db.sh` vägrar
+själv ett mål som innehåller prods projekt-ref (`rauvaxuypujbeintnnoe`), utan
+någon override-flagga.
+
+- [ ] Förutsättningar: Docker igång, `op` inloggad, fältet
+      `db connection string` finns på 1Password-posten
+      `Supabase Sports Event Manager prod` (Session pooler-strängen från
+      prod-projektets Dashboard → Connect — läggs in manuellt, scriptet
+      gissar aldrig på den).
+- [ ] Ta en riktig snapshot av prod: `scripts/ops/snapshot-prod-db.sh 9999`
+      (ett testnummer som inte kolliderar med en riktig migration — se
+      `Migration number collision`-jobbet i `quality.yml` för varför
+      kollisioner är farliga). Notera blob-namnet som skrivs ut på slutet.
+- [ ] Verifiera i Azure att blobben faktiskt landade:
+      `az storage blob list --account-name sportsevtmgrprodsnaps --container-name db-snapshots --output table`
+- [ ] Starta lokal stack: `supabase start` (eller `supabase db reset` om den
+      redan är igång, för en ren baslinje).
+- [ ] Hämta lokal stackens connection string:
+      `supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['DB_URL'])"`
+- [ ] Återställ snapshotten till lokal stack:
+      `scripts/ops/restore-prod-db.sh <blob-namn-från-steg-2> "<lokal-DB_URL>"`
+      — bekräfta med `restore` när scriptet frågar.
+- [ ] Verifiera att datan faktiskt kom med, inte bara att kommandot exit-ade 0:
+      räkna rader i minst en tabell med känt innehåll (t.ex.
+      `select count(*) from tenants;`) och jämför mot vad du vet finns i prod.
+- [ ] Testa guarden: försök köra
+      `scripts/ops/restore-prod-db.sh <blob-namn> "postgresql://x:x@db.rauvaxuypujbeintnnoe.supabase.co:5432/postgres"`
+      och bekräfta att scriptet vägrar direkt, innan någon lösenordsprompt ens
+      visas.
+- [ ] Ta tid på hela kedjan (snapshot → nedladdning → restore → verifiering).
+- [ ] Skriv upp i loggen: vad tog tid, vad saknade dokumentation, och om
+      1Password-fältet redan fanns eller behövde läggas till för första
+      gången.
+
+**Kör igenom hela Del 5 minst en gång från Git Bash på Windows (Eduardo).**
+Båda scripten sätter `MSYS2_ARG_CONV_EXCL="*"` när de upptäcker `MSYSTEM`
+(samma riskklass som F-MNT-18 — Git Bashs MSYS-runtime konverterar
+`/`-inledda argument till Windows-sökvägar innan de når `az`/`op`, som är
+riktiga Windows-binärer). Det skyddet är skrivet men **inte verifierat mot
+en riktig Git Bash-miljö** — bara resonerat fram från samma mönster som
+`set-probes.sh`. Om en nedladdad snapshot eller en restore ser konstig ut på
+Windows: misstänk tyst path-conversion först, jämför mot en körning från WSL2
+eller macOS, innan datan i sig antas vara trasig.
+
+Det som ska komma ut av övningen: att den som faktiskt behöver göra detta
+under en incident inte gör det för första gången då.
+
+### Körning 2026-09-07 — Del 5, första fullständiga genomkörningen
+
+**PASS efter fyra fynd**, alla fixade i scripts/ops/restore-prod-db.sh under
+samma session (macOS, Frida):
+
+1. `roles.sql` mot `ALTER ROLE supabase_admin` — reserverad roll, ingen
+   icke-superuser-anslutning kan ändra den. Fix: roller hoppas över som
+   default (`--include-roles` för den som ändå behöver det, mot en riktig
+   superuser-anslutning).
+2. `schema.sql`s `ADD CONSTRAINT` kolliderade med redan-migrerat
+   `public`-schema (samma fel oavsett om lokal stack precis startats om
+   utan seed). Fix: `DROP SCHEMA public CASCADE` + `CREATE SCHEMA public`
+   före restore.
+3. `data.sql`s `COPY` in i `storage.buckets` kolliderade med `logos`-raden
+   — roten är att **migration 0015 gör en INSERT direkt**, inte bara DDL,
+   så _varje_ miljö som kört migrationssviten redan har raden. Fix:
+   `TRUNCATE storage.buckets CASCADE` riktat mot den enda tabellen, innan
+   restore.
+4. `data.sql`s `COPY` in i `storage.buckets_vectors` gav "permission
+   denied" — även ett superuser-`GRANT` gav tyst "no privileges were
+   granted". Root cause ej vidare utredd (skulle kräva att gräva i
+   Supabases egna platform-migrationer). Bekräftat 0 rader i
+   `buckets_vectors`/`vector_indexes` på prod (ingen vector-search-
+   användning), så COPY-blocken för de två tabellerna stryks ur
+   `data.sql` med `sed` innan restore körs.
+
+Efter fix 1–4: full kedja (snapshot → guard-vägran mot prod-mål → restore
+mot lokal stack → radräkning) **PASS**. Verifierat: `tenants` 5, `events` 5,
+`officials` 25 — matchar prod exakt vid mättillfället.
+
+**Vad som saknade dokumentation:** att `data.sql`/`schema.sql` är byggda
+för att restoreras mot en helt tom databas (Supabases egen guide antar en
+aldrig-körd self-hosted instans), medan det enda praktiskt tillgängliga
+testmålet (lokal stack) alltid redan kört migrationssviten — vilket i sig
+introducerar kollisioner som inte går att undvika genom miljöval allena,
+eftersom minst en av dem (migration 0015) kommer från DML i migrationen
+själv, inte från seed-data.
+
+**Säkerhetsincident under samma session:** ett felsökningskommando läckte
+av misstag ut prods fullständiga DB-connection-string (inklusive lösenord)
+i klartext. Lösenordet roterades direkt via Supabase Dashboard. Efter det:
+allt hemlighetskänsligt output omdirigerades till fil och filtrerades
+innan det visades.
+
+---
+
 ## Logg
 
 Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
