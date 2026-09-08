@@ -7,7 +7,7 @@ import {
   serviceClient,
 } from './helpers'
 
-// SEC-01 (migration 0056): create_workstation (migration 0031) checked that
+// SEC-01 (migration 0059): create_workstation (migration 0031) checked that
 // p_tenant_id matched the caller's own tenant (via RLS on the workstations
 // INSERT) but never checked that p_event_id/p_stage_id actually belonged to
 // that tenant. workstations.event_id/stage_id are plain foreign keys with no
@@ -145,10 +145,10 @@ describe('SEC-01: create_workstation rejects cross-tenant event_id/stage_id', ()
     expect(data).not.toBeNull()
   })
 
-  // Migration 0057: the RPC guard above only covers callers going through
+  // Migration 0060: the RPC guard above only covers callers going through
   // create_workstation. tenant_admin_manage_workstations (0007) is FOR ALL
   // with USING on tenant_id alone and no WITH CHECK, so a direct INSERT that
-  // bypasses the RPC was still exploitable before 0057 added composite FKs
+  // bypasses the RPC was still exploitable before 0060 added composite FKs
   // pinning event_id/stage_id to the same tenant_id. These assert the FK
   // itself rejects the mismatch, independent of the RPC.
   it('rejects a direct INSERT with a foreign event_id (bypassing the RPC)', async () => {
@@ -202,7 +202,7 @@ describe('SEC-01: create_workstation rejects cross-tenant event_id/stage_id', ()
   })
 
   // The three tests above use serviceClient() to isolate the FK from RLS.
-  // This one exercises the actual threat model the 0057 header names: "a
+  // This one exercises the actual threat model the 0060 header names: "a
   // tenant_admin hitting PostgREST directly" — same request shape a browser
   // client would send, going through RLS (which allows it, since
   // tenant_admin_manage_workstations has no WITH CHECK) before the new

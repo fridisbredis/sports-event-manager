@@ -1,10 +1,10 @@
 -- ============================================================================
--- Migration 0057: Composite tenant-consistency FKs on workstations
+-- Migration 0060: Composite tenant-consistency FKs on workstations
 -- ============================================================================
 --
--- SEC-01 follow-up to migration 0056 (PR #145, review by Eduardo).
+-- SEC-01 follow-up to migration 0059 (PR #145, review by Eduardo).
 --
--- 0056 closed the cross-tenant event_id/stage_id gap inside the
+-- 0059 closed the cross-tenant event_id/stage_id gap inside the
 -- create_workstation RPC, but that only covers callers going through the
 -- RPC. tenant_admin_manage_workstations (0007_stage_model.sql) is a FOR ALL
 -- policy with a USING predicate on workstations.tenant_id alone and no
@@ -25,7 +25,7 @@
 -- rejected by Postgres itself, regardless of whether the write came through
 -- the RPC, a direct INSERT, or a direct UPDATE.
 --
--- The 0056 RPC-level check is left in place — cheap belt-and-braces that
+-- The 0059 RPC-level check is left in place — cheap belt-and-braces that
 -- also gives a friendlier error (WSTN1) than a raw FK-violation for the
 -- one path (create_workstation) that already had it.
 --
@@ -54,7 +54,7 @@
 --             ALTER TABLE ... ADD CONSTRAINT (which validates all existing
 --             rows) is expected to succeed without rejecting anything.
 --   Blast:    if reverted, the direct-INSERT/UPDATE path becomes exploitable
---              again (pre-0057 behavior) — not a new failure mode.
+--              again (pre-0060 behavior) — not a new failure mode.
 --   Window:   compatible. No application code reads or writes the new
 --             UNIQUE(id, tenant_id) constraints directly — they exist only
 --             as the composite FK target. Old and new app code both send
@@ -88,11 +88,11 @@ ALTER TABLE workstations
     FOREIGN KEY (stage_id, tenant_id) REFERENCES event_stages(id, tenant_id) ON DELETE CASCADE;
 
 COMMENT ON CONSTRAINT workstations_event_tenant_fkey ON workstations IS
-  'SEC-01 (migration 0057): pins event_id to the same tenant_id as the workstation row, '
-  'closing the direct-INSERT/UPDATE path that the create_workstation RPC guard (0056) cannot reach.';
+  'SEC-01 (migration 0060): pins event_id to the same tenant_id as the workstation row, '
+  'closing the direct-INSERT/UPDATE path that the create_workstation RPC guard (0059) cannot reach.';
 COMMENT ON CONSTRAINT workstations_stage_tenant_fkey ON workstations IS
-  'SEC-01 (migration 0057): pins stage_id to the same tenant_id as the workstation row, '
-  'closing the direct-INSERT/UPDATE path that the create_workstation RPC guard (0056) cannot reach.';
+  'SEC-01 (migration 0060): pins stage_id to the same tenant_id as the workstation row, '
+  'closing the direct-INSERT/UPDATE path that the create_workstation RPC guard (0059) cannot reach.';
 
 -- ============================================================================
 -- DONE

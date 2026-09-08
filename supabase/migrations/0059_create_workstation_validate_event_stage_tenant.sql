@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 0056: create_workstation validates event_id/stage_id tenant match
+-- Migration 0059: create_workstation validates event_id/stage_id tenant match
 -- ============================================================================
 --
 -- SEC-01 follow-up: create_workstation (migration 0031) checks that the
@@ -123,7 +123,7 @@ comment on function public.create_workstation is
   'Atomically creates a workstation with its operating windows and todos in one transaction. '
   'Caller must be authenticated with tenant_admin or system_admin role (enforced by app layer + RLS). '
   'Raises "Invalid workstation payload" (errcode WSTN1) if p_event_id, or a non-null p_stage_id, '
-  'does not belong to p_tenant_id (SEC-01, migration 0056) — the same tenant-consistency guard '
+  'does not belong to p_tenant_id (SEC-01, migration 0059) — the same tenant-consistency guard '
   'save_assignments_batch (migration 0033) already applies to its own foreign-key parameters.';
 
 -- Function signature is unchanged (same args, same default SECURITY
