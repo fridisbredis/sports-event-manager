@@ -32,11 +32,16 @@
 #     `az` credentials, so it works for anyone with 1Password access alone).
 #
 # USAGE:
-#   scripts/ops/snapshot-prod-db.sh <migration-number>
+#   scripts/ops/snapshot-prod-db.sh <migration-version>
 #
 #   e.g. scripts/ops/snapshot-prod-db.sh 0048
+#   e.g. scripts/ops/snapshot-prod-db.sh 20260908143000
 #
-# The migration number is required so the snapshot filename can be referenced
+# <migration-version> is the migration file's own version prefix — a legacy
+# 00NN number or a YYYYMMDDHHMMSS timestamp (see .claude/CLAUDE.md
+# "Migration naming") — passed through verbatim into the snapshot filename.
+#
+# The migration version is required so the snapshot filename can be referenced
 # from that migration's Forward-fix `Data:` line — the connective tissue this
 # script exists to provide.
 #
@@ -70,8 +75,9 @@ fi
 MIGRATION_NUMBER="${1:-}"
 
 if [[ -z "${MIGRATION_NUMBER}" ]]; then
-  echo "Usage: $0 <migration-number>" >&2
+  echo "Usage: $0 <migration-version>" >&2
   echo "  e.g.: $0 0048" >&2
+  echo "  e.g.: $0 20260908143000" >&2
   exit 1
 fi
 
