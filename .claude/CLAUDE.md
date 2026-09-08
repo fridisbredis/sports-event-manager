@@ -252,6 +252,27 @@ announcements
 
 ---
 
+### Migration naming (changed 2026-09-08)
+
+Migrations 0001–0058 use sequential `00NN_description.sql` numbers. **From
+0059 onward, migrations use the Supabase CLI's own timestamp format:
+`YYYYMMDDHHMMSS_description.sql`.** This is a forward-only change — the 58
+existing files keep their `00NN` names permanently and are never renamed.
+
+Renaming an already-applied migration file is not just a style change: the
+CLI matches a file's version prefix against the rows already recorded in
+`supabase_migrations.schema_migrations` on dev and prod. Renaming an
+applied file makes the CLI treat it as a new, unapplied migration and try
+to run it again. Two prior incidents (F-REL-09 schema drift, the `db push`
+number-collision issue below) were exactly this class of mismatch, so the
+old files are left alone rather than "cleaned up."
+
+The reason for the switch: sequential integers collide when two people
+create migrations in parallel (whoever merges second must manually renumber
+— see the routine below). Timestamps don't collide in practice, so
+`supabase migration new <name>` (used as-is, no manual renumbering) is now
+sufficient going forward.
+
 ### How to apply migrations
 
 1. `supabase migration new <descriptive_name>` — creates the file under `supabase/migrations/` with a timestamp prefix
@@ -286,8 +307,11 @@ would ever return.
 
 ```sql
 -- ============================================================================
--- Migration 00NN: <title>
+-- Migration <version>: <title>
 -- ============================================================================
+-- <version> is the file's own prefix: 00NN for 0001–0058 (legacy), or the
+-- full YYYYMMDDHHMMSS timestamp for 0059 onward — copy it verbatim from the
+-- filename, don't invent a sequential number.
 --
 -- <what it does and why — as today>
 --
