@@ -5,7 +5,7 @@ Context:
 Context:
 
 - PostgreSQL via Supabase
-- Migrations in supabase/migrations/ — 0001–0058 use sequential NNNN_description.sql (legacy, never renumbered); 0059 onward uses the Supabase CLI's YYYYMMDDHHMMSS_description.sql timestamp format (run `supabase migration new <name>` to generate the filename, don't hand-pick a number)
+- Migrations in supabase/migrations/ — existing files use sequential NNNN_description.sql (legacy, never renumbered); new migrations use the Supabase CLI's YYYYMMDDHHMMSS_description.sql timestamp format (run `supabase migration new <name>` to generate the filename, don't hand-pick a number). Before merging a new timestamped migration, confirm no other open PR still carries an unmerged NNNN file — see .claude/CLAUDE.md "Migration naming" for why mixing the two after a timestamped migration has been pushed strands the older one.
 - Existing production database — do NOT recreate schema, use ALTER TABLE
 - RLS enabled on all tables
 - Both dev (lhflutwvwvzawzbcuwup) and prod must receive the migration

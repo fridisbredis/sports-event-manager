@@ -254,24 +254,50 @@ announcements
 
 ### Migration naming (changed 2026-09-08)
 
-Migrations 0001–0058 use sequential `00NN_description.sql` numbers. **From
-0059 onward, migrations use the Supabase CLI's own timestamp format:
-`YYYYMMDDHHMMSS_description.sql`.** This is a forward-only change — the 58
-existing files keep their `00NN` names permanently and are never renamed.
+`supabase/migrations/` currently holds 58 files numbered `0001`–`0060`
+(there's a gap — `0056`/`0057` were never used) using sequential
+`00NN_description.sql` names. **Starting with the next migration written
+after this convention lands, migrations use the Supabase CLI's own
+timestamp format instead: `YYYYMMDDHHMMSS_description.sql`.** This is a
+forward-only change — the existing `00NN` files keep their names
+permanently and are never renamed. (Deliberately not naming a specific next
+number here — see the ordering rule below for why picking one in advance
+doesn't work with two people merging in parallel.)
 
 Renaming an already-applied migration file is not just a style change: the
 CLI matches a file's version prefix against the rows already recorded in
 `supabase_migrations.schema_migrations` on dev and prod. Renaming an
 applied file makes the CLI treat it as a new, unapplied migration and try
-to run it again. Two prior incidents (F-REL-09 schema drift, the `db push`
-number-collision issue below) were exactly this class of mismatch, so the
-old files are left alone rather than "cleaned up."
+to run it again. This is the same class of mismatch as the F-REL-09 schema
+drift incident, so the old files are left alone rather than "cleaned up."
 
 The reason for the switch: sequential integers collide when two people
-create migrations in parallel (whoever merges second must manually renumber
-— see the routine below). Timestamps don't collide in practice, so
-`supabase migration new <name>` (used as-is, no manual renumbering) is now
-sufficient going forward.
+create migrations in parallel — whoever merges second has had to manually
+renumber past the other's file. Timestamps at second resolution don't
+collide in practice, so `supabase migration new <name>` (used as-is, no
+manual renumbering) is sufficient going forward.
+
+**Ordering hazard this introduces — read before merging the first
+timestamped migration.** `supabase db push` (invoked without
+`--include-all` in both `deploy-dev.yml` and `deploy-prod.yml`) compares
+each local migration's version string against the highest version already
+recorded in that environment's `schema_migrations` and will not apply one
+that sorts lower. Every `YYYYMMDDHHMMSS` prefix (starts with `2`) sorts
+above every `00NN` prefix (starts with `0`). So: once the first timestamped
+migration has been pushed to an environment, any `00NN` file merged after
+that point is permanently stuck below the ceiling in that environment's
+ledger — not a merge-order annoyance you retry past, since the filename
+comparison never changes. The only ways out at that point are renumbering
+the stranded file to sort above the ceiling (renaming a file not yet
+applied anywhere is fine) or pushing with `--include-all`, which bypasses
+the same ordering protection that exists to prevent F-REL-09-style
+mistakes.
+
+**The rule: land every `00NN` migration already written and merge-pending
+before merging the first timestamped one.** In practice, since we're two
+people, this means checking with each other before merging a
+newly-timestamped migration if there's any open PR still carrying a `00NN`
+file.
 
 ### How to apply migrations
 
@@ -303,15 +329,15 @@ on both dev and prod, and retrofitting plans onto them costs more than it
 would ever return.
 
 **Format** — extends the header convention already used in
-`0026_rate_limit_officials_invite.sql` and `0031_create_workstation_rpc.sql`:
+`0026_rate_limit_officials_invite.sql` and `0031_create_workstation_rpc.sql`.
+`<version>` in the template below is the file's own prefix — `00NN` for a
+legacy file, or the full `YYYYMMDDHHMMSS` for a timestamped one — copied
+verbatim from the filename, never invented or renumbered:
 
 ```sql
 -- ============================================================================
 -- Migration <version>: <title>
 -- ============================================================================
--- <version> is the file's own prefix: 00NN for 0001–0058 (legacy), or the
--- full YYYYMMDDHHMMSS timestamp for 0059 onward — copy it verbatim from the
--- filename, don't invent a sequential number.
 --
 -- <what it does and why — as today>
 --
@@ -331,7 +357,7 @@ would ever return.
 | ------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `additive`    | new table, new nullable/defaulted column, new index, new RPC               | A `drop ... if exists`. Safe by construction, so `Data:` is "no data loss".                                                                                                                                              |
 | `destructive` | drop or rename a column, tighten a CHECK, backfill or UPDATE existing rows | Must name where the original data lives — the PITR window, an export file, or an explicit "not recoverable". Snapshot the affected rows with a `select` **before** pushing, or state outright that the loss is accepted. |
-| `replace`     | changed RPC definition, changed RLS policy, changed trigger                | "Restore the definition from migration 00MM", with the filename. Always cheap, because the `create or replace` / `drop policy if exists` pattern is already the norm here.                                               |
+| `replace`     | changed RPC definition, changed RLS policy, changed trigger                | "Restore the definition from migration `<version>`", with the filename. Always cheap, because the `create or replace` / `drop policy if exists` pattern is already the norm here.                                        |
 
 ### RPC return-shape contracts (mandatory for `replace` on an RPC)
 
