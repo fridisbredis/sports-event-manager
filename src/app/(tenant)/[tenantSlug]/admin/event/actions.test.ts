@@ -43,7 +43,9 @@ function mockClient(
   rpcResults: Partial<Record<'sync_event_stages' | 'sync_event_facilities', unknown>> = {}
 ) {
   const rpcMock = vi.fn((fn: string) =>
-    Promise.resolve(rpcResults[fn as 'sync_event_stages' | 'sync_event_facilities'] ?? { error: null })
+    Promise.resolve(
+      rpcResults[fn as 'sync_event_stages' | 'sync_event_facilities'] ?? { error: null }
+    )
   )
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
