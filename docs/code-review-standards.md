@@ -59,15 +59,16 @@ Go through in this order — security and data integrity before style.
 
 ### 2.2 Migrations
 
-- [ ] **Pending #151 (still open as of this writing):** once merged, new
-      migrations (0059 onward) use the Supabase CLI's native
+- [ ] New migrations use the Supabase CLI's native
       `YYYYMMDDHHMMSS_description.sql` filename, not a hand-picked sequential
-      `00NN` number — this is what eliminates the collision risk when two
-      people create migrations in parallel. Migrations 0001–0055, 0058 are
-      never renamed retroactively (0056/0057 don't exist on `main`; the
-      sequence has a gap there). Until #151 merges, a correctly sequential
-      `0059_*.sql`/`0060_*.sql`/etc. is still the expected format — don't
-      hold a PR to the timestamp convention early.
+      `00NN` number (#151, merged 2026-09-08) — this is what eliminates the
+      collision risk when two people create migrations in parallel. The last
+      sequential migration on `main` is `0060` — the cutover happened
+      mid-sequence, not cleanly at a round number, so don't assume "0059
+      onward" or any other fixed number; check the tail of
+      `supabase/migrations/` for the actual latest file. Migrations
+      0001–0055, 0058–0060 are never renamed retroactively (0056/0057 don't
+      exist on `main`; the sequence has a gap there).
 - [ ] The forward-fix block exists and is filled in (for migrations created
       from 0033 onward — see `.claude/CLAUDE.md`)
 - [ ] If `destructive`: the `Data:` line describes something **verified**,
@@ -80,7 +81,7 @@ Go through in this order — security and data integrity before style.
 - [ ] CI's `migration-number-collision` job (`quality.yml`, PR #74) catches a
       shared numeric prefix under `supabase/migrations/` automatically —
       the prefix-extraction regex matches a 14-digit timestamp exactly as
-      well as a 4-digit number, so this already covers post-#151 filenames
+      well as a 4-digit number, so this already covers timestamped filenames
       too. A collision is practically impossible under the timestamp scheme;
       the job existing is belt-and-braces, not a manual step for reviewers
       to redo.
@@ -166,3 +167,8 @@ Go through in this order — security and data integrity before style.
   covers timestamped filenames); replaced the unresolvable
   `feedback_sv_locale_intentionally_incomplete` citation with an inline,
   verifiable statement of the sv-locale gap
+- 2026-09-08 — #151 merged same day. Updated §2.2 from "pending" to
+  in-force; corrected the naming cutover point — it landed mid-sequence at
+  `0060`, not cleanly at `0059` — and pointed reviewers at the actual tail
+  of `supabase/migrations/` instead of a fixed number that will go stale
+  again
