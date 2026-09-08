@@ -62,6 +62,24 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
+  // Stage model v0.7: a published event must keep at least one Race stage
+  // (mirrors the same check in publishEvent). Checked before any write so a
+  // rejected save never leaves the events row partially updated. Fails
+  // closed: if we can't confirm the event isn't published, we don't proceed.
+  const { data: currentEvent, error: currentEventError } = await supabase
+    .from('events')
+    .select('status')
+    .eq('id', input.eventId)
+    .eq('tenant_id', input.tenantId)
+    .single()
+
+  if (currentEventError) return { error: currentEventError.message }
+
+  const stageRowsHaveRaceStage = input.stages.some((s) => s.name.trim() && s.stage_type === 'race')
+  if (currentEvent.status === 'published' && !stageRowsHaveRaceStage) {
+    return { error: 'Cannot remove the last Race stage from a published event.' }
+  }
+
   // Derive start_date / end_date from Race stage times so the events row stays
   // coherent even though those columns are now nullable.
   const raceStages = input.stages.filter((s) => s.stage_type === 'race' && s.start_time)
