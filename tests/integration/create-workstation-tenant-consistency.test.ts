@@ -200,4 +200,22 @@ describe('SEC-01: create_workstation rejects cross-tenant event_id/stage_id', ()
     expect(error).not.toBeNull()
     expect(error?.message).toMatch(/workstations_stage_tenant_fkey/)
   })
+
+  // The three tests above use serviceClient() to isolate the FK from RLS.
+  // This one exercises the actual threat model the 0057 header names: "a
+  // tenant_admin hitting PostgREST directly" — same request shape a browser
+  // client would send, going through RLS (which allows it, since
+  // tenant_admin_manage_workstations has no WITH CHECK) before the new
+  // composite FK is what actually stops the write.
+  it("rejects tenant_admin A's own direct INSERT with a foreign event_id via RLS-scoped client", async () => {
+    const { error } = await clientAdminA.from('workstations').insert({
+      tenant_id: tenantA.id,
+      event_id: eventB.id,
+      name: 'RLS-client direct-insert cross-tenant event workstation',
+      capacity_ceiling: 3,
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toMatch(/workstations_event_tenant_fkey/)
+  })
 })
