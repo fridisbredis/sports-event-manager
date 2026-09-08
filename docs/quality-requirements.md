@@ -698,9 +698,9 @@ itself.
   `toTwilioE164` fix. **The one genuinely remaining gap was §3's note that
   the 0018 RPC (`confirm_official_invite_by_phone`) had never been
   exercised end-to-end** — closed 2026-09-08 by
-  `tests/integration/confirm-official-invite-by-phone.test.ts` (added by
-  Eduardo in PR #117, 2026-09-03; re-run against a fresh local reset
-  2026-09-08, 11/11 passing), which plants rows in the exact
+  `tests/integration/confirm-official-invite-by-phone.test.ts` (added in
+  PR #120, 2026-09-03; re-run against a fresh local reset 2026-09-08,
+  11/11 passing), which plants rows in the exact
   `invite_status = 'invited'` / `invite_token IS NULL` state the app never
   produces on its own and exercises consent enforcement, the row-lock race,
   the cross-role upsert (0047), the anon/authenticated access-control
