@@ -1,8 +1,14 @@
-# [MNT-03] Code review standards
+# Code review standards
 
 > Status: Draft — checklist/convention for PR review. Doesn't block anything
 > urgent, but is requested as a prerequisite for consistent quality now that
 > two developers (Frida + Eduardo) work in parallel on this codebase.
+>
+> No `MNT-0x` ID is assigned yet — every existing MNT slot in
+> `docs/quality-requirements.md` covers something else, and MNT-03 there is
+> a different, unrelated requirement (test coverage for business rules).
+> Minting a new ID is a call for whoever owns that register, not something
+> this PR should decide unilaterally.
 
 This document describes **how we review PRs here**, not general best
 practices. Where a project decision is already documented in
@@ -53,11 +59,15 @@ Go through in this order — security and data integrity before style.
 
 ### 2.2 Migrations
 
-- [ ] New migrations (0059 onward) use the Supabase CLI's native
+- [ ] **Pending #151 (still open as of this writing):** once merged, new
+      migrations (0059 onward) use the Supabase CLI's native
       `YYYYMMDDHHMMSS_description.sql` filename, not a hand-picked sequential
-      `00NN` number — this is what actually eliminates the collision risk
-      when two people create migrations in parallel (PR #151). Migrations
-      0001–0058 are never renamed retroactively.
+      `00NN` number — this is what eliminates the collision risk when two
+      people create migrations in parallel. Migrations 0001–0055, 0058 are
+      never renamed retroactively (0056/0057 don't exist on `main`; the
+      sequence has a gap there). Until #151 merges, a correctly sequential
+      `0059_*.sql`/`0060_*.sql`/etc. is still the expected format — don't
+      hold a PR to the timestamp convention early.
 - [ ] The forward-fix block exists and is filled in (for migrations created
       from 0033 onward — see `.claude/CLAUDE.md`)
 - [ ] If `destructive`: the `Data:` line describes something **verified**,
@@ -68,9 +78,12 @@ Go through in this order — security and data integrity before style.
       safe in one release" table in CLAUDE.md) — otherwise require an
       expand/contract split
 - [ ] CI's `migration-number-collision` job (`quality.yml`, PR #74) catches a
-      shared numeric prefix under `supabase/migrations/` automatically — this
-      only applies to the legacy `00NN`-numbered files; it's not a substitute
-      for checking new-style timestamped filenames don't shadow one another
+      shared numeric prefix under `supabase/migrations/` automatically —
+      the prefix-extraction regex matches a 14-digit timestamp exactly as
+      well as a 4-digit number, so this already covers post-#151 filenames
+      too. A collision is practically impossible under the timestamp scheme;
+      the job existing is belt-and-braces, not a manual step for reviewers
+      to redo.
 - [ ] No `RENAME COLUMN` or CHECK tightening that old code could violate
 
 ### 2.3 Types and data model
@@ -113,9 +126,14 @@ Go through in this order — security and data integrity before style.
 
 ## 3. What does NOT block a merge
 
-- Missing Swedish (`sv`) i18n keys — the app intentionally defaults to
-  English, this is by design, not a bug (see
-  `feedback_sv_locale_intentionally_incomplete`)
+- Missing Swedish (`sv`) i18n keys — `sv` is a registered, active locale
+  (`src/lib/i18n/config.ts`) but most namespace files under
+  `public/locales/sv/` are incomplete or absent (e.g. `common.json` has 2 of
+  the 7 keys `en` has). The app falls back to English for missing keys, so
+  this is a known, accepted gap rather than a regression — don't block a PR
+  on adding `sv` translations unless the PR is specifically about i18n. No
+  written decision doc exists for this yet; treat this bullet itself as
+  that record until one does.
 - Style nits with no functional consequence — comment, but don't hold up
   the merge for it
 - Missing retroactive "down" migration for 0001–0032 — these are explicitly
@@ -139,4 +157,12 @@ Go through in this order — security and data integrity before style.
 
 ## Changelog
 
-- 2026-09-08 — First draft (MNT-03)
+- 2026-09-08 — First draft
+- 2026-09-08 — Address review by @eduardoOlguin on PR #153: dropped the
+  `MNT-03` ID (already taken by an unrelated requirement in
+  `quality-requirements.md`; no ID assigned yet, pending register owner);
+  marked the timestamp migration-naming bullet as pending #151 rather than
+  already in force; corrected the CI collision-job description (it already
+  covers timestamped filenames); replaced the unresolvable
+  `feedback_sv_locale_intentionally_incomplete` citation with an inline,
+  verifiable statement of the sv-locale gap
