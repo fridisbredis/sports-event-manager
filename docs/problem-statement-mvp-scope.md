@@ -77,6 +77,7 @@ Cross-cutting, non-negotiable from day one: multi-tenant isolation; i18n archite
 - **SMS provider** selected by Frida; no email fallback in v1.
 - **Multi-tenant**, **i18n-ready**, and **per-tenant feature toggling** are the three non-negotiable architectural requirements.
 - **UI delivery** (decided 2026-06-24): one responsive codebase, no separate apps. Admin screens are **web-first** (designed for desktop; still reachable on mobile in a non-optimized, view-heavy way). Official and participant screens are **mobile-first**. Navigation is role-based. The scheduling matrix is edit-on-desktop and view-only on mobile. The official's "My schedule" and the admin scheduler are separate views, not a shared component.
+- **Responsiveness confirmed by Peter (2026-09-08): the whole app must be responsive**, not only the mobile-first official/participant screens — admin screens must also adapt sensibly across viewport sizes, not just be "reachable" in a degraded, unoptimized way. This does not change the web-first vs. mobile-first split above (each surface still designs primarily for its own device class); it raises the bar on how well each surface behaves outside that primary size.
 
 ## Domain vocabulary
 

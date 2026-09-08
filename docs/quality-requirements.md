@@ -107,6 +107,16 @@ above it fails. (The worked example above, 633%, is illustrative of the
 calculation only — it would fail against this ceiling.) This replaces the
 fixed "p95 ≤ 2s" criteria below — see PERF-01/PERF-02.
 
+**Note (2026-09-08): this ceiling's precision is now in question.** Peter has
+since said 300% "was just a number like any other" — i.e. not a deliberately
+chosen ratio — and that what he actually wants is for the app to feel
+responsive under load. The measurements and findings already recorded against
+the 300% figure (F-PERF-07 and the checklist below) stay valid as
+measurements; what's unconfirmed is whether 300% specifically is the right
+pass/fail line, versus a looser or more qualitative "stays responsive"
+criterion. Treat 300% as the working ceiling until this is renegotiated with
+Peter — don't silently substitute a different number.
+
 - One event with **20 officials** and **5 concurrent tenant-admin sessions**
   (confirmed: ~3 admins worked the event; padded to 5 for headroom, e.g.
   multiple sessions per admin).

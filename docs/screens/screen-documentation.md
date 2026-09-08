@@ -39,6 +39,8 @@ ACCT-01 | Personal account | Signed-in user views and manages their own account 
 HOME-01 | Official home | Official landing; entry to their screens | Navigation (event info, my schedule, announcements, personal account) | (none specified)
 INFO-01 | Event info | Official reads the read-only facts about the event | Identity (name, logo, type, description), dates by stage, location/venue per stage, facilities, event programme by stage, Race Results links | read-only, published-only, officials-see-all-stages, participants-see-race-stages-only
 MYSCH-01 | My schedule | Official reads their own assignments in two views | View toggle (time / work area), time view (chronological assignments, across stages), work area view (assignments grouped per work area with checklist), read-only | time-view, work-area-view, read-only, mobile-first
+
+MYSCH-01 note (Peter, 2026-09-08): loading day-by-day (rather than fetching the whole multi-day event's assignments up front) is confirmed as good enough — no need to build eager/whole-event loading for this screen.
 ANN-01 | Announcements | Official reads the officials announcement channel | Announcement timeline (read-only) | read-only
 
 
