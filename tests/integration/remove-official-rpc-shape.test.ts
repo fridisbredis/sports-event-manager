@@ -7,7 +7,7 @@ import {
   cleanupTenant,
 } from './helpers'
 
-// SEC-07-rest (migration 0047): remove_official's jsonb return shape is
+// SEC-07-rest (migration 0048): remove_official's jsonb return shape is
 // consumed via `data as unknown as { user_id: string | null }` in
 // src/app/api/officials/[id]/route.ts. TypeScript can't see inside a jsonb
 // return (db:types always emits Returns: Json), so only a real call against

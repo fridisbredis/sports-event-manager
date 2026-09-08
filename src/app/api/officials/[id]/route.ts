@@ -54,10 +54,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to remove official' }, { status: 500 })
   }
 
-  // Migration 0047: remove_official now returns the revoked official's
+  // Migration 0048: remove_official now returns the revoked official's
   // user_id, so the audit trail can point at a real target_id instead of
-  // null (SEC-07-rest).
-  const { user_id: revokedUserId } = data as unknown as { user_id: string | null }
+  // null (SEC-07-rest). Optional key + null-safe access: on a database where
+  // this migration hasn't been applied yet, user_id is absent from the jsonb
+  // response rather than present-and-null.
+  const revokedUserId =
+    (data as unknown as { user_id?: string | null } | null)?.user_id ?? null
 
   await logAuditEvent({
     tenantId: parsed.data.tenantId,

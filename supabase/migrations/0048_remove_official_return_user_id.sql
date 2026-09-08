@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 0047: remove_official returns revoked user_id
+-- Migration 0048: remove_official returns revoked user_id
 -- ============================================================================
 --
 -- SEC-07-rest (optional follow-up from the 2026-08-28 SEC-07 plan, flagged
@@ -19,10 +19,15 @@
 --             true) only, no user_id key).
 --   Data:     no data loss — this only changes what the function returns,
 --             not what it writes.
---   Blast:    none. The added key is additive; nothing currently reads the
---             RPC response (grep confirms officials/[id]/route.ts discards
---             it via `const { error } = await supabase.rpc(...)`), so no
---             caller depends on this shape yet.
+--   Blast:    this PR's companion route change makes officials/[id]/route.ts
+--             read the new key, so a rollback to 0025's body isn't blast-free
+--             once both land. If the function reverts to the old body while
+--             the new route code is still deployed, user_id is absent from
+--             the jsonb response, revokedUserId is undefined, and
+--             logAuditEvent's `input.targetId ?? null` writes target_id:
+--             null. Degraded audit attribution, no error, no failed request
+--             — same silent-gap class as the 0043->0045 role_granted
+--             regression that motivated the shape-contract rule.
 --   Window:   compatible. Old code ignores the new key; new code (this
 --             migration's companion route-handler change) can start
 --             consuming it once deployed.
@@ -90,7 +95,7 @@ comment on function public.remove_official is
   'P0001) if no matching official exists for (p_official_id, p_tenant_id). '
   'Returns the revoked official''s user_id (null if they had never '
   'accepted their invite) so callers can attribute the role_revoked audit '
-  'event to a real target_id (SEC-07-rest, migration 0047).';
+  'event to a real target_id (SEC-07-rest, migration 0048).';
 
 -- Function signature is unchanged (same args, same SECURITY INVOKER), so
 -- the existing grants from 0025 remain valid — no grant/revoke needed here.

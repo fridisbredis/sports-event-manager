@@ -136,7 +136,7 @@ describe('DELETE /api/officials/[id]', () => {
     })
   })
 
-  // SEC-07-rest (migration 0047): an official who never accepted their
+  // SEC-07-rest (migration 0048): an official who never accepted their
   // invite has no user_id to revoke — remove_official returns user_id: null
   // in that case, and the audit event's targetId must reflect that rather
   // than crashing on a missing key.
