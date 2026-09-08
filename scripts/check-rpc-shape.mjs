@@ -12,8 +12,6 @@
 
 import { execFileSync } from 'node:child_process'
 
-const MIGRATIONS_GLOB = 'supabase/migrations/*.sql'
-
 function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' })
 }
@@ -93,8 +91,11 @@ function findFunctionsByName(migrationFiles, ref) {
     for (const [name, body] of bodies) {
       const keys = extractReturnedJsonbKeys(body)
       if (keys.size === 0) continue
-      // Later migration files (lexically greater filename = higher number
-      // prefix) win, since they're the most recent definition as of `ref`.
+      // Later migration files win, since they're the most recent definition
+      // as of `ref`. Filenames sort lexically by their version prefix — a
+      // legacy 00NN number or a YYYYMMDDHHMMSS timestamp (see .claude/CLAUDE.md
+      // "Migration naming") — and a timestamp always sorts above every 00NN,
+      // so "greater filename" still means "more recent" across both formats.
       const existing = byName.get(name)
       if (!existing || file > existing.file) {
         byName.set(name, { file, keys })
@@ -106,7 +107,7 @@ function findFunctionsByName(migrationFiles, ref) {
 
 // The migration header convention (.claude/CLAUDE.md "Forward-fix plan") is:
 //   -- ===...===   (title fence open, line 1)
-//   -- Migration NNNN: <title>
+//   -- Migration <version>: <title>
 //   -- ===...===   (title fence close)
 //   --
 //   -- <free-text description, Forward-fix block, etc.>
