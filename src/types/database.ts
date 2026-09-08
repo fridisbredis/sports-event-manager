@@ -893,6 +893,20 @@ export type Database = {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
         Returns: undefined
       }
+      update_workstation: {
+        Args: {
+          p_capacity_ceiling?: number
+          p_description?: string
+          p_name?: string
+          p_recurring?: boolean
+          p_stage_id?: string
+          p_tenant_id: string
+          p_todos?: Json
+          p_windows?: Json
+          p_workstation_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
