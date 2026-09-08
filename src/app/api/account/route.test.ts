@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { PATCH } from './route'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { revalidateTag } from 'next/cache'
+import { officialHomeCacheTag } from '@/lib/cache/tags'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -125,6 +131,35 @@ describe('PATCH /api/account', () => {
 
       expect(res.status).toBe(200)
       expect(body).toEqual({ ok: true })
+    })
+
+    // PERF-06 / F-PERF-04 Phase 1: officials.name is exactly what HOME-01's
+    // cached read (migration 0050) returns, so a rename here has to clear that
+    // official's home tag or the greeting keeps the old name for up to 60s.
+    it('invalidates the official home cache tag on a successful rename', async () => {
+      mockServerClient({ id: 'user-1' })
+      const builder = chain({ data: { id: 'off-1' }, error: null })
+      vi.mocked(createSupabaseServiceClient).mockReturnValue({
+        from: vi.fn().mockReturnValueOnce(builder),
+      } as never)
+
+      await PATCH(makeRequest({ tenantId: TENANT_ID, name: 'Anna', smsOptOut: false }))
+
+      expect(revalidateTag).toHaveBeenCalledWith(officialHomeCacheTag(TENANT_ID, 'user-1'), {
+        expire: 0,
+      })
+    })
+
+    it('does not invalidate the home cache tag when the update failed', async () => {
+      mockServerClient({ id: 'user-1' })
+      const builder = chain({ data: null, error: { message: 'boom' } })
+      vi.mocked(createSupabaseServiceClient).mockReturnValue({
+        from: vi.fn().mockReturnValueOnce(builder),
+      } as never)
+
+      await PATCH(makeRequest({ tenantId: TENANT_ID, name: 'Anna', smsOptOut: false }))
+
+      expect(revalidateTag).not.toHaveBeenCalled()
     })
 
     it('returns 500 when the update reports an error', async () => {

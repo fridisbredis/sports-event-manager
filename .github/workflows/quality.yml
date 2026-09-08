@@ -273,6 +273,27 @@ jobs:
 
           node scripts/check-rpc-shape.mjs "$base" HEAD
 
+  guc-transaction-local:
+    name: Transaction-local app.* GUCs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Whole-tree scan, so no base-ref diff and no fetch-depth needed
+      # (unlike the RPC return-shape check above, which has to compare two
+      # versions of the same function). ADR-0003 rule 5: an `app.*` GUC set
+      # session-scoped survives its transaction on a pooled PostgREST
+      # connection and misapplies tenant scoping to a later request.
+      - name: Check every app.* GUC is set transaction-locally
+        run: node scripts/check-guc-transaction-local.mjs
+
   migration-number-collision:
     name: Migration number collision
     runs-on: ubuntu-latest

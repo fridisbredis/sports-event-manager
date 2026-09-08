@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -8,6 +8,7 @@ import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import type { Json } from '@/types/database'
 import { ASSIGNMENT_STATUSES, type AssignmentStatus } from '@/types/app'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -212,6 +213,12 @@ export async function saveAssignments(
   }
 
   revalidatePath(`/${tenantSlug}/admin/scheduling`)
+
+  // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached summary reads
+  // assignments transitively via scheduling_warning_counts (over-capacity /
+  // double-booking counts). updateTag (not revalidateTag) so the admin who
+  // just saved sees the warnings update immediately.
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return { inserted: data ?? [] }
 }

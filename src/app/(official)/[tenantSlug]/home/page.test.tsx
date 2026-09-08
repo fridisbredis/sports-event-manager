@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialHomePage from './page'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  createSupabaseServiceClient: vi.fn(),
+}))
+
+// PERF-06 / F-PERF-04 Phase 1: unstable_cache would otherwise need a real
+// Next.js request/cache context (same "static generation store missing"
+// problem revalidateTag hits in these unit tests) — mocked as a passthrough
+// so the wrapped function runs directly and these tests exercise it without
+// caching or its context requirements getting in the way.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }))
 
 // getOfficialTenant resolves the tenant only after the official-surface
@@ -47,6 +57,15 @@ function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 }
 
+// PERF-06 / F-PERF-04 Phase 1: the officials read moved off the session
+// client onto get_official_home_cached (migration 0050) via the
+// service-role client — see the page's own comment for why.
+function mockOfficialHomeRpc(result: { data: unknown; error: unknown }) {
+  const rpc = vi.fn().mockResolvedValue(result)
+  vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc } as never)
+  return rpc
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -69,7 +88,7 @@ describe('OfficialHomePage', () => {
     expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('scopes the officials lookup by user_id and tenant_id, and events by tenant_id only', async () => {
+  it('reads the confirmed official via the cached RPC scoped by tenant and user, and events by tenant_id via the session client', async () => {
     vi.mocked(getOfficialTenant).mockResolvedValue({
       id: TENANT_ID,
       slug: 'viadal',
@@ -77,17 +96,17 @@ describe('OfficialHomePage', () => {
       is_active: true,
       officialId: null,
     })
-    const officialsBuilder = chain({ data: { name: 'Anna' } })
     const eventsBuilder = chain({ data: { name: 'Viadal 2026' } })
-    const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(eventsBuilder)
+    const fromMock = vi.fn().mockReturnValue(eventsBuilder)
     mockUser('user-1', fromMock)
+    const rpc = mockOfficialHomeRpc({ data: { name: 'Anna' }, error: null })
 
     await OfficialHomePage({ params: PARAMS })
 
-    expect(fromMock).toHaveBeenCalledWith('officials')
-    expect(officialsBuilder.eq).toHaveBeenCalledWith('user_id', 'user-1')
-    expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(rpc).toHaveBeenCalledWith('get_official_home_cached', {
+      p_tenant_id: TENANT_ID,
+      p_user_id: 'user-1',
+    })
     expect(fromMock).toHaveBeenCalledWith('events')
     expect(eventsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
   })
@@ -101,6 +120,7 @@ describe('OfficialHomePage', () => {
       officialId: null,
     })
     mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
+    mockOfficialHomeRpc({ data: { name: null }, error: null })
 
     const result = await OfficialHomePage({ params: PARAMS })
 
