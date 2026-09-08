@@ -22,7 +22,11 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
   let workstationB: { id: string }
   let opWindowB: { id: string }
   let todoB: { id: string }
+  let workstationA: { id: string }
+  let opWindowA: { id: string }
+  let todoA: { id: string }
   let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
+  let clientOfficialA: Awaited<ReturnType<typeof signInAsClient>>
 
   beforeAll(async () => {
     tenantA = await createTenant('Tenant A Workstations')
@@ -31,7 +35,59 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
     const adminA = await createUserWithRole(tenantA.id, 'tenant_admin')
     clientAdminA = await signInAsClient(adminA.phone, '000000')
 
+    const officialA = await createUserWithRole(tenantA.id, 'official')
+    clientOfficialA = await signInAsClient(officialA.phone, '000000')
+
     const admin = serviceClient()
+
+    const { data: eventAData, error: eventAError } = await admin
+      .from('events')
+      .insert({
+        tenant_id: tenantA.id,
+        name: 'Tenant A Event',
+        event_type: 'race',
+        start_date: '2026-06-01',
+        end_date: '2026-06-01',
+      })
+      .select()
+      .single()
+    if (eventAError) throw eventAError
+
+    const { data: wsAData, error: wsAError } = await admin
+      .from('workstations')
+      .insert({
+        tenant_id: tenantA.id,
+        event_id: eventAData.id,
+        name: 'Tenant A Workstation',
+        capacity_ceiling: 3,
+      })
+      .select()
+      .single()
+    if (wsAError) throw wsAError
+    workstationA = wsAData
+
+    const { data: opWindowAData, error: opWindowAError } = await admin
+      .from('workstation_operating_windows')
+      .insert({
+        workstation_id: workstationA.id,
+        window_start: '2026-06-01T06:00:00Z',
+        window_end: '2026-06-01T18:00:00Z',
+      })
+      .select()
+      .single()
+    if (opWindowAError) throw opWindowAError
+    opWindowA = opWindowAData
+
+    const { data: todoAData, error: todoAError } = await admin
+      .from('workstation_todos')
+      .insert({
+        workstation_id: workstationA.id,
+        instruction_text: 'Check equipment A',
+      })
+      .select()
+      .single()
+    if (todoAError) throw todoAError
+    todoA = todoAData
 
     const { data: eventData, error: eventError } = await admin
       .from('events')
@@ -114,6 +170,60 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
       .eq('workstation_id', workstationB.id)
     expect(error).toBeNull()
     expect(data).toEqual([])
+  })
+
+  // The read-block tests above only exercise the tenant_admin path. Because
+  // permissive policies OR together, a broken-open
+  // tenant_member_read_workstation_* policy would leak into that admin read
+  // and fail those tests anyway — but a broken-closed one is invisible
+  // there, and that's an official silently losing INFO-01/MYSCH-01 data.
+  // These cover the other half of the indirection this suite exists to
+  // protect: an official reading their own tenant's windows/todos.
+  it('an official can read its own tenant workstation_operating_windows via the workstation join', async () => {
+    const { data, error } = await clientOfficialA
+      .from('workstation_operating_windows')
+      .select('*')
+      .eq('id', opWindowA.id)
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect(data?.[0].id).toBe(opWindowA.id)
+  })
+
+  it('an official can read its own tenant workstation_todos via the workstation join', async () => {
+    const { data, error } = await clientOfficialA
+      .from('workstation_todos')
+      .select('*')
+      .eq('id', todoA.id)
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect(data?.[0].id).toBe(todoA.id)
+  })
+
+  it('an official cannot read tenant B workstation_operating_windows via the workstation join', async () => {
+    const { data, error } = await clientOfficialA
+      .from('workstation_operating_windows')
+      .select('*')
+      .eq('workstation_id', workstationB.id)
+    expect(error).toBeNull()
+    expect(data).toEqual([])
+  })
+
+  it('an official cannot update its own tenant operating window (read-only role)', async () => {
+    const { data, error } = await clientOfficialA
+      .from('workstation_operating_windows')
+      .update({ window_start: '2026-06-01T05:00:00Z' })
+      .eq('id', opWindowA.id)
+      .select()
+    expect(error).toBeNull()
+    expect(data).toEqual([])
+
+    const admin = serviceClient()
+    const { data: unchanged } = await admin
+      .from('workstation_operating_windows')
+      .select('window_start')
+      .eq('id', opWindowA.id)
+      .single()
+    expect(unchanged?.window_start).toBe('2026-06-01T06:00:00+00:00')
   })
 
   it('cannot update a tenant B operating window', async () => {
@@ -222,7 +332,7 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
     const { data: readWs, error: readWsError } = await clientAdminA
       .from('workstations')
       .select('*')
-      .eq('tenant_id', tenantA.id)
+      .eq('id', createdWs!.id)
     expect(readWsError).toBeNull()
     expect(readWs).toHaveLength(1)
   })
