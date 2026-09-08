@@ -88,7 +88,7 @@ Go through in this order — security and data integrity before style.
 - [ ] **Ordering with any still-open sequential (`00NN`) migration PR:**
       every `YYYYMMDDHHMMSS` prefix sorts above every `00NN` prefix, and
       `supabase db push` runs without `--include-all` in both deploy
-      workflows. A `00NN` migration merged *after* the first timestamped one
+      workflows. A `00NN` migration merged _after_ the first timestamped one
       lands below that environment's ledger ceiling and is silently skipped
       by `db push` — not a merge-order annoyance you can retry past, but a
       permanently stranded file. Before merging the first timestamped
