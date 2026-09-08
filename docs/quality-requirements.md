@@ -756,17 +756,24 @@ itself.
    mature real-Postgres suite (helpers, a local-only loopback guard, its
    own `vitest.integration.config.mts`, wired into `quality.yml`) and
    MNT-08/F-MNT-06 had already been closed 2026-08-28. An audit of RLS
-   policies against that suite found only two tables — the child tables
-   `workstation_operating_windows` and `workstation_todos`, which have no
+   policies against that suite found the child tables
+   `workstation_operating_windows` and `workstation_todos` — which have no
    `tenant_id` column and inherit isolation only through an indirect
    `EXISTS` join to `workstations.tenant_id` — genuinely lacked a dedicated
-   tenant-isolation test; every other table either already had one or is
-   safe by construction (service-role-only, or a global admin table with no
-   per-tenant RLS to test). Added
+   tenant-isolation test. Added
    `tests/integration/tenant-isolation-workstations.test.ts` covering both.
-   Decide the participant question (F-REL-07). (The retention position
-   behind SEC-09/F-SEC-10 is resolved as of 2026-08-25 — no longer an open
-   decision.)
+   `event_stages`, `event_distances`, and `event_facilities` also have no
+   dedicated tenant-isolation test on `main` as of this writing, despite
+   having a direct `tenant_id` and the same canonical 0004 policy pair as
+   `workstations` — accepted as a deferred gap for now rather than blocking
+   this item, since they're lower-risk (direct column + standard policy
+   shape, not the indirect-join pattern this item was written to catch).
+   Every other table either already had a dedicated test or is safe by
+   construction (service-role-only, or a global admin table with no
+   per-tenant RLS to test).
+   **Remaining:** decide the participant question (F-REL-07). (The
+   retention position behind SEC-09/F-SEC-10 is resolved as of 2026-08-25 —
+   no longer an open decision.)
 4. **Before the Viadal-scale event:** agree the capacity baseline, create
    representative seed data, run load tests, and address PERF-01 through
    PERF-06 and MNT-07 together.
