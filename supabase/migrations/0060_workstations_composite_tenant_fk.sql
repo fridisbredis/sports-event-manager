@@ -53,6 +53,7 @@
 --             on dev or prod would fail the new FK validation, so the
 --             ALTER TABLE ... ADD CONSTRAINT (which validates all existing
 --             rows) is expected to succeed without rejecting anything.
+--             see 0060_pre-migration_2026-09-08T13-59-11Z.tar.gz
 --   Blast:    if reverted, the direct-INSERT/UPDATE path becomes exploitable
 --              again (pre-0060 behavior) — not a new failure mode.
 --   Window:   compatible. No application code reads or writes the new
