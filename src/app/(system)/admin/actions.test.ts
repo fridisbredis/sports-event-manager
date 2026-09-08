@@ -39,11 +39,15 @@ function chain(result: unknown) {
 // assertSystemAdmin's role lookup goes through createSupabaseServiceClient
 // (bootstrap lookup — see the comment in actions.ts); every write after
 // that check passes goes through createSupabaseServerClient (RLS-enforced),
-// so the two clients need independent from() mocks.
-function mockAuthedSystemAdmin(serverFromMock: ReturnType<typeof vi.fn>) {
+// so the two clients need independent from()/rpc() mocks.
+function mockAuthedSystemAdmin(
+  serverFromMock: ReturnType<typeof vi.fn>,
+  rpcMock: ReturnType<typeof vi.fn> = vi.fn()
+) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'admin-1' } } }) },
     from: serverFromMock,
+    rpc: rpcMock,
   } as never)
   vi.mocked(createSupabaseServiceClient).mockResolvedValue({
     from: vi.fn().mockReturnValueOnce(chain({ data: { role: 'system_admin' } })),
@@ -96,25 +100,28 @@ describe('createTenant', () => {
     expect(fromMock).not.toHaveBeenCalled()
   })
 
-  it('creates the tenant, default event, and default stages, then revalidates /admin', async () => {
+  // REL-01: tenant/event/stages are now created atomically by the
+  // create_tenant_with_defaults RPC (migration 20260908130253) instead of
+  // three separate .insert() calls — see
+  // tests/integration/create-tenant-atomicity.test.ts for the real-Postgres
+  // proof that a partial failure rolls back all three tables. This unit
+  // test only proves the call site passes the right args and handles the
+  // RPC's response shape correctly.
+  it('creates the tenant via the atomic RPC, then revalidates /admin', async () => {
     const fromMock = vi.fn()
-    mockAuthedSystemAdmin(fromMock)
-    fromMock
-      .mockReturnValueOnce(chain({ data: { id: 'tenant-1' }, error: null })) // tenants insert
-      .mockReturnValueOnce(chain({ data: { id: 'event-1' }, error: null })) // events insert
-      .mockReturnValueOnce(chain({ error: null })) // event_stages insert
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: { tenant_id: 'tenant-1', event_id: 'event-1' },
+      error: null,
+    })
+    mockAuthedSystemAdmin(fromMock, rpcMock)
 
     const result = await createTenant('  Viadal 2026  ')
 
     expect(result).toEqual({})
-    const tenantsBuilder = fromMock.mock.results[0].value
-    expect(tenantsBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Viadal 2026', slug: 'viadal-2026', is_active: true })
-    )
-    const eventsBuilder = fromMock.mock.results[1].value
-    expect(eventsBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ tenant_id: 'tenant-1', name: 'Viadal 2026' })
-    )
+    expect(rpcMock).toHaveBeenCalledWith('create_tenant_with_defaults', {
+      p_name: 'Viadal 2026',
+      p_slug: 'viadal-2026',
+    })
     expect(revalidatePath).toHaveBeenCalledWith('/admin')
     // SEC-07
     expect(logAuditEvent).toHaveBeenCalledWith({
@@ -130,8 +137,8 @@ describe('createTenant', () => {
 
   it('returns a friendly error on a duplicate tenant name (unique violation)', async () => {
     const fromMock = vi.fn()
-    mockAuthedSystemAdmin(fromMock)
-    fromMock.mockReturnValueOnce(chain({ data: null, error: { code: '23505' } }))
+    const rpcMock = vi.fn().mockResolvedValue({ data: null, error: { code: '23505' } })
+    mockAuthedSystemAdmin(fromMock, rpcMock)
 
     const result = await createTenant('Viadal 2026')
 
