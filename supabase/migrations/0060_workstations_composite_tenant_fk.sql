@@ -48,7 +48,8 @@
 --                   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
 --                 ADD CONSTRAINT workstations_stage_id_fkey
 --                   FOREIGN KEY (stage_id) REFERENCES event_stages(id) ON DELETE CASCADE;
---   Data:     no data loss. This migration only adds constraints; it does
+--   Data:     see 0060_pre-migration_2026-09-08T13-59-11Z.tar.gz — no data
+--             loss expected; this migration only adds constraints and does
 --             not modify any row. Verified above that zero existing rows
 --             on dev or prod would fail the new FK validation, so the
 --             ALTER TABLE ... ADD CONSTRAINT (which validates all existing
