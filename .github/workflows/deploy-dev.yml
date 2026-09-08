@@ -23,7 +23,7 @@ jobs:
           # Pinned to match quality.yml — see that file's comment for why
           # `latest` is avoided (version skew) and it also avoids GitHub API
           # rate-limit failures from resolving "latest" on every run.
-          version: 2.95.4
+          version: 2.116.0
 
       - name: Preview pending DB migrations (dev)
         run: |

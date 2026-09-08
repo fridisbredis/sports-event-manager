@@ -1,11 +1,33 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { unstable_cache } from 'next/cache'
+import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
 import { FacilityChips } from './_components/facility-chips'
 import { SectionLabel } from './_components/section-label'
+
+interface EventInfoCached {
+  event: {
+    name: string | null
+    event_type: string | null
+    description: string | null
+    logo_url: string | null
+    status: string
+  } | null
+  stages: Array<{
+    id: string
+    name: string
+    stage_type: string
+    start_time: string | null
+    end_time: string | null
+    venue: string | null
+    position: number
+  }>
+  facilities: Array<{ id: string; label: string; position: number }>
+}
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -34,7 +56,6 @@ export default async function EventInfoPage({ params }: Props) {
   const { tenantSlug } = await params
   const t = await getServerTranslation('en', 'official')
 
-  const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
 
   if (!user) redirect('/login')
@@ -45,33 +66,33 @@ export default async function EventInfoPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  const [
-    { data: event, error: eventError },
-    { data: stages, error: stagesError },
-    { data: facilities, error: facilitiesError },
-  ] = await Promise.all([
-    supabase
-      .from('events')
-      .select('name, event_type, description, logo_url, status')
-      .eq('tenant_id', tenant.id)
-      .maybeSingle(),
-    supabase
-      .from('event_stages')
-      .select('id, name, stage_type, start_time, end_time, venue, position')
-      .eq('tenant_id', tenant.id)
-      .order('position'),
-    supabase
-      .from('event_facilities')
-      .select('id, label, position')
-      .eq('tenant_id', tenant.id)
-      .order('position'),
-  ])
+  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): reads moved behind
+  // get_event_info_cached (migration 0051). Must be the service-role
+  // client — unstable_cache can't reach cookies(), and this is only safe
+  // because the RPC is SECURITY DEFINER owned by cache_rpc_reader
+  // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
+  const getEventInfoCached = unstable_cache(
+    async (tenantId: string) => {
+      const service = createSupabaseServiceClient()
+      const { data, error } = await service.rpc('get_event_info_cached', {
+        p_tenant_id: tenantId,
+      })
+      if (error) throw error
+      return data as unknown as EventInfoCached
+    },
+    ['event-info'], // cache namespace, data-shape only — tenant scoping
+    // comes entirely from the tenantId closure argument reaching both the
+    // RPC call above and the tags array below
+    {
+      tags: [eventInfoCacheTag(tenant.id)],
+      revalidate: 60,
+    }
+  )
 
-  const queryError = eventError ?? stagesError ?? facilitiesError
-  if (queryError) throw queryError
+  const { event, stages, facilities } = await getEventInfoCached(tenant.id)
 
-  const stageList = stages ?? []
-  const facilityList = facilities ?? []
+  const stageList = stages
+  const facilityList = facilities
 
   return (
     <div className="px-5 pt-10 pb-6">

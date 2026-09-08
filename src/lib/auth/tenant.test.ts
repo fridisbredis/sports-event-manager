@@ -17,6 +17,8 @@ import {
 } from './tenant'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
+import { revalidateTag } from 'next/cache'
+import { adminDashboardCacheTag, officialHomeCacheTag } from '@/lib/cache/tags'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -25,6 +27,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/audit/log-auth-event', () => ({
   logAuthEvent: vi.fn(),
+}))
+
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -210,6 +216,40 @@ describe('confirmOfficialInvite', () => {
       p_user_phone: '0701234567',
       p_privacy_accepted: true,
     })
+  })
+
+  // PERF-06 / F-PERF-04: this path and the token-flow confirm route
+  // (api/officials/confirm) make the identical invite_status write, so they
+  // must invalidate the identical pair of tags. The dashboard tag was missing
+  // here while the token route had it, which left the admin dashboard's
+  // invited/confirmed counts (migration 0054) stale for up to the 60s
+  // revalidate window on phone-fallback confirms only. Asserted as a pair, so
+  // adding a third confirm path that invalidates just one of them fails here.
+  it('invalidates both the official-home and admin-dashboard cache tags on a successful confirm', async () => {
+    mockServiceClientWithRpc({
+      rpcResult: { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+    })
+
+    await confirmOfficialInvite('user-1', '0701234567', true)
+
+    expect(revalidateTag).toHaveBeenCalledWith(officialHomeCacheTag(TENANT_ID, 'user-1'), {
+      expire: 0,
+    })
+    expect(revalidateTag).toHaveBeenCalledWith(adminDashboardCacheTag(TENANT_ID), { expire: 0 })
+    expect(revalidateTag).toHaveBeenCalledTimes(2)
+  })
+
+  it('invalidates nothing when the RPC reports no matching invited official', async () => {
+    // Negative control: the early `if (error) return null` runs before either
+    // revalidateTag call, so a failed confirm must not bust a live cache.
+    mockServiceClientWithRpc({
+      rpcResult: { data: null, error: { message: 'not_found' } },
+    })
+
+    await confirmOfficialInvite('user-1', '0701234567', true)
+
+    expect(revalidateTag).not.toHaveBeenCalled()
   })
 
   it('logs a role_granted_via_invite_confirmation auth event when the RPC actually granted the role', async () => {

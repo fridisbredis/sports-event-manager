@@ -1,12 +1,18 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 import { logger } from '@/lib/logger'
+import {
+  eventInfoCacheTag,
+  adminEventCacheTag,
+  workstationsCacheTag,
+  adminDashboardCacheTag,
+} from '@/lib/cache/tags'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -133,6 +139,20 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   revalidatePath(`/${input.tenantSlug}/admin/event`)
   revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
+
+  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): saveEvent touches events,
+  // event_stages, event_distances, and event_facilities — every Group 1
+  // cached page reads at least one of those tables, so all three tags are
+  // invalidated. updateTag (not revalidateTag) so the admin who just saved
+  // sees their own write immediately on next render.
+  updateTag(eventInfoCacheTag(input.tenantId))
+  updateTag(adminEventCacheTag(input.tenantId))
+  updateTag(workstationsCacheTag(input.tenantId))
+
+  // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached summary reads events
+  // (name, dates, status) and event_stages (race-stage count) — both changed
+  // by this same write.
+  updateTag(adminDashboardCacheTag(input.tenantId))
 
   return {}
 }

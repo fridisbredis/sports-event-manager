@@ -1,11 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { workstationsCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
 
 const tenantIdSchema = z.string().uuid()
@@ -88,6 +89,13 @@ export async function createWorkstation(
   if (rpcError) return { error: rpcError.message }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
+  // updateTag (not revalidateTag) so the admin who just created this
+  // workstation sees it immediately on next render.
+  updateTag(workstationsCacheTag(parsedTenantId.data))
+  // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached over_capacity/
+  // double_booked warnings are computed via scheduling_warning_counts, which
+  // joins against workstations.capacity_ceiling.
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return {}
 }
@@ -186,6 +194,12 @@ export async function updateWorkstation(
   }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
+  // updateTag (not revalidateTag) so the admin who just updated this
+  // workstation sees the change immediately on next render.
+  updateTag(workstationsCacheTag(parsedTenantId.data))
+  // PERF-06 / F-PERF-04 Phase 3: capacity_ceiling feeds the dashboard's
+  // cached over_capacity/double_booked warnings via scheduling_warning_counts.
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return {}
 }
@@ -228,6 +242,13 @@ export async function deleteWorkstation(
   if (error) return { error: error.message }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
+  // updateTag (not revalidateTag) so the admin who just deleted this
+  // workstation sees it gone immediately on next render.
+  updateTag(workstationsCacheTag(parsedTenantId.data))
+  // PERF-06 / F-PERF-04 Phase 3: removing a workstation removes its
+  // capacity_ceiling from scheduling_warning_counts' join, changing the
+  // dashboard's cached warning counts.
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return {}
 }
