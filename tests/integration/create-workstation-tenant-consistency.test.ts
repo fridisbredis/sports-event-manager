@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createTenant, createUserWithRole, signInAsClient, cleanupTenant } from './helpers'
+import {
+  createTenant,
+  createUserWithRole,
+  signInAsClient,
+  cleanupTenant,
+  serviceClient,
+} from './helpers'
 
 // SEC-01 (migration 0056): create_workstation (migration 0031) checked that
 // p_tenant_id matched the caller's own tenant (via RLS on the workstations
@@ -25,7 +31,6 @@ describe('SEC-01: create_workstation rejects cross-tenant event_id/stage_id', ()
     const adminA = await createUserWithRole(tenantA.id, 'tenant_admin')
     clientAdminA = await signInAsClient(adminA.phone, '000000')
 
-    const { serviceClient } = await import('./helpers')
     const admin = serviceClient()
 
     const { data: eventAData, error: eventAError } = await admin
@@ -110,7 +115,6 @@ describe('SEC-01: create_workstation rejects cross-tenant event_id/stage_id', ()
   })
 
   it('still allows an honest tenant_id/event_id/stage_id combination', async () => {
-    const { serviceClient } = await import('./helpers')
     const admin = serviceClient()
     const { data: stageAData, error: stageAError } = await admin
       .from('event_stages')
@@ -139,5 +143,61 @@ describe('SEC-01: create_workstation rejects cross-tenant event_id/stage_id', ()
 
     expect(error).toBeNull()
     expect(data).not.toBeNull()
+  })
+
+  // Migration 0057: the RPC guard above only covers callers going through
+  // create_workstation. tenant_admin_manage_workstations (0007) is FOR ALL
+  // with USING on tenant_id alone and no WITH CHECK, so a direct INSERT that
+  // bypasses the RPC was still exploitable before 0057 added composite FKs
+  // pinning event_id/stage_id to the same tenant_id. These assert the FK
+  // itself rejects the mismatch, independent of the RPC.
+  it('rejects a direct INSERT with a foreign event_id (bypassing the RPC)', async () => {
+    const admin = serviceClient()
+    const { error } = await admin.from('workstations').insert({
+      tenant_id: tenantA.id,
+      event_id: eventB.id,
+      name: 'Direct-insert cross-tenant event workstation',
+      capacity_ceiling: 3,
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toMatch(/workstations_event_tenant_fkey/)
+  })
+
+  it('rejects a direct INSERT with a foreign stage_id (bypassing the RPC)', async () => {
+    const admin = serviceClient()
+    const { error } = await admin.from('workstations').insert({
+      tenant_id: tenantA.id,
+      event_id: eventA.id,
+      stage_id: stageB.id,
+      name: 'Direct-insert cross-tenant stage workstation',
+      capacity_ceiling: 3,
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toMatch(/workstations_stage_tenant_fkey/)
+  })
+
+  it('rejects a direct UPDATE that moves stage_id to a foreign tenant (the updateWorkstation path)', async () => {
+    const admin = serviceClient()
+    const { data: ownWorkstation, error: insertError } = await admin
+      .from('workstations')
+      .insert({
+        tenant_id: tenantA.id,
+        event_id: eventA.id,
+        name: 'Own-tenant workstation for update test',
+        capacity_ceiling: 3,
+      })
+      .select()
+      .single()
+    if (insertError) throw insertError
+
+    const { error } = await admin
+      .from('workstations')
+      .update({ stage_id: stageB.id })
+      .eq('id', ownWorkstation.id)
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toMatch(/workstations_stage_tenant_fkey/)
   })
 })
