@@ -93,5 +93,5 @@ Output:
 - No prose outside the SQL comment header
 - No markdown fences
 - Suggested filename: run `supabase migration new <short_description>` to get
-  the correct YYYYMMDDHHMMSS_<short_description>.sql name — don't hand-pick
+  the correct YYYYMMDDHHMMSS\_<short_description>.sql name — don't hand-pick
   a sequential number
