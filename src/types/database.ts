@@ -743,18 +743,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'workstations_event_id_fkey'
-            columns: ['event_id']
+            foreignKeyName: 'workstations_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
             isOneToOne: false
             referencedRelation: 'events'
-            referencedColumns: ['id']
+            referencedColumns: ['id', 'tenant_id']
           },
           {
-            foreignKeyName: 'workstations_stage_id_fkey'
-            columns: ['stage_id']
+            foreignKeyName: 'workstations_stage_tenant_fkey'
+            columns: ['stage_id', 'tenant_id']
             isOneToOne: false
             referencedRelation: 'event_stages'
-            referencedColumns: ['id']
+            referencedColumns: ['id', 'tenant_id']
           },
           {
             foreignKeyName: 'workstations_tenant_id_fkey'
