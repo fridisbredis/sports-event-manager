@@ -42,7 +42,7 @@ export async function DELETE(
   //      admin access. A surviving row here would otherwise keep steering
   //      this phone's post-login redirect to this tenant forever, since
   //      resolvePostLoginRedirect reads user_roles alone.
-  const { error } = await supabase.rpc('remove_official', {
+  const { data, error } = await supabase.rpc('remove_official', {
     p_official_id: id,
     p_tenant_id: parsed.data.tenantId,
   })
@@ -54,6 +54,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to remove official' }, { status: 500 })
   }
 
+  // Migration 0048: remove_official now returns the revoked official's
+  // user_id, so the audit trail can point at a real target_id instead of
+  // null (SEC-07-rest). Optional key + null-safe access: on a database where
+  // this migration hasn't been applied yet, user_id is absent from the jsonb
+  // response rather than present-and-null.
+  const revokedUserId = (data as unknown as { user_id?: string | null } | null)?.user_id ?? null
+
   await logAuditEvent({
     tenantId: parsed.data.tenantId,
     actorUserId: auth.user.id,
@@ -62,7 +69,7 @@ export async function DELETE(
     actorRole: auth.role as AuditActorRole,
     action: 'role_revoked',
     targetType: 'user_role',
-    targetId: null,
+    targetId: revokedUserId,
     detail: { officialId: id },
   })
 
