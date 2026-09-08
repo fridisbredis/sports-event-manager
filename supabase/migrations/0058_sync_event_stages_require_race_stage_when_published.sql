@@ -13,18 +13,38 @@
 --
 -- saveEvent (src/app/(tenant)/[tenantSlug]/admin/event/actions.ts) now
 -- checks events.status before calling this RPC and rejects the save at the
--- application layer with a friendly error. That check runs in a separate
--- statement from the RPC call, with no lock held in between, so two
--- concurrent saves (or a save racing a publish) can each read 'draft' and
--- both proceed — a TOCTOU window the app layer alone cannot close. This
--- migration adds the same invariant inside sync_event_stages itself, as the
--- last statement of the function body, so it runs in the same transaction
--- as the upsert/delete and sees the final row state under normal Postgres
--- read-committed visibility rules for a single transaction. It is
--- defense-in-depth alongside the app check, not a replacement for it (the
--- app check gives a caller-friendly `{ error: '...' }` before ever hitting
--- the network round-trip for the RPC; this is the backstop for every other
--- write path, present or future, direct SQL included).
+-- application layer with a friendly error. This migration adds the same
+-- invariant inside sync_event_stages itself, as the last statement of the
+-- function body, so it runs in the same transaction as the upsert/delete
+-- and sees the final row state under normal Postgres read-committed
+-- visibility rules for a single transaction. It is defense-in-depth
+-- alongside the app check, not a replacement for it (the app check gives a
+-- caller-friendly `{ error: '...' }` before ever hitting the network
+-- round-trip for the RPC; this is the RPC-level backstop for every other
+-- write path that goes through sync_event_stages, present or future,
+-- direct SQL included).
+--
+-- Two known gaps this migration does NOT close (tracked as follow-ups,
+-- not fixed here):
+--   1. Not serializable against a concurrent publishEvent. publishEvent
+--      counts Race stages, then updates events.status in a separate
+--      statement with no lock held across the two. Under READ COMMITTED,
+--      a concurrent sync_event_stages call can read events.status as
+--      'draft' (publish not yet committed), remove the last Race stage,
+--      and commit — while publishEvent's own count still saw the stage
+--      present and proceeds to set 'published'. Both commit; invariant
+--      violated. Closing this needs `SELECT ... FOR UPDATE` on the events
+--      row in both this function and publishEvent, or a deferred
+--      constraint trigger — out of scope for this migration.
+--   2. Not table-level. tenant_admin_manage_event_stages (migration 0007)
+--      is a FOR ALL policy with no WITH CHECK beyond tenant_id, so a
+--      tenant_admin can DELETE straight through PostgREST
+--      (DELETE /rest/v1/event_stages?id=eq...) and bypass this RPC
+--      entirely. This is an authorized user breaking a business rule, not
+--      a tenant-isolation or privilege-escalation gap, so the impact is
+--      low, but it means this guard is a backstop for the RPC call path
+--      only, not a true DB-wide invariant. A constraint trigger on
+--      event_stages would be needed for that.
 --
 -- Forward-fix: replace
 --   Rollback: restore the prior function body from migration
@@ -129,13 +149,21 @@ BEGIN
     coalesce(nullif(trim(s->>'stage_type'), ''), 'race') = 'race'
     AND trim(coalesce(d->>'label', '')) <> '';
 
-  -- Stage model v0.7 invariant, enforced here as the backstop: a published
-  -- event must keep at least one Race stage. Checked last, against the
-  -- table state this same transaction just wrote, so it sees the final
-  -- row set regardless of which branch above ran.
+  -- Stage model v0.7 invariant, enforced here as the RPC-level backstop: a
+  -- published event must keep at least one Race stage. Checked last,
+  -- against the table state this same transaction just wrote, so it sees
+  -- the final row set regardless of which branch above ran. Fails closed:
+  -- if the events row isn't visible under caller RLS, that's treated as
+  -- "can't confirm this is safe" rather than silently skipping the check
+  -- (mirrors the fail-closed posture of the app-level check in saveEvent).
   SELECT status INTO v_event_status
   FROM events
   WHERE id = p_event_id AND tenant_id = p_tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Event % not found for tenant %', p_event_id, p_tenant_id
+      USING ERRCODE = 'P0002';
+  END IF;
 
   IF v_event_status = 'published' THEN
     SELECT count(*) INTO v_race_stage_ct
@@ -182,7 +210,12 @@ COMMENT ON FUNCTION public.sync_event_stages IS
   '(23514, "Cannot remove the last Race stage from a published event.") when '
   'the resulting stage set has zero stage_type = ''race'' rows (migration 0058) — '
   'this is the same invariant publishEvent enforces before allowing publish, '
-  'held afterwards too. '
+  'held afterwards too as an RPC-level backstop (not serializable against a '
+  'concurrent publishEvent, and bypassable via a direct DELETE on '
+  'event_stages under tenant_admin_manage_event_stages — see migration '
+  '0058''s header for both gaps). Raises P0002 if the events row itself '
+  'isn''t visible for (p_event_id, p_tenant_id) under caller RLS, rather '
+  'than silently skipping the check. '
   'This contract is mirrored by StageInput in '
   'src/app/(tenant)/[tenantSlug]/admin/event/actions.ts and is NOT enforced by '
   'the generated types (p_stages is Json) — see F-REL-16.';
