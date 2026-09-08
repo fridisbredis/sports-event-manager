@@ -34,25 +34,15 @@ function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
 }
 
-// PERF-06 / F-PERF-04 Phase 1: the route now reads officials.user_id (via
-// .from(), before calling remove_official) to know which HOME-01 cache tag
-// to invalidate — remove_official itself nulls out user_id, so this is the
-// only chance to capture it. Defaults to a fixed id so the pre-existing
-// tests below don't each need to know about this; officialUserId lets a
-// test override it (e.g. to null, covering the "never invited" case).
-function mockRpc(
-  result: { data: unknown; error: unknown },
-  officialUserId: string | null = 'official-user-1'
-) {
+// PERF-06 / F-PERF-04 Phase 1: the revoked official's user_id comes out of
+// remove_official's own jsonb response (migration 0048), which captures it
+// before the UPDATE nulls the officials row. It drives both the HOME-01 tag
+// and the audit target, so a test sets it by putting user_id in `result`.
+// The mocked client deliberately exposes only `rpc` — no `from` — so a
+// reintroduced pre-call read fails here loudly instead of silently passing.
+function mockRpc(result: { data: unknown; error: unknown }) {
   const rpc = vi.fn().mockResolvedValue(result)
-  const maybeSingle = vi
-    .fn()
-    .mockResolvedValue({ data: officialUserId ? { user_id: officialUserId } : null })
-  const eqTenant = vi.fn().mockReturnValue({ maybeSingle })
-  const eqId = vi.fn().mockReturnValue({ eq: eqTenant })
-  const select = vi.fn().mockReturnValue({ eq: eqId })
-  const from = vi.fn().mockReturnValue({ select })
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({ rpc, from } as never)
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({ rpc } as never)
   return rpc
 }
 
@@ -100,7 +90,7 @@ describe('DELETE /api/officials/[id]', () => {
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    const rpc = mockRpc({ data: { ok: true }, error: null })
+    const rpc = mockRpc({ data: { ok: true, user_id: 'user-1' }, error: null })
 
     const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
     const body = await res.json()
@@ -119,7 +109,7 @@ describe('DELETE /api/officials/[id]', () => {
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    mockRpc({ data: { ok: true }, error: null }, 'official-user-1')
+    mockRpc({ data: { ok: true, user_id: 'official-user-1' }, error: null })
 
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
@@ -134,7 +124,7 @@ describe('DELETE /api/officials/[id]', () => {
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    mockRpc({ data: { ok: true }, error: null }, 'official-user-1')
+    mockRpc({ data: { ok: true, user_id: 'official-user-1' }, error: null })
 
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
@@ -151,7 +141,7 @@ describe('DELETE /api/officials/[id]', () => {
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    mockRpc({ data: { ok: true }, error: null }, null)
+    mockRpc({ data: { ok: true, user_id: null }, error: null })
 
     const res = await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
@@ -188,12 +178,12 @@ describe('DELETE /api/officials/[id]', () => {
   })
 
   // SEC-07
-  it('logs a role_revoked audit event after remove_official succeeds', async () => {
+  it('logs a role_revoked audit event with the revoked user_id after remove_official succeeds', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
       role: 'tenant_admin',
     } as never)
-    mockRpc({ data: { ok: true }, error: null })
+    mockRpc({ data: { ok: true, user_id: 'user-1' }, error: null })
 
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
@@ -203,9 +193,25 @@ describe('DELETE /api/officials/[id]', () => {
       actorRole: 'tenant_admin',
       action: 'role_revoked',
       targetType: 'user_role',
-      targetId: null,
+      targetId: 'user-1',
       detail: { officialId: OFFICIAL_ID },
     })
+  })
+
+  // SEC-07-rest (migration 0048): an official who never accepted their
+  // invite has no user_id to revoke — remove_official returns user_id: null
+  // in that case, and the audit event's targetId must reflect that rather
+  // than crashing on a missing key.
+  it('logs targetId: null when the removed official never had a user_id', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    mockRpc({ data: { ok: true, user_id: null }, error: null })
+
+    await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
+
+    expect(logAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ targetId: null }))
   })
 
   it('does not log an audit event when remove_official fails', async () => {

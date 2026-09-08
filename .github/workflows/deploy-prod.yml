@@ -31,7 +31,7 @@ jobs:
           # Pinned to match quality.yml — see that file's comment for why
           # `latest` is avoided (version skew) and it also avoids GitHub API
           # rate-limit failures from resolving "latest" on every run.
-          version: 2.95.4
+          version: 2.116.0
 
       - name: Preview pending DB migrations (prod)
         run: |
@@ -51,7 +51,15 @@ jobs:
           # time predated 24 already-applied migrations, which a tag-based
           # diff would have wrongly flagged as newly pending). This is the
           # same source of truth `supabase db push` itself uses.
-          list_json=$(supabase migration list --linked --output-format json 2>/dev/null | grep '^{')
+          # stderr intentionally not discarded: a CLI error here previously
+          # produced empty stdout, which `grep '^{'` then failed on under
+          # pipefail with no visible message (silent 0.45s crash, 2026-09-08).
+          raw_output=$(supabase migration list --linked --output-format json)
+          list_json=$(echo "$raw_output" | grep '^{') || {
+            echo "Could not find a JSON line in 'supabase migration list' output:" >&2
+            echo "$raw_output" >&2
+            exit 1
+          }
 
           pending_migrations=$(echo "$list_json" \
             | python3 -c "

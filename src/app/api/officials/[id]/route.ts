@@ -28,19 +28,6 @@ export async function DELETE(
 
   const supabase = await createSupabaseServerClient()
 
-  // PERF-06 / F-PERF-04 Phase 1: remove_official below nulls out user_id
-  // (see step 2 in the comment further down) — captured here, before the
-  // call, since it's the only chance to know which HOME-01 cache tag
-  // (migration 0050) needs invalidating. Null means this official had no
-  // user_id yet (never invited to a confirmed state), so there is nothing
-  // to invalidate.
-  const { data: officialBeforeRemoval } = await supabase
-    .from('officials')
-    .select('user_id')
-    .eq('id', id)
-    .eq('tenant_id', parsed.data.tenantId)
-    .maybeSingle()
-
   // remove_official (migration 0025) does the following atomically, in one
   // transaction, as the caller's own session (SECURITY INVOKER — relies on
   // this caller's tenant_admin_manage_officials/_assignments and migration
@@ -57,7 +44,7 @@ export async function DELETE(
   //      admin access. A surviving row here would otherwise keep steering
   //      this phone's post-login redirect to this tenant forever, since
   //      resolvePostLoginRedirect reads user_roles alone.
-  const { error } = await supabase.rpc('remove_official', {
+  const { data, error } = await supabase.rpc('remove_official', {
     p_official_id: id,
     p_tenant_id: parsed.data.tenantId,
   })
@@ -69,10 +56,23 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to remove official' }, { status: 500 })
   }
 
-  if (officialBeforeRemoval?.user_id) {
-    // { expire: 0 }, not profile="max": a removed official's cached greeting
-    // name should not keep showing for up to 60s after removal.
-    revalidateTag(officialHomeCacheTag(parsed.data.tenantId, officialBeforeRemoval.user_id), {
+  // Migration 0048: remove_official returns the revoked official's user_id,
+  // captured before the UPDATE nulls the officials row's own copy. Single
+  // source for both the audit target below and the HOME-01 cache tag — this
+  // route previously re-read it with its own pre-call select, which 0048
+  // made redundant. Optional key + null-safe access: on a database where
+  // 0048 has not been applied, user_id is absent from the jsonb response
+  // rather than present-and-null.
+  const revokedUserId = (data as unknown as { user_id?: string | null } | null)?.user_id ?? null
+
+  if (revokedUserId) {
+    // PERF-06 / F-PERF-04 Phase 1: { expire: 0 }, not profile="max" — a
+    // removed official's cached greeting name (migration 0050) should not
+    // keep showing for up to 60s after removal. Null means they never had a
+    // user_id, so no HOME-01 cache entry exists to invalidate. On a database
+    // predating 0048 this degrades to the 60s revalidate rather than going
+    // stale indefinitely; 0048 is already on main, so that window is closed.
+    revalidateTag(officialHomeCacheTag(parsed.data.tenantId, revokedUserId), {
       expire: 0,
     })
   }
@@ -91,7 +91,7 @@ export async function DELETE(
     actorRole: auth.role as AuditActorRole,
     action: 'role_revoked',
     targetType: 'user_role',
-    targetId: null,
+    targetId: revokedUserId,
     detail: { officialId: id },
   })
 

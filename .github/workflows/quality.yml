@@ -112,7 +112,10 @@ jobs:
           # Pinned to match the version verified locally. `latest` drifts and
           # previously caused a version skew where `supabase status -o env`
           # returned a key format PostgREST rejected with a consistent 403.
-          version: 2.95.4
+          # Bumped 2026-09-08: 2.95.4 predates `migration list
+          # --output-format json`, which deploy-prod.yml's F-REL-20 snapshot
+          # gate depends on — that flag only exists from v2.100.0 onward.
+          version: 2.116.0
 
       - name: Start local Supabase stack
         run: supabase start
