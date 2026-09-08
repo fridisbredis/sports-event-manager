@@ -134,26 +134,21 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   if (rpcError) return { error: rpcError.message }
 
-  // Facilities: delete + insert (unchanged pattern from before).
-  const { error: delFacError } = await supabase
-    .from('event_facilities')
-    .delete()
-    .eq('event_id', input.eventId)
-    .eq('tenant_id', input.tenantId)
-  if (delFacError) return { error: delFacError.message }
-
+  // REL-01: facilities are replaced atomically by this RPC — see migration
+  // 20260908131614 and docs/patterns/atomic-multi-table-writes.md.
+  // Previously this was a separate delete + insert with no transaction, so
+  // a failure on the insert left the delete already committed, silently
+  // wiping the event's facility list.
   const facilityRows = input.facilities
     .filter((f) => f.label.trim())
-    .map((f, i) => ({
-      label: f.label,
-      position: i,
-      event_id: input.eventId,
-      tenant_id: input.tenantId,
-    }))
-  if (facilityRows.length > 0) {
-    const { error: insFacError } = await supabase.from('event_facilities').insert(facilityRows)
-    if (insFacError) return { error: insFacError.message }
-  }
+    .map((f, i) => ({ label: f.label, position: i }))
+
+  const { error: facError } = await supabase.rpc('sync_event_facilities', {
+    p_event_id: input.eventId,
+    p_tenant_id: input.tenantId,
+    p_facilities: facilityRows,
+  })
+  if (facError) return { error: facError.message }
 
   revalidatePath(`/${input.tenantSlug}/admin/event`)
   revalidatePath(`/${input.tenantSlug}/admin/dashboard`)

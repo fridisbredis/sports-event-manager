@@ -889,6 +889,10 @@ export type Database = {
           over_capacity: number
         }[]
       }
+      sync_event_facilities: {
+        Args: { p_event_id: string; p_facilities: Json; p_tenant_id: string }
+        Returns: undefined
+      }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
         Returns: undefined

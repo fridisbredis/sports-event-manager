@@ -35,12 +35,22 @@ function chain(result: unknown) {
   return builder
 }
 
-function mockClient(fromMock: ReturnType<typeof vi.fn>, rpcResult: unknown = { error: null }) {
+// sync_event_stages and sync_event_facilities are both plain RPC calls now
+// (REL-01), so a single blanket rpc mock can no longer distinguish which one
+// failed — results are looked up by function name, defaulting to success.
+function mockClient(
+  fromMock: ReturnType<typeof vi.fn>,
+  rpcResults: Partial<Record<'sync_event_stages' | 'sync_event_facilities', unknown>> = {}
+) {
+  const rpcMock = vi.fn((fn: string) =>
+    Promise.resolve(rpcResults[fn as 'sync_event_stages' | 'sync_event_facilities'] ?? { error: null })
+  )
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
     from: fromMock,
-    rpc: vi.fn().mockResolvedValue(rpcResult),
+    rpc: rpcMock,
   } as never)
+  return rpcMock
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
@@ -182,36 +192,41 @@ describe('saveEvent', () => {
     expect(updateTag).not.toHaveBeenCalled()
   })
 
-  it('returns the rpc error message and skips facility writes when sync_event_stages fails', async () => {
+  it('returns the rpc error message and skips facility sync when sync_event_stages fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
     const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
-    mockClient(fromMock, { error: { message: 'stage sync failed' } })
+    const rpcMock = mockClient(fromMock, {
+      sync_event_stages: { error: { message: 'stage sync failed' } },
+    })
 
     const result = await saveEvent(BASE_INPUT)
 
     expect(result).toEqual({ error: 'stage sync failed' })
     expect(fromMock).toHaveBeenCalledTimes(2)
+    expect(rpcMock).not.toHaveBeenCalledWith('sync_event_facilities', expect.anything())
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
 
-  it('returns the db error message and skips revalidation when deleting facilities fails', async () => {
+  // REL-01: facilities are now replaced atomically via the
+  // sync_event_facilities RPC (migration 20260908131614) instead of a
+  // separate delete + insert — see
+  // tests/integration/sync-event-facilities-atomicity.test.ts for the
+  // real-Postgres proof that a partial failure rolls back both statements.
+  it('returns the rpc error message and skips revalidation when sync_event_facilities fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
-    const delFacBuilder = chain({ error: { message: 'delete facilities failed' } })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(statusBuilder)
-      .mockReturnValueOnce(eventsBuilder)
-      .mockReturnValueOnce(delFacBuilder)
-    mockClient(fromMock, { error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    mockClient(fromMock, {
+      sync_event_facilities: { error: { message: 'facility sync failed' } },
+    })
 
     const result = await saveEvent(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'delete facilities failed' })
+    expect(result).toEqual({ error: 'facility sync failed' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -220,18 +235,13 @@ describe('saveEvent', () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
-    const delFacBuilder = chain({ error: null })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(statusBuilder)
-      .mockReturnValueOnce(eventsBuilder)
-      .mockReturnValueOnce(delFacBuilder)
-    mockClient(fromMock, { error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    mockClient(fromMock)
 
     const result = await saveEvent({ ...BASE_INPUT, stages: [NON_RACE_STAGE] })
 
     expect(result).toEqual({})
-    expect(fromMock).toHaveBeenCalledTimes(3)
+    expect(fromMock).toHaveBeenCalledTimes(2)
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/dashboard')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
@@ -245,13 +255,8 @@ describe('saveEvent', () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('published')
     const eventsBuilder = chain({ error: null })
-    const delFacBuilder = chain({ error: null })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(statusBuilder)
-      .mockReturnValueOnce(eventsBuilder)
-      .mockReturnValueOnce(delFacBuilder)
-    mockClient(fromMock, { error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    mockClient(fromMock)
 
     const result = await saveEvent({ ...BASE_INPUT, stages: [RACE_STAGE, NON_RACE_STAGE] })
 
@@ -259,30 +264,31 @@ describe('saveEvent', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
   })
 
-  it('inserts non-blank facilities and returns the db error when the insert fails', async () => {
+  it('calls sync_event_facilities with the filtered, re-positioned facilities payload', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
-    const delFacBuilder = chain({ error: null })
-    const insFacBuilder = chain({ error: { message: 'insert facilities failed' } })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(statusBuilder)
-      .mockReturnValueOnce(eventsBuilder)
-      .mockReturnValueOnce(delFacBuilder)
-      .mockReturnValueOnce(insFacBuilder)
-    mockClient(fromMock, { error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    const rpcMock = mockClient(fromMock)
 
     const result = await saveEvent({
       ...BASE_INPUT,
-      facilities: [{ label: 'Water station', position: 0 }],
+      facilities: [
+        { label: 'Water station', position: 0 },
+        { label: '   ', position: 1 },
+        { label: 'Medical tent', position: 5 },
+      ],
     })
 
-    expect(result).toEqual({ error: 'insert facilities failed' })
-    expect(insFacBuilder.insert).toHaveBeenCalledWith([
-      { label: 'Water station', position: 0, event_id: EVENT_ID, tenant_id: TENANT_ID },
-    ])
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
+    expect(result).toEqual({})
+    expect(rpcMock).toHaveBeenCalledWith('sync_event_facilities', {
+      p_event_id: EVENT_ID,
+      p_tenant_id: TENANT_ID,
+      p_facilities: [
+        { label: 'Water station', position: 0 },
+        { label: 'Medical tent', position: 1 },
+      ],
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
   })
 })
