@@ -144,8 +144,13 @@ for (const file of files) {
     }
   }
 
-  // --- bare `SET app.x = ...`, which is session-scoped by default ---
-  const bareRe = /\bset\s+(?!local\b)(app\.[a-z_][a-z0-9_]*)\s*(=|\bto\b)/gi
+  // --- bare `SET app.x = ...` / `SET SESSION app.x = ...`, both session-scoped ---
+  // The optional `session` alternative has to sit INSIDE the pattern. With
+  // only the `(?!local\b)` lookahead, `set session app.x` did not match at
+  // all -- the lookahead passes on `session`, and then `app\.` cannot match
+  // the word `session` -- so the most explicitly session-scoped form in the
+  // language walked straight past this check. `SET LOCAL` stays excluded.
+  const bareRe = /\bset\s+(?:session\s+)?(?!local\b)(app\.[a-z_][a-z0-9_]*)\s*(=|\bto\b)/gi
   while ((m = bareRe.exec(sql)) !== null) {
     violations.push({
       file,

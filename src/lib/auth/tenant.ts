@@ -4,7 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
-import { officialHomeCacheTag } from '@/lib/cache/tags'
+import { adminDashboardCacheTag, officialHomeCacheTag } from '@/lib/cache/tags'
 import { logger } from '@/lib/logger'
 import type { User } from '@supabase/supabase-js'
 
@@ -111,9 +111,31 @@ export async function confirmOfficialInvite(
   // PERF-06 / F-PERF-04 Phase 1: same reasoning as the token-flow confirm
   // route — this just flipped invite_status to 'confirmed', so HOME-01's
   // cached read (migration 0050) must not keep serving the stale pre-confirm
-  // shape. { expire: 0 }, not profile="max": this is the post-login redirect
-  // path straight to /home, same immediacy requirement as the confirm route.
+  // shape. { expire: 0 }, not profile="max", because the official who just
+  // confirmed is the same user who reads this tag — it is registered on
+  // (official)/[tenantSlug]/home/page.tsx keyed on their own user_id — so a
+  // stale window would serve that user the pre-confirm shape of their own
+  // write.
+  // Unlike the token-flow confirm route, this path does NOT redirect to
+  // /home: the only caller (actions/confirm-invite-by-phone.ts) redirects to
+  // `/${tenantSlug}/assignments`, which has no route under
+  // (official)/[tenantSlug]/. That is a separate pre-existing defect; the
+  // invalidation is still correct for whenever /home is next loaded.
   revalidateTag(officialHomeCacheTag(tenantId, userId), { expire: 0 })
+
+  // PERF-06 / F-PERF-04 Phase 3: the same invite_status flip also moves one
+  // official from invited to confirmed in the dashboard's officials counts
+  // (migration 0054). The token-flow confirm route invalidates this tag for
+  // the identical write; without it here, the phone-fallback flow left those
+  // counts stale for up to the 60s revalidate window.
+  // revalidateTag, not updateTag, and deliberately NOT for the Route-Handler
+  // reason the token route gives: this is reached from a Server Action
+  // ('use server' in actions/confirm-invite-by-phone.ts), so updateTag is
+  // available here. It just buys nothing — this tag is read by a tenant
+  // admin, a different user from the official confirming, so there is no
+  // read-your-own-writes requirement to satisfy. { expire: 0 } so the next
+  // dashboard load rebuilds rather than serving one more stale window.
+  revalidateTag(adminDashboardCacheTag(tenantId), { expire: 0 })
 
   // SEC-07: only log when the RPC actually inserted a user_roles row.
   // confirm_official_invite_by_phone's insert is `on conflict do nothing`,

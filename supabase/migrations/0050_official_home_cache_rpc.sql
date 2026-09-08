@@ -101,6 +101,15 @@ begin
   order by o.created_at desc
   limit 1;
 
+  -- Reset both GUCs before returning, matching 0051-0055. Not load-bearing on
+  -- its own: set_config(..., true) is transaction-local and each PostgREST
+  -- call is its own transaction, and a stale app.user_id would narrow a later
+  -- read rather than widen it (0055's policy treats a set app.user_id as the
+  -- own-row case). Done anyway so every cache RPC states its scope on entry
+  -- and leaves none behind, instead of this one function being the exception.
+  perform pg_catalog.set_config('app.user_id', '', true);
+  perform pg_catalog.set_config('app.tenant_id', '', true);
+
   return jsonb_build_object('name', v_name);
 end;
 $$;
