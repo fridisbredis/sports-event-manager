@@ -119,19 +119,23 @@ if [[ "$AUTO_YES" == false ]]; then
   fi
 fi
 
-for entry in "${worktree_candidates[@]}"; do
-  wt_path="${entry%%|*}"
-  if [[ -n "$(git -C "$wt_path" status --porcelain 2>/dev/null)" ]]; then
-    echo "Skipping dirty worktree: $wt_path"
-    continue
-  fi
-  git worktree remove "$wt_path" --force
-done
+if [[ ${#worktree_candidates[@]} -gt 0 ]]; then
+  for entry in "${worktree_candidates[@]}"; do
+    wt_path="${entry%%|*}"
+    if [[ -n "$(git -C "$wt_path" status --porcelain 2>/dev/null)" ]]; then
+      echo "Skipping dirty worktree: $wt_path"
+      continue
+    fi
+    git worktree remove "$wt_path" --force
+  done
+fi
 git worktree prune
 
-for b in "${branch_candidates[@]}"; do
-  git branch -D "$b"
-done
+if [[ ${#branch_candidates[@]} -gt 0 ]]; then
+  for b in "${branch_candidates[@]}"; do
+    git branch -D "$b"
+  done
+fi
 
 echo
 echo "Done."
