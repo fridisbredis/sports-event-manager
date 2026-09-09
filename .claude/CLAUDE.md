@@ -205,6 +205,21 @@ Direct subqueries on user_roles (the 0003 style) are obsolete.
 
 ---
 
+### When a server action makes more than one write
+
+If a route handler or server action performs two or more separate
+`.insert()`/`.update()`/`.delete()` calls where a later one can fail after
+an earlier one already committed, see
+`docs/patterns/atomic-multi-table-writes.md` (REL-01) before writing more
+sequential calls with individual `if (error) return` checks. The rule:
+wrap the sequence in one `plpgsql` RPC so Postgres's own transaction rolls
+back every statement together on failure. That document has the full
+checklist (locking, tenant-consistency checks, grants, the required
+atomicity-proving integration test) and links the RPC return-shape
+contract rule below for when you're also replacing an existing RPC's body.
+
+---
+
 ## Data model (Supabase Postgres)
 
 All tables have RLS enabled. Tenant isolation is enforced via RLS policies that check `tenant_id` against the requesting user's `user_roles` rows.
