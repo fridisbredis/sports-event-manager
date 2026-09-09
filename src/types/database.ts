@@ -816,6 +816,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_tenant_with_defaults: {
+        Args: { p_name: string; p_slug: string }
+        Returns: Json
+      }
       create_workstation: {
         Args: {
           p_capacity_ceiling?: number
