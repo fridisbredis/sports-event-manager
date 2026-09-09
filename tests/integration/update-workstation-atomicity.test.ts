@@ -372,6 +372,72 @@ describe('update_workstation: RLS and tenant-consistency as an authenticated cal
     expect(unchanged?.name).toBe('Tenant B Workstation')
   })
 
+  // Review follow-up (PR #156, Eduardo, second pass): the test above sends
+  // an honest p_tenant_id (tenant A's own) paired with a foreign
+  // workstation_id. That combination is rejected by the guard's own column
+  // comparison (w.tenant_id = p_tenant_id) alone — it would reject
+  // identically even with the function switched to SECURITY DEFINER, so it
+  // does not actually prove RLS is load-bearing.
+  //
+  // This test isolates RLS specifically: both p_workstation_id and
+  // p_tenant_id honestly refer to tenant B, called from tenant A's client.
+  // Both guard predicates match on columns alone, so the only thing that
+  // can make `select 1 from workstations` return zero rows for this caller
+  // is tenant_member_read_workstations hiding the row from admin A. Under
+  // SECURITY DEFINER, this exact call would sail through and update another
+  // tenant's workstation — see create-workstation-tenant-consistency.test.ts:210
+  // for the analogous case on migration 0059.
+  it('rejects an internally consistent foreign payload (own tenant_id/workstation_id pair, wrong tenant) via RLS alone', async () => {
+    const admin = serviceClient()
+    const { data: eventBForOwnPayload, error: eventBError } = await admin
+      .from('events')
+      .insert({
+        tenant_id: tenantB.id,
+        name: 'Tenant B Event For RLS-Isolated Payload',
+        event_type: 'race',
+        start_date: '2026-06-01',
+        end_date: '2026-06-01',
+      })
+      .select('id')
+      .single()
+    if (eventBError) throw eventBError
+
+    const { data: tenantBWorkstation, error: insertError } = await admin
+      .from('workstations')
+      .insert({
+        tenant_id: tenantB.id,
+        event_id: eventBForOwnPayload.id,
+        name: 'Tenant B Own-Payload Workstation',
+        capacity_ceiling: 3,
+      })
+      .select('id')
+      .single()
+    if (insertError) throw insertError
+
+    const { data, error } = await clientAdminA.rpc('update_workstation', {
+      p_workstation_id: tenantBWorkstation.id,
+      p_tenant_id: tenantB.id,
+      p_stage_id: undefined,
+      p_name: 'Hijacked via internally consistent payload',
+      p_description: undefined,
+      p_capacity_ceiling: 1,
+      p_recurring: false,
+      p_windows: [],
+      p_todos: [],
+    })
+
+    expect(data).toBeNull()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('Invalid workstation payload')
+
+    const { data: unchanged } = await admin
+      .from('workstations')
+      .select('name')
+      .eq('id', tenantBWorkstation.id)
+      .single()
+    expect(unchanged?.name).toBe('Tenant B Own-Payload Workstation')
+  })
+
   it("rejects an honest workstation_id/tenant_id paired with another tenant's stage_id", async () => {
     const workstationId = await seedOwnWorkstation()
 
