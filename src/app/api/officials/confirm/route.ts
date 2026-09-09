@@ -4,6 +4,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
+import { logQueryError } from '@/lib/db/query-error'
 
 const confirmSchema = z.object({
   token: z.string().uuid(),
@@ -26,14 +27,30 @@ export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
   const authHeader = request.headers.get('Authorization')
   let user = null
+  let authError = null
 
   if (authHeader?.startsWith('Bearer ')) {
     const bearerToken = authHeader.slice(7)
-    const { data } = await supabase.auth.getUser(bearerToken)
+    const { data, error } = await supabase.auth.getUser(bearerToken)
     user = data.user
+    authError = error
   } else {
-    const { data } = await supabase.auth.getUser()
+    const { data, error } = await supabase.auth.getUser()
     user = data.user
+    authError = error
+  }
+
+  // An expired or malformed token is the ordinary path to the 401 below and is
+  // not logged — that is a user with a stale session, not a defect. Anything
+  // else (Auth unreachable, a 5xx from GoTrue) would otherwise be
+  // indistinguishable from it, and the invitee just sees "Unauthorized".
+  if (authError && authError.status !== undefined && authError.status >= 500) {
+    logQueryError(authError, {
+      op: 'POST /api/officials/confirm',
+      table: 'auth.users',
+      kind: 'select',
+      extra: { via: authHeader?.startsWith('Bearer ') ? 'bearer' : 'cookie' },
+    })
   }
 
   if (!user) {
@@ -84,6 +101,15 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       default:
+        // The named cases above are the RPC's deliberate business-rule
+        // signals (migration 0017) and are not defects. Reaching here means
+        // something else went wrong — a schema change, an RLS regression, a
+        // renamed raise — and this is the branch that used to 500 silently.
+        logQueryError(error, {
+          op: 'POST /api/officials/confirm',
+          table: 'confirm_official_invite',
+          kind: 'rpc',
+        })
         return NextResponse.json({ error: 'Unexpected error' }, { status: 500 })
     }
   }
@@ -127,11 +153,24 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const { data: tenant } = await service
+  const { data: tenant, error: tenantError } = await service
     .from('tenants')
     .select('slug')
     .eq('id', tenantId)
     .maybeSingle()
+
+  // The confirmation itself already committed, so this must not fail the
+  // request — but a missing slug drops the caller's post-confirm redirect, so
+  // it should not be silent either.
+  if (tenantError) {
+    logQueryError(tenantError, {
+      op: 'POST /api/officials/confirm',
+      table: 'tenants',
+      kind: 'select',
+      tenantId,
+      extra: { usage: 'post_confirm_redirect' },
+    })
+  }
 
   return NextResponse.json({ ok: true, tenantSlug: tenant?.slug })
 }

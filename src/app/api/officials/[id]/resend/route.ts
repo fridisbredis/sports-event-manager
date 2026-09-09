@@ -11,6 +11,7 @@ import {
   releaseInviteRateLimit,
   type RateLimitResult,
 } from '@/lib/rate-limit'
+import { logQueryError } from '@/lib/db/query-error'
 
 const resendSchema = z.object({
   tenantId: z.string().uuid(),
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const supabase = await createSupabaseServerClient()
 
-  const { data: official } = await supabase
+  const { data: official, error: officialError } = await supabase
     .from('officials')
     .select('id, name, phone, invite_status')
     .eq('id', id)
@@ -38,6 +39,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .single()
 
   if (!official) {
+    // A failed read and a genuinely absent official both produced this 404.
+    // PGRST116 is `.single()` matching no row — the real not-found — so
+    // anything else here is a query failure wearing a 404.
+    if (officialError && officialError.code !== 'PGRST116') {
+      logQueryError(officialError, {
+        op: 'POST /api/officials/[id]/resend',
+        table: 'officials',
+        kind: 'select',
+        tenantId: parsed.data.tenantId,
+        extra: { officialId: id },
+      })
+    }
     return NextResponse.json({ error: 'Official not found' }, { status: 404 })
   }
 
@@ -124,7 +137,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // write in this codebase carries both, and a single unscoped filter is what an
   // audit has to stop and reason about.
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: updated } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('officials')
     .update({ invite_token: randomUUID(), invite_token_expires_at: tokenExpiresAt })
     .eq('id', id)
@@ -133,15 +146,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .single()
 
   if (!updated?.invite_token) {
+    // Worth logging loudly: this is the destructive edge described above. If
+    // the rotation half-applied, the admin's old link may already be dead
+    // while they only see 'Failed to refresh invite token'.
+    logQueryError(updateError, {
+      op: 'POST /api/officials/[id]/resend',
+      table: 'officials',
+      kind: 'update',
+      tenantId: parsed.data.tenantId,
+      extra: { officialId: id, reason: updateError ? 'update_error' : 'no_row_returned' },
+    })
     await releaseInviteRateLimit(parsed.data.tenantId, rateLimitPhone)
     return NextResponse.json({ error: 'Failed to refresh invite token' }, { status: 500 })
   }
 
-  const { data: tenant } = await supabase
+  const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select('name')
     .eq('id', parsed.data.tenantId)
     .single()
+
+  // Cosmetic only — the SMS falls back to 'an event' — so it must not fail a
+  // resend whose token has already been rotated.
+  if (tenantError) {
+    logQueryError(tenantError, {
+      op: 'POST /api/officials/[id]/resend',
+      table: 'tenants',
+      kind: 'select',
+      tenantId: parsed.data.tenantId,
+      extra: { usage: 'invite_sms_copy' },
+    })
+  }
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${updated.invite_token}`
 

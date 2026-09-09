@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
+import { logQueryError } from '@/lib/db/query-error'
 
 const officialSchema = z.object({
   mode: z.undefined().or(z.literal('official')),
@@ -41,6 +42,11 @@ export async function PATCH(request: NextRequest) {
     })
 
     if (error) {
+      logQueryError(error, {
+        op: 'PATCH /api/account',
+        table: 'auth.users',
+        kind: 'update',
+      })
       return NextResponse.json({ error: 'Update failed' }, { status: 500 })
     }
 
@@ -71,6 +77,16 @@ export async function PATCH(request: NextRequest) {
     .single()
 
   if (error || !official) {
+    logQueryError(error, {
+      op: 'PATCH /api/account',
+      table: 'officials',
+      kind: 'update',
+      tenantId,
+      // No error but no row means the filter matched nothing (not a confirmed
+      // official in this tenant) rather than a query failure — worth telling
+      // apart in Log Analytics, since only one of the two is a bug here.
+      extra: { matchedNoRow: !error && !official },
+    })
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
 
