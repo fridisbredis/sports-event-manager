@@ -41,6 +41,9 @@
     "byWorkstation": "Work area",
     "noAssignments": "No assignments yet",
     "noAssignmentsDescription": "Your schedule will appear here once you've been assigned.",
+    "noAssignmentsOnDay": "Nothing on this day",
+    "noAssignmentsOnDayDescription": "You have no assignments on this day. Pick another day above.",
+    "dayTabsLabel": "Choose a day",
     "workstation": "Work area",
     "time": "Time",
     "checklist": "Checklist"
