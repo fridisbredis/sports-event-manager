@@ -51,5 +51,7 @@ AGENTS.md
 !.claude/agents/**
 !.claude/skills/
 !.claude/skills/**
+!.claude/reference/
+!.claude/reference/**
 bash.exe.stackdump
 reviewerfindings.json*
