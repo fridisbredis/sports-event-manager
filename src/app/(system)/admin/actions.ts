@@ -62,73 +62,30 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   const slug = toSlug(parsed.data.name)
   if (!slug) return { error: 'Invalid name' }
 
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    .insert({
-      name: parsed.data.name,
-      slug,
-      is_active: true,
-      tier: 'standard',
-      feature_flags: {},
-    })
-    .select('id')
-    .single()
+  // REL-01: tenant + default event + default stages are created atomically
+  // by this RPC — see migration 20260908130253 and
+  // docs/patterns/atomic-multi-table-writes.md. Previously these were three
+  // separate .insert() calls with no transaction, so a failure on the third
+  // step left an orphaned tenant with no event/stages behind.
+  const { data: rpcData, error: rpcError } = await supabase.rpc('create_tenant_with_defaults', {
+    p_name: parsed.data.name,
+    p_slug: slug,
+  })
 
-  if (tenantError) {
-    if (tenantError.code === '23505') return { error: 'A tenant with that name already exists' }
+  if (rpcError) {
+    if (rpcError.code === '23505') return { error: 'A tenant with that name already exists' }
     return { error: 'Failed to create tenant' }
   }
 
-  const { data: event, error: eventError } = await supabase
-    .from('events')
-    .insert({
-      tenant_id: tenant.id,
-      name: parsed.data.name,
-      event_type: 'Event',
-      status: 'draft',
-      scheduling_granularity_min: 60,
-    })
-    .select('id')
-    .single()
-
-  if (eventError || !event) return { error: 'Failed to create event' }
-
-  const { error: stagesError } = await supabase.from('event_stages').insert([
-    {
-      event_id: event.id,
-      tenant_id: tenant.id,
-      name: 'Setup',
-      stage_type: 'non_race',
-      race_type: 'distance',
-      position: 0,
-    },
-    {
-      event_id: event.id,
-      tenant_id: tenant.id,
-      name: 'Race',
-      stage_type: 'race',
-      race_type: 'distance',
-      position: 1,
-    },
-    {
-      event_id: event.id,
-      tenant_id: tenant.id,
-      name: 'Teardown',
-      stage_type: 'non_race',
-      race_type: 'distance',
-      position: 2,
-    },
-  ])
-
-  if (stagesError) return { error: 'Failed to create default stages' }
+  const { tenant_id: tenantId } = rpcData as unknown as { tenant_id: string; event_id: string }
 
   await logAuditEvent({
-    tenantId: tenant.id,
+    tenantId,
     actorUserId: userId,
     actorRole: 'system_admin',
     action: 'tenant_created',
     targetType: 'tenant',
-    targetId: tenant.id,
+    targetId: tenantId,
     detail: { name: parsed.data.name, slug },
   })
 

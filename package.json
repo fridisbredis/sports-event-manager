@@ -19,7 +19,8 @@
     "seed:dev:local": "node scripts/seed-dev-local.mjs",
     "seed:perf": "tsx scripts/seed-perf.ts",
     "seed:perf:clean": "tsx scripts/seed-perf-clean.ts",
-    "perf:measure": "tsx scripts/perf-measure.ts"
+    "perf:measure": "tsx scripts/perf-measure.ts",
+    "clean-branches": "bash scripts/clean-branches.sh"
   },
   "dependencies": {
     "@gravity-ui/icons": "^2.20.0",
