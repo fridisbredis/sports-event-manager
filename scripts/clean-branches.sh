@@ -24,10 +24,13 @@
 # A branch is NEVER a candidate if it has an OPEN PR, or if it's the branch
 # currently checked out, or if it's main/master.
 #
-# Worktrees are listed separately — this script never assumes a worktree is
-# safe just because its branch is. It only prunes worktrees whose branch is
-# about to be deleted, and only after confirming there is no uncommitted
-# work in that worktree.
+# Worktrees are listed separately, but ARE gated on branch candidacy: a
+# worktree is only ever a candidate if its branch is also a branch_candidate
+# (i.e. already about to be deleted), and even then only after confirming
+# there is no uncommitted work in it. `git status --porcelain` does not see
+# gitignored files, so a clean worktree can still contain a `.env.local` or
+# `node_modules` that `git worktree remove --force` will silently delete —
+# unlike `git branch -D`, this is NOT recoverable via reflog.
 #
 # USAGE
 #   scripts/clean-branches.sh          # dry run — just lists candidates
@@ -81,6 +84,16 @@ while IFS= read -r line; do
   wt_path=$(awk '{print $1}' <<<"$line")
   wt_branch=$(sed -n 's/.*\[\(.*\)\]/\1/p' <<<"$line")
   [[ "$wt_path" == "$(pwd)" ]] && continue # main worktree, never touch
+
+  # Only a candidate if its branch is itself about to be deleted — a worktree
+  # for a branch with an open PR (or any branch not in branch_candidates)
+  # must never be touched, even if its working tree happens to be clean.
+  is_candidate=false
+  for b in "${branch_candidates[@]:-}"; do
+    [[ "$b" == "$wt_branch" ]] && is_candidate=true && break
+  done
+  [[ "$is_candidate" == false ]] && continue
+
   worktree_candidates+=("$wt_path|$wt_branch")
 done < <(git worktree list)
 
@@ -99,7 +112,7 @@ fi
 
 if [[ ${#worktree_candidates[@]} -gt 0 ]]; then
   echo
-  echo "Worktrees found (removed regardless of branch state — you asked for 0 worktrees):"
+  echo "Worktrees to remove (branch is also being deleted; --force removes gitignored files like .env.local and node_modules too, NOT recoverable via reflog):"
   for entry in "${worktree_candidates[@]}"; do
     wt_path="${entry%%|*}"
     dirty=""
