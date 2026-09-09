@@ -688,8 +688,25 @@ itself.
   showed no collisions. Normalized all 23 rows the same day via a plain
   `UPDATE officials SET phone = ltrim(phone, '+') WHERE phone LIKE '+%'` (data
   cleanup, not a schema change — no new migration file). 0 rows with a
-  leading `+` remain. The manual SMS-delivery re-verification from §6/§7
-  is still outstanding.
+  leading `+` remain. Dev normalized the same way 2026-09-01 (14 rows).
+  **The manual SMS-delivery re-verification from §6/§7 was completed
+  2026-08-18** (this line previously said it was still outstanding — that
+  was stale; see the testing doc for the actual sign-off) — all three
+  Twilio call sites (`officials/route.ts:105`,
+  `officials/[id]/resend/route.ts:87`, `announcements/route.ts:70`) were
+  manually verified against dev with a real phone number after the
+  `toTwilioE164` fix. **The one genuinely remaining gap was §3's note that
+  the 0018 RPC (`confirm_official_invite_by_phone`) had never been
+  exercised end-to-end** — closed 2026-09-08 by
+  `tests/integration/confirm-official-invite-by-phone.test.ts` (added in
+  PR #120, 2026-09-03; re-run against a fresh local reset 2026-09-08,
+  11/11 passing), which plants rows in the exact
+  `invite_status = 'invited'` / `invite_token IS NULL` state the app never
+  produces on its own and exercises consent enforcement, the row-lock race,
+  the cross-role upsert (0047), the anon/authenticated access-control
+  boundary, and the exact `jsonb` return shape. SEC-04 is now fully closed:
+  code deployed, prod data normalized, and both RPC paths verified against
+  real Postgres.
 - Whether the `participant` role ships in this version (F-REL-07). SEC-02
   and SEC-05 depend on the answer. (F-SEC-10's retention position is
   resolved independently as of 2026-08-25 — see SEC-09.)
