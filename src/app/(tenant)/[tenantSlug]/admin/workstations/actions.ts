@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { translateDbError } from '@/lib/actions/db-error-message'
 import { workstationsCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
 
@@ -86,7 +87,14 @@ export async function createWorkstation(
     })) as unknown as Json,
   })
 
-  if (rpcError) return { error: rpcError.message }
+  if (rpcError)
+    return {
+      error: await translateDbError(
+        'createWorkstation: create_workstation failed',
+        rpcError,
+        'workstations.genericSaveError'
+      ),
+    }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
   // updateTag (not revalidateTag) so the admin who just created this
@@ -162,7 +170,14 @@ export async function updateWorkstation(
     p_todos: validTodos as unknown as Json,
   })
 
-  if (rpcError) return { error: rpcError.message }
+  if (rpcError)
+    return {
+      error: await translateDbError(
+        'updateWorkstation: update_workstation failed',
+        rpcError,
+        'workstations.genericSaveError'
+      ),
+    }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
   // updateTag (not revalidateTag) so the admin who just updated this
@@ -210,7 +225,14 @@ export async function deleteWorkstation(
     .eq('id', input.workstationId)
     .eq('tenant_id', parsedTenantId.data)
 
-  if (error) return { error: error.message }
+  if (error)
+    return {
+      error: await translateDbError(
+        'deleteWorkstation: delete failed',
+        error,
+        'workstations.genericDeleteError'
+      ),
+    }
 
   revalidatePath(`/${input.tenantSlug}/admin/workstations`)
   // updateTag (not revalidateTag) so the admin who just deleted this

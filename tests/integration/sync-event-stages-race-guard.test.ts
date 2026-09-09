@@ -16,6 +16,13 @@ import {
 // role_granted key out of confirm_official_invite_by_phone between
 // migrations 0043 and 0045.
 //
+// F-REL-22 (migration 20260909130951): the Race-stage guard's SQLSTATE was
+// changed from 23514 to a custom P0003 so the app layer can tell it apart
+// from event_stages_times_order_check, which also raises plain 23514 from
+// the same function's INSERT ... ON CONFLICT UPDATE. A mocked unit test
+// cannot prove this discrimination — see the last test in this file, which
+// asserts both codes from one real Postgres session.
+//
 // Migration 20260908143523 closed the TOCTOU race between this function and
 // publish_event by adding SELECT ... FOR UPDATE to both functions' events
 // read. supabase-js/PostgREST has no way to hold one transaction open across
@@ -119,7 +126,7 @@ describe('sync_event_stages RPC: published-event Race-stage guard', () => {
       ],
     })
 
-    expect(error?.code).toBe('23514')
+    expect(error?.code).toBe('P0003')
     expect(error?.message).toContain('Cannot remove the last Race stage from a published event.')
     // The whole call must have rolled back — the row is still a Race stage.
     expect(await countRaceStages(event.id)).toBe(1)
@@ -147,7 +154,7 @@ describe('sync_event_stages RPC: published-event Race-stage guard', () => {
       p_stages: [],
     })
 
-    expect(error?.code).toBe('23514')
+    expect(error?.code).toBe('P0003')
     // Rolled back — the original Race stage must still be there.
     expect(await countRaceStages(event.id)).toBe(1)
   })
@@ -169,6 +176,48 @@ describe('sync_event_stages RPC: published-event Race-stage guard', () => {
 
     expect(error).toBeNull()
     expect(await countRaceStages(event.id)).toBe(0)
+  })
+
+  it('distinguishes the Race-stage guard (P0003) from event_stages_times_order_check (23514)', async () => {
+    // F-REL-22: both raises happen inside sync_event_stages. Only a real
+    // Postgres call proves they carry different SQLSTATEs — a mock can be
+    // told to return whatever code the test author expects.
+    const publishedEvent = await createEvent('draft')
+    const { error: seedError } = await clientAdmin.rpc('sync_event_stages', {
+      p_event_id: publishedEvent.id,
+      p_tenant_id: tenant.id,
+      p_stages: await raceStagePayload(),
+    })
+    expect(seedError).toBeNull()
+    const admin = serviceClient()
+    await admin.from('events').update({ status: 'published' }).eq('id', publishedEvent.id)
+
+    const { error: raceStageError } = await clientAdmin.rpc('sync_event_stages', {
+      p_event_id: publishedEvent.id,
+      p_tenant_id: tenant.id,
+      p_stages: [],
+    })
+    expect(raceStageError?.code).toBe('P0003')
+
+    const draftEvent = await createEvent('draft')
+    const { error: timesOrderError } = await clientAdmin.rpc('sync_event_stages', {
+      p_event_id: draftEvent.id,
+      p_tenant_id: tenant.id,
+      p_stages: [
+        {
+          name: 'Backwards stage',
+          stage_type: 'race',
+          race_type: 'time',
+          start_time: '2026-06-01T10:00:00Z',
+          end_time: '2026-06-01T08:00:00Z',
+          venue: '',
+          position: 0,
+          distances: [],
+        },
+      ],
+    })
+    expect(timesOrderError?.code).toBe('23514')
+    expect(timesOrderError?.code).not.toBe(raceStageError?.code)
   })
 })
 

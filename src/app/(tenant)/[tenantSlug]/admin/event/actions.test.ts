@@ -158,6 +158,10 @@ describe('saveEvent', () => {
     expect(result).toEqual({ error: 'Cannot remove the last Race stage from a published event.' })
   })
 
+  // F-REL-22: never forward a raw DB error.message to the client — assert
+  // the translated fallback string, not the raw message the mock returns.
+  const GENERIC_SAVE_ERROR = 'Something went wrong while saving. Please try again.'
+
   it('fails closed when the event status cannot be read', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor(null, 'connection reset')
@@ -170,11 +174,11 @@ describe('saveEvent', () => {
 
     const result = await saveEvent({ ...BASE_INPUT, stages: [NON_RACE_STAGE] })
 
-    expect(result).toEqual({ error: 'connection reset' })
+    expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
     expect(eventUpdateBuilder.update).not.toHaveBeenCalled()
   })
 
-  it('returns the db error message and skips sync_event_stages when the events update fails', async () => {
+  it('translates the db error and skips sync_event_stages when the events update fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: { message: 'events update failed' } })
@@ -188,13 +192,13 @@ describe('saveEvent', () => {
 
     const result = await saveEvent(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'events update failed' })
+    expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
     expect(rpcMock).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
 
-  it('returns the rpc error message and skips facility sync when sync_event_stages fails', async () => {
+  it('translates the rpc error and skips facility sync when sync_event_stages fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
@@ -205,11 +209,27 @@ describe('saveEvent', () => {
 
     const result = await saveEvent(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'stage sync failed' })
+    expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
     expect(fromMock).toHaveBeenCalledTimes(2)
     expect(rpcMock).not.toHaveBeenCalledWith('sync_event_facilities', expect.anything())
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
+  })
+
+  it('translates P0003 to the Race-stage-specific message from sync_event_stages', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const statusBuilder = statusBuilderFor('published')
+    const eventsBuilder = chain({ error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    mockClient(fromMock, {
+      sync_event_stages: { error: { code: 'P0003', message: 'raw pg message' } },
+    })
+
+    const result = await saveEvent({ ...BASE_INPUT, stages: [RACE_STAGE] })
+
+    expect(result).toEqual({
+      error: 'Cannot remove the last Race stage from a published event.',
+    })
   })
 
   // REL-01: facilities are now replaced atomically via the
@@ -217,7 +237,7 @@ describe('saveEvent', () => {
   // separate delete + insert — see
   // tests/integration/sync-event-facilities-atomicity.test.ts for the
   // real-Postgres proof that a partial failure rolls back both statements.
-  it('returns the rpc error message and skips revalidation when sync_event_facilities fails', async () => {
+  it('translates the rpc error and skips revalidation when sync_event_facilities fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
@@ -228,7 +248,7 @@ describe('saveEvent', () => {
 
     const result = await saveEvent(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'facility sync failed' })
+    expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })

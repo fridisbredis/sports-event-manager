@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { translateDbError } from '@/lib/actions/db-error-message'
 import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 
 const tenantIdSchema = z.string().uuid()
@@ -49,8 +50,22 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   })
 
   if (rpcError) {
-    if (rpcError.code === 'P0002') return { error: 'Event not found.' }
-    return { error: rpcError.message }
+    // 23514 covers both "name required" and "needs a Race stage" checks in
+    // publish_event — the client already pre-validates both before calling,
+    // so this is a rare backstop and a shared message is sufficient (unlike
+    // sync_event_stages, this path doesn't need the two cases told apart).
+    // P0002 keeps the shared "not found" meaning from DB_ERROR_KEYS; the
+    // fallbackKey below only applies to codes DB_ERROR_KEYS doesn't map
+    // (23514 included, since that key maps to a different, stage-times
+    // message elsewhere).
+    return {
+      error: await translateDbError(
+        'publishEvent: publish_event RPC failed',
+        rpcError,
+        'eventConfig.cannotPublishNoRaceStage',
+        { '23514': 'eventConfig.cannotPublishNoRaceStage' }
+      ),
+    }
   }
 
   // No-op: the event was already published, so nothing actually changed —

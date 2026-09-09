@@ -106,7 +106,13 @@
     "saveStage": "Save stage",
     "cancel": "Cancel",
     "publishRequiresName": "Event name is required before publishing.",
-    "eventNameEmpty": "Event name cannot be empty."
+    "eventNameEmpty": "Event name cannot be empty.",
+    "genericSaveError": "Something went wrong while saving. Please try again.",
+    "eventNotFound": "This event could not be found. Refresh the page and try again.",
+    "cannotRemoveLastRaceStage": "Cannot remove the last Race stage from a published event.",
+    "stageTimesInvalid": "A stage's end time must be after its start time.",
+    "cannotPublishNoRaceStage": "Add at least one Race stage before publishing.",
+    "logoUploadError": "Something went wrong while uploading the logo. Please try again."
   },
   "workstations": {
     "title": "Work areas",
@@ -160,6 +166,8 @@
     "noStages": "No stages defined",
     "noStagesHint": "Define stages in Event configuration before adding work areas.",
     "goToEventConfig": "Go to Event configuration",
+    "genericSaveError": "Something went wrong while saving. Please try again.",
+    "genericDeleteError": "Something went wrong while deleting. Please try again.",
     "workAreaCount_zero": "0 work areas",
     "workAreaCount_one": "{{count}} work area",
     "workAreaCount_other": "{{count}} work areas"

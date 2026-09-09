@@ -77,7 +77,10 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Event not found.' })
+    // F-REL-22: never forward the raw DB error message to the client.
+    expect(result).toEqual({
+      error: 'This event could not be found. Refresh the page and try again.',
+    })
     expect(rpcMock).toHaveBeenCalledWith('publish_event', {
       p_event_id: EVENT_ID,
       p_tenant_id: TENANT_ID,
@@ -108,7 +111,12 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Event name is required before publishing.' })
+    // F-REL-22: publish_event's two 23514 cases (blank name, no Race stage)
+    // share one translated fallback — the client already pre-validates both
+    // before calling, so this is a rare backstop and doesn't need the two
+    // discriminated (unlike sync_event_stages' P0003 vs 23514, see
+    // db-error-message.ts).
+    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
   })
 
   it('returns an error when there are no Race stages (23514)', async () => {
@@ -146,7 +154,7 @@ describe('publishEvent', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
-  it('returns the RPC error message and skips revalidation when the RPC fails', async () => {
+  it('translates the RPC error and skips revalidation when the RPC fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const rpcMock = vi
       .fn()
@@ -155,7 +163,8 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'db is down' })
+    // F-REL-22: never forward the raw DB error message to the client.
+    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
