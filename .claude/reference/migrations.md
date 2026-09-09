@@ -252,7 +252,7 @@ migration to satisfy one rule:
 What that permits and forbids:
 
 | Change                                             | Safe in one release?                                                    |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
 | New nullable column, new index, new table, new RPC | **Yes.** Old code ignores what it does not select.                      |
 | New mandatory column **with** a default            | **Yes.** Old code's `INSERT` omits the field; the default fills it.     |
 | New mandatory column **without** a default         | **No.** Every `INSERT` from old code fails for the whole window.        |
