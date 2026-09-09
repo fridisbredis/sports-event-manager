@@ -338,11 +338,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'event_stages_event_id_fkey'
-            columns: ['event_id']
+            foreignKeyName: 'event_stages_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
             isOneToOne: false
             referencedRelation: 'events'
-            referencedColumns: ['id']
+            referencedColumns: ['id', 'tenant_id']
           },
           {
             foreignKeyName: 'event_stages_tenant_id_fkey'
