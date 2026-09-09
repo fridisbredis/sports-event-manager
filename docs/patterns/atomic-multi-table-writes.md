@@ -87,8 +87,8 @@ When writing the RPC:
 - [ ] **Explicit grant, not the default PUBLIC execute.** `revoke all on
 function ... from public` then `grant execute ... to authenticated`
       (or `service_role` for the rare pre-auth case). F-SEC-13 tracks the
-      one existing RPC (`create_workstation`) that still relies on the
-      default grant — don't repeat that gap in a new one.
+      RPCs that still rely on the default grant (`create_workstation`,
+      `sync_event_stages`) — don't repeat that gap in a new one.
 - [ ] **Forward-fix header**, per `.claude/CLAUDE.md` — a brand-new RPC is
       `additive` (rollback is `drop function if exists`); a `replace` of an
       existing RPC's body needs the return-shape contract check below.
