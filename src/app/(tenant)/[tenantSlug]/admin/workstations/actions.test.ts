@@ -178,11 +178,18 @@ const UPDATE_BASE_INPUT = {
   schedulingGranularityMin: 30,
 }
 
+// REL-01: workstation/windows/todos are now updated atomically by the
+// update_workstation RPC (migration 20260908130927) instead of five
+// separate .update()/.delete()/.insert() calls — see
+// tests/integration/update-workstation-atomicity.test.ts for the
+// real-Postgres proof that a partial failure rolls back all three tables.
+// These unit tests only prove the call site passes the right args and
+// handles the RPC's response correctly.
 describe('updateWorkstation', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
-      from: vi.fn(),
+      rpc: vi.fn(),
     } as never)
 
     await expect(updateWorkstation(UPDATE_BASE_INPUT)).rejects.toThrow('NEXT_REDIRECT')
@@ -190,32 +197,32 @@ describe('updateWorkstation', () => {
     expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
   })
 
-  it('returns an authorization error for an invalid tenantId and never touches the database', async () => {
-    const fromMock = vi.fn()
-    mockFromClient(fromMock)
+  it('returns an authorization error for an invalid tenantId and never calls rpc', async () => {
+    const rpcMock = vi.fn()
+    mockClient(rpcMock)
 
     const result = await updateWorkstation({ ...UPDATE_BASE_INPUT, tenantId: 'not-a-uuid' })
 
     expect(result).toEqual({ error: 'Not authorized' })
-    expect(fromMock).not.toHaveBeenCalled()
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
-  it('returns an authorization error when access is denied and never touches the database', async () => {
+  it('returns an authorization error when access is denied and never calls rpc', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
-    const fromMock = vi.fn()
-    mockFromClient(fromMock)
+    const rpcMock = vi.fn()
+    mockClient(rpcMock)
 
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
 
     expect(result).toEqual({ error: 'Not authorized' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
-    expect(fromMock).not.toHaveBeenCalled()
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
-  it('returns a validation error when a window is shorter than the scheduling granularity and never touches the database', async () => {
+  it('returns a validation error when a window is shorter than the scheduling granularity and never calls rpc', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi.fn()
-    mockFromClient(fromMock)
+    const rpcMock = vi.fn()
+    mockClient(rpcMock)
 
     const result = await updateWorkstation({
       ...UPDATE_BASE_INPUT,
@@ -224,162 +231,61 @@ describe('updateWorkstation', () => {
     })
 
     expect(result).toEqual({ error: 'Operating window is shorter than the scheduling granularity' })
-    expect(fromMock).not.toHaveBeenCalled()
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
-  it('returns the workstation update error and stops before touching windows/todos', async () => {
+  it('calls update_workstation with the filtered windows/todos payload and revalidates on success', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chainResult({ error: { message: 'ws update failed' } }))
-    mockFromClient(fromMock)
-
-    const result = await updateWorkstation(UPDATE_BASE_INPUT)
-
-    expect(result).toEqual({ error: 'ws update failed' })
-    expect(fromMock).toHaveBeenCalledTimes(1)
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
-  })
-
-  it('returns the windows-delete error and stops before inserting windows or touching todos', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chainResult({ error: null }))
-      .mockReturnValueOnce(chainResult({ error: { message: 'window delete failed' } }))
-    mockFromClient(fromMock)
-
-    const result = await updateWorkstation(UPDATE_BASE_INPUT)
-
-    expect(result).toEqual({ error: 'window delete failed' })
-    expect(fromMock).toHaveBeenCalledTimes(2)
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
-  })
-
-  it('returns the windows-insert error and stops before touching todos', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chainResult({ error: null }))
-      .mockReturnValueOnce(chainResult({ error: null }))
-      .mockReturnValueOnce(chainResult({ error: { message: 'window insert failed' } }))
-    mockFromClient(fromMock)
-
-    const result = await updateWorkstation(UPDATE_BASE_INPUT)
-
-    expect(result).toEqual({ error: 'window insert failed' })
-    expect(fromMock).toHaveBeenCalledTimes(3)
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
-  })
-
-  it('returns the todos-delete error when windows are empty', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chainResult({ error: null })) // workstations update
-      .mockReturnValueOnce(chainResult({ error: null })) // windows delete
-      .mockReturnValueOnce(chainResult({ error: { message: 'todo delete failed' } })) // todos delete
-
-    mockFromClient(fromMock)
-
-    const result = await updateWorkstation({ ...UPDATE_BASE_INPUT, windows: [] })
-
-    expect(result).toEqual({ error: 'todo delete failed' })
-    expect(fromMock).toHaveBeenCalledTimes(3)
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
-  })
-
-  it('returns the todos-insert error', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chainResult({ error: null })) // workstations update
-      .mockReturnValueOnce(chainResult({ error: null })) // windows delete
-      .mockReturnValueOnce(chainResult({ error: null })) // todos delete
-      .mockReturnValueOnce(chainResult({ error: { message: 'todo insert failed' } })) // todos insert
-
-    mockFromClient(fromMock)
-
-    const result = await updateWorkstation({ ...UPDATE_BASE_INPUT, windows: [] })
-
-    expect(result).toEqual({ error: 'todo insert failed' })
-    expect(fromMock).toHaveBeenCalledTimes(4)
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
-  })
-
-  it('replaces windows and todos, then revalidates on success', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const wsChain = chainResult({ error: null })
-    const winDelChain = chainResult({ error: null })
-    const winInsChain = chainResult({ error: null })
-    const todoDelChain = chainResult({ error: null })
-    const todoInsChain = chainResult({ error: null })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(wsChain)
-      .mockReturnValueOnce(winDelChain)
-      .mockReturnValueOnce(winInsChain)
-      .mockReturnValueOnce(todoDelChain)
-      .mockReturnValueOnce(todoInsChain)
-    mockFromClient(fromMock)
+    const rpcMock = vi.fn().mockResolvedValue({ data: { ok: true }, error: null })
+    mockClient(rpcMock)
 
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
 
     expect(result).toEqual({})
-    expect(fromMock).toHaveBeenNthCalledWith(1, 'workstations')
-    expect(fromMock).toHaveBeenNthCalledWith(2, 'workstation_operating_windows')
-    expect(fromMock).toHaveBeenNthCalledWith(3, 'workstation_operating_windows')
-    expect(fromMock).toHaveBeenNthCalledWith(4, 'workstation_todos')
-    expect(fromMock).toHaveBeenNthCalledWith(5, 'workstation_todos')
-
-    expect(wsChain.update).toHaveBeenCalledWith({
-      stage_id: null,
-      name: 'Water station',
-      description: null,
-      capacity_ceiling: 4,
-      recurring: false,
+    expect(rpcMock).toHaveBeenCalledWith('update_workstation', {
+      p_workstation_id: WORKSTATION_ID,
+      p_tenant_id: TENANT_ID,
+      p_stage_id: undefined,
+      p_name: 'Water station',
+      p_description: undefined,
+      p_capacity_ceiling: 4,
+      p_recurring: false,
+      p_windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
+      p_todos: ['Fill cups'],
     })
-    expect(wsChain.eq).toHaveBeenNthCalledWith(1, 'id', WORKSTATION_ID)
-    expect(wsChain.eq).toHaveBeenNthCalledWith(2, 'tenant_id', TENANT_ID)
-
-    expect(winDelChain.eq).toHaveBeenCalledWith('workstation_id', WORKSTATION_ID)
-    expect(winInsChain.insert).toHaveBeenCalledWith([
-      {
-        workstation_id: WORKSTATION_ID,
-        window_start: '2026-09-01T08:00:00Z',
-        window_end: '2026-09-01T16:00:00Z',
-      },
-    ])
-
-    expect(todoDelChain.eq).toHaveBeenCalledWith('workstation_id', WORKSTATION_ID)
-    expect(todoInsChain.insert).toHaveBeenCalledWith([
-      { workstation_id: WORKSTATION_ID, instruction_text: 'Fill cups', position: 0 },
-    ])
-
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
     // PERF-06 / F-PERF-04 Phase 3
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
-  it('skips the windows/todos insert calls when both are empty', async () => {
+  it('returns the rpc error message and skips revalidation when the rpc call fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(chainResult({ error: null })) // workstations update
-      .mockReturnValueOnce(chainResult({ error: null })) // windows delete
-      .mockReturnValueOnce(chainResult({ error: null })) // todos delete
-    mockFromClient(fromMock)
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid workstation payload' },
+    })
+    mockClient(rpcMock)
+
+    const result = await updateWorkstation(UPDATE_BASE_INPUT)
+
+    expect(result).toEqual({ error: 'Invalid workstation payload' })
+    expect(revalidatePath).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
+  })
+
+  it('calls update_workstation with empty windows/todos arrays when both are empty', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const rpcMock = vi.fn().mockResolvedValue({ data: { ok: true }, error: null })
+    mockClient(rpcMock)
 
     const result = await updateWorkstation({ ...UPDATE_BASE_INPUT, windows: [], todos: [] })
 
     expect(result).toEqual({})
-    expect(fromMock).toHaveBeenCalledTimes(3)
+    expect(rpcMock).toHaveBeenCalledWith(
+      'update_workstation',
+      expect.objectContaining({ p_windows: [], p_todos: [] })
+    )
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
     // PERF-06 / F-PERF-04 Phase 3
