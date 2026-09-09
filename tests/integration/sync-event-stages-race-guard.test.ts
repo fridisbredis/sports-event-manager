@@ -170,6 +170,71 @@ describe('sync_event_stages RPC: published-event Race-stage guard', () => {
     expect(error).toBeNull()
     expect(await countRaceStages(event.id)).toBe(0)
   })
+
+  // SEC-01 (migration 20260909123808): event_distances.stage_id got a
+  // composite (stage_id, tenant_id) FK. A plain multi-column ON DELETE SET
+  // NULL nulls every column in the FK, including tenant_id — which is
+  // NOT NULL on event_distances — so sync_event_stages's own
+  // `DELETE FROM event_stages WHERE ... id <> ALL(...)` statement (which
+  // runs before this function's later unconditional
+  // `DELETE FROM event_distances`) would raise a not-null violation the
+  // instant a removed stage still has a distance row pointing at it,
+  // aborting the whole call. The migration fixes this with the PG15+
+  // column-scoped `ON DELETE SET NULL (stage_id)` syntax, so only stage_id
+  // is nulled and tenant_id is left alone — after which this function's own
+  // unconditional distances DELETE/INSERT still fully replaces the set as
+  // designed. This test only needs to prove the stage removal itself no
+  // longer errors; it does not assert on the (momentarily nulled, then
+  // deleted) intermediate distance row.
+  it('removes a stage with distances attached without erroring', async () => {
+    const event = await createEvent('draft')
+    const { error: seedError } = await clientAdmin.rpc('sync_event_stages', {
+      p_event_id: event.id,
+      p_tenant_id: tenant.id,
+      p_stages: await raceStagePayload(),
+    })
+    expect(seedError).toBeNull()
+
+    const admin = serviceClient()
+    const { data: stage, error: stageError } = await admin
+      .from('event_stages')
+      .select('id')
+      .eq('event_id', event.id)
+      .single()
+    if (stageError) throw stageError
+
+    const { error: distanceError } = await admin.from('event_distances').insert({
+      tenant_id: tenant.id,
+      event_id: event.id,
+      stage_id: stage.id,
+      label: 'Distance on stage to be removed',
+    })
+    if (distanceError) throw distanceError
+
+    // Replace with a different-named Race stage (no id), which is treated
+    // as removing the old stage and inserting a new one — the exact
+    // "edit an event, remove a stage that has distances" flow the bug
+    // report described.
+    const { error } = await clientAdmin.rpc('sync_event_stages', {
+      p_event_id: event.id,
+      p_tenant_id: tenant.id,
+      p_stages: [
+        {
+          name: 'Replacement Stage',
+          stage_type: 'race',
+          race_type: 'distance',
+          start_time: '2026-06-01T08:00:00Z',
+          end_time: '2026-06-01T10:00:00Z',
+          venue: 'Start line',
+          position: 0,
+          distances: [],
+        },
+      ],
+    })
+
+    expect(error).toBeNull()
+    expect(await countRaceStages(event.id)).toBe(1)
+  })
 })
 
 describe('publish_event RPC', () => {

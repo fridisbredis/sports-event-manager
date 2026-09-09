@@ -144,6 +144,28 @@ describe('SEC-01: event_facilities/event_distances reject cross-tenant event_id/
     expect(error?.message).toMatch(/event_distances_stage_tenant_fkey/)
   })
 
+  it('rejects a direct UPDATE that moves event_facilities.event_id to a foreign tenant', async () => {
+    const admin = serviceClient()
+    const { data: ownFacility, error: insertError } = await admin
+      .from('event_facilities')
+      .insert({
+        tenant_id: tenantA.id,
+        event_id: eventA.id,
+        label: 'Own-tenant facility for update test',
+      })
+      .select()
+      .single()
+    if (insertError) throw insertError
+
+    const { error } = await admin
+      .from('event_facilities')
+      .update({ event_id: eventB.id })
+      .eq('id', ownFacility.id)
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toMatch(/event_facilities_event_tenant_fkey/)
+  })
+
   it('still allows an honest tenant_id/event_id/stage_id combination', async () => {
     const admin = serviceClient()
     const { data: stageAData, error: stageAError } = await admin

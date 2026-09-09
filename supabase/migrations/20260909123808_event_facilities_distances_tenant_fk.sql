@@ -26,7 +26,7 @@
 -- had pre-0060.
 --
 -- Verified no pre-existing inconsistent rows before writing this migration
--- (all four queries returned zero rows, run 2026-09-09):
+-- (all three queries returned zero rows, run 2026-09-09):
 --   select f.id from event_facilities f join events e on e.id = f.event_id
 --     where e.tenant_id <> f.tenant_id;
 --   select d.id from event_distances d join events e on e.id = d.event_id
@@ -36,7 +36,7 @@
 --   Dev (lhflutwvwvzawzbcuwup): 0 rows (all three).
 --   Prod (rauvaxuypujbeintnnoe): 0 rows (all three).
 --
--- Forward-fix: additive
+-- Forward-fix: destructive
 --   Rollback: a new migration dropping the three composite FKs
 --             (event_facilities_event_tenant_fkey,
 --             event_distances_event_tenant_fkey,
@@ -88,7 +88,8 @@ ALTER TABLE event_distances
   ADD CONSTRAINT event_distances_event_tenant_fkey
     FOREIGN KEY (event_id, tenant_id) REFERENCES events(id, tenant_id) ON DELETE CASCADE,
   ADD CONSTRAINT event_distances_stage_tenant_fkey
-    FOREIGN KEY (stage_id, tenant_id) REFERENCES event_stages(id, tenant_id) ON DELETE SET NULL;
+    FOREIGN KEY (stage_id, tenant_id) REFERENCES event_stages(id, tenant_id)
+    ON DELETE SET NULL (stage_id);
 
 COMMENT ON CONSTRAINT event_distances_event_tenant_fkey ON event_distances IS
   'SEC-01: pins event_id to the same tenant_id as the event_distances row, '
