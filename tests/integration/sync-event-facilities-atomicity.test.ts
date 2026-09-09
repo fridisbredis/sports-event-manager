@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createTenant, cleanupTenant, serviceClient } from './helpers'
+import {
+  createTenant,
+  createUserWithRole,
+  signInAsClient,
+  cleanupTenant,
+  serviceClient,
+} from './helpers'
 
 // REL-01: saveEvent() in src/app/(tenant)/[tenantSlug]/admin/event/actions.ts
 // replaces event_facilities via two separate operations with no surrounding
@@ -134,5 +140,114 @@ describe('saveEvent: atomicity of event_facilities replacement', () => {
       { label: 'Showers', position: 0 },
       { label: 'Parking', position: 1 },
     ])
+  })
+})
+
+// Review follow-up (PR #157, Eduardo): every test above calls
+// sync_event_facilities via serviceClient(), which has BYPASSRLS. The
+// migration header claims "RLS on event_facilities ... provides a second
+// layer" but nothing verified that claim — the function is the default
+// SECURITY INVOKER with the default PUBLIC execute grant, so its entire
+// security model *is* RLS. This suite runs the RPC as a real authenticated
+// tenant_admin, mirroring create-workstation-tenant-consistency.test.ts
+// (migration 0059's analogous coverage for create_workstation).
+//
+// Note: unlike create_workstation/update_workstation, this RPC does not
+// itself check that p_event_id belongs to p_tenant_id (tracked separately
+// as a pre-existing SEC-01 gap, not introduced by this PR). What these
+// tests verify is narrower and still meaningful: that RLS's own
+// USING (get_user_role(tenant_id) = 'tenant_admin' ...) clause — which the
+// policy declares without an explicit WITH CHECK — is still enforced by
+// Postgres as the implicit check on INSERT, and actually blocks a caller
+// from writing rows tagged with a foreign tenant_id (raising 42501),
+// independent of what p_event_id/p_tenant_id claim.
+describe('sync_event_facilities: RLS as an authenticated caller', () => {
+  let tenantA: { id: string }
+  let tenantB: { id: string }
+  let eventA: string
+  let eventB: string
+  let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
+
+  beforeAll(async () => {
+    tenantA = await createTenant('Tenant A Facilities RLS')
+    tenantB = await createTenant('Tenant B Facilities RLS')
+
+    const adminA = await createUserWithRole(tenantA.id, 'tenant_admin')
+    clientAdminA = await signInAsClient(adminA.phone, '000000')
+
+    const admin = serviceClient()
+
+    const { data: eventAData, error: eventAError } = await admin
+      .from('events')
+      .insert({
+        tenant_id: tenantA.id,
+        name: 'Tenant A Event',
+        event_type: 'race',
+        start_date: '2026-06-01',
+        end_date: '2026-06-01',
+      })
+      .select('id')
+      .single()
+    if (eventAError) throw eventAError
+    eventA = eventAData.id
+
+    const { data: eventBData, error: eventBError } = await admin
+      .from('events')
+      .insert({
+        tenant_id: tenantB.id,
+        name: 'Tenant B Event',
+        event_type: 'race',
+        start_date: '2026-06-01',
+        end_date: '2026-06-01',
+      })
+      .select('id')
+      .single()
+    if (eventBError) throw eventBError
+    eventB = eventBData.id
+  })
+
+  afterAll(async () => {
+    await cleanupTenant(tenantA.id)
+    await cleanupTenant(tenantB.id)
+  })
+
+  it('allows an authenticated tenant_admin to sync facilities on their own tenant/event', async () => {
+    const { error } = await clientAdminA.rpc('sync_event_facilities', {
+      p_event_id: eventA,
+      p_tenant_id: tenantA.id,
+      p_facilities: [{ label: 'Showers', position: 0 }],
+    })
+
+    expect(error).toBeNull()
+
+    const admin = serviceClient()
+    const { data: facilities } = await admin
+      .from('event_facilities')
+      .select('label, position')
+      .eq('event_id', eventA)
+    expect(facilities).toEqual([{ label: 'Showers', position: 0 }])
+  })
+
+  it("rejects a tenant_admin writing rows tagged with another tenant's tenant_id via RLS", async () => {
+    const { data, error } = await clientAdminA.rpc('sync_event_facilities', {
+      p_event_id: eventB,
+      p_tenant_id: tenantB.id,
+      p_facilities: [{ label: 'Hijacked', position: 0 }],
+    })
+
+    // RLS's USING clause on tenant_admin_manage_event_facilities checks
+    // get_user_role(tenant_id) — tenant A's admin has no role on tenant B,
+    // so Postgres enforces it as the implicit WITH CHECK on the INSERT and
+    // raises 42501 rather than silently filtering the row.
+    expect(data).toBeNull()
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe('42501')
+
+    const admin = serviceClient()
+    const { data: facilities } = await admin
+      .from('event_facilities')
+      .select('label')
+      .eq('event_id', eventB)
+    expect(facilities).toEqual([])
   })
 })

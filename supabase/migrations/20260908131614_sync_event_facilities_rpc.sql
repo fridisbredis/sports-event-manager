@@ -32,9 +32,11 @@
 --   Rollback: drop function if exists public.sync_event_facilities(uuid, uuid, jsonb);
 --   Data:     no data loss — this only adds a new function, no existing
 --             table or row is touched.
---   Blast:    none until the app is changed to call it; the old two-step
---             delete+insert code path in saveEvent() keeps working
---             unmodified until that follow-up change lands.
+--   Blast:    saveEvent() in this same PR is the only caller — see
+--             src/app/(tenant)/[tenantSlug]/admin/event/actions.ts. A
+--             rollback of this migration breaks that server action
+--             immediately; it must be rolled back together with reverting
+--             the actions.ts change, not on its own.
 --   Window:   compatible — additive, no schema old code depends on changes.
 -- ============================================================================
 
@@ -57,7 +59,7 @@ begin
     (f->>'label')::text,
     coalesce((f->>'position')::integer, 0)
   from jsonb_array_elements(p_facilities) as f
-  where trim((f->>'label')::text) <> '' and (f->>'label') is not null;
+  where trim((f->>'label')::text) <> '';
 end;
 $$;
 
