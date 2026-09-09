@@ -301,6 +301,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check for duplicate migration number prefixes
         run: |
@@ -339,6 +341,77 @@ jobs:
           fi
 
           echo "No migration number collisions."
+
+      - name: Check new migrations sort above base branch
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # supabase db push refuses to apply a migration whose prefix sorts
+          # below the highest version already recorded for that environment
+          # (see .claude/CLAUDE.md "Ordering hazard"). A PR that was green
+          # against an older main can still land a migration with a prefix
+          # that sorts below one merged in the meantime — this check re-runs
+          # on every push to the head branch, so it only catches that if
+          # "require branches to be up to date before merging" is also
+          # enabled; without that setting this step can go stale the same
+          # way the PR it's meant to catch does.
+          #
+          # Only ADDED files count (--diff-filter=A), same as the forward-fix
+          # job above — editing an existing 00NN file's body must not trip
+          # this, and legacy 00NN prefixes always sort below every timestamp
+          # prefix anyway, so they can't threaten the floor.
+          if [ -n "${BASE_SHA:-}" ]; then
+            base="$BASE_SHA"
+          else
+            base="HEAD^"
+          fi
+
+          new_migrations=$(git diff --name-only --diff-filter=A "$base" HEAD \
+            -- 'supabase/migrations/*.sql')
+
+          if [ -z "$new_migrations" ]; then
+            echo "No new migrations in this change."
+            exit 0
+          fi
+
+          floor=$(git show "$base:supabase/migrations" 2>/dev/null \
+            | grep -E '\.sql$' \
+            | sed -E 's/^([0-9]+)_.*/\1/' \
+            | sort | tail -1)
+          floor="${floor:-0}"
+
+          echo "Highest migration prefix on base branch: $floor"
+
+          failed=""
+          for file in $new_migrations; do
+            prefix=$(basename "$file" | sed -E 's/^([0-9]+)_.*/\1/')
+            # Compare as strings first (equal length = numeric order for
+            # same-format prefixes); pad to compare 00NN against timestamps.
+            if [ "$(printf '%020d\n%020d\n' "$prefix" "$floor" | sort | tail -1)" != "$(printf '%020d' "$prefix")" ]; then
+              echo "FAIL $file — prefix $prefix does not sort above base branch floor $floor"
+              failed="$failed $file"
+            else
+              echo "OK   $file — prefix $prefix"
+            fi
+          done
+
+          if [ -n "$failed" ]; then
+            cat <<EOF
+
+          One or more new migrations sort below the highest migration prefix
+          already on main. supabase db push will silently skip them instead
+          of applying them (this is what caused F-REL-09).
+
+          Rebase onto the latest main and regenerate the migration filename
+          with 'supabase migration new <name>' so its timestamp sorts above
+          the current floor.
+          EOF
+            exit 1
+          fi
+
+          echo "All new migrations sort above the base branch floor."
 
   build:
     name: Production build

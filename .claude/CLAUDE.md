@@ -299,6 +299,52 @@ people, this means checking with each other before merging a
 newly-timestamped migration if there's any open PR still carrying a `00NN`
 file.
 
+**This same class of hazard can recur going forward, not just during the
+`00NN` → timestamp cutover** — any time two migrations are written in
+parallel, whichever one *merges* second can still land with a prefix that
+sorts below one already recorded in an environment's ledger, because
+`supabase db push`'s ceiling is set by merge order onto `main`, not by
+when either migration was written. The `Migration number collision` CI job
+(`quality.yml`) has a second step for this: it compares every newly added
+migration file's prefix (`--diff-filter=A`, same as the forward-fix check)
+against the highest prefix already present on the PR's base branch, and
+fails the PR if a new file sorts at or below that floor. This only catches
+a collision introduced by a merge that happened after the PR's branch was
+last synced — it depends on branch protection's "require branches to be up
+to date before merging" (`strict: true` on `main`'s required status
+checks, already enabled) to force a re-run against current `main` before
+merge. Without that setting, this check can go stale in exactly the same
+way the PR it's meant to catch does.
+
+**MNT-07 (2026-09): pushing an `additive` migration to dev at write-time
+(instead of waiting for merge) is a proposed way to make dev's push order
+follow write order instead of merge order**, which sidesteps this hazard
+for dev specifically, and also removes the need to hand-apply a `gen types
+--local` diff onto the dev-generated `database.ts` (see "The `--local` vs
+dev types" note above) since the migration is already live on dev before
+types are regenerated. Constraints on that proposal, if adopted:
+
+- **Never early-push a `replace` migration.** `additive` is
+  backward-compatible with already-running code by construction (that's
+  what the risk class means); `replace` is not — replacing an RPC body
+  hits deployed code immediately, and early-push would mean dev sits
+  broken for the PR's entire review lifetime instead of one short deploy
+  window. `replace` still only pushes at merge time.
+- **Once a migration is pushed to dev, its SQL body can't be edited in
+  place.** A changed body after push needs a new timestamped file — editing
+  in place means dev has the old version recorded, so a later `db push`
+  never reapplies the edit and dev silently diverges from what the file on
+  disk says. Same shape as the F-REL-09 schema drift incident.
+- **This only fixes dev's ordering, not prod's.** Prod is deployed via tag
+  or manual `workflow_dispatch`, never at write-time, so prod's ceiling is
+  still set by merge order onto `main` regardless of this proposal. A
+  migration can still strand on prod even with early-push adopted for dev;
+  merge sequencing for migrations still pending merge has to be decided by
+  hand (see "The rule" above) — early-push does not remove that need.
+
+This proposal is discussed but not yet adopted as policy — only the CI
+ordering check above is implemented so far.
+
 ### How to apply migrations
 
 1. `supabase migration new <descriptive_name>` — creates the file under `supabase/migrations/` with a timestamp prefix
