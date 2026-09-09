@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { useEffect, useState } from 'react'
+import { dayKey } from '@/lib/scheduling/day-window'
 
 type Todo = { id: string; instruction_text: string; position: number }
 type WorkstationRef = {
@@ -28,10 +30,18 @@ interface Strings {
   byWorkstation: string
   noAssignments: string
   noAssignmentsDescription: string
+  noAssignmentsOnDay: string
+  noAssignmentsOnDayDescription: string
+  dayTabsLabel: string
 }
 
 interface Props {
   assignments: AssignmentRow[]
+  /** UTC `YYYY-MM-DD` days this official has shifts on, ascending. */
+  days: string[]
+  /** The day `assignments` covers. Null only when `days` is empty. */
+  selectedDay: string | null
+  tenantSlug: string
   strings: Strings
 }
 
@@ -52,8 +62,17 @@ function formatDayHeader(ts: string): string {
   })
 }
 
-function dayKey(ts: string): string {
-  return ts.slice(0, 10) // YYYY-MM-DD, UTC
+// Short form for the day tabs — the long header would not fit several tabs
+// across a phone. Takes a `YYYY-MM-DD` day rather than a full timestamp, so it
+// is anchored to midnight UTC to match the `timeZone: 'UTC'` the rest of this
+// component formats in.
+function formatDayTab(day: string): string {
+  return new Date(`${day}T00:00:00.000Z`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
 }
 
 function groupByDay(assignments: AssignmentRow[]) {
@@ -70,28 +89,81 @@ function groupByDay(assignments: AssignmentRow[]) {
   return groups
 }
 
-function EmptyState({ strings }: { strings: Strings }) {
+// Day changes are links, not local state: the point of the `?day=` param is
+// that the server fetches one day of shifts instead of the whole event
+// (PERF-06). Holding the day in client state would mean shipping every day to
+// the browser again, which is the read this change exists to avoid.
+function DaySelector({
+  days,
+  selectedDay,
+  tenantSlug,
+  label,
+}: {
+  days: string[]
+  selectedDay: string | null
+  tenantSlug: string
+  label: string
+}) {
+  // One day needs no chooser, and zero days renders the empty state instead.
+  if (days.length < 2) return null
+
+  return (
+    <nav aria-label={label} className="-mx-5 px-5 mb-6 overflow-x-auto">
+      <div className="flex gap-2 w-max">
+        {days.map((day) => {
+          const isSelected = day === selectedDay
+          return (
+            <Link
+              key={day}
+              href={`/${tenantSlug}/schedule?day=${day}`}
+              aria-current={isSelected ? 'page' : undefined}
+              scroll={false}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                isSelected
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {formatDayTab(day)}
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+function EmptyIcon() {
+  return (
+    <div className="w-20 h-20 rounded-large border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        className="w-10 h-10 text-gray-300"
+      >
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+      </svg>
+    </div>
+  )
+}
+
+function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-      <div className="w-20 h-20 rounded-large border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.5}
-          className="w-10 h-10 text-gray-300"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
-        </svg>
-      </div>
-      <p className="text-base font-semibold text-gray-900 mb-1">{strings.noAssignments}</p>
-      <p className="text-sm text-gray-500 leading-relaxed">{strings.noAssignmentsDescription}</p>
+      <EmptyIcon />
+      <p className="text-base font-semibold text-gray-900 mb-1">{title}</p>
+      <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
     </div>
   )
 }
 
 function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
+  // Still grouped even though the window is one day: the header is what
+  // confirms which date is on screen, and it stays correct if a window ever
+  // spans a boundary.
   const groups = groupByDay(assignments)
   return (
     <div className="flex flex-col gap-6">
@@ -124,20 +196,6 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
   )
 }
 
-function CheckboxIcon() {
-  return (
-    <svg
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-4 h-4 shrink-0 text-gray-400"
-    >
-      <rect x="1" y="1" width="16" height="16" rx="3" />
-    </svg>
-  )
-}
-
 function WorkAreaView({ assignments }: { assignments: AssignmentRow[] }) {
   // Group by workstation id, preserving first-seen order
   const seen = new Set<string>()
@@ -166,20 +224,23 @@ function WorkAreaView({ assignments }: { assignments: AssignmentRow[] }) {
                 <span className="font-normal text-gray-500"> · {ws.description}</span>
               ) : null}
             </p>
+            {/* Times only, no dates: the view covers one day, and repeating the
+                date on every station is what made this line unreadable for an
+                official working the same station across several days. */}
             <p className="text-xs text-gray-500 mb-2">
-              {rows
-                .map(
-                  (a) => `${formatDayHeader(a.timeslot_start)} · ${formatTime(a.timeslot_start)}`
-                )
-                .join(', ')}
+              {rows.map((a) => formatTime(a.timeslot_start)).join(', ')}
             </p>
+            {/* Text only, deliberately no checkbox. v1 stores no completion state
+                (DECISION Peter 2026-06-24, docs/flows/workstation-checklist-config.md:46),
+                so a checkbox would be an affordance that ignores every tap. The
+                wireframes do show checkboxes — they predate this decision. Add them
+                back when completion tracking lands, not before. */}
             {sortedTodos.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {sortedTodos.map((todo) => (
-                  <div key={todo.id} className="flex items-center gap-2.5">
-                    <CheckboxIcon />
-                    <span className="text-sm text-gray-700">{todo.instruction_text}</span>
-                  </div>
+                  <p key={todo.id} className="text-sm text-gray-700">
+                    {todo.instruction_text}
+                  </p>
                 ))}
               </div>
             ) : null}
@@ -190,7 +251,7 @@ function WorkAreaView({ assignments }: { assignments: AssignmentRow[] }) {
   )
 }
 
-export function ScheduleView({ assignments, strings }: Props) {
+export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strings }: Props) {
   const [view, setView] = useState<View>('time')
 
   useEffect(() => {
@@ -207,6 +268,13 @@ export function ScheduleView({ assignments, strings }: Props) {
     localStorage.setItem('official-schedule-view', v)
   }
 
+  // Two distinct emptinesses. No days at all means nobody has scheduled this
+  // official yet. Days but nothing on the selected one means the shift was
+  // removed between the day-list read and the windowed read — rare, but it
+  // must not render as a blank pane under a highlighted tab.
+  const hasNoAssignmentsAtAll = days.length === 0
+  const selectedDayIsEmpty = !hasNoAssignmentsAtAll && assignments.length === 0
+
   return (
     <div className="px-5 pt-10 pb-6">
       {/* Header */}
@@ -221,6 +289,7 @@ export function ScheduleView({ assignments, strings }: Props) {
       <div className="flex rounded-large border border-gray-200 overflow-hidden mb-6">
         <Button
           onClick={() => handleViewChange('time')}
+          radius="none"
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'time'
               ? 'bg-primary text-primary-foreground'
@@ -231,6 +300,7 @@ export function ScheduleView({ assignments, strings }: Props) {
         </Button>
         <Button
           onClick={() => handleViewChange('work-area')}
+          radius="none"
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
             view === 'work-area'
               ? 'bg-primary text-primary-foreground'
@@ -241,9 +311,21 @@ export function ScheduleView({ assignments, strings }: Props) {
         </Button>
       </div>
 
+      <DaySelector
+        days={days}
+        selectedDay={selectedDay}
+        tenantSlug={tenantSlug}
+        label={strings.dayTabsLabel}
+      />
+
       {/* Content */}
-      {assignments.length === 0 ? (
-        <EmptyState strings={strings} />
+      {hasNoAssignmentsAtAll ? (
+        <EmptyState title={strings.noAssignments} description={strings.noAssignmentsDescription} />
+      ) : selectedDayIsEmpty ? (
+        <EmptyState
+          title={strings.noAssignmentsOnDay}
+          description={strings.noAssignmentsOnDayDescription}
+        />
       ) : view === 'time' ? (
         <TimeView assignments={assignments} />
       ) : (
