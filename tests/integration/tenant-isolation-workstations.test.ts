@@ -20,10 +20,10 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
   let tenantB: { id: string }
   let eventB: { id: string }
   let workstationB: { id: string }
-  let opWindowB: { id: string }
+  let opWindowB: { id: string; window_start: string }
   let todoB: { id: string }
   let workstationA: { id: string }
-  let opWindowA: { id: string }
+  let opWindowA: { id: string; window_start: string }
   let todoA: { id: string }
   let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
   let clientOfficialA: Awaited<ReturnType<typeof signInAsClient>>
@@ -223,7 +223,9 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
       .select('window_start')
       .eq('id', opWindowA.id)
       .single()
-    expect(unchanged?.window_start).toBe('2026-06-01T06:00:00+00:00')
+    expect(new Date(unchanged!.window_start).toISOString()).toBe(
+      new Date(opWindowA.window_start).toISOString()
+    )
   })
 
   it('cannot update a tenant B operating window', async () => {
@@ -241,7 +243,9 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
       .select('window_start')
       .eq('id', opWindowB.id)
       .single()
-    expect(unchanged?.window_start).toBe('2026-06-01T06:00:00+00:00')
+    expect(new Date(unchanged!.window_start).toISOString()).toBe(
+      new Date(opWindowB.window_start).toISOString()
+    )
   })
 
   it('cannot update a tenant B todo', async () => {
@@ -286,7 +290,25 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
       window_start: '2026-06-02T06:00:00Z',
       window_end: '2026-06-02T18:00:00Z',
     })
-    expect(error).not.toBeNull()
+    expect(error?.code).toBe('42501')
+  })
+
+  it('cannot create a workstation under a tenant B event (forged tenant_id)', async () => {
+    const { error } = await clientAdminA.from('workstations').insert({
+      tenant_id: tenantB.id,
+      event_id: eventB.id,
+      name: 'Forged Workstation',
+      capacity_ceiling: 3,
+    })
+    expect(error?.code).toBe('42501')
+  })
+
+  it('cannot create a todo under a tenant B workstation', async () => {
+    const { error } = await clientAdminA.from('workstation_todos').insert({
+      workstation_id: workstationB.id,
+      instruction_text: 'Forged todo',
+    })
+    expect(error?.code).toBe('42501')
   })
 
   it('can read and manage its own tenant workstations and children', async () => {
