@@ -19,7 +19,7 @@ import { useTranslation } from '@/lib/i18n/client'
  * Mobile-first on purpose (see AGENTS.md: official screens are mobile-first),
  * so the copy is short and the touch target is large.
  */
-export default function OfficialError({ reset }: { error: Error; reset: () => void }) {
+export default function OfficialError({ retry }: { error: Error; retry: () => void }) {
   const { t } = useTranslation('common')
 
   return (
@@ -34,7 +34,7 @@ export default function OfficialError({ reset }: { error: Error; reset: () => vo
       <p className="mt-3 max-w-xs text-sm leading-relaxed text-gray-500">{t('errorPage.body')}</p>
 
       <button
-        onClick={reset}
+        onClick={() => retry()}
         className="mt-8 min-h-11 px-6 text-sm font-medium text-gray-900 underline decoration-gray-300 underline-offset-4 transition-colors hover:decoration-gray-900"
       >
         {t('errorPage.cta')}
