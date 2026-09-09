@@ -1,6 +1,7 @@
 // Seeds the dev Supabase project with a realistic tenant for manual testing.
 //
-// Usage: npm run seed:dev
+// Usage: npm run seed:dev        (dev cloud project)
+//        npm run seed:dev:local  (local stack — wrapper overrides env, same script)
 //
 // Safe by construction: refuses to run against anything that isn't the known
 // dev project ref or a local Supabase instance. There is no seed:prod.
@@ -41,11 +42,16 @@ const admin = createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
 // Fixed block of numbers reserved for seed data, disjoint from the
 // integration test pool (+46700000001-10, see tests/integration/helpers.ts)
 // so the two never collide when run against the same project.
+//
+// Every number here needs a matching entry under [auth.sms.test_otp] in
+// supabase/config.toml, or it cannot be logged in as on the local stack.
 const SEED_PHONES = {
   tenantAdmin: '+46709900001',
   officialConfirmed: '+46709900002',
   officialInvited: '+46709900003',
   officialRemoved: '+46709900004',
+  officialSingleDay: '+46709900005',
+  officialNoShifts: '+46709900006',
 } as const
 
 // SEED_PHONES keeps the '+' because auth.admin.createUser() wants canonical E.164, but
@@ -61,6 +67,24 @@ const storedPhone = (phone: string) => phone.replace(/^\+/, '')
 // database default (0010), so the seed has to set it explicitly.
 const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
+// Relative dates, never literals. MYSCH-01 resolves its default day with
+// `new Date().toISOString().slice(0, 10)` (schedule/page.tsx), so shifts have to
+// land on today's *UTC* date or the "default to today" branch is untestable —
+// and a hardcoded date stops exercising it the moment that date passes.
+// Three days is the minimum that renders a day selector at all: DaySelector
+// returns null below two days, so the single-day seed this replaced made the
+// whole feature invisible.
+const SEED_DAYS = [0, 1, 2].map((offset) => {
+  const day = new Date()
+  day.setUTCHours(0, 0, 0, 0)
+  day.setUTCDate(day.getUTCDate() + offset)
+  return day.toISOString().slice(0, 10)
+})
+const [day0, day1, day2] = SEED_DAYS
+
+// 'YYYY-MM-DD' plus 'HH:MM' -> a UTC timestamptz literal.
+const at = (day: string, time: string) => `${day}T${time}:00Z`
+
 async function upsertAuthUser(phone: string) {
   const { data: existing } = await admin.auth.admin.listUsers()
   const found = existing.users.find((u) => u.phone === phone.replace('+', ''))
@@ -69,6 +93,33 @@ async function upsertAuthUser(phone: string) {
   const { data, error } = await admin.auth.admin.createUser({ phone, phone_confirm: true })
   if (error) throw error
   return data.user.id
+}
+
+// A confirmed official who can actually log in: auth user + 'official' role +
+// a confirmed officials row. resolveOfficialSurfaceAccess (src/lib/auth/tenant.ts)
+// matches on user_id + tenant_id + invite_status='confirmed' and never reads the
+// phone, so these three rows are exactly what the official surfaces require.
+async function createConfirmedOfficial(tenantId: string, name: string, phone: string) {
+  const userId = await upsertAuthUser(phone)
+
+  const { error: roleError } = await admin
+    .from('user_roles')
+    .insert({ user_id: userId, tenant_id: tenantId, role: 'official' })
+  if (roleError) throw roleError
+
+  const { data, error } = await admin
+    .from('officials')
+    .insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      name,
+      phone: storedPhone(phone),
+      invite_status: 'confirmed',
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }
 
 async function main() {
@@ -103,8 +154,8 @@ async function main() {
       tenant_id: tenant.id,
       name: 'Seed Race 2026',
       event_type: 'race',
-      start_date: '2026-09-05',
-      end_date: '2026-09-06',
+      start_date: day0,
+      end_date: day2,
       location: 'Seed Stadium',
       status: 'published',
       scheduling_granularity_min: 60,
@@ -112,52 +163,110 @@ async function main() {
     .select()
     .single()
   if (eventError) throw eventError
-  console.log(`  event: ${event.name} (${event.id})`)
+  console.log(`  event: ${event.name} (${event.id}) ${day0} -> ${day2}`)
 
-  const { error: stageError } = await admin
-    .from('event_stages')
-    .insert({
+  // One race stage per day. start_time/end_time are timestamptz (0007) and used
+  // to be left NULL, which made getAllocableRange return null and left
+  // admin/scheduling with no grid to draw. 0007's `end_time >= start_time`
+  // check is satisfied by construction. stage_type and race_type are omitted on
+  // purpose — their defaults ('race', 'distance') are what keeps a published
+  // event's "at least one Race stage" rule satisfied.
+  const { error: stageError } = await admin.from('event_stages').insert(
+    SEED_DAYS.map((day, index) => ({
       tenant_id: tenant.id,
       event_id: event.id,
-      name: 'Day 1',
-      stage_date: '2026-09-05',
+      name: `Day ${index + 1}`,
+      stage_date: day,
+      start_time: at(day, '07:00'),
+      end_time: at(day, '18:00'),
       venue: 'Seed Stadium',
-      position: 0,
-    })
-    .select()
-    .single()
+      position: index,
+    }))
+  )
   if (stageError) throw stageError
+  console.log(`  stages: ${SEED_DAYS.join(', ')} (07:00-18:00Z each)`)
 
-  const { data: workstation, error: wsError } = await admin
+  // Two work areas, so MYSCH-01's work-area view groups more than one thing.
+  const { data: workstationRows, error: wsError } = await admin
     .from('workstations')
-    .insert({
-      tenant_id: tenant.id,
-      event_id: event.id,
-      name: 'Finish line',
-      description: 'Timing and finish chute',
-      capacity_ceiling: 4,
-    })
+    .insert([
+      {
+        tenant_id: tenant.id,
+        event_id: event.id,
+        name: 'Finish line',
+        description: 'Timing and finish chute',
+        capacity_ceiling: 4,
+      },
+      {
+        tenant_id: tenant.id,
+        event_id: event.id,
+        name: 'Water station',
+        description: 'Cups, jugs and refill point at 5 km',
+        capacity_ceiling: 2,
+      },
+    ])
     .select()
-    .single()
   if (wsError) throw wsError
 
-  const { error: windowError } = await admin.from('workstation_operating_windows').insert({
-    workstation_id: workstation.id,
-    window_start: '2026-09-05T07:00:00Z',
-    window_end: '2026-09-05T18:00:00Z',
-  })
+  // Looked up by name rather than by position: a multi-row insert's RETURNING
+  // order is not guaranteed, and silently swapping the two would leave the
+  // day-window fixture below testing something other than what it claims.
+  const workstationByName = (name: string) => {
+    const found = workstationRows.find((row) => row.name === name)
+    if (!found) throw new Error(`Workstation '${name}' missing after insert`)
+    return found
+  }
+  const finishLine = workstationByName('Finish line')
+  const waterStation = workstationByName('Water station')
+  console.log(`  workstations: ${finishLine.name}, ${waterStation.name}`)
+
+  // An operating window per work area per day, so the admin scheduling grid
+  // stays consistent with the shifts the official sees.
+  const { error: windowError } = await admin.from('workstation_operating_windows').insert(
+    [finishLine, waterStation].flatMap((ws) =>
+      SEED_DAYS.map((day) => ({
+        workstation_id: ws.id,
+        window_start: at(day, '07:00'),
+        window_end: at(day, '18:00'),
+      }))
+    )
+  )
   if (windowError) throw windowError
 
-  const { data: todo, error: todoError } = await admin
+  const { data: todoRows, error: todoError } = await admin
     .from('workstation_todos')
-    .insert({
-      workstation_id: workstation.id,
-      instruction_text: 'Confirm timing gate is powered on',
-      position: 0,
-    })
+    .insert([
+      {
+        workstation_id: finishLine.id,
+        instruction_text: 'Confirm timing gate is powered on',
+        position: 0,
+      },
+      {
+        workstation_id: finishLine.id,
+        instruction_text: 'Log finish times on the paper backup sheet',
+        position: 1,
+      },
+      {
+        workstation_id: waterStation.id,
+        instruction_text: 'Refill jugs before each wave',
+        position: 0,
+      },
+      {
+        workstation_id: waterStation.id,
+        instruction_text: 'Bag and remove used cups',
+        position: 1,
+      },
+    ])
     .select()
-    .single()
   if (todoError) throw todoError
+
+  const todoFor = (workstationId: string, position: number) => {
+    const found = todoRows.find(
+      (row) => row.workstation_id === workstationId && row.position === position
+    )
+    if (!found) throw new Error(`Todo (workstation ${workstationId}, position ${position}) missing`)
+    return found
+  }
 
   const tenantAdminId = await upsertAuthUser(SEED_PHONES.tenantAdmin)
   const { error: adminRoleError } = await admin
@@ -185,7 +294,7 @@ async function main() {
     .select()
     .single()
   if (confirmedError) throw confirmedError
-  console.log(`  official (confirmed): ${SEED_PHONES.officialConfirmed}`)
+  console.log(`  official (confirmed, 3 days of shifts): ${SEED_PHONES.officialConfirmed}`)
 
   const { error: invitedError } = await admin.from('officials').insert({
     tenant_id: tenant.id,
@@ -208,6 +317,20 @@ async function main() {
     `  official (removed, tests the SEC-05 invite_status filter): ${SEED_PHONES.officialRemoved}`
   )
 
+  // Two more confirmed officials, both loggable-in, for the MYSCH-01 cases the
+  // three above cannot cover: one day of shifts renders no day selector at all
+  // (DaySelector returns null below two days), and no shifts at all has to show
+  // the empty-schedule copy rather than the empty-day copy.
+  const singleDayOfficial = await createConfirmedOfficial(
+    tenant.id,
+    'Seed Official One Day',
+    SEED_PHONES.officialSingleDay
+  )
+  console.log(`  official (confirmed, 1 day of shifts): ${SEED_PHONES.officialSingleDay}`)
+
+  await createConfirmedOfficial(tenant.id, 'Seed Official No Shifts', SEED_PHONES.officialNoShifts)
+  console.log(`  official (confirmed, no shifts at all): ${SEED_PHONES.officialNoShifts}`)
+
   const { error: participantError } = await admin.from('participants').insert({
     tenant_id: tenant.id,
     name: 'Seed Participant',
@@ -217,17 +340,76 @@ async function main() {
   })
   if (participantError) throw participantError
 
-  const { error: assignmentError } = await admin.from('assignments').insert({
-    tenant_id: tenant.id,
-    official_id: confirmedOfficial.id,
-    workstation_id: workstation.id,
-    todo_id: todo.id,
-    timeslot_start: '2026-09-05T08:00:00Z',
-    timeslot_end: '2026-09-05T09:00:00Z',
-    slot_index: 1,
-    status: 'assigned',
-  })
+  // The MYSCH-01 day-window fixture. Each row earns its place:
+  //   day0 Finish line + day0 Water station -> two work areas on one day, so the
+  //                                            work-area view groups more than one
+  //   day0 Finish line + day1 Finish line   -> the same work area on two days,
+  //                                            the case whose flattened date row
+  //                                            was removed from the work-area view
+  //   day2 Water station at 13:00           -> a shift no other day has, so the
+  //                                            window is seen to exclude rather
+  //                                            than merely order
+  //   singleDayOfficial on day0 only        -> the no-day-selector case
+  // All rows are distinct on (workstation_id, timeslot_start, slot_index), so
+  // 0012's unique index needs no special handling, and every row carries a
+  // workstation_id, which is what 0003's status='assigned' check requires.
+  const { error: assignmentError } = await admin.from('assignments').insert([
+    {
+      tenant_id: tenant.id,
+      official_id: confirmedOfficial.id,
+      workstation_id: finishLine.id,
+      todo_id: todoFor(finishLine.id, 0).id,
+      timeslot_start: at(day0, '08:00'),
+      timeslot_end: at(day0, '09:00'),
+      slot_index: 1,
+      status: 'assigned',
+    },
+    {
+      tenant_id: tenant.id,
+      official_id: confirmedOfficial.id,
+      workstation_id: waterStation.id,
+      todo_id: todoFor(waterStation.id, 0).id,
+      timeslot_start: at(day0, '10:00'),
+      timeslot_end: at(day0, '11:00'),
+      slot_index: 1,
+      status: 'assigned',
+    },
+    {
+      tenant_id: tenant.id,
+      official_id: confirmedOfficial.id,
+      workstation_id: finishLine.id,
+      todo_id: todoFor(finishLine.id, 1).id,
+      timeslot_start: at(day1, '08:00'),
+      timeslot_end: at(day1, '09:00'),
+      slot_index: 1,
+      status: 'assigned',
+    },
+    {
+      tenant_id: tenant.id,
+      official_id: confirmedOfficial.id,
+      workstation_id: waterStation.id,
+      todo_id: todoFor(waterStation.id, 1).id,
+      timeslot_start: at(day2, '13:00'),
+      timeslot_end: at(day2, '14:00'),
+      slot_index: 1,
+      status: 'assigned',
+    },
+    {
+      tenant_id: tenant.id,
+      official_id: singleDayOfficial.id,
+      workstation_id: finishLine.id,
+      todo_id: todoFor(finishLine.id, 0).id,
+      timeslot_start: at(day0, '08:00'),
+      timeslot_end: at(day0, '09:00'),
+      slot_index: 2,
+      status: 'assigned',
+    },
+  ])
   if (assignmentError) throw assignmentError
+  console.log(
+    `  assignments: 4 for ${SEED_PHONES.officialConfirmed} across ${day0}/${day1}/${day2}`
+  )
+  console.log(`               1 for ${SEED_PHONES.officialSingleDay} on ${day0}`)
 
   const { error: announcementError } = await admin.from('announcements').insert({
     tenant_id: tenant.id,
