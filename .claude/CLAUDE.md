@@ -299,6 +299,36 @@ people, this means checking with each other before merging a
 newly-timestamped migration if there's any open PR still carrying a `00NN`
 file.
 
+**The same hazard recurs between two timestamped migrations in parallel
+PRs** — whichever one gets pushed to an environment second, if it sorts
+lower than the first, is stranded there the same way (this is what
+happened between PR #156's `20260908130927` and PR #157's `20260908131614`
+in September 2026: #157 would have stranded #156 if it had deployed
+first). Timestamps at second resolution don't collide, but they also don't
+guarantee deploy order matches review order — whoever merges last still
+wins the race regardless of which PR opened or was reviewed first.
+
+**The rule, split by Forward-fix risk class ([[project_migration_forward_fix_convention]]):**
+
+- **`additive`** migrations: push to dev as soon as they're written —
+  `supabase db push` against dev right after local `db reset` passes,
+  before or during review, not only at merge time. This pins the
+  migration's place in dev's `schema_migrations` ordering early and
+  naturally sequentially (whoever writes theirs first, pushes first),
+  instead of leaving the order to be decided by whoever happens to merge
+  last. If the PR is later rejected in review, the function/table sits
+  unused on dev until the app code that calls it lands (or a follow-up
+  migration drops it) — no data is touched, so this is cheap to leave
+  around.
+- **`destructive`** migrations, and any `replace` migration risky enough
+  that its RPC return-shape or RLS behavior isn't yet review-confirmed: do
+  **not** push early just to win the ordering race. These still wait for
+  a completed review — in particular a verified `Data:` line — exactly as
+  the destructive-migration rule already requires elsewhere in this file.
+  If an ordering collision is possible against another open PR, resolve it
+  the same way as the `00NN`/timestamp hazard above: check with each other
+  before merging.
+
 ### How to apply migrations
 
 1. `supabase migration new <descriptive_name>` — creates the file under `supabase/migrations/` with a timestamp prefix
