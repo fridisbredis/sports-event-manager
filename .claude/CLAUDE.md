@@ -301,7 +301,7 @@ file.
 
 **This same class of hazard can recur going forward, not just during the
 `00NN` → timestamp cutover** — any time two migrations are written in
-parallel, whichever one *merges* second can still land with a prefix that
+parallel, whichever one _merges_ second can still land with a prefix that
 sorts below one already recorded in an environment's ledger, because
 `supabase db push`'s ceiling is set by merge order onto `main`, not by
 when either migration was written. The `Migration number collision` CI job
