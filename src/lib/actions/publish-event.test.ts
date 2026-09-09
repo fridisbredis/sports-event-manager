@@ -24,21 +24,10 @@ vi.mock('next/cache', () => ({
   updateTag: vi.fn(),
 }))
 
-function chain(result: unknown) {
-  const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'update']) {
-    builder[method] = vi.fn(() => builder)
-  }
-  builder.single = vi.fn(() => Promise.resolve(result))
-  builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-    Promise.resolve(result).then(resolve, reject)
-  return builder
-}
-
-function mockClient(fromMock: ReturnType<typeof vi.fn>) {
+function mockClient(rpcMock: ReturnType<typeof vi.fn>) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
-    from: fromMock,
+    rpc: rpcMock,
   } as never)
 }
 
@@ -50,11 +39,16 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+// EVT-02: publishEvent now delegates the name/status/Race-stage-count check
+// and the publish write to a single publish_event RPC (migration
+// 20260908143523), which holds a row lock across both to close a TOCTOU race
+// against sync_event_stages. These tests mock supabase.rpc() instead of the
+// old two-call supabase.from('events') chain.
 describe('publishEvent', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
-      from: vi.fn(),
+      rpc: vi.fn(),
     } as never)
 
     await expect(publishEvent(INPUT)).rejects.toThrow('NEXT_REDIRECT')
@@ -62,77 +56,68 @@ describe('publishEvent', () => {
     expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
   })
 
-  it('returns an authorization error and never queries events when access is denied', async () => {
+  it('returns an authorization error and never calls the RPC when access is denied', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
-    const fromMock = vi.fn()
-    mockClient(fromMock)
+    const rpcMock = vi.fn()
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 
     expect(result).toEqual({ error: 'Not authorized' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
-    expect(fromMock).not.toHaveBeenCalled()
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
-  it('returns an error when the event is not found for this tenant', async () => {
+  it('returns an error when the event is not found for this tenant (P0002)', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: null })
-    const fromMock = vi.fn().mockReturnValueOnce(eventBuilder)
-    mockClient(fromMock)
+    const rpcMock = vi
+      .fn()
+      .mockResolvedValue({ data: null, error: { code: 'P0002', message: 'not found' } })
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 
     expect(result).toEqual({ error: 'Event not found.' })
-    expect(eventBuilder.eq).toHaveBeenCalledWith('id', EVENT_ID)
-    expect(eventBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(rpcMock).toHaveBeenCalledWith('publish_event', {
+      p_event_id: EVENT_ID,
+      p_tenant_id: TENANT_ID,
+    })
   })
 
-  it('is a no-op success when the event is already published', async () => {
+  it('is a no-op success and skips revalidation when the event is already published', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: { name: 'Viadal 2026', status: 'published' } })
-    const fromMock = vi.fn().mockReturnValueOnce(eventBuilder)
-    mockClient(fromMock)
+    // publish_event returns false (no-op) when the event was already published.
+    const rpcMock = vi.fn().mockResolvedValue({ data: false, error: null })
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 
     expect(result).toEqual({})
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(rpcMock).toHaveBeenCalledTimes(1)
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
 
-  it('returns an error when the event name is empty or only whitespace', async () => {
+  it('returns an error when the event name is empty or only whitespace (23514)', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: { name: '   ', status: 'draft' } })
-    const fromMock = vi.fn().mockReturnValueOnce(eventBuilder)
-    mockClient(fromMock)
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: '23514', message: 'Event name is required before publishing.' },
+    })
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 
     expect(result).toEqual({ error: 'Event name is required before publishing.' })
-    expect(fromMock).toHaveBeenCalledTimes(1)
   })
 
-  it('returns an error when there are no Race stages', async () => {
+  it('returns an error when there are no Race stages (23514)', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: { name: 'Viadal 2026', status: 'draft' } })
-    const stagesBuilder = chain({ count: 0 })
-    const fromMock = vi.fn().mockReturnValueOnce(eventBuilder).mockReturnValueOnce(stagesBuilder)
-    mockClient(fromMock)
-
-    const result = await publishEvent(INPUT)
-
-    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
-    expect(stagesBuilder.eq).toHaveBeenCalledWith('event_id', EVENT_ID)
-    expect(stagesBuilder.eq).toHaveBeenCalledWith('stage_type', 'race')
-  })
-
-  it('returns an error when the race stage count is null', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: { name: 'Viadal 2026', status: 'draft' } })
-    const stagesBuilder = chain({ count: null })
-    const fromMock = vi.fn().mockReturnValueOnce(eventBuilder).mockReturnValueOnce(stagesBuilder)
-    mockClient(fromMock)
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: '23514', message: 'Add at least one Race stage before publishing.' },
+    })
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 
@@ -141,21 +126,17 @@ describe('publishEvent', () => {
 
   it('publishes the event and revalidates both admin paths on success', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: { name: 'Viadal 2026', status: 'draft' } })
-    const stagesBuilder = chain({ count: 1 })
-    const updateBuilder = chain({ error: null })
-    const fromMock = vi
-      .fn()
-      .mockReturnValueOnce(eventBuilder)
-      .mockReturnValueOnce(stagesBuilder)
-      .mockReturnValueOnce(updateBuilder)
-    mockClient(fromMock)
+    // publish_event returns true when it actually transitioned draft -> published.
+    const rpcMock = vi.fn().mockResolvedValue({ data: true, error: null })
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 
     expect(result).toEqual({})
-    expect(updateBuilder.update).toHaveBeenCalledWith({ status: 'published' })
-    expect(updateBuilder.eq).toHaveBeenCalledWith('id', EVENT_ID)
+    expect(rpcMock).toHaveBeenCalledWith('publish_event', {
+      p_event_id: EVENT_ID,
+      p_tenant_id: TENANT_ID,
+    })
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/dashboard')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
@@ -165,17 +146,12 @@ describe('publishEvent', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
-  it('returns the db error message and skips revalidation when the update fails', async () => {
+  it('returns the RPC error message and skips revalidation when the RPC fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const eventBuilder = chain({ data: { name: 'Viadal 2026', status: 'draft' } })
-    const stagesBuilder = chain({ count: 1 })
-    const updateBuilder = chain({ error: { message: 'db is down' } })
-    const fromMock = vi
+    const rpcMock = vi
       .fn()
-      .mockReturnValueOnce(eventBuilder)
-      .mockReturnValueOnce(stagesBuilder)
-      .mockReturnValueOnce(updateBuilder)
-    mockClient(fromMock)
+      .mockResolvedValue({ data: null, error: { code: 'XXXXX', message: 'db is down' } })
+    mockClient(rpcMock)
 
     const result = await publishEvent(INPUT)
 

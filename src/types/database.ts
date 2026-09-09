@@ -852,6 +852,10 @@ export type Database = {
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       is_system_admin: { Args: never; Returns: boolean }
+      publish_event: {
+        Args: { p_event_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
       release_rate_limit: { Args: { p_key: string }; Returns: undefined }
       remove_official: {
         Args: { p_official_id: string; p_tenant_id: string }

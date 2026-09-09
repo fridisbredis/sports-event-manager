@@ -38,36 +38,25 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
     return { error: 'Not authorized' }
 
-  const { data: ev } = await supabase
-    .from('events')
-    .select('name, status')
-    .eq('id', input.eventId)
-    .eq('tenant_id', parsedTenantId.data)
-    .single()
+  // EVT-02: name/status/Race-stage-count check and the publish write happen
+  // inside this single RPC, under a row lock (SELECT ... FOR UPDATE) held
+  // across both — see migration 20260908143523. Doing this as two separate
+  // PostgREST calls (as before) left a TOCTOU window against a concurrent
+  // sync_event_stages call removing the last Race stage.
+  const { data: didPublish, error: rpcError } = await supabase.rpc('publish_event', {
+    p_event_id: input.eventId,
+    p_tenant_id: parsedTenantId.data,
+  })
 
-  if (!ev) return { error: 'Event not found.' }
-  if (ev.status === 'published') return {}
-
-  if (!ev.name?.trim()) return { error: 'Event name is required before publishing.' }
-
-  // Stage model v0.7: at least one Race stage is required (satisfies the "at least one date"
-  // requirement since a Race stage carries its own start/end time).
-  const { count: raceStageCount } = await supabase
-    .from('event_stages')
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', input.eventId)
-    .eq('stage_type', 'race')
-
-  if (!raceStageCount || raceStageCount === 0) {
-    return { error: 'Add at least one Race stage before publishing.' }
+  if (rpcError) {
+    if (rpcError.code === 'P0002') return { error: 'Event not found.' }
+    return { error: rpcError.message }
   }
 
-  const { error } = await supabase
-    .from('events')
-    .update({ status: 'published' })
-    .eq('id', input.eventId)
-
-  if (error) return { error: error.message }
+  // No-op: the event was already published, so nothing actually changed —
+  // skip revalidation instead of paying for a cache invalidation that has
+  // nothing to invalidate (matches pre-EVT-02 behavior).
+  if (!didPublish) return {}
 
   revalidatePath(`/${input.tenantSlug}/admin/event`)
   revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
