@@ -31,23 +31,29 @@
 -- every statement in this body for exactly this caller.
 --
 -- Forward-fix: additive
---   Rollback: drop function if exists public.update_workstation(uuid, uuid, uuid, text, text, integer, boolean, jsonb, jsonb);
+--   Rollback: drop function if exists public.update_workstation(uuid, uuid, text, integer, boolean, uuid, text, jsonb, jsonb);
 --   Data:     no data loss — this only adds a new function, no existing
 --             table or row is touched.
---   Blast:    none until the app is changed to call it; the old five-step
---             code path in updateWorkstation() keeps working unmodified
---             until that follow-up change lands.
+--   Blast:    updateWorkstation() in this same PR is the only caller — see
+--             src/app/(tenant)/[tenantSlug]/admin/workstations/actions.ts.
+--             A rollback of this migration breaks that server action
+--             immediately; it must be rolled back together with reverting
+--             the actions.ts change, not on its own.
 --   Window:   compatible — additive, no schema old code depends on changes.
 -- ============================================================================
 
+-- p_name/p_capacity_ceiling/p_recurring have no defaults, unlike
+-- create_workstation's INSERT-shaped signature — this is an unconditional
+-- UPDATE, so a caller omitting one of these would blank the name or zero
+-- the capacity rather than leaving it alone.
 create or replace function public.update_workstation(
   p_workstation_id   uuid,
   p_tenant_id        uuid,
+  p_name             text,
+  p_capacity_ceiling integer,
+  p_recurring        boolean,
   p_stage_id         uuid default null,
-  p_name             text default '',
   p_description      text default null,
-  p_capacity_ceiling integer default 0,
-  p_recurring        boolean default false,
   p_windows          jsonb default '[]'::jsonb,
   p_todos            jsonb default '[]'::jsonb
 )
@@ -129,8 +135,8 @@ comment on function public.update_workstation is
 -- needed. Revoke the default PUBLIC execute grant and grant to
 -- authenticated explicitly, so RLS inside the function body is the only
 -- gate, not "can call the function at all".
-revoke all on function public.update_workstation(uuid, uuid, uuid, text, text, integer, boolean, jsonb, jsonb) from public;
-grant execute on function public.update_workstation(uuid, uuid, uuid, text, text, integer, boolean, jsonb, jsonb) to authenticated;
+revoke all on function public.update_workstation(uuid, uuid, text, integer, boolean, uuid, text, jsonb, jsonb) from public;
+grant execute on function public.update_workstation(uuid, uuid, text, integer, boolean, uuid, text, jsonb, jsonb) to authenticated;
 
 -- ============================================================================
 -- DONE

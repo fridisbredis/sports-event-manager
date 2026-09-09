@@ -899,10 +899,10 @@ export type Database = {
       }
       update_workstation: {
         Args: {
-          p_capacity_ceiling?: number
+          p_capacity_ceiling: number
           p_description?: string
-          p_name?: string
-          p_recurring?: boolean
+          p_name: string
+          p_recurring: boolean
           p_stage_id?: string
           p_tenant_id: string
           p_todos?: Json
