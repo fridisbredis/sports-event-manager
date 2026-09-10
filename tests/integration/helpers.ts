@@ -29,10 +29,10 @@ export async function createTenant(name: string) {
 // the same worker process (module state survives across files even with
 // fileParallelism: false), so a blind round-robin index would eventually
 // reclaim a number still held by another file's still-signed-in client.
-// Instead, always pick a number with no existing user, only falling back to
-// deleting the oldest-claimed one if every number is genuinely in use at
-// once — the pool must stay larger than the max number of distinct users
-// alive at the same time across the whole suite.
+// Instead, always pick a number with no existing user, and treat an
+// exhausted pool as a hard error (see claimTestPhone below) rather than
+// evicting anyone — the pool must stay larger than the max number of
+// distinct users alive at the same time across the whole suite.
 const TEST_PHONES = [
   '+46700000001',
   '+46700000002',
@@ -45,23 +45,64 @@ const TEST_PHONES = [
   '+46700000009',
   '+46700000010',
 ]
-const claimedOrder: string[] = []
+// Numbers this process currently holds, keyed by the auth user id holding
+// them, so releaseTestPhone() can drop the entry when that user is deleted.
+// Purely for the exhaustion error message below — the authoritative source
+// of what is taken is always GoTrue itself, re-read on every claim.
+const claimedPhonesByUserId = new Map<string, string>()
 
-async function claimTestPhone(admin: ReturnType<typeof serviceClient>) {
-  const { data: existing } = await admin.auth.admin.listUsers()
-  const takenPhones = new Set(existing?.users.map((u) => u.phone).filter(Boolean))
+function releaseTestPhone(userId: string) {
+  claimedPhonesByUserId.delete(userId)
+}
 
-  let phone = TEST_PHONES.find((candidate) => !takenPhones.has(candidate.replace('+', '')))
+// GoTrue's admin listUsers() paginates, defaulting to 50 per page. The local
+// stack also holds the seed-dev users and anything left over from manual
+// poking, so the pool numbers are not guaranteed to land on page 1 — a
+// truncated read would report a pool number as free while a live user still
+// holds it, handing the same number to two fixtures. Page through fully.
+async function listAllUsers(admin: ReturnType<typeof serviceClient>) {
+  const users: { id: string; phone?: string | null }[] = []
+  const perPage = 1000
 
-  if (!phone) {
-    const oldest = claimedOrder.shift()
-    if (!oldest) throw new Error('No free test phone number and no claimed number to evict')
-    const staleUser = existing?.users.find((u) => u.phone === oldest.replace('+', ''))
-    if (staleUser) await admin.auth.admin.deleteUser(staleUser.id)
-    phone = oldest
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const batch = data?.users ?? []
+    users.push(...batch)
+    if (batch.length < perPage) break
   }
 
-  claimedOrder.push(phone)
+  return users
+}
+
+async function claimTestPhone(admin: ReturnType<typeof serviceClient>) {
+  const existingUsers = await listAllUsers(admin)
+  const takenPhones = new Set(existingUsers.map((u) => u.phone).filter(Boolean))
+
+  const phone = TEST_PHONES.find((candidate) => !takenPhones.has(candidate.replace('+', '')))
+
+  // Exhaustion is a bug in the suite, not a condition to recover from. The
+  // previous behavior here was to evict the oldest number this process had
+  // claimed, which silently deleted a fixture user that a signed-in client
+  // was still holding: the client keeps its JWT, so auth.uid() then resolves
+  // to a deleted user, get_user_role() returns NULL, and the next write
+  // fails with a bare 42501 in whichever test happened to run next. That is
+  // far harder to diagnose than failing here, and it made unrelated tests
+  // fail at random. Leftovers from an earlier interrupted run are reclaimed
+  // once by tests/integration/global-setup.ts, so a full pool now genuinely
+  // means too many users are alive at the same time.
+  if (!phone) {
+    throw new Error(
+      `All ${TEST_PHONES.length} test phone numbers are in use. Either a test file is not ` +
+        'cleaning up its fixtures (call cleanupTenant() in afterAll, and deleteAuthUser() for ' +
+        'users created outside createUserWithRole()), or the suite now needs more numbers — ' +
+        'add them to TEST_PHONES here and to [auth.sms.test_otp] in supabase/config.toml. ' +
+        'Still held by this process: ' +
+        `${Array.from(claimedPhonesByUserId.values()).sort().join(', ') || '(none)'}.`
+    )
+  }
+
   return phone
 }
 
@@ -76,6 +117,7 @@ export async function createUserWithRole(tenantId: string, role: TenantRole) {
     phone_confirm: true,
   })
   if (userError) throw userError
+  claimedPhonesByUserId.set(userData.user.id, phone)
 
   const { error: roleError } = await admin
     .from('user_roles')
@@ -119,6 +161,7 @@ export async function createSystemAdmin() {
     phone_confirm: true,
   })
   if (userError) throw userError
+  claimedPhonesByUserId.set(userData.user.id, phone)
 
   const { error: roleError } = await admin
     .from('user_roles')
@@ -134,6 +177,7 @@ export async function deleteAuthUser(userId: string) {
   const admin = serviceClient()
   await admin.from('user_roles').delete().eq('user_id', userId)
   await admin.auth.admin.deleteUser(userId)
+  releaseTestPhone(userId)
 }
 
 // Logs in as the given phone via the local test OTP (see supabase/config.toml
@@ -203,4 +247,5 @@ export async function cleanupTenant(tenantId: string) {
   const userIds = createdUserIdsByTenant.get(tenantId) ?? []
   createdUserIdsByTenant.delete(tenantId)
   await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)))
+  userIds.forEach(releaseTestPhone)
 }
