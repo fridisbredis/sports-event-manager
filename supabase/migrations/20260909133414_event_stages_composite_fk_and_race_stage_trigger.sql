@@ -53,8 +53,7 @@
 -- 20260908143523, 2026-09-09):
 --   select s.id from event_stages s join events e on e.id = s.event_id
 --     where e.tenant_id <> s.tenant_id;
--- Same query must be run against dev and prod before pushing there — not
--- yet done as of this file being written (local-only session).
+-- Same query run against dev and prod on 2026-09-10: 0 rows in both.
 --
 -- Forward-fix: destructive
 --   Rollback: a new migration that
