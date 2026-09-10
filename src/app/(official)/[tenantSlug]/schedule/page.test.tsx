@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { ScheduleView } from './_components/schedule-view'
 import { logger } from '@/lib/logger'
+import { expectRangeCeiling, expectReadCeilingWarn } from '@/lib/db/bounded-read.test-helpers'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -355,8 +356,8 @@ describe('SchedulePage', () => {
 
     // 501 rows requested for a 500 ceiling: the extra row is what makes a
     // breach detectable instead of a silent truncation.
-    expect(dayBuilder.range).toHaveBeenCalledWith(0, 500)
-    expect(windowBuilder.range).toHaveBeenCalledWith(0, 500)
+    expectRangeCeiling(dayBuilder, 500)
+    expectRangeCeiling(windowBuilder, 500)
   })
 
   it('warns and truncates to the ceiling when the day-list ceiling is breached', async () => {
@@ -373,15 +374,11 @@ describe('SchedulePage', () => {
 
     // The warn context is what makes a breach actionable in the logs — a
     // truncated schedule with no tenant/official attached is unchaseable.
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('read ceiling'),
-      expect.objectContaining({
-        ceiling: 500,
-        page: '(official)/schedule#days',
-        tenantId: TENANT_ID,
-        officialId: 'off-1',
-      })
-    )
+    expectReadCeilingWarn(vi.mocked(logger.warn), {
+      ceiling: 500,
+      page: '(official)/schedule#days',
+      context: { tenantId: TENANT_ID, officialId: 'off-1' },
+    })
     const view = findByType(result, ScheduleView)
     expect(view!.props.days).toHaveLength(500)
   })
@@ -397,16 +394,11 @@ describe('SchedulePage', () => {
 
     const result = await SchedulePage({ params: PARAMS, searchParams: noParams() })
 
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('read ceiling'),
-      expect.objectContaining({
-        ceiling: 500,
-        page: '(official)/schedule',
-        tenantId: TENANT_ID,
-        officialId: 'off-1',
-        day: TODAY,
-      })
-    )
+    expectReadCeilingWarn(vi.mocked(logger.warn), {
+      ceiling: 500,
+      page: '(official)/schedule',
+      context: { tenantId: TENANT_ID, officialId: 'off-1', day: TODAY },
+    })
     const view = findByType(result, ScheduleView)
     expect(view!.props.assignments).toHaveLength(500)
   })
