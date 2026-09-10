@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { revalidatePath, updateTag } from 'next/cache'
+import { logger } from '@/lib/logger'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -24,6 +25,10 @@ vi.mock('next/cache', () => ({
   updateTag: vi.fn(),
 }))
 
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
 function mockClient(rpcMock: ReturnType<typeof vi.fn>) {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
@@ -38,6 +43,9 @@ const INPUT = { tenantSlug: 'viadal', tenantId: TENANT_ID, eventId: EVENT_ID }
 beforeEach(() => {
   vi.clearAllMocks()
 })
+
+const PUBLISH_PRECONDITION_ERROR =
+  "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again."
 
 // EVT-02: publishEvent now delegates the name/status/Race-stage-count check
 // and the publish write to a single publish_event RPC (migration
@@ -77,11 +85,52 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Event not found.' })
+    // F-REL-22: never forward the raw DB error message to the client.
+    expect(result).toEqual({
+      error: 'This event could not be found. Refresh the page and try again.',
+    })
     expect(rpcMock).toHaveBeenCalledWith('publish_event', {
       p_event_id: EVENT_ID,
       p_tenant_id: TENANT_ID,
     })
+  })
+
+  // REL-03 + F-REL-22 interaction: publishEvent logs the failure itself via
+  // logQueryError (which carries op/table/kind/tenantId for Log Analytics) and
+  // tells translateDbError not to log, so one failure produces one log line
+  // rather than two of differing shape.
+  it('logs a real RPC failure exactly once, with the structured context', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockClient(
+      vi.fn().mockResolvedValue({ data: null, error: { code: '42501', message: 'RLS denied' } })
+    )
+
+    await publishEvent(INPUT)
+
+    expect(logger.error).toHaveBeenCalledTimes(1)
+    expect(logger.error).toHaveBeenCalledWith(
+      'publishEvent: rpc on publish_event failed',
+      expect.anything(),
+      expect.objectContaining({
+        op: 'publishEvent',
+        table: 'publish_event',
+        kind: 'rpc',
+        pgCode: '42501',
+        tenantId: TENANT_ID,
+        eventId: EVENT_ID,
+      })
+    )
+  })
+
+  it('does not log P0002, which is an ordinary not-found rather than a failure', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockClient(
+      vi.fn().mockResolvedValue({ data: null, error: { code: 'P0002', message: 'not found' } })
+    )
+
+    await publishEvent(INPUT)
+
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('is a no-op success and skips revalidation when the event is already published', async () => {
@@ -108,7 +157,14 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Event name is required before publishing.' })
+    // F-REL-22: publish_event's two 23514 cases (blank name, no Race stage)
+    // share one translated message naming both preconditions — the client
+    // already pre-validates both before calling, so this is a rare backstop
+    // and doesn't need the two discriminated (unlike sync_event_stages'
+    // P0003 vs 23514, see db-error-message.ts).
+    expect(result).toEqual({
+      error: PUBLISH_PRECONDITION_ERROR,
+    })
   })
 
   it('returns an error when there are no Race stages (23514)', async () => {
@@ -121,7 +177,9 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
+    expect(result).toEqual({
+      error: PUBLISH_PRECONDITION_ERROR,
+    })
   })
 
   it('publishes the event and revalidates both admin paths on success', async () => {
@@ -146,7 +204,7 @@ describe('publishEvent', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
-  it('returns the RPC error message and skips revalidation when the RPC fails', async () => {
+  it('translates the RPC error and skips revalidation when the RPC fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const rpcMock = vi
       .fn()
@@ -155,7 +213,13 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'db is down' })
+    // F-REL-22: never forward the raw DB error message to the client — and
+    // an unmapped code (a transient/infra failure) must get the generic
+    // message, not a precondition message that would be confidently wrong
+    // about why publishing failed.
+    expect(result).toEqual({
+      error: 'Something went wrong while saving. Please try again.',
+    })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })

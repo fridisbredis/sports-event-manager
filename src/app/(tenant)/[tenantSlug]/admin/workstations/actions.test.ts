@@ -148,7 +148,7 @@ describe('createWorkstation', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
-  it('returns the rpc error message and skips revalidation when the rpc call fails', async () => {
+  it('translates the rpc error and skips revalidation when the rpc call fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const rpcMock = vi.fn().mockResolvedValue({
       data: null,
@@ -158,7 +158,8 @@ describe('createWorkstation', () => {
 
     const result = await createWorkstation(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'window_end must be after window_start' })
+    // F-REL-22: never forward the raw DB error message to the client.
+    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -259,7 +260,7 @@ describe('updateWorkstation', () => {
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })
 
-  it('returns the rpc error message and skips revalidation when the rpc call fails', async () => {
+  it('translates the rpc error and skips revalidation when the rpc call fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const rpcMock = vi.fn().mockResolvedValue({
       data: null,
@@ -269,7 +270,8 @@ describe('updateWorkstation', () => {
 
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
 
-    expect(result).toEqual({ error: 'Invalid workstation payload' })
+    // F-REL-22: never forward the raw DB error message to the client.
+    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -333,7 +335,7 @@ describe('deleteWorkstation', () => {
     expect(fromMock).not.toHaveBeenCalled()
   })
 
-  it('returns the delete error and skips revalidation when the delete fails', async () => {
+  it('translates the delete error and skips revalidation when the delete fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const fromMock = vi
       .fn()
@@ -342,7 +344,8 @@ describe('deleteWorkstation', () => {
 
     const result = await deleteWorkstation(DELETE_BASE_INPUT)
 
-    expect(result).toEqual({ error: 'delete failed' })
+    // F-REL-22: never forward the raw DB error message to the client.
+    expect(result).toEqual({ error: 'Something went wrong while deleting. Please try again.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
