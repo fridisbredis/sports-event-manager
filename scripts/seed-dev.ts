@@ -171,65 +171,111 @@ async function main() {
   // check is satisfied by construction. stage_type and race_type are omitted on
   // purpose — their defaults ('race', 'distance') are what keeps a published
   // event's "at least one Race stage" rule satisfied.
-  const { error: stageError } = await admin.from('event_stages').insert(
-    SEED_DAYS.map((day, index) => ({
-      tenant_id: tenant.id,
-      event_id: event.id,
-      name: `Day ${index + 1}`,
-      stage_date: day,
-      start_time: at(day, '07:00'),
-      end_time: at(day, '18:00'),
-      venue: 'Seed Stadium',
-      position: index,
-    }))
-  )
+  const { data: stageRows, error: stageError } = await admin
+    .from('event_stages')
+    .insert(
+      SEED_DAYS.map((day, index) => ({
+        tenant_id: tenant.id,
+        event_id: event.id,
+        name: `Day ${index + 1}`,
+        stage_date: day,
+        start_time: at(day, '07:00'),
+        end_time: at(day, '18:00'),
+        venue: 'Seed Stadium',
+        position: index,
+      }))
+    )
+    .select()
   if (stageError) throw stageError
   console.log(`  stages: ${SEED_DAYS.join(', ')} (07:00-18:00Z each)`)
 
-  // Two work areas, so MYSCH-01's work-area view groups more than one thing.
+  // Same reasoning as workstationByName below: RETURNING order is not
+  // guaranteed, so look stages up by name rather than by position.
+  const stageByName = (name: string) => {
+    const found = stageRows.find((row) => row.name === name)
+    if (!found) throw new Error(`Stage '${name}' missing after insert`)
+    return found
+  }
+  const day1Stage = stageByName('Day 1')
+  const day2Stage = stageByName('Day 2')
+  const day3Stage = stageByName('Day 3')
+
+  // Work areas belong to a stage (v0.7 stage model), and WS-01 groups the list
+  // by stage: `workstations.filter(ws => ws.stage_id === stage.id)`. A work
+  // area with a NULL stage_id therefore belongs to no group and never renders —
+  // the screen reports "0 work areas" for every stage while the rows sit in the
+  // database. SCHED-01 is scoped per stage too, so stageless work areas leave
+  // its grid with nothing to assign against.
+  //
+  // One set of work areas per stage rather than two shared across all three
+  // days. A work area cannot span stages (single stage_id), and its operating
+  // windows have to fall inside its own stage's range, so "the same work area
+  // on two days" is not expressible in this model — the MYSCH-01 fixture below
+  // gets its multi-day case from same-named work areas on different stages
+  // instead.
+  const WORK_AREA_TEMPLATES = [
+    { name: 'Finish line', description: 'Timing and finish chute', capacity_ceiling: 4 },
+    {
+      name: 'Water station',
+      description: 'Cups, jugs and refill point at 5 km',
+      capacity_ceiling: 2,
+    },
+  ]
+
   const { data: workstationRows, error: wsError } = await admin
     .from('workstations')
-    .insert([
-      {
-        tenant_id: tenant.id,
-        event_id: event.id,
-        name: 'Finish line',
-        description: 'Timing and finish chute',
-        capacity_ceiling: 4,
-      },
-      {
-        tenant_id: tenant.id,
-        event_id: event.id,
-        name: 'Water station',
-        description: 'Cups, jugs and refill point at 5 km',
-        capacity_ceiling: 2,
-      },
-    ])
+    .insert(
+      stageRows.flatMap((stage) =>
+        WORK_AREA_TEMPLATES.map((template) => ({
+          tenant_id: tenant.id,
+          event_id: event.id,
+          stage_id: stage.id,
+          ...template,
+        }))
+      )
+    )
     .select()
   if (wsError) throw wsError
 
-  // Looked up by name rather than by position: a multi-row insert's RETURNING
-  // order is not guaranteed, and silently swapping the two would leave the
-  // day-window fixture below testing something other than what it claims.
-  const workstationByName = (name: string) => {
-    const found = workstationRows.find((row) => row.name === name)
-    if (!found) throw new Error(`Workstation '${name}' missing after insert`)
+  // Keyed on (stage, name) rather than position: a multi-row insert's RETURNING
+  // order is not guaranteed, and the same names now recur once per stage, so
+  // name alone no longer identifies a row.
+  const workstationOn = (stageId: string, name: string) => {
+    const found = workstationRows.find((row) => row.stage_id === stageId && row.name === name)
+    if (!found) throw new Error(`Workstation '${name}' missing on stage ${stageId}`)
     return found
   }
-  const finishLine = workstationByName('Finish line')
-  const waterStation = workstationByName('Water station')
-  console.log(`  workstations: ${finishLine.name}, ${waterStation.name}`)
 
-  // An operating window per work area per day, so the admin scheduling grid
-  // stays consistent with the shifts the official sees.
+  const finishLineDay1 = workstationOn(day1Stage.id, 'Finish line')
+  const waterStationDay1 = workstationOn(day1Stage.id, 'Water station')
+  const finishLineDay2 = workstationOn(day2Stage.id, 'Finish line')
+  const waterStationDay3 = workstationOn(day3Stage.id, 'Water station')
+  console.log(
+    `  workstations: ${WORK_AREA_TEMPLATES.length} per stage ` +
+      `(${workstationRows.length} total across ${stageRows.length} stages)`
+  )
+
+  // One operating window per work area, on its own stage's day. A window has to
+  // sit inside its stage's allocable range (WS-02 enforces this), so the
+  // earlier every-work-area-times-every-day fixture would now produce windows
+  // outside the owning stage.
+  const stageDateById = new Map(
+    stageRows.map((stage) => {
+      if (!stage.stage_date) throw new Error(`Stage '${stage.name}' has no stage_date`)
+      return [stage.id, stage.stage_date]
+    })
+  )
+
   const { error: windowError } = await admin.from('workstation_operating_windows').insert(
-    [finishLine, waterStation].flatMap((ws) =>
-      SEED_DAYS.map((day) => ({
+    workstationRows.map((ws) => {
+      const day = stageDateById.get(ws.stage_id!)
+      if (!day) throw new Error(`Workstation '${ws.name}' has no resolvable stage date`)
+      return {
         workstation_id: ws.id,
         window_start: at(day, '07:00'),
         window_end: at(day, '18:00'),
-      }))
-    )
+      }
+    })
   )
   if (windowError) throw windowError
 
@@ -237,24 +283,37 @@ async function main() {
     .from('workstation_todos')
     .insert([
       {
-        workstation_id: finishLine.id,
+        workstation_id: finishLineDay1.id,
         instruction_text: 'Confirm timing gate is powered on',
         position: 0,
       },
       {
-        workstation_id: finishLine.id,
+        workstation_id: finishLineDay1.id,
         instruction_text: 'Log finish times on the paper backup sheet',
         position: 1,
       },
       {
-        workstation_id: waterStation.id,
+        workstation_id: waterStationDay1.id,
         instruction_text: 'Refill jugs before each wave',
         position: 0,
       },
       {
-        workstation_id: waterStation.id,
+        workstation_id: waterStationDay1.id,
         instruction_text: 'Bag and remove used cups',
         position: 1,
+      },
+      // MYSCH-01's work-area view renders each assignment's checklist, so the
+      // work areas the multi-day fixture below assigns on other stages need
+      // their own todos rather than borrowing Day 1's.
+      {
+        workstation_id: finishLineDay2.id,
+        instruction_text: 'Confirm timing gate is powered on',
+        position: 0,
+      },
+      {
+        workstation_id: waterStationDay3.id,
+        instruction_text: 'Refill jugs before each wave',
+        position: 0,
       },
     ])
     .select()
@@ -343,9 +402,13 @@ async function main() {
   // The MYSCH-01 day-window fixture. Each row earns its place:
   //   day0 Finish line + day0 Water station -> two work areas on one day, so the
   //                                            work-area view groups more than one
-  //   day0 Finish line + day1 Finish line   -> the same work area on two days,
-  //                                            the case whose flattened date row
-  //                                            was removed from the work-area view
+  //   day0 Finish line + day1 Finish line   -> the same work area *name* on two
+  //                                            days, the case whose flattened
+  //                                            date row was removed from the
+  //                                            work-area view. These are now two
+  //                                            rows (one per stage) rather than
+  //                                            one shared row, since a work area
+  //                                            belongs to a single stage.
   //   day2 Water station at 13:00           -> a shift no other day has, so the
   //                                            window is seen to exclude rather
   //                                            than merely order
@@ -357,8 +420,8 @@ async function main() {
     {
       tenant_id: tenant.id,
       official_id: confirmedOfficial.id,
-      workstation_id: finishLine.id,
-      todo_id: todoFor(finishLine.id, 0).id,
+      workstation_id: finishLineDay1.id,
+      todo_id: todoFor(finishLineDay1.id, 0).id,
       timeslot_start: at(day0, '08:00'),
       timeslot_end: at(day0, '09:00'),
       slot_index: 1,
@@ -367,8 +430,8 @@ async function main() {
     {
       tenant_id: tenant.id,
       official_id: confirmedOfficial.id,
-      workstation_id: waterStation.id,
-      todo_id: todoFor(waterStation.id, 0).id,
+      workstation_id: waterStationDay1.id,
+      todo_id: todoFor(waterStationDay1.id, 0).id,
       timeslot_start: at(day0, '10:00'),
       timeslot_end: at(day0, '11:00'),
       slot_index: 1,
@@ -377,8 +440,8 @@ async function main() {
     {
       tenant_id: tenant.id,
       official_id: confirmedOfficial.id,
-      workstation_id: finishLine.id,
-      todo_id: todoFor(finishLine.id, 1).id,
+      workstation_id: finishLineDay2.id,
+      todo_id: todoFor(finishLineDay2.id, 0).id,
       timeslot_start: at(day1, '08:00'),
       timeslot_end: at(day1, '09:00'),
       slot_index: 1,
@@ -387,8 +450,8 @@ async function main() {
     {
       tenant_id: tenant.id,
       official_id: confirmedOfficial.id,
-      workstation_id: waterStation.id,
-      todo_id: todoFor(waterStation.id, 1).id,
+      workstation_id: waterStationDay3.id,
+      todo_id: todoFor(waterStationDay3.id, 0).id,
       timeslot_start: at(day2, '13:00'),
       timeslot_end: at(day2, '14:00'),
       slot_index: 1,
@@ -397,8 +460,8 @@ async function main() {
     {
       tenant_id: tenant.id,
       official_id: singleDayOfficial.id,
-      workstation_id: finishLine.id,
-      todo_id: todoFor(finishLine.id, 0).id,
+      workstation_id: finishLineDay1.id,
+      todo_id: todoFor(finishLineDay1.id, 0).id,
       timeslot_start: at(day0, '08:00'),
       timeslot_end: at(day0, '09:00'),
       slot_index: 2,
