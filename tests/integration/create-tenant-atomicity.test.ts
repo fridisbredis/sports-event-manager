@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { serviceClient } from './helpers'
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
+import { serviceClient, createSystemAdmin, deleteAuthUser, signInAsClient } from './helpers'
 
 // REL-01: createTenant() in src/app/(system)/admin/actions.ts performs three
 // separate .insert() calls (tenants, events, event_stages) with no
@@ -14,6 +14,17 @@ import { serviceClient } from './helpers'
 // the red test this migration is written to turn green.
 describe('createTenant: atomicity across tenants/events/event_stages', () => {
   const createdTenantIds: string[] = []
+  let systemAdmin: Awaited<ReturnType<typeof createSystemAdmin>>
+  let clientSystemAdmin: Awaited<ReturnType<typeof signInAsClient>>
+
+  beforeAll(async () => {
+    systemAdmin = await createSystemAdmin()
+    clientSystemAdmin = await signInAsClient(systemAdmin.phone, '000000')
+  })
+
+  afterAll(async () => {
+    await deleteAuthUser(systemAdmin.userId)
+  })
 
   afterEach(async () => {
     const admin = serviceClient()
@@ -83,7 +94,7 @@ describe('createTenant: atomicity across tenants/events/event_stages', () => {
     const admin = serviceClient()
     const slug = `atomicity-fix-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-    const { data, error } = await admin.rpc('create_tenant_with_defaults', {
+    const { data, error } = await clientSystemAdmin.rpc('create_tenant_with_defaults', {
       p_name: 'Atomicity Fixed Tenant',
       p_slug: slug,
     })
@@ -114,17 +125,17 @@ describe('createTenant: atomicity across tenants/events/event_stages', () => {
     const admin = serviceClient()
     const slug = `atomicity-dup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-    const { data: firstData, error: firstError } = await admin.rpc('create_tenant_with_defaults', {
-      p_name: 'First Tenant',
-      p_slug: slug,
-    })
+    const { data: firstData, error: firstError } = await clientSystemAdmin.rpc(
+      'create_tenant_with_defaults',
+      { p_name: 'First Tenant', p_slug: slug }
+    )
     expect(firstError).toBeNull()
     const { tenant_id: firstTenantId } = firstData as unknown as { tenant_id: string }
     createdTenantIds.push(firstTenantId)
 
     // Reusing the same slug violates tenants' unique constraint on the
     // first insert of the transaction — nothing beyond it should exist.
-    const { data: secondData, error: secondError } = await admin.rpc(
+    const { data: secondData, error: secondError } = await clientSystemAdmin.rpc(
       'create_tenant_with_defaults',
       { p_name: 'Second Tenant', p_slug: slug }
     )
