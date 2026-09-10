@@ -26,6 +26,26 @@ async function createPendingOfficial(tenantId: string, phone: string) {
   return data
 }
 
+async function createPendingOfficialWithRealToken(tenantId: string, phone: string) {
+  // Mirrors the real creation path (src/app/api/officials/route.ts): no
+  // invite_token in the insert payload, so it gets a real, non-null value
+  // from officials.invite_token's DEFAULT gen_random_uuid() (migration
+  // 0010) — exactly like every official actually created through the app.
+  const admin = serviceClient()
+  const { data, error } = await admin
+    .from('officials')
+    .insert({
+      tenant_id: tenantId,
+      name: 'Invited Official (never clicked link)',
+      phone,
+      invite_status: 'invited',
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 async function confirmByPhone(
   admin: ReturnType<typeof serviceClient>,
   userId: string,
@@ -124,6 +144,49 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
       .eq('tenant_id', tenant.id)
       .maybeSingle()
     expect(roleRow?.role).toBe('official')
+  })
+
+  // Regression test for the unreachable-lookup fix: before it, this RPC's
+  // lookup required invite_status = 'invited' AND invite_token IS NULL — a
+  // combination no code path ever produces, since officials.invite_token
+  // defaults to a real UUID at creation (migration 0010) and nothing nulls
+  // it before this RPC's own UPDATE runs. An official who never visited
+  // their /invite/[token] link and only completed OTP login could never be
+  // confirmed; this RPC always raised not_found for them. This test creates
+  // an official the way the real invite-creation endpoint does — with a
+  // live, non-null invite_token — and asserts the phone-fallback confirm
+  // now succeeds instead of raising not_found.
+  it('confirms an official who still has a live invite_token and never visited the invite link', async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('Unreachable Lookup Fix')
+    createdTenantIds.push(tenant.id)
+    const phone = `+46703${Math.floor(Math.random() * 1_000_000)}`
+    const official = await createPendingOfficialWithRealToken(tenant.id, phone)
+    expect(official.invite_token).not.toBeNull()
+
+    const { data: userData, error: userError } = await admin.auth.admin.createUser({
+      phone,
+      phone_confirm: true,
+    })
+    if (userError) throw userError
+    createdUserIds.push(userData.user.id)
+
+    const { data, error } = await confirmByPhone(admin, userData.user.id, phone, true)
+    expect(error).toBeNull()
+    const result = data as unknown as { tenant_id: string; role_granted: boolean }
+    expect(result.tenant_id).toBe(tenant.id)
+    expect(result.role_granted).toBe(true)
+
+    const { data: row } = await admin
+      .from('officials')
+      .select('invite_status, user_id, invite_token')
+      .eq('id', official.id)
+      .single()
+    expect(row!.invite_status).toBe('confirmed')
+    expect(row!.user_id).toBe(userData.user.id)
+    // Confirming nulls the token so the /invite/[token] link can't also be
+    // used afterward — same guarantee the no-token path already had.
+    expect(row!.invite_token).toBeNull()
   })
 
   // Regression test for migration 0047. Before 0047, the user_roles

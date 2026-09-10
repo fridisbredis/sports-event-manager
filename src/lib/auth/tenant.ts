@@ -71,7 +71,6 @@ export async function hasPendingOfficialInviteByPhone(phone: string): Promise<bo
     .select('id')
     .eq('phone', phone)
     .eq('invite_status', 'invited')
-    .is('invite_token', null)
     .limit(1)
     .maybeSingle()
 
