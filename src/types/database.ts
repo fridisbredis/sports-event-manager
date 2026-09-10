@@ -229,18 +229,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'event_distances_event_id_fkey'
-            columns: ['event_id']
+            foreignKeyName: 'event_distances_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
             isOneToOne: false
             referencedRelation: 'events'
-            referencedColumns: ['id']
+            referencedColumns: ['id', 'tenant_id']
           },
           {
-            foreignKeyName: 'event_distances_stage_id_fkey'
-            columns: ['stage_id']
+            foreignKeyName: 'event_distances_stage_tenant_fkey'
+            columns: ['stage_id', 'tenant_id']
             isOneToOne: false
             referencedRelation: 'event_stages'
-            referencedColumns: ['id']
+            referencedColumns: ['id', 'tenant_id']
           },
           {
             foreignKeyName: 'event_distances_tenant_id_fkey'
@@ -278,11 +278,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'event_facilities_event_id_fkey'
-            columns: ['event_id']
+            foreignKeyName: 'event_facilities_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
             isOneToOne: false
             referencedRelation: 'events'
-            referencedColumns: ['id']
+            referencedColumns: ['id', 'tenant_id']
           },
           {
             foreignKeyName: 'event_facilities_tenant_id_fkey'
