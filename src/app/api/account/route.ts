@@ -20,9 +20,20 @@ const adminSchema = z.object({
 
 export async function PATCH(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  const user = authData.user
+
+  // An expired or missing session is the ordinary path to the 401 below and is
+  // not logged. Anything else (Auth unreachable, a 5xx from GoTrue) would
+  // otherwise be indistinguishable from it, and the caller just sees
+  // "Unauthorized".
+  if (authError && authError.status !== undefined && authError.status >= 500) {
+    logQueryError(authError, {
+      op: 'PATCH /api/account',
+      table: 'auth.users',
+      kind: 'select',
+    })
+  }
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

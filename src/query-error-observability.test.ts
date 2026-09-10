@@ -81,6 +81,34 @@ function unassignedWrites(src: string): string[] {
 }
 
 /**
+ * An auth call whose `error` is never destructured — `const { data: { user } } =
+ * await supabase.auth.getUser()`.
+ *
+ * This is the same defect as `unassignedWrites` in a shape neither of the other
+ * two checks can see: the result *is* assigned, so it is not fire-and-forget,
+ * and the file never binds `error` at all, so `branchesOnErrorWithoutLogging`
+ * returns early before it can fire. That blind spot let three call sites
+ * (`confirmInviteByPhone`, `publishEvent`, `PATCH /api/account`) survive the
+ * first pass of this survey — an unreachable GoTrue was indistinguishable from
+ * an expired session, and produced a redirect or a 401 with nothing logged.
+ *
+ * Matching is on the destructuring pattern rather than the call: what makes it
+ * unobservable is that the awaited result's `error` half is thrown away, which
+ * is visible in the binding alone.
+ */
+function authCallsDiscardingError(src: string): string[] {
+  const found: string[] = []
+  // `const { data … } = await <client>.auth.<method>(` with no `error` bound.
+  const pattern =
+    /(?:const|let)\s*(\{[\s\S]{0,120}?\})\s*=\s*await\s+\w+\s*\.auth\s*\.\s*(?:admin\s*\.\s*)?(\w+)\s*\(/g
+
+  for (const match of src.matchAll(pattern)) {
+    if (!/\berror\b/.test(match[1])) found.push(`auth.${match[2]}`)
+  }
+  return found
+}
+
+/**
  * An error that is destructured and used for control flow but never logged.
  *
  * Detection is per-file rather than per-query on purpose: tying a specific
@@ -124,6 +152,38 @@ describe('query failures in server actions and route handlers are observable (RE
       .map((file) => path.relative(SRC_DIR, file))
 
     expect(offenders).toEqual([])
+  })
+
+  it('has no auth call whose error is discarded', () => {
+    const offenders: string[] = []
+
+    for (const file of surveyedFiles()) {
+      const calls = authCallsDiscardingError(readFileSync(file, 'utf8'))
+      if (calls.length > 0) {
+        offenders.push(`${path.relative(SRC_DIR, file)}: ${calls.join(', ')}`)
+      }
+    }
+
+    expect(offenders).toEqual([])
+  })
+
+  it('detects an auth call that discards its error', () => {
+    const bad = `
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+    `
+    expect(authCallsDiscardingError(bad)).toEqual(['auth.getUser'])
+
+    const good = `
+      const { data, error: authError } = await supabase.auth.getUser()
+    `
+    expect(authCallsDiscardingError(good)).toEqual([])
+
+    const admin = `
+      const { data: created } = await service.auth.admin.createUser({ phone })
+    `
+    expect(authCallsDiscardingError(admin)).toEqual(['auth.createUser'])
   })
 
   it('detects a fire-and-forget write', () => {
@@ -181,5 +241,6 @@ describe('query failures in server actions and route handlers are observable (RE
     `
     expect(branchesOnErrorWithoutLogging(none)).toBe(false)
     expect(unassignedWrites(none)).toEqual([])
+    expect(authCallsDiscardingError(none)).toEqual([])
   })
 })

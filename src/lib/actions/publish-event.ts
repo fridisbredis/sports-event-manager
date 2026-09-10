@@ -23,9 +23,19 @@ export interface PublishEventResult {
 
 export async function publishEvent(input: PublishEventInput): Promise<PublishEventResult> {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  const user = authData.user
+
+  // An expired or missing session is the ordinary path to the /login redirect
+  // below and is not logged. A 5xx from GoTrue would otherwise look identical
+  // to it, and the admin just gets bounced to /login with nothing recorded.
+  if (authError && authError.status !== undefined && authError.status >= 500) {
+    logQueryError(authError, {
+      op: 'publishEvent',
+      table: 'auth.users',
+      kind: 'select',
+    })
+  }
 
   if (!user) redirect('/login')
 
