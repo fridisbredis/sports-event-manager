@@ -29,10 +29,10 @@ export async function createTenant(name: string) {
 // the same worker process (module state survives across files even with
 // fileParallelism: false), so a blind round-robin index would eventually
 // reclaim a number still held by another file's still-signed-in client.
-// Instead, always pick a number with no existing user, only falling back to
-// deleting the oldest-claimed one if every number is genuinely in use at
-// once — the pool must stay larger than the max number of distinct users
-// alive at the same time across the whole suite.
+// Instead, always pick a number with no existing user, and treat an
+// exhausted pool as a hard error (see claimTestPhone below) rather than
+// evicting anyone — the pool must stay larger than the max number of
+// distinct users alive at the same time across the whole suite.
 const TEST_PHONES = [
   '+46700000001',
   '+46700000002',
@@ -51,14 +51,27 @@ async function claimTestPhone(admin: ReturnType<typeof serviceClient>) {
   const { data: existing } = await admin.auth.admin.listUsers()
   const takenPhones = new Set(existing?.users.map((u) => u.phone).filter(Boolean))
 
-  let phone = TEST_PHONES.find((candidate) => !takenPhones.has(candidate.replace('+', '')))
+  const phone = TEST_PHONES.find((candidate) => !takenPhones.has(candidate.replace('+', '')))
 
+  // Exhaustion is a bug in the suite, not a condition to recover from. The
+  // previous behavior here was to evict the oldest number this process had
+  // claimed, which silently deleted a fixture user that a signed-in client
+  // was still holding: the client keeps its JWT, so auth.uid() then resolves
+  // to a deleted user, get_user_role() returns NULL, and the next write
+  // fails with a bare 42501 in whichever test happened to run next. That is
+  // far harder to diagnose than failing here, and it made unrelated tests
+  // fail at random. Leftovers from an earlier interrupted run are reclaimed
+  // once by tests/integration/global-setup.ts, so a full pool now genuinely
+  // means too many users are alive at the same time.
   if (!phone) {
-    const oldest = claimedOrder.shift()
-    if (!oldest) throw new Error('No free test phone number and no claimed number to evict')
-    const staleUser = existing?.users.find((u) => u.phone === oldest.replace('+', ''))
-    if (staleUser) await admin.auth.admin.deleteUser(staleUser.id)
-    phone = oldest
+    throw new Error(
+      `All ${TEST_PHONES.length} test phone numbers are in use. Either a test file is not ` +
+        'cleaning up its fixtures (call cleanupTenant() in afterAll, and deleteAuthUser() for ' +
+        'users created outside createUserWithRole()), or the suite now needs more numbers — ' +
+        'add them to TEST_PHONES here and to [auth.sms.test_otp] in supabase/config.toml. ' +
+        'Currently claimed by this process: ' +
+        `${claimedOrder.join(', ') || '(none)'}.`
+    )
   }
 
   claimedOrder.push(phone)
