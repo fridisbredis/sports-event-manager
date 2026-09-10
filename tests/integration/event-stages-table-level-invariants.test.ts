@@ -150,6 +150,63 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
     expect(data?.event_id).toBe(sourceEvent.id)
   })
 
+  // PR #170 review: the trigger originally re-checked "is the Race-stage
+  // count zero now?" for every DELETE/UPDATE, with no regard for whether
+  // the write in question caused that. Once an event is published with
+  // zero Race stages -- reachable via a direct UPDATE events SET
+  // status='published' bypassing publish_event, since this trigger lives
+  // on event_stages, not events -- every subsequent write to that event's
+  // stage rows failed, including ones that never touch a Race stage.
+  async function addNonRaceStage(eventId: string) {
+    const admin = serviceClient()
+    const { data, error } = await admin
+      .from('event_stages')
+      .insert({
+        event_id: eventId,
+        tenant_id: tenant.id,
+        name: 'Check-in',
+        stage_type: 'non_race',
+        race_type: 'distance',
+        position: 0,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+
+  async function publishDirectly(eventId: string) {
+    const admin = serviceClient()
+    const { error } = await admin.from('events').update({ status: 'published' }).eq('id', eventId)
+    if (error) throw error
+  }
+
+  it('allows renaming a non_race stage on a published event with zero Race stages (no lockout)', async () => {
+    const event = await createEvent('draft')
+    const stage = await addNonRaceStage(event.id)
+    await publishDirectly(event.id)
+
+    const { error } = await clientAdmin
+      .from('event_stages')
+      .update({ name: 'Check-in renamed' })
+      .eq('id', stage.id)
+
+    expect(error).toBeNull()
+  })
+
+  it('allows deleting a non_race stage on a published event with zero Race stages (no lockout)', async () => {
+    const event = await createEvent('draft')
+    const stage = await addNonRaceStage(event.id)
+    await publishDirectly(event.id)
+
+    const { error } = await clientAdmin.from('event_stages').delete().eq('id', stage.id)
+
+    expect(error).toBeNull()
+    const admin = serviceClient()
+    const { data } = await admin.from('event_stages').select('id').eq('id', stage.id).maybeSingle()
+    expect(data).toBeNull()
+  })
+
   it('allows UPDATE event_id moving a Race stage away when the source event keeps another Race stage', async () => {
     const sourceEvent = await createEvent('published')
     const destEvent = await createEvent('published')

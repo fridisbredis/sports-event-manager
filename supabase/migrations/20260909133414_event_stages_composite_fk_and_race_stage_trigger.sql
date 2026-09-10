@@ -27,23 +27,23 @@
 --    commit time, regardless of which write path touched the table.
 --
 -- Deliberately NOT closed by this migration (residual, accepted as Low —
--- see the Trello F-REL-21 card):
---   The literal race migration 0058's header described ("publishEvent
---   counts Race stages, then updates events.status in a separate
---   statement") is already gone — 20260908143523 made publish_event a
---   single locked RPC (SELECT ... FOR UPDATE on the events row), and
---   src/lib/actions/publish-event.ts calls it that way. What remains is
---   narrower: a direct DELETE on event_stages (the same bypass this
---   migration's trigger targets) takes no lock on the events row, so it is
---   not serialized against a concurrent publish_event call. The trigger
---   below reads events.status with a plain SELECT, not SELECT ... FOR
---   UPDATE, so a DELETE that commits in the gap between publish_event's
---   own count and its UPDATE could still race it. Needs two concurrent
---   admin writes on the same event inside a millisecond window; same
---   recoverable damage (re-add the stage) as gap 1. Closing this fully
---   would need a second trigger on events for the transition into
---   'published', taking the same lock — out of scope here by product
---   decision, not an oversight.
+-- see the Trello F-REL-21 card and the new F-REL-22 card this review round
+-- opened for it):
+--   Nothing guards the events table itself, so a direct
+--   UPDATE events SET status = 'published' on an event with zero Race
+--   stages goes straight through — no concurrency needed at all.
+--   publish_event (20260908143523, a single SELECT ... FOR UPDATE-locked
+--   RPC) blocks this path, but that is exactly the direct-PostgREST-bypass
+--   class this migration exists to close on event_stages; leaving the
+--   events side of it open means the invariant is still not enforced at
+--   the table level end to end. A second, narrower gap sits behind the
+--   same plain-SELECT read: the trigger below reads events.status without
+--   FOR UPDATE, so it is not serialized against a concurrent publish_event
+--   call either — a millisecond-window race, recoverable the same way.
+--   Closing either fully would need a second deferred constraint trigger on
+--   events for the transition into 'published', taking the same lock —
+--   out of scope here by product decision (tracked as F-REL-22), not an
+--   oversight.
 --
 -- F-REL-18 (publishEvent's final UPDATE missing an explicit tenant_id
 -- filter) is a separate card and not touched here.
@@ -130,6 +130,30 @@ BEGIN
   LOOP
     CONTINUE WHEN v_event_id IS NULL;
 
+    -- This trigger only exists to catch a write that could reduce a
+    -- published event's Race-stage count to zero. A write to a row that
+    -- neither was nor becomes a Race stage of v_event_id can never do that
+    -- -- checking end-state alone ("is the count zero now?") would instead
+    -- re-validate every write against every published event's current
+    -- count forever, permanently locking out edits to non_race rows the
+    -- moment any published event reaches zero Race stages by some other
+    -- path (e.g. a direct UPDATE events SET status='published' on an
+    -- event with none, which this trigger cannot see -- it lives on
+    -- event_stages, not events). Skip unless this row was a Race stage of
+    -- v_event_id before, or becomes one.
+    --
+    -- NEW.event_id IS NOT NULL is deliberate, not defensive filler: on
+    -- DELETE, NEW is an unassigned record, so NEW.event_id = v_event_id
+    -- evaluates to SQL NULL rather than false. false OR NULL is NULL, and
+    -- CONTINUE WHEN NOT(NULL) does not continue -- it would silently defeat
+    -- this whole skip for a DELETE of a non_race row, the exact case the
+    -- skip exists for. The explicit IS NOT NULL check short-circuits the
+    -- AND to a real false instead, so DELETE keeps proper two-valued logic.
+    CONTINUE WHEN NOT (
+      (OLD.event_id = v_event_id AND OLD.stage_type = 'race')
+      OR (NEW.event_id IS NOT NULL AND NEW.event_id = v_event_id AND NEW.stage_type = 'race')
+    );
+
     SELECT status INTO v_event_status
     FROM events
     WHERE id = v_event_id;
@@ -162,9 +186,17 @@ COMMENT ON FUNCTION public.enforce_published_event_has_race_stage IS
   'scripts/seed-dev.ts (creates a published event, then inserts its stages in a '
   'separate call). Checks both OLD.event_id and NEW.event_id (not just '
   'COALESCE(NEW, OLD)) so an UPDATE that moves a row to a different event_id also '
-  're-validates the event it left behind. Reads events.status with a plain SELECT, not SELECT ... FOR '
-  'UPDATE, so this is not serialized against a concurrent publish_event call '
-  '(migration 20260908143523) — an accepted residual, see this migration''s header.';
+  're-validates the event it left behind. Per event_id, only re-checks the count if '
+  'the touched row was a Race stage of that event before or becomes one -- a write '
+  'to a row that neither was nor becomes a Race stage of that event can never reduce '
+  'its Race-stage count, and checking end-state alone would otherwise lock out every '
+  'edit to a non_race row the moment a published event reaches zero Race stages by '
+  'some other path this trigger cannot see (found in PR #170 review: a direct UPDATE '
+  'events SET status=''published'' on a stageless event, which lives on events, not '
+  'event_stages, and is a separate accepted residual, tracked as F-REL-22). Reads '
+  'events.status with a plain SELECT, not SELECT ... FOR UPDATE, so this is not '
+  'serialized against a concurrent publish_event call (migration 20260908143523) — '
+  'an accepted residual, see this migration''s header.';
 
 DROP TRIGGER IF EXISTS event_stages_published_race_stage_guard ON event_stages;
 CREATE CONSTRAINT TRIGGER event_stages_published_race_stage_guard
