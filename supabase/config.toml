@@ -245,7 +245,12 @@ enable_confirmations = false
 # Template for sending OTP to users
 template = "Your code is {{ .Code }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
-max_frequency = "5s"
+# 1s locally, matching [auth.email] above, so several users can be signed in
+# back to back. At 5s GoTrue rejects the second sign-in with
+# over_sms_send_rate_limit, which surfaces as a login form that silently stays
+# on the phone step — easy to misread as a broken form rather than a throttle.
+# This is a local-only file; the hosted projects keep their own defaults.
+max_frequency = "1s"
 
 # Use pre-defined map of phone number to OTP for testing.
 # Keys are E.164 WITH the leading '+', because that is what the app sends:
@@ -276,6 +281,13 @@ max_frequency = "5s"
 "+46709900004" = "000000"
 "+46709900005" = "000000"
 "+46709900006" = "000000"
+
+# Reserved for a local system_admin. scripts/seed-dev.ts deliberately seeds no
+# system_admin — that role is global (user_roles.tenant_id must be NULL per
+# 0021) and is not part of a tenant's seed data — which leaves SYS-01 and SYS-02
+# unreachable on a fresh local stack. Create the user against this number to
+# exercise them.
+"+46709900007" = "000000"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
