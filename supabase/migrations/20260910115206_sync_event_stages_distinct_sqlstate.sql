@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 20260909130951: sync_event_stages — distinct SQLSTATE for the
+-- Migration 20260910115206: sync_event_stages — distinct SQLSTATE for the
 -- Race-stage-removal guard, separate from event_stages_times_order_check
 -- ============================================================================
 --
@@ -20,11 +20,21 @@
 -- now match P0003 exactly for the Race-stage message and treat any other
 -- 23514 as the times-order violation.
 --
+-- The same invariant has a second enforcement point as of migration
+-- 20260909133414 (F-REL-21): the deferred constraint trigger
+-- enforce_published_event_has_race_stage, which catches direct writes that
+-- bypass the RPC. It raised 23514 too, so this migration moves it to P0003
+-- as well — otherwise the same user-facing condition would produce the
+-- times-order message on the direct-write path and the correct one on the
+-- RPC path.
+--
 -- Forward-fix: replace
---   Rollback: restore the prior function body from migration
---             20260908143523_publish_event_rpc.sql verbatim (ERRCODE
---             '23514' on the Race-stage RAISE instead of 'P0003'). No other
---             change in that migration is touched.
+--   Rollback: restore sync_event_stages' prior body from migration
+--             20260908143523_publish_event_rpc.sql verbatim, and
+--             enforce_published_event_has_race_stage' prior body from
+--             migration 20260909133414 verbatim (ERRCODE '23514' on the
+--             Race-stage RAISE in both, instead of 'P0003'). No other
+--             change in either migration is touched.
 --   Data:     no data loss. This migration only changes which SQLSTATE one
 --             RAISE EXCEPTION uses; no column, table, or constraint changes.
 --   Blast:    if reverted, the app-layer discrimination added alongside
@@ -39,6 +49,10 @@
 --             so nothing that worked before stops working during the
 --             deploy window.
 -- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1. The RPC-level guard.
+-- ----------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.sync_event_stages(
   p_event_id  uuid,
@@ -193,19 +207,106 @@ COMMENT ON FUNCTION public.sync_event_stages IS
   'If the parent event''s status is ''published'', the call also aborts '
   '(P0003, "Cannot remove the last Race stage from a published event.") when '
   'the resulting stage set has zero stage_type = ''race'' rows (migration 0058, '
-  'SQLSTATE changed to P0003 by migration 20260909130951 — F-REL-22 — so it '
+  'SQLSTATE changed to P0003 by migration 20260910115206 — F-REL-22 — so it '
   'is distinguishable from event_stages_times_order_check''s plain 23514) — '
   'this is the same invariant publishEvent enforces before allowing publish, '
   'held afterwards too as an RPC-level backstop. Serializable against a '
   'concurrent publish_event call as of migration 20260908143523 (both take '
-  'SELECT ... FOR UPDATE on the events row before reading status) — bypassable '
-  'via a direct DELETE on event_stages under tenant_admin_manage_event_stages '
-  'is the one gap still open, see migration 0058''s header. '
+  'SELECT ... FOR UPDATE on the events row before reading status). A direct '
+  'DELETE on event_stages bypassing this RPC is caught by the deferred '
+  'constraint trigger enforce_published_event_has_race_stage (migration '
+  '20260909133414), which raises the same P0003 as of this migration. '
   'Raises P0002 if the events row itself isn''t visible for (p_event_id, '
   'p_tenant_id) under caller RLS, rather than silently skipping the check. '
   'This contract is mirrored by StageInput in '
   'src/app/(tenant)/[tenantSlug]/admin/event/actions.ts and is NOT enforced by '
   'the generated types (p_stages is Json) — see F-REL-16.';
+
+-- ----------------------------------------------------------------------------
+-- 2. Same SQLSTATE change for the table-level backstop.
+--
+--    Migration 20260909133414 (F-REL-21, merged after this migration was
+--    first written) added enforce_published_event_has_race_stage: a deferred
+--    constraint trigger enforcing this exact same "published event keeps >=1
+--    Race stage" invariant on direct writes that bypass sync_event_stages.
+--    It raises plain 23514. Leaving it that way would defeat the point of
+--    this migration: the app maps 23514 to the times-order message, so a
+--    direct DELETE of the last Race stage would show "stage times invalid"
+--    while the RPC path showed the correct message for the same invariant.
+--    Both sources now raise P0003. Body is otherwise verbatim from
+--    20260909133414 — only the ERRCODE literal differs.
+-- ----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.enforce_published_event_has_race_stage()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_event_id      uuid;
+  v_event_status  text;
+  v_race_stage_ct integer;
+BEGIN
+  -- UPDATE ... SET event_id = <other event> moves a row off OLD.event_id and
+  -- onto NEW.event_id in the same statement. COALESCE(NEW, OLD) here would
+  -- only ever see NEW (never null on UPDATE), so the source event's
+  -- now-possibly-zero Race-stage count would never be checked. Check both
+  -- endpoints; on DELETE, NEW.event_id is null and the loop only checks OLD.
+  FOREACH v_event_id IN ARRAY ARRAY[OLD.event_id, NEW.event_id]::uuid[]
+  LOOP
+    CONTINUE WHEN v_event_id IS NULL;
+
+    -- This trigger only exists to catch a write that could reduce a
+    -- published event's Race-stage count to zero. A write to a row that
+    -- neither was nor becomes a Race stage of v_event_id can never do that
+    -- -- checking end-state alone ("is the count zero now?") would instead
+    -- re-validate every write against every published event's current
+    -- count forever, permanently locking out edits to non_race rows the
+    -- moment any published event reaches zero Race stages by some other
+    -- path (e.g. a direct UPDATE events SET status='published' on an
+    -- event with none, which this trigger cannot see -- it lives on
+    -- event_stages, not events). Skip unless this row was a Race stage of
+    -- v_event_id before, or becomes one.
+    --
+    -- NEW.event_id IS NOT NULL is deliberate, not defensive filler: on
+    -- DELETE, NEW is an unassigned record, so NEW.event_id = v_event_id
+    -- evaluates to SQL NULL rather than false. false OR NULL is NULL, and
+    -- CONTINUE WHEN NOT(NULL) does not continue -- it would silently defeat
+    -- this whole skip for a DELETE of a non_race row, the exact case the
+    -- skip exists for. The explicit IS NOT NULL check short-circuits the
+    -- AND to a real false instead, so DELETE keeps proper two-valued logic.
+    CONTINUE WHEN NOT (
+      (OLD.event_id = v_event_id AND OLD.stage_type = 'race')
+      OR (NEW.event_id IS NOT NULL AND NEW.event_id = v_event_id AND NEW.stage_type = 'race')
+    );
+
+    SELECT status INTO v_event_status
+    FROM events
+    WHERE id = v_event_id;
+
+    IF v_event_status = 'published' THEN
+      SELECT count(*) INTO v_race_stage_ct
+      FROM event_stages
+      WHERE event_id = v_event_id
+        AND stage_type = 'race';
+
+      IF v_race_stage_ct = 0 THEN
+        RAISE EXCEPTION 'Cannot remove the last Race stage from a published event.'
+          USING ERRCODE = 'P0003';
+      END IF;
+    END IF;
+  END LOOP;
+
+  RETURN NULL; -- ignored for an AFTER trigger
+END;
+$$;
+
+COMMENT ON FUNCTION public.enforce_published_event_has_race_stage IS
+  'F-REL-21 (migration 20260909133414): table-level backstop for the same '
+  '"published event keeps >=1 Race stage" invariant sync_event_stages enforces '
+  'inside the RPC, catching direct PostgREST writes that bypass it. Raises '
+  'P0003 (changed from 23514 by migration 20260910115206 — F-REL-22 — so both '
+  'sources of this invariant report the same distinguishable code, separate '
+  'from event_stages_times_order_check''s plain 23514).';
 
 -- ============================================================================
 -- DONE
@@ -220,4 +321,7 @@ COMMENT ON FUNCTION public.sync_event_stages IS
 --   -- 3. Expect SQLSTATE P0003 (not 23514).
 --   -- 4. Separately, call sync_event_stages with a stage whose end_time is
 --   --    before its start_time. Expect SQLSTATE 23514 (unchanged).
+--   -- 5. Direct-write path: DELETE the last Race stage of a published event
+--   --    straight from event_stages (bypassing the RPC). Expect P0003 at
+--   --    COMMIT time (the trigger is deferred), not 23514.
 -- ============================================================================

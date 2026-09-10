@@ -16,9 +16,13 @@ interface DbErrorLike {
   message: string
 }
 
-// P0003 (custom, migration 20260909130951) discriminates sync_event_stages'
-// Race-stage-removal guard from event_stages_times_order_check, which also
-// raises 23514 in the same function call — see that migration's header.
+// P0003 (custom, migration 20260910115206) discriminates the Race-stage
+// removal guard from event_stages_times_order_check, which also raises 23514
+// from the same sync_event_stages call — see that migration's header. Both
+// enforcement points of that invariant use P0003: the guard inside
+// sync_event_stages, and the deferred constraint trigger
+// enforce_published_event_has_race_stage that catches direct writes
+// bypassing the RPC (migration 20260909133414).
 const DB_ERROR_KEYS: Record<string, string> = {
   P0002: 'eventConfig.eventNotFound',
   P0003: 'eventConfig.cannotRemoveLastRaceStage',

@@ -16,7 +16,7 @@ import {
 // role_granted key out of confirm_official_invite_by_phone between
 // migrations 0043 and 0045.
 //
-// F-REL-22 (migration 20260909130951): the Race-stage guard's SQLSTATE was
+// F-REL-22 (migration 20260910115206): the Race-stage guard's SQLSTATE was
 // changed from 23514 to a custom P0003 so the app layer can tell it apart
 // from event_stages_times_order_check, which also raises plain 23514 from
 // the same function's INSERT ... ON CONFLICT UPDATE. A mocked unit test
