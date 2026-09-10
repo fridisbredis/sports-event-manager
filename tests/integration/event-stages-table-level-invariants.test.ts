@@ -117,7 +117,11 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
     expect(error?.code).toBe('23514')
 
     const admin = serviceClient()
-    const { data } = await admin.from('event_stages').select('stage_type').eq('id', stage.id).single()
+    const { data } = await admin
+      .from('event_stages')
+      .select('stage_type')
+      .eq('id', stage.id)
+      .single()
     expect(data?.stage_type).toBe('race')
   })
 
@@ -138,7 +142,11 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
     expect(error?.code).toBe('23514')
 
     const admin = serviceClient()
-    const { data } = await admin.from('event_stages').select('event_id').eq('id', movedStage.id).single()
+    const { data } = await admin
+      .from('event_stages')
+      .select('event_id')
+      .eq('id', movedStage.id)
+      .single()
     expect(data?.event_id).toBe(sourceEvent.id)
   })
 
@@ -157,10 +165,17 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
     expect(error).toBeNull()
 
     const admin = serviceClient()
-    const { data } = await admin.from('event_stages').select('id, event_id').eq('id', movedStage.id).single()
+    const { data } = await admin
+      .from('event_stages')
+      .select('id, event_id')
+      .eq('id', movedStage.id)
+      .single()
     expect(data?.event_id).toBe(destEvent.id)
 
-    const { data: sourceStages } = await admin.from('event_stages').select('id').eq('event_id', sourceEvent.id)
+    const { data: sourceStages } = await admin
+      .from('event_stages')
+      .select('id')
+      .eq('event_id', sourceEvent.id)
     expect(sourceStages?.map((row) => row.id)).toEqual([keptStage.id])
   })
 })
@@ -194,7 +209,12 @@ describe('event_stages composite tenant FK (F-REL-17)', () => {
     const admin = serviceClient()
     const { data: eventB, error: eventError } = await admin
       .from('events')
-      .insert({ tenant_id: tenantB.id, name: 'Tenant B Event', event_type: 'race', status: 'draft' })
+      .insert({
+        tenant_id: tenantB.id,
+        name: 'Tenant B Event',
+        event_type: 'race',
+        status: 'draft',
+      })
       .select()
       .single()
     if (eventError) throw eventError
