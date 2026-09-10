@@ -6,6 +6,7 @@ import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
+import { logQueryError } from '@/lib/db/query-error'
 
 const deleteSchema = z.object({
   tenantId: z.string().uuid(),
@@ -50,9 +51,18 @@ export async function DELETE(
   })
 
   if (error) {
+    // not_found is the RPC's own signal for an id that isn't a live official
+    // in this tenant — an ordinary 404, not a failure.
     if (error.message === 'not_found') {
       return NextResponse.json({ error: 'Official not found' }, { status: 404 })
     }
+    logQueryError(error, {
+      op: 'DELETE /api/officials/[id]',
+      table: 'remove_official',
+      kind: 'rpc',
+      tenantId: parsed.data.tenantId,
+      extra: { officialId: id },
+    })
     return NextResponse.json({ error: 'Failed to remove official' }, { status: 500 })
   }
 

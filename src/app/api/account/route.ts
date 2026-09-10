@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
+import { logQueryError } from '@/lib/db/query-error'
 
 const officialSchema = z.object({
   mode: z.undefined().or(z.literal('official')),
@@ -19,9 +20,20 @@ const adminSchema = z.object({
 
 export async function PATCH(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  const user = authData.user
+
+  // An expired or missing session is the ordinary path to the 401 below and is
+  // not logged. Anything else (Auth unreachable, a 5xx from GoTrue) would
+  // otherwise be indistinguishable from it, and the caller just sees
+  // "Unauthorized".
+  if (authError && authError.status !== undefined && authError.status >= 500) {
+    logQueryError(authError, {
+      op: 'PATCH /api/account',
+      table: 'auth.users',
+      kind: 'select',
+    })
+  }
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,6 +53,11 @@ export async function PATCH(request: NextRequest) {
     })
 
     if (error) {
+      logQueryError(error, {
+        op: 'PATCH /api/account',
+        table: 'auth.users',
+        kind: 'update',
+      })
       return NextResponse.json({ error: 'Update failed' }, { status: 500 })
     }
 
@@ -71,6 +88,16 @@ export async function PATCH(request: NextRequest) {
     .single()
 
   if (error || !official) {
+    logQueryError(error, {
+      op: 'PATCH /api/account',
+      table: 'officials',
+      kind: 'update',
+      tenantId,
+      // No error but no row means the filter matched nothing (not a confirmed
+      // official in this tenant) rather than a query failure — worth telling
+      // apart in Log Analytics, since only one of the two is a bug here.
+      extra: { matchedNoRow: !error && !official },
+    })
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
 
