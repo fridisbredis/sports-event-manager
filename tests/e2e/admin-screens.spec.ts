@@ -7,23 +7,45 @@ import { SEED_TENANT_SLUG } from './fixtures/users'
 const base = `/${SEED_TENANT_SLUG}/admin`
 
 test.describe('WS-01 work areas list', () => {
-  test('groups the stages, each with its own add action', async ({ tenantAdminPage: page }) => {
+  test('groups work areas by stage, with capacity and windows', async ({
+    tenantAdminPage: page,
+  }) => {
     await page.goto(`${base}/workstations`)
 
     // exact: the accordion headings for each stage end in "N work areas" and
     // would otherwise match too.
     await expect(page.getByRole('heading', { name: 'Work areas', exact: true })).toBeVisible()
 
-    // One accordion section per stage. scripts/seed-dev.ts creates three race
-    // days, and each section ends in its own add button.
-    const addButtons = page.getByRole('button', { name: '+ Add work area' })
-    await expect(addButtons).toHaveCount(3)
+    // One accordion section per stage, each with its own add button.
+    // scripts/seed-dev.ts creates three race days with two work areas each.
+    await expect(page.getByRole('button', { name: '+ Add work area' })).toHaveCount(3)
+    await expect(page.getByText('2 work areas').first()).toBeVisible()
 
-    // The seed creates no work areas, so every stage reports an empty count.
-    // The populated list — the capacity "Up to N" cells and the clickable rows
-    // that open WS-02 — therefore has no E2E coverage yet; covering it needs
-    // either seeded work areas or a spec that creates one and cleans it up.
-    await expect(page.getByText('0 work areas').first()).toBeVisible()
+    // Grouping is per stage, not one bucket: the seed uses the same two names
+    // on every stage, so a work area filed under the wrong heading would show
+    // as a count other than 2.
+    const dayOne = page.getByRole('region', { name: /Day 1/ })
+    await expect(dayOne.getByRole('rowheader', { name: 'Finish line' })).toBeVisible()
+    await expect(dayOne.getByRole('rowheader', { name: 'Water station' })).toBeVisible()
+
+    // Capacity renders as the spec's "up to X" ceiling, not a bare number, and
+    // each row summarises its operating window.
+    await expect(dayOne.getByRole('gridcell', { name: 'Up to 4' })).toBeVisible()
+    await expect(dayOne.getByRole('gridcell', { name: /07:00–18:00/ }).first()).toBeVisible()
+  })
+
+  test('opens a work area from the list', async ({ tenantAdminPage: page }) => {
+    await page.goto(`${base}/workstations`)
+
+    // Rows carry an onClick rather than an anchor, so this is a click on the
+    // cell — getByRole('link') would find nothing.
+    await page
+      .getByRole('region', { name: /Day 1/ })
+      .getByRole('rowheader', { name: 'Finish line' })
+      .click()
+
+    await expect(page).toHaveURL(new RegExp(`${base}/workstations/[0-9a-f-]+$`))
+    await expect(page.getByRole('heading', { name: 'Finish line' })).toBeVisible()
   })
 })
 
