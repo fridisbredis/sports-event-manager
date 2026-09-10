@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 import { logger } from '@/lib/logger'
+import { translateDbError, translateStorageError } from '@/lib/actions/db-error-message'
 import {
   eventInfoCacheTag,
   adminEventCacheTag,
@@ -73,7 +74,10 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     .eq('tenant_id', input.tenantId)
     .single()
 
-  if (currentEventError) return { error: currentEventError.message }
+  if (currentEventError)
+    return {
+      error: await translateDbError('saveEvent: current event lookup failed', currentEventError),
+    }
 
   const stageRowsHaveRaceStage = input.stages.some((s) => s.name.trim() && s.stage_type === 'race')
   if (currentEvent.status === 'published' && !stageRowsHaveRaceStage) {
@@ -106,7 +110,8 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     .eq('id', input.eventId)
     .eq('tenant_id', input.tenantId)
 
-  if (eventError) return { error: eventError.message }
+  if (eventError)
+    return { error: await translateDbError('saveEvent: events update failed', eventError) }
 
   // Atomically replace all stages AND their distances via RPC (delete + insert
   // in one transaction). Distances are now embedded per Race stage in p_stages.
@@ -132,7 +137,8 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     p_stages: stageRows,
   })
 
-  if (rpcError) return { error: rpcError.message }
+  if (rpcError)
+    return { error: await translateDbError('saveEvent: sync_event_stages failed', rpcError) }
 
   // REL-01: facilities are replaced atomically by this RPC — see migration
   // 20260908131614 and docs/patterns/atomic-multi-table-writes.md.
@@ -148,7 +154,8 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
     p_tenant_id: input.tenantId,
     p_facilities: facilityRows,
   })
-  if (facError) return { error: facError.message }
+  if (facError)
+    return { error: await translateDbError('saveEvent: sync_event_facilities failed', facError) }
 
   revalidatePath(`/${input.tenantSlug}/admin/event`)
   revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
@@ -216,7 +223,10 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
     .from('logos')
     .upload(path, file, { contentType: file.type })
 
-  if (uploadError) return { error: uploadError.message }
+  if (uploadError)
+    return {
+      error: await translateStorageError('uploadEventLogo: storage upload failed', uploadError),
+    }
 
   // Best-effort cleanup of old logo — ignore errors
   const oldPath = extractStoragePath(oldLogoUrl, 'logos')
@@ -260,7 +270,8 @@ export async function updateTenantColorPalette(
     .update({ color_palette: colorPalette })
     .eq('id', parsedTenantId.data)
 
-  if (error) return { error: error.message }
+  if (error)
+    return { error: await translateDbError('updateTenantColorPalette: update failed', error) }
 
   revalidatePath(`/${tenantSlug}`, 'layout')
 
