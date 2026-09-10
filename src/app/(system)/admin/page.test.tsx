@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { notFound } from 'next/navigation'
 import { logger } from '@/lib/logger'
+import { expectRangeCeiling, expectReadCeilingWarn } from '@/lib/db/bounded-read.test-helpers'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -74,7 +75,7 @@ describe('SystemAdminPage', () => {
 
     // 501 rows requested for a 500 ceiling: the extra row is what makes a
     // breach detectable instead of a silent truncation.
-    expect(tenantsBuilder.range).toHaveBeenCalledWith(0, 500)
+    expectRangeCeiling(tenantsBuilder, 500)
   })
 
   it('warns and truncates to the ceiling when the ceiling is breached', async () => {
@@ -91,10 +92,7 @@ describe('SystemAdminPage', () => {
 
     const result = await SystemAdminPage()
 
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('read ceiling'),
-      expect.objectContaining({ ceiling: 500, page: '(system)/admin' })
-    )
+    expectReadCeilingWarn(vi.mocked(logger.warn), { ceiling: 500, page: '(system)/admin' })
     expect(result.props.tenants).toHaveLength(500)
   })
 

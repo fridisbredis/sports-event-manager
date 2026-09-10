@@ -55,3 +55,11 @@ AGENTS.md
 !.claude/reference/**
 bash.exe.stackdump
 reviewerfindings.json*
+
+# Playwright (E2E)
+/test-results/
+/playwright-report/
+/blob-report/
+# Cached sign-in cookies, one file per role. Real session tokens for the local
+# stack — regenerated on demand, never committed.
+/tests/e2e/.auth/

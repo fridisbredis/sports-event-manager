@@ -64,13 +64,13 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
     return data
   }
 
-  it('rejects a direct DELETE of the only Race stage on a published event (23514)', async () => {
+  it('rejects a direct DELETE of the only Race stage on a published event (P0003)', async () => {
     const event = await createEvent('published')
     const stage = await addRaceStage(event.id)
 
     const { error } = await clientAdmin.from('event_stages').delete().eq('id', stage.id)
 
-    expect(error?.code).toBe('23514')
+    expect(error?.code).toBe('P0003')
     expect(error?.message).toContain('Cannot remove the last Race stage from a published event.')
 
     // Deferred trigger fires at commit time, but the whole request still
@@ -105,7 +105,7 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
     expect(data).toBeNull()
   })
 
-  it('rejects UPDATE stage_type away from race on the only Race stage of a published event (23514)', async () => {
+  it('rejects UPDATE stage_type away from race on the only Race stage of a published event (P0003)', async () => {
     const event = await createEvent('published')
     const stage = await addRaceStage(event.id)
 
@@ -114,7 +114,7 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
       .update({ stage_type: 'non_race' })
       .eq('id', stage.id)
 
-    expect(error?.code).toBe('23514')
+    expect(error?.code).toBe('P0003')
 
     const admin = serviceClient()
     const { data } = await admin
@@ -128,7 +128,7 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
   // COALESCE(NEW.event_id, OLD.event_id) always resolves to NEW on UPDATE
   // (never null), so a naive version of this trigger only ever re-checks the
   // destination event and never the source event a row was moved off of.
-  it('rejects UPDATE event_id that moves the only Race stage off a published source event (23514)', async () => {
+  it('rejects UPDATE event_id that moves the only Race stage off a published source event (P0003)', async () => {
     const sourceEvent = await createEvent('published')
     const destEvent = await createEvent('published')
     const movedStage = await addRaceStage(sourceEvent.id)
@@ -139,7 +139,7 @@ describe('event_stages published-event Race-stage guard: direct DELETE (F-REL-21
       .update({ event_id: destEvent.id })
       .eq('id', movedStage.id)
 
-    expect(error?.code).toBe('23514')
+    expect(error?.code).toBe('P0003')
 
     const admin = serviceClient()
     const { data } = await admin

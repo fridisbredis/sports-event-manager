@@ -23,6 +23,7 @@ import {
 describe('updateWorkstation: atomicity across workstations/windows/todos', () => {
   let tenant: { id: string }
   let eventId: string
+  let clientAdmin: Awaited<ReturnType<typeof signInAsClient>>
 
   beforeAll(async () => {
     tenant = await createTenant('Tenant Update WS Atomicity')
@@ -40,6 +41,9 @@ describe('updateWorkstation: atomicity across workstations/windows/todos', () =>
       .single()
     if (error) throw error
     eventId = event.id
+
+    const tenantAdmin = await createUserWithRole(tenant.id, 'tenant_admin')
+    clientAdmin = await signInAsClient(tenantAdmin.phone, '000000')
   })
 
   afterAll(async () => {
@@ -118,7 +122,7 @@ describe('updateWorkstation: atomicity across workstations/windows/todos', () =>
     const admin = serviceClient()
     const workstationId = await seedWorkstationWithWindow()
 
-    const { error } = await admin.rpc('update_workstation', {
+    const { error } = await clientAdmin.rpc('update_workstation', {
       p_workstation_id: workstationId,
       p_tenant_id: tenant.id,
       p_stage_id: undefined,
@@ -154,7 +158,7 @@ describe('updateWorkstation: atomicity across workstations/windows/todos', () =>
     const admin = serviceClient()
     const workstationId = await seedWorkstationWithWindow()
 
-    const { data, error } = await admin.rpc('update_workstation', {
+    const { data, error } = await clientAdmin.rpc('update_workstation', {
       p_workstation_id: workstationId,
       p_tenant_id: tenant.id,
       p_stage_id: undefined,
@@ -201,12 +205,13 @@ describe('updateWorkstation: atomicity across workstations/windows/todos', () =>
   })
 })
 
-// Review follow-up (PR #156, Eduardo): every test above calls
-// update_workstation via serviceClient(), which has BYPASSRLS. The function
-// is SECURITY INVOKER — its entire security model *is* the caller's RLS plus
-// the revoke-from-public/grant-to-authenticated pair the migration adds — so
-// none of the above actually exercises that model. This suite runs the RPC
-// as a real authenticated tenant_admin, mirroring
+// Review follow-up (PR #156, Eduardo): update_workstation is SECURITY
+// INVOKER — its entire security model *is* the caller's RLS plus the
+// revoke-from-public/grant-to-authenticated pair the migration adds. The
+// block above now calls the RPC as a real authenticated tenant_admin
+// (serviceClient() is only used there to seed/verify table state, not to
+// call the RPC). This block goes further, isolating RLS and cross-tenant
+// guard behavior specifically, mirroring
 // create-workstation-tenant-consistency.test.ts (migration 0059's analogous
 // coverage for create_workstation).
 describe('update_workstation: RLS and tenant-consistency as an authenticated caller', () => {
