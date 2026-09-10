@@ -50,20 +50,22 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   })
 
   if (rpcError) {
-    // 23514 covers both "name required" and "needs a Race stage" checks in
-    // publish_event — the client already pre-validates both before calling,
-    // so this is a rare backstop and a shared message is sufficient (unlike
-    // sync_event_stages, this path doesn't need the two cases told apart).
-    // P0002 keeps the shared "not found" meaning from DB_ERROR_KEYS; the
-    // fallbackKey below only applies to codes DB_ERROR_KEYS doesn't map
-    // (23514 included, since that key maps to a different, stage-times
-    // message elsewhere).
+    // 23514 covers publish_event's "name required" and "needs a Race stage"
+    // checks — the client pre-validates both before calling, so this is a
+    // rare backstop and one message naming both preconditions is sufficient
+    // (unlike sync_event_stages, this path doesn't need them told apart).
+    // The override is needed because 23514 maps to a stage-times message in
+    // DB_ERROR_KEYS, which is about a different function entirely.
+    // P0002 keeps the shared "not found" meaning from DB_ERROR_KEYS. Every
+    // other code — a transient or infra failure the app can't interpret —
+    // must get the generic fallback: claiming a precondition failed would
+    // tell the admin something confidently wrong about an unrelated error.
     return {
       error: await translateDbError(
         'publishEvent: publish_event RPC failed',
         rpcError,
-        'eventConfig.cannotPublishNoRaceStage',
-        { '23514': 'eventConfig.cannotPublishNoRaceStage' }
+        'eventConfig.genericSaveError',
+        { '23514': 'eventConfig.publishPreconditionFailed' }
       ),
     }
   }

@@ -56,9 +56,11 @@ describe('translateDbError', () => {
       'test',
       { code: '23514', message: 'raw pg message' },
       'eventConfig.genericSaveError',
-      { '23514': 'eventConfig.cannotPublishNoRaceStage' }
+      { '23514': 'eventConfig.publishPreconditionFailed' }
     )
-    expect(result).toBe('Add at least one Race stage before publishing.')
+    expect(result).toBe(
+      "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again."
+    )
   })
 
   it('still uses DB_ERROR_KEYS for a code codeOverrides does not mention', async () => {
@@ -66,7 +68,7 @@ describe('translateDbError', () => {
       'test',
       { code: 'P0002', message: 'raw pg message' },
       'eventConfig.genericSaveError',
-      { '23514': 'eventConfig.cannotPublishNoRaceStage' }
+      { '23514': 'eventConfig.publishPreconditionFailed' }
     )
     expect(result).toBe('This event could not be found. Refresh the page and try again.')
   })

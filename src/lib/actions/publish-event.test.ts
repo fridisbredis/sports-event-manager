@@ -39,6 +39,9 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const PUBLISH_PRECONDITION_ERROR =
+  "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again."
+
 // EVT-02: publishEvent now delegates the name/status/Race-stage-count check
 // and the publish write to a single publish_event RPC (migration
 // 20260908143523), which holds a row lock across both to close a TOCTOU race
@@ -112,11 +115,13 @@ describe('publishEvent', () => {
     const result = await publishEvent(INPUT)
 
     // F-REL-22: publish_event's two 23514 cases (blank name, no Race stage)
-    // share one translated fallback — the client already pre-validates both
-    // before calling, so this is a rare backstop and doesn't need the two
-    // discriminated (unlike sync_event_stages' P0003 vs 23514, see
-    // db-error-message.ts).
-    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
+    // share one translated message naming both preconditions — the client
+    // already pre-validates both before calling, so this is a rare backstop
+    // and doesn't need the two discriminated (unlike sync_event_stages'
+    // P0003 vs 23514, see db-error-message.ts).
+    expect(result).toEqual({
+      error: PUBLISH_PRECONDITION_ERROR,
+    })
   })
 
   it('returns an error when there are no Race stages (23514)', async () => {
@@ -129,7 +134,9 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
+    expect(result).toEqual({
+      error: PUBLISH_PRECONDITION_ERROR,
+    })
   })
 
   it('publishes the event and revalidates both admin paths on success', async () => {
@@ -163,8 +170,13 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Add at least one Race stage before publishing.' })
+    // F-REL-22: never forward the raw DB error message to the client — and
+    // an unmapped code (a transient/infra failure) must get the generic
+    // message, not a precondition message that would be confidently wrong
+    // about why publishing failed.
+    expect(result).toEqual({
+      error: 'Something went wrong while saving. Please try again.',
+    })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })

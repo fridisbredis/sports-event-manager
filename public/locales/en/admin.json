@@ -111,7 +111,7 @@
     "eventNotFound": "This event could not be found. Refresh the page and try again.",
     "cannotRemoveLastRaceStage": "Cannot remove the last Race stage from a published event.",
     "stageTimesInvalid": "A stage's end time must be after its start time.",
-    "cannotPublishNoRaceStage": "Add at least one Race stage before publishing.",
+    "publishPreconditionFailed": "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again.",
     "logoUploadError": "Something went wrong while uploading the logo. Please try again."
   },
   "workstations": {

@@ -31,11 +31,12 @@ export async function translateDbError(
   fallbackKey = 'eventConfig.genericSaveError',
   // Per-call-site overrides for a code otherwise absent from DB_ERROR_KEYS
   // (or that means something different at this call site than it does
-  // elsewhere) — e.g. publish_event's P0002 shares the shared "not found"
-  // meaning, but its non-P0002 codes (23514 for two distinct RAISEs) should
-  // fall back to a publish-specific message rather than the shared generic
-  // save error. Checked before DB_ERROR_KEYS so a call site can also
-  // override a shared mapping if it ever needs to.
+  // elsewhere) — e.g. 23514 means "stage times out of order" for
+  // sync_event_stages but "publish preconditions unmet" for publish_event.
+  // Checked before DB_ERROR_KEYS so a call site can override a shared
+  // mapping, not just add a code it's missing. Note this is only for codes
+  // whose meaning the call site actually knows: fallbackKey must stay a
+  // generic message, since it catches codes the app can't interpret at all.
   codeOverrides?: Record<string, string>
 ): Promise<string> {
   logger.error(logMessage, undefined, { code: error.code, message: error.message })
