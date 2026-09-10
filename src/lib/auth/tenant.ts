@@ -82,27 +82,80 @@ export async function hasPendingOfficialInviteByPhone(phone: string): Promise<bo
   return data !== null
 }
 
+export type PendingOfficialInvite = {
+  tenantId: string
+  tenantName: string
+  tenantSlug: string
+  expired: boolean
+}
+
+// Full pending-invite list for a phone, across every tenant that currently
+// has an 'invited' officials row for it. Used by /confirm-invite to decide
+// between auto-selecting the one tenant (exactly one result) and rendering
+// a picker (two or more) — hasPendingOfficialInviteByPhone (above) is kept
+// unchanged for the root page's cheap boolean redirect-gate check, since it
+// doesn't need tenant names. Expired invites are still included (not
+// filtered out) but flagged via `expired: true`, computed with the same
+// semantics as confirm_official_invite_by_phone (20260910145957) — null or
+// past invite_token_expires_at — so the picker can disable them instead of
+// letting the user pick one that will fail with 'expired' at confirm time.
+export async function getPendingOfficialInvitesByPhone(
+  phone: string
+): Promise<PendingOfficialInvite[]> {
+  const service = await createSupabaseServiceClient()
+  const { data, error } = await service
+    .from('officials')
+    .select('tenant_id, invite_token_expires_at, tenants(name, slug)')
+    .eq('phone', phone)
+    .eq('invite_status', 'invited')
+
+  if (error) {
+    logger.error('Failed to fetch pending phone-fallback official invites', error)
+    return []
+  }
+
+  return (data ?? []).flatMap((row) => {
+    const tenant = row.tenants as { name: string; slug: string } | null
+    if (!tenant) return []
+    const expired = !row.invite_token_expires_at || new Date(row.invite_token_expires_at) <= new Date()
+    return [
+      { tenantId: row.tenant_id, tenantName: tenant.name, tenantSlug: tenant.slug, expired },
+    ]
+  })
+}
+
 export async function confirmOfficialInvite(
   userId: string,
+  tenantId: string,
   phone: string,
   privacyAccepted: boolean
 ): Promise<string | null> {
+  if (!tenantIdSchema.safeParse(tenantId).success) return null
+
   const service = await createSupabaseServiceClient()
 
   // SEC-04/F-SEC-11/SEC-09: confirm_official_invite_by_phone (migration 0018,
-  // consent added in 0045) does the lookup, the atomic status-guarded update,
-  // the privacy_accepted_at write, and the user_roles insert in one
-  // transaction, so concurrent logins for the same invited phone can't both
-  // succeed.
+  // consent added in 0045, tenant_id required as of 20260910145957) does the
+  // lookup, the atomic status-guarded update, the privacy_accepted_at write,
+  // and the user_roles insert in one transaction, so concurrent logins for
+  // the same invited phone can't both succeed. p_tenant_id disambiguates
+  // which tenant's invite to confirm when the same phone has pending invites
+  // in more than one — the phone match (p_user_phone, this user's own
+  // verified phone from the session, not client-controlled) remains the real
+  // security boundary; tenant_id only selects among that phone's own rows.
   const { data, error } = await service.rpc('confirm_official_invite_by_phone', {
     p_user_id: userId,
+    p_tenant_id: tenantId,
     p_user_phone: phone,
     p_privacy_accepted: privacyAccepted,
   })
 
   if (error) return null
 
-  const { tenant_id: tenantId, role_granted: roleGranted } = data as unknown as {
+  // tenant_id in the response is always this same tenantId: the RPC's
+  // WHERE clause requires tenant_id = p_tenant_id, so a successful call
+  // cannot return a different tenant than the one passed in.
+  const { role_granted: roleGranted } = data as unknown as {
     tenant_id: string
     role_granted: boolean
   }

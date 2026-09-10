@@ -15,10 +15,19 @@ export interface ConfirmInviteByPhoneResult {
 // a phone-matched, role-less user to this interstitial — rather than inline
 // in the token-flow's pre-OTP form.
 export async function confirmInviteByPhone(
+  tenantId: string,
   privacyAccepted: boolean
 ): Promise<ConfirmInviteByPhoneResult> {
   if (!privacyAccepted) {
     return { error: 'privacy_not_accepted' }
+  }
+
+  // Guards against an empty/missing selection reaching the RPC — the picker
+  // UI is expected to always submit a real tenantId (auto-selected when
+  // there is exactly one pending invite, chosen by the user when there are
+  // several), so this is a defensive early return, not the primary guard.
+  if (!tenantId) {
+    return { error: 'not_found' }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -40,7 +49,7 @@ export async function confirmInviteByPhone(
   if (!user) redirect('/login')
   if (!user.phone) return { error: 'phone_mismatch' }
 
-  const tenantSlug = await confirmOfficialInvite(user.id, user.phone, privacyAccepted)
+  const tenantSlug = await confirmOfficialInvite(user.id, tenantId, user.phone, privacyAccepted)
   if (!tenantSlug) return { error: 'not_found' }
 
   redirect(`/${tenantSlug}/assignments`)
