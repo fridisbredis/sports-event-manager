@@ -63,4 +63,30 @@ describe('hasPendingOfficialInviteByPhone (real Postgres)', () => {
   it('returns false when no official row exists for the phone', async () => {
     expect(await hasPendingOfficialInviteByPhone('+46709999999')).toBe(false)
   })
+
+  // PR #175 review: pins a deliberate decision, not an oversight. This
+  // function stays a routing hint only — confirm_official_invite_by_phone
+  // (the RPC) is the real boundary and is the one that now enforces
+  // invite_token_expires_at (20260910120830). So an expired invite still
+  // routes to /confirm-invite; the RPC underneath is what then rejects it
+  // with 'expired'. If this ever needs to change to filter out expired
+  // invites at the routing-hint level too, that's a product decision to
+  // make explicitly, not a side effect of an unrelated RPC fix.
+  it('returns true even when invite_token_expires_at has passed (routing hint only — the RPC enforces expiry)', async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('Pending Invite Expired Token')
+    createdTenantIds.push(tenant.id)
+    const phone = `+46703${Math.floor(Math.random() * 1_000_000)}`
+
+    const { error: insertError } = await admin.from('officials').insert({
+      tenant_id: tenant.id,
+      name: 'Expired Invite Official',
+      phone,
+      invite_status: 'invited',
+      invite_token_expires_at: new Date(Date.now() - 1000).toISOString(),
+    })
+    if (insertError) throw insertError
+
+    expect(await hasPendingOfficialInviteByPhone(phone)).toBe(true)
+  })
 })
