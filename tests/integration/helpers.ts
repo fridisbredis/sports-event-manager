@@ -45,11 +45,40 @@ const TEST_PHONES = [
   '+46700000009',
   '+46700000010',
 ]
-const claimedOrder: string[] = []
+// Numbers this process currently holds, keyed by the auth user id holding
+// them, so releaseTestPhone() can drop the entry when that user is deleted.
+// Purely for the exhaustion error message below — the authoritative source
+// of what is taken is always GoTrue itself, re-read on every claim.
+const claimedPhonesByUserId = new Map<string, string>()
+
+function releaseTestPhone(userId: string) {
+  claimedPhonesByUserId.delete(userId)
+}
+
+// GoTrue's admin listUsers() paginates, defaulting to 50 per page. The local
+// stack also holds the seed-dev users and anything left over from manual
+// poking, so the pool numbers are not guaranteed to land on page 1 — a
+// truncated read would report a pool number as free while a live user still
+// holds it, handing the same number to two fixtures. Page through fully.
+async function listAllUsers(admin: ReturnType<typeof serviceClient>) {
+  const users: { id: string; phone?: string | null }[] = []
+  const perPage = 1000
+
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const batch = data?.users ?? []
+    users.push(...batch)
+    if (batch.length < perPage) break
+  }
+
+  return users
+}
 
 async function claimTestPhone(admin: ReturnType<typeof serviceClient>) {
-  const { data: existing } = await admin.auth.admin.listUsers()
-  const takenPhones = new Set(existing?.users.map((u) => u.phone).filter(Boolean))
+  const existingUsers = await listAllUsers(admin)
+  const takenPhones = new Set(existingUsers.map((u) => u.phone).filter(Boolean))
 
   const phone = TEST_PHONES.find((candidate) => !takenPhones.has(candidate.replace('+', '')))
 
@@ -69,12 +98,11 @@ async function claimTestPhone(admin: ReturnType<typeof serviceClient>) {
         'cleaning up its fixtures (call cleanupTenant() in afterAll, and deleteAuthUser() for ' +
         'users created outside createUserWithRole()), or the suite now needs more numbers — ' +
         'add them to TEST_PHONES here and to [auth.sms.test_otp] in supabase/config.toml. ' +
-        'Currently claimed by this process: ' +
-        `${claimedOrder.join(', ') || '(none)'}.`
+        'Still held by this process: ' +
+        `${Array.from(claimedPhonesByUserId.values()).sort().join(', ') || '(none)'}.`
     )
   }
 
-  claimedOrder.push(phone)
   return phone
 }
 
@@ -89,6 +117,7 @@ export async function createUserWithRole(tenantId: string, role: TenantRole) {
     phone_confirm: true,
   })
   if (userError) throw userError
+  claimedPhonesByUserId.set(userData.user.id, phone)
 
   const { error: roleError } = await admin
     .from('user_roles')
@@ -132,6 +161,7 @@ export async function createSystemAdmin() {
     phone_confirm: true,
   })
   if (userError) throw userError
+  claimedPhonesByUserId.set(userData.user.id, phone)
 
   const { error: roleError } = await admin
     .from('user_roles')
@@ -147,6 +177,7 @@ export async function deleteAuthUser(userId: string) {
   const admin = serviceClient()
   await admin.from('user_roles').delete().eq('user_id', userId)
   await admin.auth.admin.deleteUser(userId)
+  releaseTestPhone(userId)
 }
 
 // Logs in as the given phone via the local test OTP (see supabase/config.toml
@@ -216,4 +247,5 @@ export async function cleanupTenant(tenantId: string) {
   const userIds = createdUserIdsByTenant.get(tenantId) ?? []
   createdUserIdsByTenant.delete(tenantId)
   await Promise.all(userIds.map((id) => admin.auth.admin.deleteUser(id)))
+  userIds.forEach(releaseTestPhone)
 }

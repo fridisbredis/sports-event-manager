@@ -67,10 +67,23 @@ export default async function setup() {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const { data, error } = await admin.auth.admin.listUsers()
-  if (error) throw error
+  // listUsers() paginates, defaulting to 50 per page. The local stack also
+  // carries the seed-dev users and whatever manual poking left behind, so a
+  // leftover pool number is not guaranteed to sit on page 1 — reading only
+  // the first page would silently reclaim nothing and leave the pool short.
+  const allUsers: { id: string; phone?: string | null }[] = []
+  const perPage = 1000
 
-  const leftovers = (data?.users ?? []).filter((u) => u.phone && TEST_PHONE_PATTERN.test(u.phone))
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const batch = data?.users ?? []
+    allUsers.push(...batch)
+    if (batch.length < perPage) break
+  }
+
+  const leftovers = allUsers.filter((u) => u.phone && TEST_PHONE_PATTERN.test(u.phone))
   if (leftovers.length === 0) return
 
   for (const user of leftovers) {
