@@ -5,6 +5,7 @@ import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import OfficialsList from './_components/officials-list'
 import { logger } from '@/lib/logger'
+import { expectRangeCeiling, expectReadCeilingWarn } from '@/lib/db/bounded-read.test-helpers'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -155,7 +156,7 @@ describe('OfficialsPage', () => {
     )!.value
     // 501 rows requested for a 500 ceiling: the extra row is what makes a
     // breach detectable instead of a silent truncation of the roster.
-    expect(officialsBuilder.range).toHaveBeenCalledWith(0, 500)
+    expectRangeCeiling(officialsBuilder, 500)
   })
 
   it('warns and truncates to the ceiling when the ceiling is breached', async () => {
@@ -172,10 +173,11 @@ describe('OfficialsPage', () => {
 
     const result = await OfficialsPage({ params: PARAMS })
 
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('read ceiling'),
-      expect.objectContaining({ ceiling: 500, tenantId: TENANT_ID, page: 'admin/officials' })
-    )
+    expectReadCeilingWarn(vi.mocked(logger.warn), {
+      ceiling: 500,
+      page: 'admin/officials',
+      context: { tenantId: TENANT_ID },
+    })
     const list = findByType(result, OfficialsList)
     expect(list!.props.officials).toHaveLength(500)
   })
