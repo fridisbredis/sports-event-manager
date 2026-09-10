@@ -191,7 +191,7 @@ async function main() {
 
   // Same reasoning as workstationByName below: RETURNING order is not
   // guaranteed, so look stages up by name rather than by position.
-  const stageByName = (name: string) => {
+  const stageByName = (name: string): Database['public']['Tables']['event_stages']['Row'] => {
     const found = stageRows.find((row) => row.name === name)
     if (!found) throw new Error(`Stage '${name}' missing after insert`)
     return found
@@ -240,7 +240,10 @@ async function main() {
   // Keyed on (stage, name) rather than position: a multi-row insert's RETURNING
   // order is not guaranteed, and the same names now recur once per stage, so
   // name alone no longer identifies a row.
-  const workstationOn = (stageId: string, name: string) => {
+  const workstationOn = (
+    stageId: string,
+    name: string
+  ): Database['public']['Tables']['workstations']['Row'] => {
     const found = workstationRows.find((row) => row.stage_id === stageId && row.name === name)
     if (!found) throw new Error(`Workstation '${name}' missing on stage ${stageId}`)
     return found

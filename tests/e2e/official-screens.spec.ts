@@ -1,3 +1,4 @@
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/auth'
 import { SEED_TENANT_SLUG } from './fixtures/users'
 
@@ -11,7 +12,7 @@ const base = `/${SEED_TENANT_SLUG}`
 // 'Event info', 'My schedule' and 'Announcements' appear twice on HOME-01:
 // once as a card and once in the bottom tab bar. Scope to the nav to be
 // unambiguous about which one a test means.
-const tabBar = (page: import('@playwright/test').Page) => page.locator('nav').last()
+const tabBar = (page: Page): Locator => page.locator('nav').last()
 
 test.describe('HOME-01 official home', () => {
   test('greets the official and links to their screens', async ({
@@ -53,13 +54,22 @@ test.describe('INFO-01 event info', () => {
     await expect(page.getByRole('button', { name: /Save|Publish/ })).toHaveCount(0)
   })
 
-  test('officials see every stage, not just race stages', async ({
-    officialConfirmedPage: page,
-  }) => {
+  test('officials see every stage of the event', async ({ officialConfirmedPage: page }) => {
     await page.goto(`${base}/event-info`)
-    // INFO-01: officials-see-all-stages. The seed has Setup/Race/Teardown, so
-    // more than one stage card must render.
-    await expect(page.getByText(/^[123]$/).first()).toBeVisible()
+
+    // INFO-01: officials-see-all-stages. page.tsx passes `stages` straight to
+    // the list with no type filter, so every stage the event has must render.
+    // The seed builds three (Day 1/2/3), so assert all three by name — the
+    // previous `getByText(/^[123]$/).first()` matched a single stage-number
+    // badge and passed even if only one card rendered.
+    for (const name of ['Day 1', 'Day 2', 'Day 3']) {
+      await expect(page.getByText(name, { exact: true })).toBeVisible()
+    }
+
+    // The "not just race stages" half of INFO-01 is NOT covered here: the seed
+    // omits stage_type on all three stages, so they all default to 'race'
+    // (scripts/seed-dev.ts) and there is no non-race stage to distinguish. To
+    // cover it, the seed needs a stage_type: 'non_race' stage.
   })
 })
 

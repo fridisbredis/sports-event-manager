@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures/auth'
 import { SEED_TENANT_SLUG } from './fixtures/users'
 
@@ -58,7 +59,7 @@ test.describe('SYS-02 tenant detail', () => {
   // Resolve the seed tenant's detail URL rather than hardcoding an id. The row
   // link carries the tenant's *name*; the slug sits in a sibling paragraph, so
   // find the row by slug and then click the link inside it.
-  async function gotoSeedTenant(page: import('@playwright/test').Page) {
+  async function gotoSeedTenant(page: Page): Promise<void> {
     await page.goto('/admin')
     await page.getByRole('row').filter({ hasText: SEED_TENANT_SLUG }).getByRole('link').click()
     await expect(page).toHaveURL(/\/admin\/[0-9a-f-]{36}$/)
