@@ -14,6 +14,7 @@ import {
   releaseInviteRateLimit,
   type RateLimitResult,
 } from '@/lib/rate-limit'
+import { logQueryError } from '@/lib/db/query-error'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
   // what invite confirmation binds against (0017/0018). Checked here as well as by the
   // partial unique index from 0020 so the rule still holds if a database is behind on
   // migrations; the index is what makes it race-proof, handled below.
-  const { data: duplicate } = await supabase
+  const { data: duplicate, error: duplicateError } = await supabase
     .from('officials')
     .select('id')
     .eq('tenant_id', tenantId)
@@ -91,6 +92,21 @@ export async function POST(request: NextRequest) {
     .neq('invite_status', 'removed')
     .limit(1)
     .maybeSingle()
+
+  // A failed check is not "no duplicate", but it must not fail the invite
+  // either: the partial unique index from 0020 is the race-proof guarantee and
+  // still turns a real duplicate into the 409 below. So log and continue —
+  // this read going dark would otherwise be invisible until the index started
+  // catching everything.
+  if (duplicateError) {
+    logQueryError(duplicateError, {
+      op: 'POST /api/officials',
+      table: 'officials',
+      kind: 'select',
+      tenantId,
+      extra: { check: 'duplicate_phone_precheck' },
+    })
+  }
 
   if (duplicate) {
     await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
@@ -123,11 +139,26 @@ export async function POST(request: NextRequest) {
         { p_phone: phone }
       )
       if (lookupError || !existingUserId) {
+        logQueryError(lookupError, {
+          op: 'POST /api/officials',
+          table: 'get_user_id_by_phone',
+          kind: 'rpc',
+          tenantId,
+          // phone_exists said the auth row is there, so an empty result is a
+          // real inconsistency rather than an ordinary miss.
+          extra: { reason: lookupError ? 'rpc_error' : 'no_user_for_existing_phone' },
+        })
         await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
         return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
       }
       officialUserId = existingUserId
     } else {
+      logQueryError(createUserError, {
+        op: 'POST /api/officials',
+        table: 'auth.users',
+        kind: 'insert',
+        tenantId,
+      })
       await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
       return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
     }
@@ -162,6 +193,20 @@ export async function POST(request: NextRequest) {
   }
 
   if (error || !official) {
+    // pgCode only, no message/details: this insert carries `phone`, and a
+    // constraint violation on it quotes the value back in `details` — the same
+    // reason the Twilio catch below logs the numeric code alone. The 23505 case
+    // is already handled above, so anything reaching here is unexpected.
+    logQueryError(
+      { code: error?.code ?? 'none' },
+      {
+        op: 'POST /api/officials',
+        table: 'officials',
+        kind: 'insert',
+        tenantId,
+        extra: { reason: error ? 'insert_error' : 'no_row_returned' },
+      }
+    )
     if (!createUserError) await service.auth.admin.deleteUser(officialUserId)
     await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     return NextResponse.json({ error: 'Failed to create official' }, { status: 500 })
@@ -187,7 +232,24 @@ export async function POST(request: NextRequest) {
   // Server Action.
   revalidateTag(adminDashboardCacheTag(tenantId), { expire: 0 })
 
-  const { data: tenant } = await supabase.from('tenants').select('name').eq('id', tenantId).single()
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
+    .select('name')
+    .eq('id', tenantId)
+    .single()
+
+  // Cosmetic only — the SMS falls back to 'an event' — so this must not fail
+  // the invite. Logged because a tenant row that cannot be read is a signal
+  // even when the copy degrades gracefully.
+  if (tenantError) {
+    logQueryError(tenantError, {
+      op: 'POST /api/officials',
+      table: 'tenants',
+      kind: 'select',
+      tenantId,
+      extra: { usage: 'invite_sms_copy' },
+    })
+  }
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${official.invite_token}`
 

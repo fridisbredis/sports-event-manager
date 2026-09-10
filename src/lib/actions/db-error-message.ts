@@ -37,9 +37,18 @@ export async function translateDbError(
   // mapping, not just add a code it's missing. Note this is only for codes
   // whose meaning the call site actually knows: fallbackKey must stay a
   // generic message, since it catches codes the app can't interpret at all.
-  codeOverrides?: Record<string, string>
+  codeOverrides?: Record<string, string>,
+  // `log: false` for a code the call site already logged (or deliberately
+  // chose not to log) through `logQueryError` — publishEvent's P0002 is an
+  // ordinary 404 rather than a failure, and its other codes get the richer
+  // structured context (op/table/kind/tenantId) that REL-03 alerts select on.
+  // Without this, those call sites would emit a second, thinner log line for
+  // the same error.
+  options?: { log?: boolean }
 ): Promise<string> {
-  logger.error(logMessage, undefined, { code: error.code, message: error.message })
+  if (options?.log !== false) {
+    logger.error(logMessage, undefined, { code: error.code, message: error.message })
+  }
   const t = await getServerTranslation('en', 'admin')
   const key = codeOverrides?.[error.code ?? ''] ?? DB_ERROR_KEYS[error.code ?? ''] ?? fallbackKey
   return t(key)

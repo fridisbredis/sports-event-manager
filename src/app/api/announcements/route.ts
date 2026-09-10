@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
+import { logQueryError } from '@/lib/db/query-error'
 
 const publishSchema = z.object({
   tenantId: z.string().uuid(),
@@ -57,6 +58,13 @@ export async function POST(request: NextRequest) {
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
 
   if (error) {
+    logQueryError(error, {
+      op: 'POST /api/announcements',
+      table: channel === 'officials' ? 'officials' : 'participants',
+      kind: 'select',
+      tenantId,
+      extra: { channel },
+    })
     return NextResponse.json({ error: 'Failed to fetch recipients' }, { status: 500 })
   }
 

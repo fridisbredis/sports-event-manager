@@ -8,6 +8,7 @@ import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { translateDbError } from '@/lib/actions/db-error-message'
 import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
+import { logQueryError } from '@/lib/db/query-error'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -23,9 +24,19 @@ export interface PublishEventResult {
 
 export async function publishEvent(input: PublishEventInput): Promise<PublishEventResult> {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  const user = authData.user
+
+  // An expired or missing session is the ordinary path to the /login redirect
+  // below and is not logged. A 5xx from GoTrue would otherwise look identical
+  // to it, and the admin just gets bounced to /login with nothing recorded.
+  if (authError && authError.status !== undefined && authError.status >= 500) {
+    logQueryError(authError, {
+      op: 'publishEvent',
+      table: 'auth.users',
+      kind: 'select',
+    })
+  }
 
   if (!user) redirect('/login')
 
@@ -50,6 +61,20 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   })
 
   if (rpcError) {
+    // P0002 is the RPC's own "event not found" signal, not a failure — it is
+    // raised for a bad id and shown to the operator as such, so logging it
+    // would be noise on an ordinary 404. It still goes through the helper
+    // below for its translated message.
+    if (rpcError.code !== 'P0002') {
+      logQueryError(rpcError, {
+        op: 'publishEvent',
+        table: 'publish_event',
+        kind: 'rpc',
+        tenantId: parsedTenantId.data,
+        extra: { eventId: input.eventId },
+      })
+    }
+
     // 23514 covers publish_event's "name required" and "needs a Race stage"
     // checks — the client pre-validates both before calling, so this is a
     // rare backstop and one message naming both preconditions is sufficient
@@ -65,7 +90,11 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
         'publishEvent: publish_event RPC failed',
         rpcError,
         'eventConfig.genericSaveError',
-        { '23514': 'eventConfig.publishPreconditionFailed' }
+        { '23514': 'eventConfig.publishPreconditionFailed' },
+        // This call site logs every code it means to log itself, just above,
+        // via logQueryError — so the helper must not log a second, thinner
+        // line for the same error.
+        { log: false }
       ),
     }
   }

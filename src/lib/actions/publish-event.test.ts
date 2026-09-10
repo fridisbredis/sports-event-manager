@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { revalidatePath, updateTag } from 'next/cache'
+import { logger } from '@/lib/logger'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -22,6 +23,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
   updateTag: vi.fn(),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
 function mockClient(rpcMock: ReturnType<typeof vi.fn>) {
@@ -88,6 +93,44 @@ describe('publishEvent', () => {
       p_event_id: EVENT_ID,
       p_tenant_id: TENANT_ID,
     })
+  })
+
+  // REL-03 + F-REL-22 interaction: publishEvent logs the failure itself via
+  // logQueryError (which carries op/table/kind/tenantId for Log Analytics) and
+  // tells translateDbError not to log, so one failure produces one log line
+  // rather than two of differing shape.
+  it('logs a real RPC failure exactly once, with the structured context', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockClient(
+      vi.fn().mockResolvedValue({ data: null, error: { code: '42501', message: 'RLS denied' } })
+    )
+
+    await publishEvent(INPUT)
+
+    expect(logger.error).toHaveBeenCalledTimes(1)
+    expect(logger.error).toHaveBeenCalledWith(
+      'publishEvent: rpc on publish_event failed',
+      expect.anything(),
+      expect.objectContaining({
+        op: 'publishEvent',
+        table: 'publish_event',
+        kind: 'rpc',
+        pgCode: '42501',
+        tenantId: TENANT_ID,
+        eventId: EVENT_ID,
+      })
+    )
+  })
+
+  it('does not log P0002, which is an ordinary not-found rather than a failure', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockClient(
+      vi.fn().mockResolvedValue({ data: null, error: { code: 'P0002', message: 'not found' } })
+    )
+
+    await publishEvent(INPUT)
+
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('is a no-op success and skips revalidation when the event is already published', async () => {

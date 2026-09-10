@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import type { SmsQueueItem } from '@/types/app'
+import { logQueryError } from '@/lib/db/query-error'
 
 // PERF-04: triggered every minute by the sms-queue-worker-trigger pg_cron job
 // (migration 0030) via pg_net, same pattern as the gdpr-warning cron route.
@@ -99,10 +100,27 @@ export async function POST(request: NextRequest) {
             to: toTwilioE164(row.recipient_phone),
           })
 
-          await service
+          // The message is delivered; this write is the only record of that.
+          // If it fails silently the row stays 'sending' and is either
+          // reclaimed and sent twice, or stalls there forever — so it must be
+          // visible even though there is nothing to roll back.
+          const { error: markSentError } = await service
             .from('sms_queue')
             .update({ status: 'sent', updated_at: new Date().toISOString() })
             .eq('id', row.id)
+
+          if (markSentError) {
+            logQueryError(markSentError, {
+              op: 'GET /api/cron/sms-worker',
+              table: 'sms_queue',
+              kind: 'update',
+              tenantId: row.tenant_id,
+              extra: {
+                announcementId: row.announcement_id,
+                consequence: 'row_stuck_sending_after_successful_send',
+              },
+            })
+          }
           sent += 1
         } catch (err) {
           const attempts = row.attempts + 1
@@ -112,7 +130,10 @@ export async function POST(request: NextRequest) {
           // message (see announcements/route.ts's original send loop).
           const willRetry = attempts < MAX_ATTEMPTS
 
-          await service
+          // Carries the incremented attempt count, so a silent failure here
+          // costs the retry budget: the row returns to the pool with its old
+          // `attempts` and can outlive MAX_ATTEMPTS.
+          const { error: markFailedError } = await service
             .from('sms_queue')
             .update({
               status: willRetry ? 'pending' : 'failed',
@@ -121,6 +142,19 @@ export async function POST(request: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq('id', row.id)
+
+          if (markFailedError) {
+            logQueryError(markFailedError, {
+              op: 'GET /api/cron/sms-worker',
+              table: 'sms_queue',
+              kind: 'update',
+              tenantId: row.tenant_id,
+              extra: {
+                announcementId: row.announcement_id,
+                consequence: 'attempt_count_not_recorded',
+              },
+            })
+          }
 
           if (willRetry) {
             retried += 1
@@ -143,14 +177,39 @@ export async function POST(request: NextRequest) {
   // Reconcile sms_sent on every announcement touched this tick: true once
   // at least one recipient has been sent, false only while none have yet.
   for (const announcementId of announcementIds) {
-    const { count } = await service
+    const { count, error: countError } = await service
       .from('sms_queue')
       .select('id', { count: 'exact', head: true })
       .eq('announcement_id', announcementId)
       .eq('status', 'sent')
 
+    // A failed count is not zero. Left silent it reads as "nothing sent yet"
+    // and sms_sent stays false on an announcement that did go out, which is
+    // what COMM-01 shows the admin.
+    if (countError) {
+      logQueryError(countError, {
+        op: 'GET /api/cron/sms-worker',
+        table: 'sms_queue',
+        kind: 'select',
+        extra: { announcementId, stage: 'reconcile_count' },
+      })
+      continue
+    }
+
     if (count && count > 0) {
-      await service.from('announcements').update({ sms_sent: true }).eq('id', announcementId)
+      const { error: reconcileError } = await service
+        .from('announcements')
+        .update({ sms_sent: true })
+        .eq('id', announcementId)
+
+      if (reconcileError) {
+        logQueryError(reconcileError, {
+          op: 'GET /api/cron/sms-worker',
+          table: 'announcements',
+          kind: 'update',
+          extra: { announcementId, stage: 'reconcile_sms_sent' },
+        })
+      }
     }
   }
 

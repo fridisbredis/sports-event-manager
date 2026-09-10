@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { confirmOfficialInvite } from '@/lib/auth/tenant'
+import { logQueryError } from '@/lib/db/query-error'
 
 export interface ConfirmInviteByPhoneResult {
   error?: string
@@ -21,9 +22,20 @@ export async function confirmInviteByPhone(
   }
 
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data, error: authError } = await supabase.auth.getUser()
+  const user = data.user
+
+  // An expired or missing session is the ordinary path to the /login redirect
+  // below and is not logged — that is a stale session, not a defect. Anything
+  // else (Auth unreachable, a 5xx from GoTrue) would otherwise be
+  // indistinguishable from it, and the invitee just lands back on /login.
+  if (authError && authError.status !== undefined && authError.status >= 500) {
+    logQueryError(authError, {
+      op: 'confirmInviteByPhone',
+      table: 'auth.users',
+      kind: 'select',
+    })
+  }
 
   if (!user) redirect('/login')
   if (!user.phone) return { error: 'phone_mismatch' }
