@@ -113,7 +113,7 @@ jobs:
           # previously caused a version skew where `supabase status -o env`
           # returned a key format PostgREST rejected with a consistent 403.
           # Bumped 2026-09-08: 2.95.4 predates `migration list
-          # --output-format json`, which deploy-prod.yml's F-REL-20 snapshot
+          # --output-format json`, which deploy-prod.yml's REL-04 snapshot
           # gate depends on — that flag only exists from v2.100.0 onward.
           version: 2.116.0
 
@@ -305,7 +305,7 @@ jobs:
           # Full history so the merge-base diff below can resolve.
           fetch-depth: 0
 
-      - name: Warn about destructive migrations with no snapshot (F-REL-20)
+      - name: Warn about destructive migrations with no snapshot (REL-04)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -357,7 +357,7 @@ jobs:
 
           NOTE — not a failure. One or more destructive migrations in this PR
           reference no prod snapshot and claim no constraint-only exemption.
-          The prod deploy WILL block on this later (deploy-prod.yml, F-REL-20).
+          The prod deploy WILL block on this later (deploy-prod.yml, REL-04).
 
           Before cutting the release, either run
             scripts/ops/snapshot-prod-db.sh <migration version>

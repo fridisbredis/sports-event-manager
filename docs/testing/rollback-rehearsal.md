@@ -267,7 +267,7 @@ kan köras utan att först städa raderna.
 
 ---
 
-## Del 5 — Rehearsal: snapshot och restore (F-REL-20)
+## Del 5 — Rehearsal: snapshot och restore (REL-04)
 
 Del 1–4 övar på **schemat** — att migrationssviten är sanningskällan och att
 recovery går framåt. De skyddar inte **datan**: en `destructive` migration som
@@ -277,7 +277,7 @@ kan ge tillbaka, eftersom en forward-fix bara ändrar schema framåt — inte
 återskapar vad en tidigare sats redan skrivit över. PITR är avstängt av
 kostnadsskäl och Supabase branching utvärderades och avfärdades som ersättning
 (en branch replayar migrationer mot en tom/seedad databas, den håller aldrig
-prods egna rader) — se F-REL-20 för hela resonemanget. Den här övningen
+prods egna rader) — se REL-04 för hela resonemanget. Den här övningen
 verifierar att `scripts/ops/snapshot-prod-db.sh` och
 `scripts/ops/restore-prod-db.sh` faktiskt fungerar, **innan** de behövs under
 en incident.

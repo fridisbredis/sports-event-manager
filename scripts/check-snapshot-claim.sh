@@ -3,7 +3,8 @@
 # scripts/check-snapshot-claim.sh
 #
 # Decides whether ONE migration file classified `Forward-fix: destructive`
-# satisfies F-REL-20's snapshot requirement, and prints the reason.
+# satisfies REL-04's snapshot requirement, and prints the reason.
+# (REL-04 is the requirement older comments cite as "F-REL-20".)
 #
 # Exit 0 = satisfied, exit 1 = not satisfied. Callers aggregate.
 #

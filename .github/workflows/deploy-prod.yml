@@ -40,7 +40,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Require a prod snapshot for destructive migrations (F-REL-20)
+      - name: Require a prod snapshot for destructive migrations (REL-04)
         run: |
           set -euo pipefail
 
@@ -125,7 +125,7 @@ jobs:
           re-read, and any INSERT/UPDATE/DELETE/TRUNCATE/DROP COLUMN outside
           a comment or a function body fails this step anyway.
 
-          See F-REL-20 in docs/quality-requirements.md for why this exists:
+          See REL-04 in docs/quality-requirements.md for why this exists:
           neither PITR nor Supabase branching cover recovering prod's actual
           row data after a destructive migration runs against the wrong rows.
           EOF
