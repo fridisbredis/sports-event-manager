@@ -294,6 +294,82 @@ jobs:
       - name: Check every app.* GUC is set transaction-locally
         run: node scripts/check-guc-transaction-local.mjs
 
+  migration-snapshot-warning:
+    name: Migration snapshot (advisory)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so the merge-base diff below can resolve.
+          fetch-depth: 0
+
+      - name: Warn about destructive migrations with no snapshot (F-REL-20)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # ADVISORY ONLY — this step never fails the build, by design.
+          #
+          # The blocking gate lives in deploy-prod.yml, and it has to: only
+          # prod's own migration ledger knows which migrations are actually
+          # pending, and a snapshot has to be taken immediately before the
+          # push to be worth anything (one taken at PR time is stale by the
+          # time the PR merges). Neither fact is knowable here.
+          #
+          # What this step is for is timing. Without it the first sign that
+          # a destructive migration has no snapshot is a failed prod deploy,
+          # which is where it was found on 2026-09-11. Surfacing it on the
+          # PR costs nothing and moves that discovery days earlier.
+          #
+          # Only ADDED files (--diff-filter=A), same as the forward-fix and
+          # sort-order jobs: editing an existing migration's body must not
+          # start warning about it.
+          if [ -n "${BASE_SHA:-}" ]; then
+            base="$BASE_SHA"
+          else
+            base="HEAD^"
+          fi
+
+          new_migrations=$(git diff --name-only --diff-filter=A "$base" HEAD \
+            -- 'supabase/migrations/*.sql')
+
+          if [ -z "$new_migrations" ]; then
+            echo "No new migrations in this change."
+            exit 0
+          fi
+
+          pending=""
+          for file in $new_migrations; do
+            grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*destructive\b' "$file" || continue
+
+            if scripts/check-snapshot-claim.sh "$file"; then
+              : # message already printed by the script
+            else
+              pending="$pending $file"
+            fi
+          done
+
+          if [ -n "$pending" ]; then
+            cat <<'EOF'
+
+          NOTE — not a failure. One or more destructive migrations in this PR
+          reference no prod snapshot and claim no constraint-only exemption.
+          The prod deploy WILL block on this later (deploy-prod.yml, F-REL-20).
+
+          Before cutting the release, either run
+            scripts/ops/snapshot-prod-db.sh <migration version>
+          and paste the printed filename into that migration's 'Data:' line, or
+          — if it writes no rows at all — claim the verified exemption:
+            -- Data:     no snapshot required (constraint-only): <why>
+
+          Deliberately advisory: the snapshot must be taken immediately before
+          the push to be useful, so taking one now would go stale anyway.
+          EOF
+          fi
+
   migration-number-collision:
     name: Migration number collision
     runs-on: ubuntu-latest

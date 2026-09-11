@@ -84,27 +84,21 @@ jobs:
             fi
 
             if grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*destructive\b' "$file"; then
-              # A destructive migration must reference a real snapshot
-              # filename in its Data: line — the exact format
-              # scripts/ops/snapshot-prod-db.sh prints on success. This does
-              # not verify the blob still exists in Storage (this job has
-              # no Blob credentials, deliberately — see that script's
-              # header), only that a human ran it and pasted the filename,
-              # which is the point: it forces the manual step to have
-              # already happened before this push can proceed.
+              # A destructive migration must either reference a real
+              # snapshot filename in its Data: line (the exact format
+              # scripts/ops/snapshot-prod-db.sh prints on success) or claim
+              # — verifiably — the constraint-only exemption. The shared
+              # script decides; quality.yml runs the same one as a warning
+              # so the two can't disagree about what counts.
               #
-              # {4,14} covers both migration naming schemes: the legacy
-              # 00NN numbers (0001-0058) and the YYYYMMDDHHMMSS timestamps
-              # used from 0059 onward (see .claude/CLAUDE.md "Migration
-              # naming"). snapshot-prod-db.sh passes the version prefix
-              # through verbatim into the filename, so a timestamp-named
-              # migration produces a 14-digit prefix. The original {4} was
-              # written before that switch and rejected every
-              # timestamp-named snapshot.
-              if grep -qE '^--[[:space:]]*Data:.*[0-9]{4,14}_pre-migration_[0-9TZ:-]+\.tar\.gz' "$file"; then
-                echo "OK   $file — snapshot filename present"
+              # This does not verify the blob still exists in Storage (this
+              # job has no Blob credentials, deliberately — see that
+              # script's header), only that a human ran it and pasted the
+              # filename, which is the point: it forces the manual step to
+              # have already happened before this push can proceed.
+              if scripts/check-snapshot-claim.sh "$file"; then
+                : # message already printed by the script
               else
-                echo "FAIL $file — destructive migration with no snapshot filename in its Data: line"
                 missing="$missing $file"
               fi
             fi
@@ -115,10 +109,21 @@ jobs:
 
           A destructive migration is about to be pushed to prod without a
           referenced snapshot. Run scripts/ops/snapshot-prod-db.sh <migration
-          number> first, then add the printed blob filename to that
+          version> first, then add the printed blob filename to that
           migration's Forward-fix 'Data:' line, e.g.:
 
             -- Data:     see 0048_pre-migration_2026-09-08T14-30-00Z.tar.gz
+
+          If the migration genuinely writes no rows — it only adds or
+          replaces constraints and triggers, and is classed destructive
+          solely because ADD CONSTRAINT validates existing rows — claim the
+          constraint-only exemption on that same line instead:
+
+            -- Data:     no snapshot required (constraint-only): <why>
+
+          That claim is verified, not trusted: the migration's SQL is
+          re-read, and any INSERT/UPDATE/DELETE/TRUNCATE/DROP COLUMN outside
+          a comment or a function body fails this step anyway.
 
           See F-REL-20 in docs/quality-requirements.md for why this exists:
           neither PITR nor Supabase branching cover recovering prod's actual

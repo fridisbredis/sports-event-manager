@@ -40,6 +40,21 @@ varningen efter listan.
 - [ ] Är migrationen `destructive`: kör snapshot-`select`:en som `Data:`-raden
       hänvisar till, mot **prod**, och spara utdatan. Raden ska vila på något du
       själv har tittat på, inte på en mätning från en annan dag eller miljö.
+- [ ] Är migrationen `destructive` men skriver **inga rader** — den lägger bara
+      till eller ersätter constraints och triggers, och är klassad `destructive`
+      enbart för att `ADD CONSTRAINT` validerar befintliga rader — så skyddar en
+      full dump ingenting. Hoppa då över snapshotten och skriv istället på
+      `Data:`-raden:
+
+      ```
+      -- Data:     no snapshot required (constraint-only): <varför>
+      ```
+
+      Påståendet kontrolleras maskinellt, det tas inte på förtroende:
+      `scripts/check-snapshot-claim.sh` läser om migrationens SQL, och varje
+      `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`/`DROP COLUMN` utanför en kommentar
+      eller en funktionskropp failar prod-deployen ändå. Undantaget är alltså
+      bara till för migrationer där det redan är sant.
 
 **Efter push:**
 
