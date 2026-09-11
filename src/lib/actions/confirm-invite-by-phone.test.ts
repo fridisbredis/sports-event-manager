@@ -103,9 +103,9 @@ describe('confirmInviteByPhone', () => {
       // A hand-crafted request body could send "true" (string), 1, or {} —
       // anything JS would treat as truthy under `if (!privacyAccepted)` but
       // that is not actually the literal `true` the RPC contract expects.
-      await expect(
-        confirmInviteByPhone(TENANT_ID, 'true' as unknown as boolean)
-      ).rejects.toThrow('NEXT_REDIRECT')
+      await expect(confirmInviteByPhone(TENANT_ID, 'true' as unknown as boolean)).rejects.toThrow(
+        'NEXT_REDIRECT'
+      )
 
       // Documents current behavior: the truthy string is forwarded verbatim,
       // not normalized to a real boolean. confirmOfficialInvite/the RPC
