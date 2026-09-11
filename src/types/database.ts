@@ -835,6 +835,10 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_admin_roster_row: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: Json
+      }
       get_admin_dashboard_cached: {
         Args: { p_tenant_id: string }
         Returns: Json

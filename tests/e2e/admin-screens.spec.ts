@@ -100,21 +100,29 @@ test.describe('OFF-01 officials roster', () => {
     await expect(page.getByText('Invited').first()).toBeVisible()
   })
 
-  // OFF-01 says the admin appears on the roster as implicitly Confirmed, marked
-  // "<name> — Event admin" and without action buttons. They do not: the seeded
-  // tenant admin has a user_roles row but no `officials` row, so the roster
-  // simply omits them.
-  //
-  // Same root cause as the 404 a tenant admin gets on the official account
-  // screen (see access-control.spec.ts) — it shows up on two screens, which is
-  // why it reads as a real gap rather than a quirk of one page. Asserting the
-  // absence keeps the discrepancy visible; flip this to expect the row once
-  // the admin is on the roster.
-  test('does not list the admin on the roster (spec says it should)', async ({
+  // F-MNT-20: OFF-01 lists the admin as implicitly Confirmed, marked
+  // "<name> — Event admin" and without action buttons — Peter's decision of
+  // 2026-06-24. This used to assert the opposite: the tenant admin had a
+  // user_roles row but no `officials` row, so the roster omitted them. The
+  // roster row now exists (ensure_admin_roster_row, migration
+  // 20260911130436, applied to the seed admin by the backfill in
+  // 20260911130546), which also clears the 404 the same admin used to get on
+  // the official account screen (see access-control.spec.ts).
+  test('lists the admin on the roster as Event admin, without action buttons', async ({
     tenantAdminPage: page,
   }) => {
     await page.goto(`${base}/officials`)
-    await expect(page.getByText(/— Event admin$/)).toHaveCount(0)
+
+    const adminRow = page.getByRole('row').filter({ hasText: /— Event admin$/ })
+    await expect(adminRow).toHaveCount(1)
+
+    // Implicitly Confirmed — never shown as Invited, since no SMS invite is
+    // sent for the admin's own row.
+    await expect(adminRow.getByText('Confirmed')).toBeVisible()
+
+    // No action buttons on your own row: an admin cannot resend an invite to
+    // themselves or remove themselves from the roster.
+    await expect(adminRow.getByRole('button')).toHaveCount(0)
   })
 
   test('add-official modal validates name and number', async ({ tenantAdminPage: page }) => {
