@@ -4,6 +4,7 @@ import {
   resolvePostLoginRedirect,
   confirmOfficialInvite,
   hasPendingOfficialInviteByPhone,
+  getPendingOfficialInvitesByPhone,
   hasAdminAccessToTenant,
   canViewOfficialSurfaces,
   requireSystemAdmin,
@@ -35,7 +36,17 @@ vi.mock('next/cache', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'or', 'limit', 'is', 'update', 'insert']) {
+  for (const method of [
+    'select',
+    'eq',
+    'or',
+    'limit',
+    'order',
+    'range',
+    'is',
+    'update',
+    'insert',
+  ]) {
     builder[method] = vi.fn(() => builder)
   }
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
@@ -166,12 +177,26 @@ describe('confirmOfficialInvite', () => {
       rpcResult: { data: null, error: { message: 'not_found' } },
     })
 
-    expect(await confirmOfficialInvite('user-1', '0701234567', true)).toBeNull()
+    expect(await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)).toBeNull()
     expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
       p_user_id: 'user-1',
+      p_tenant_id: TENANT_ID,
       p_user_phone: '0701234567',
       p_privacy_accepted: true,
     })
+  })
+
+  it('returns null and never calls the RPC when tenantId is not a valid uuid', async () => {
+    // Same tenantIdSchema guard as hasAdminAccessToTenant/requireTenantAdmin
+    // elsewhere in this file — a malformed tenantId should fail before any
+    // client is even created, not fall through to a raw Postgres error from
+    // the RPC.
+    const { rpc } = mockServiceClientWithRpc({
+      rpcResult: { data: null, error: { message: 'not_found' } },
+    })
+
+    expect(await confirmOfficialInvite('user-1', 'not-a-uuid', '0701234567', true)).toBeNull()
+    expect(rpc).not.toHaveBeenCalled()
   })
 
   it('returns null when the RPC reports the invite as already confirmed (concurrent attempt)', async () => {
@@ -180,7 +205,7 @@ describe('confirmOfficialInvite', () => {
     // flipped invite_status to 'confirmed'.
     mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'already_confirmed' } } })
 
-    expect(await confirmOfficialInvite('user-2', '0701234567', true)).toBeNull()
+    expect(await confirmOfficialInvite('user-2', TENANT_ID, '0701234567', true)).toBeNull()
   })
 
   it('returns null when the RPC reports consent was not given', async () => {
@@ -190,7 +215,7 @@ describe('confirmOfficialInvite', () => {
       rpcResult: { data: null, error: { message: 'privacy_not_accepted' } },
     })
 
-    expect(await confirmOfficialInvite('user-1', '0701234567', false)).toBeNull()
+    expect(await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', false)).toBeNull()
   })
 
   it('returns null and does not confirm when the tenant lookup finds no slug', async () => {
@@ -199,7 +224,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: null },
     })
 
-    expect(await confirmOfficialInvite('user-1', '0701234567', true)).toBeNull()
+    expect(await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)).toBeNull()
   })
 
   it('confirms the official via RPC, assigns the role, and returns the tenant slug', async () => {
@@ -208,11 +233,12 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567', true)
+    const tenantSlug = await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     expect(tenantSlug).toBe('viadal')
     expect(rpc).toHaveBeenCalledWith('confirm_official_invite_by_phone', {
       p_user_id: 'user-1',
+      p_tenant_id: TENANT_ID,
       p_user_phone: '0701234567',
       p_privacy_accepted: true,
     })
@@ -231,7 +257,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    await confirmOfficialInvite('user-1', '0701234567', true)
+    await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     expect(revalidateTag).toHaveBeenCalledWith(officialHomeCacheTag(TENANT_ID, 'user-1'), {
       expire: 0,
@@ -247,7 +273,7 @@ describe('confirmOfficialInvite', () => {
       rpcResult: { data: null, error: { message: 'not_found' } },
     })
 
-    await confirmOfficialInvite('user-1', '0701234567', true)
+    await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     expect(revalidateTag).not.toHaveBeenCalled()
   })
@@ -258,7 +284,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    await confirmOfficialInvite('user-1', '0701234567', true)
+    await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     expect(logAuthEvent).toHaveBeenCalledWith({
       phone: '0701234567',
@@ -272,7 +298,7 @@ describe('confirmOfficialInvite', () => {
   it('does not log an auth event when the RPC fails', async () => {
     mockServiceClientWithRpc({ rpcResult: { data: null, error: { message: 'not_found' } } })
 
-    await confirmOfficialInvite('user-1', '0701234567', true)
+    await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     expect(logAuthEvent).not.toHaveBeenCalled()
   })
@@ -289,7 +315,7 @@ describe('confirmOfficialInvite', () => {
       tenantResult: { data: { slug: 'viadal' } },
     })
 
-    const tenantSlug = await confirmOfficialInvite('user-1', '0701234567', true)
+    const tenantSlug = await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     // The tenant resolution / redirect still succeeds — role_granted only
     // gates the audit write, not the caller-visible result.
@@ -310,7 +336,7 @@ describe('confirmOfficialInvite', () => {
     const fromMock = vi.fn().mockReturnValue(chain({ data: null, error: { message: 'db down' } }))
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
 
-    const result = await confirmOfficialInvite('user-1', '0701234567', true)
+    const result = await confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)
 
     expect(result).toBeNull()
     expect(logAuthEvent).toHaveBeenCalledWith(
@@ -329,7 +355,9 @@ describe('confirmOfficialInvite', () => {
     })
     vi.mocked(logAuthEvent).mockRejectedValueOnce(new Error('audit db unreachable'))
 
-    await expect(confirmOfficialInvite('user-1', '0701234567', true)).resolves.toBe('viadal')
+    await expect(confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)).resolves.toBe(
+      'viadal'
+    )
   })
 })
 
@@ -356,6 +384,122 @@ describe('hasPendingOfficialInviteByPhone', () => {
     mockServiceClientWithOfficialsLookup({ data: null, error: { message: 'boom' } })
 
     expect(await hasPendingOfficialInviteByPhone('0701234567')).toBe(false)
+  })
+})
+
+describe('getPendingOfficialInvitesByPhone', () => {
+  const FUTURE_ISO = new Date(Date.now() + 86_400_000).toISOString()
+  const PAST_ISO = new Date(Date.now() - 86_400_000).toISOString()
+
+  function mockServiceClientWithOfficialsLookup(result: unknown) {
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(chain(result)),
+    } as never)
+  }
+
+  it('returns every pending tenant invite for the phone, correctly shaped', async () => {
+    mockServiceClientWithOfficialsLookup({
+      data: [
+        {
+          tenant_id: TENANT_ID,
+          invite_token_expires_at: FUTURE_ISO,
+          tenants: { name: 'Viadal', slug: 'viadal' },
+        },
+        {
+          tenant_id: OTHER_TENANT_ID,
+          invite_token_expires_at: FUTURE_ISO,
+          tenants: { name: 'Other Club', slug: 'other-club' },
+        },
+      ],
+      error: null,
+    })
+
+    expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
+      { tenantId: TENANT_ID, tenantName: 'Viadal', tenantSlug: 'viadal', expired: false },
+      {
+        tenantId: OTHER_TENANT_ID,
+        tenantName: 'Other Club',
+        tenantSlug: 'other-club',
+        expired: false,
+      },
+    ])
+  })
+
+  it('drops a row whose joined tenant is missing rather than returning a partial shape, and warns', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockServiceClientWithOfficialsLookup({
+      data: [
+        { tenant_id: TENANT_ID, invite_token_expires_at: FUTURE_ISO, tenants: null },
+        {
+          tenant_id: OTHER_TENANT_ID,
+          invite_token_expires_at: FUTURE_ISO,
+          tenants: { name: 'Other Club', slug: 'other-club' },
+        },
+      ],
+      error: null,
+    })
+
+    expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
+      {
+        tenantId: OTHER_TENANT_ID,
+        tenantName: 'Other Club',
+        tenantSlug: 'other-club',
+        expired: false,
+      },
+    ])
+    // The dropped row's orphaned tenant_id, never the phone number, is what
+    // makes the warning actionable — logging the phone would be pointless
+    // (the other row proves the phone is fine) and is PII this file
+    // otherwise never logs (see the query-error test below).
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining(TENANT_ID))
+  })
+
+  it('marks a row with a past invite_token_expires_at as expired', async () => {
+    mockServiceClientWithOfficialsLookup({
+      data: [
+        {
+          tenant_id: TENANT_ID,
+          invite_token_expires_at: PAST_ISO,
+          tenants: { name: 'Viadal', slug: 'viadal' },
+        },
+      ],
+      error: null,
+    })
+
+    expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
+      { tenantId: TENANT_ID, tenantName: 'Viadal', tenantSlug: 'viadal', expired: true },
+    ])
+  })
+
+  it('marks a row with a null invite_token_expires_at as expired', async () => {
+    mockServiceClientWithOfficialsLookup({
+      data: [
+        {
+          tenant_id: TENANT_ID,
+          invite_token_expires_at: null,
+          tenants: { name: 'Viadal', slug: 'viadal' },
+        },
+      ],
+      error: null,
+    })
+
+    expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
+      { tenantId: TENANT_ID, tenantName: 'Viadal', tenantSlug: 'viadal', expired: true },
+    ])
+  })
+
+  it('returns an empty array when there are no pending invites', async () => {
+    mockServiceClientWithOfficialsLookup({ data: [], error: null })
+
+    expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([])
+  })
+
+  it('returns an empty array and logs when the lookup query errors, rather than throwing', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockServiceClientWithOfficialsLookup({ data: null, error: { message: 'boom' } })
+
+    expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([])
+    expect(consoleSpy).toHaveBeenCalled()
   })
 })
 

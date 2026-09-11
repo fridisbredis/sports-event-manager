@@ -74,11 +74,13 @@ async function createPendingOfficialWithExpiry(tenantId: string, phone: string, 
 async function confirmByPhone(
   admin: ReturnType<typeof serviceClient>,
   userId: string,
+  tenantId: string,
   phone: string,
   privacyAccepted: boolean
 ) {
   return admin.rpc('confirm_official_invite_by_phone', {
     p_user_id: userId,
+    p_tenant_id: tenantId,
     p_user_phone: phone,
     p_privacy_accepted: privacyAccepted,
   })
@@ -104,7 +106,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     const official = await createPendingOfficial(tenant.id, phone)
 
     const fakeUserId = '00000000-0000-0000-0000-000000000099'
-    const { error } = await confirmByPhone(admin, fakeUserId, phone, false)
+    const { error } = await confirmByPhone(admin, fakeUserId, tenant.id, phone, false)
 
     expect(error).not.toBeNull()
     expect(error!.message).toContain('privacy_not_accepted')
@@ -137,7 +139,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     if (userError) throw userError
     createdUserIds.push(userData.user.id)
 
-    const { data, error } = await confirmByPhone(admin, userData.user.id, phone, true)
+    const { data, error } = await confirmByPhone(admin, userData.user.id, tenant.id, phone, true)
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
     expect(result.tenant_id).toBe(tenant.id)
@@ -171,6 +173,47 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     expect(roleRow?.role).toBe('official')
   })
 
+  // Tenant-scoping regression test for 20260910145957: the same phone has a
+  // pending invite in two different tenants, so p_tenant_id must select
+  // between them rather than the lookup matching on phone alone. Confirming
+  // with a tenant_id that has no pending invite for this phone must raise
+  // not_found, not silently confirm a different tenant's row.
+  it('raises not_found for a tenant_id with no pending invite for this phone, even when another tenant has one', async () => {
+    const admin = serviceClient()
+    const tenantWithInvite = await createTenant('SEC-09 Tenant Scoped A')
+    createdTenantIds.push(tenantWithInvite.id)
+    const tenantWithoutInvite = await createTenant('SEC-09 Tenant Scoped B')
+    createdTenantIds.push(tenantWithoutInvite.id)
+    const phone = `+46703${Math.floor(Math.random() * 1_000_000)}`
+    await createPendingOfficial(tenantWithInvite.id, phone)
+
+    const { data: userData, error: userError } = await admin.auth.admin.createUser({
+      phone,
+      phone_confirm: true,
+    })
+    if (userError) throw userError
+    createdUserIds.push(userData.user.id)
+
+    const { error } = await confirmByPhone(
+      admin,
+      userData.user.id,
+      tenantWithoutInvite.id,
+      phone,
+      true
+    )
+    expect(error).not.toBeNull()
+    expect(error!.message).toContain('not_found')
+
+    const { data: row } = await admin
+      .from('officials')
+      .select('invite_status, user_id')
+      .eq('tenant_id', tenantWithInvite.id)
+      .eq('phone', phone)
+      .single()
+    expect(row!.invite_status).toBe('invited')
+    expect(row!.user_id).toBeNull()
+  })
+
   // Regression test for the unreachable-lookup fix: before it, this RPC's
   // lookup required invite_status = 'invited' AND invite_token IS NULL — a
   // combination no code path ever produces, since officials.invite_token
@@ -196,7 +239,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     if (userError) throw userError
     createdUserIds.push(userData.user.id)
 
-    const { data, error } = await confirmByPhone(admin, userData.user.id, phone, true)
+    const { data, error } = await confirmByPhone(admin, userData.user.id, tenant.id, phone, true)
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
     expect(result.tenant_id).toBe(tenant.id)
@@ -238,7 +281,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     if (userError) throw userError
     createdUserIds.push(userData.user.id)
 
-    const { error } = await confirmByPhone(admin, userData.user.id, phone, true)
+    const { error } = await confirmByPhone(admin, userData.user.id, tenant.id, phone, true)
     expect(error).not.toBeNull()
     expect(error!.message).toContain('expired')
 
@@ -272,7 +315,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     const { userId } = await createUserWithRole(tenant.id, 'participant')
     createdUserIds.push(userId)
 
-    const { data, error } = await confirmByPhone(admin, userId, phone, true)
+    const { data, error } = await confirmByPhone(admin, userId, tenant.id, phone, true)
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
 
@@ -318,7 +361,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     // matches on invite_status = 'invited' rather than a specific row id.
     await createPendingOfficial(tenant.id, phone)
 
-    const { data, error } = await confirmByPhone(admin, userId, phone, true)
+    const { data, error } = await confirmByPhone(admin, userId, tenant.id, phone, true)
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
 
@@ -352,7 +395,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     const { userId } = await createUserWithRole(tenant.id, 'tenant_admin')
     createdUserIds.push(userId)
 
-    const { data, error } = await confirmByPhone(admin, userId, phone, true)
+    const { data, error } = await confirmByPhone(admin, userId, tenant.id, phone, true)
     expect(error).toBeNull()
     const result = data as unknown as { tenant_id: string; role_granted: boolean }
     expect(result.role_granted).toBe(false)
@@ -396,7 +439,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     createdUserIds.push(userId)
 
     const results = await Promise.all(
-      Array.from({ length: 5 }, () => confirmByPhone(admin, userId, phone, true))
+      Array.from({ length: 5 }, () => confirmByPhone(admin, userId, tenant.id, phone, true))
     )
 
     const succeeded = results.filter((r) => r.error === null)
@@ -439,7 +482,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     if (userError) throw userError
     createdUserIds.push(userData.user.id)
 
-    const { data, error } = await confirmByPhone(admin, userData.user.id, phone, true)
+    const { data, error } = await confirmByPhone(admin, userData.user.id, tenant.id, phone, true)
     expect(error).toBeNull()
     expect(Object.keys(data as object).sort()).toEqual(['role_granted', 'tenant_id'])
   })
@@ -475,7 +518,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
     )
 
     const results = await Promise.all(
-      userIds.map((userId) => confirmByPhone(admin, userId, phone, true))
+      userIds.map((userId) => confirmByPhone(admin, userId, tenant.id, phone, true))
     )
 
     const succeeded = results.filter((r) => r.error === null)
@@ -517,6 +560,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
       const { error } = await confirmByPhone(
         anon,
         '00000000-0000-0000-0000-000000000098',
+        tenant.id,
         '+46700000000',
         true
       )
@@ -536,6 +580,7 @@ describe('confirm_official_invite_by_phone RPC (SEC-09 consent + concurrency)', 
       const { error } = await confirmByPhone(
         authClient,
         '00000000-0000-0000-0000-000000000097',
+        tenantId,
         '+46709999999',
         true
       )
