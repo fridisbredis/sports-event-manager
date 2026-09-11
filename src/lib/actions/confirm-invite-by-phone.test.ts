@@ -24,15 +24,30 @@ function mockAuthedUser(user: { id: string; phone?: string } | null) {
   } as never)
 }
 
+const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 describe('confirmInviteByPhone', () => {
   it('returns an error and never reaches auth when privacyAccepted is false', async () => {
-    const result = await confirmInviteByPhone(false)
+    const result = await confirmInviteByPhone(TENANT_ID, false)
 
     expect(result).toEqual({ error: 'privacy_not_accepted' })
+    expect(createSupabaseServerClient).not.toHaveBeenCalled()
+    expect(confirmOfficialInvite).not.toHaveBeenCalled()
+  })
+
+  // Defensive guard: the picker UI is expected to always submit a real
+  // tenantId (auto-selected when there is exactly one pending invite, chosen
+  // by the user when there are several), so an empty tenantId reaching the
+  // action at all means the UI failed to select one — this must fail closed
+  // with not_found rather than passing an empty string through to the RPC.
+  it('returns not_found and never reaches auth when tenantId is empty', async () => {
+    const result = await confirmInviteByPhone('', true)
+
+    expect(result).toEqual({ error: 'not_found' })
     expect(createSupabaseServerClient).not.toHaveBeenCalled()
     expect(confirmOfficialInvite).not.toHaveBeenCalled()
   })
@@ -40,7 +55,7 @@ describe('confirmInviteByPhone', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     mockAuthedUser(null)
 
-    await expect(confirmInviteByPhone(true)).rejects.toThrow('NEXT_REDIRECT')
+    await expect(confirmInviteByPhone(TENANT_ID, true)).rejects.toThrow('NEXT_REDIRECT')
 
     expect(redirect).toHaveBeenCalledWith('/login')
     expect(confirmOfficialInvite).not.toHaveBeenCalled()
@@ -49,7 +64,7 @@ describe('confirmInviteByPhone', () => {
   it('returns phone_mismatch when the authenticated user has no verified phone', async () => {
     mockAuthedUser({ id: 'user-1' })
 
-    const result = await confirmInviteByPhone(true)
+    const result = await confirmInviteByPhone(TENANT_ID, true)
 
     expect(result).toEqual({ error: 'phone_mismatch' })
     expect(confirmOfficialInvite).not.toHaveBeenCalled()
@@ -59,19 +74,19 @@ describe('confirmInviteByPhone', () => {
     mockAuthedUser({ id: 'user-1', phone: '+46701234567' })
     vi.mocked(confirmOfficialInvite).mockResolvedValue(null)
 
-    const result = await confirmInviteByPhone(true)
+    const result = await confirmInviteByPhone(TENANT_ID, true)
 
     expect(result).toEqual({ error: 'not_found' })
   })
 
-  it('redirects to the tenant assignments page on success, passing consent through', async () => {
+  it('redirects to the tenant home page on success, passing tenantId and consent through', async () => {
     mockAuthedUser({ id: 'user-1', phone: '+46701234567' })
     vi.mocked(confirmOfficialInvite).mockResolvedValue('viadal')
 
-    await expect(confirmInviteByPhone(true)).rejects.toThrow('NEXT_REDIRECT')
+    await expect(confirmInviteByPhone(TENANT_ID, true)).rejects.toThrow('NEXT_REDIRECT')
 
-    expect(confirmOfficialInvite).toHaveBeenCalledWith('user-1', '+46701234567', true)
-    expect(redirect).toHaveBeenCalledWith('/viadal/assignments')
+    expect(confirmOfficialInvite).toHaveBeenCalledWith('user-1', TENANT_ID, '+46701234567', true)
+    expect(redirect).toHaveBeenCalledWith('/viadal/home')
   })
 
   // Adversarial: this action is a POST endpoint under the hood (Next.js
@@ -88,14 +103,19 @@ describe('confirmInviteByPhone', () => {
       // A hand-crafted request body could send "true" (string), 1, or {} —
       // anything JS would treat as truthy under `if (!privacyAccepted)` but
       // that is not actually the literal `true` the RPC contract expects.
-      await expect(confirmInviteByPhone('true' as unknown as boolean)).rejects.toThrow(
+      await expect(confirmInviteByPhone(TENANT_ID, 'true' as unknown as boolean)).rejects.toThrow(
         'NEXT_REDIRECT'
       )
 
       // Documents current behavior: the truthy string is forwarded verbatim,
       // not normalized to a real boolean. confirmOfficialInvite/the RPC
       // layer receives whatever was sent, not a guaranteed `true`.
-      expect(confirmOfficialInvite).toHaveBeenCalledWith('user-1', '+46701234567', 'true')
+      expect(confirmOfficialInvite).toHaveBeenCalledWith(
+        'user-1',
+        TENANT_ID,
+        '+46701234567',
+        'true'
+      )
     })
 
     it('rejects an unauthenticated direct call the same way the UI path would', async () => {
@@ -103,26 +123,27 @@ describe('confirmInviteByPhone', () => {
       // attacker who found the action ID but has no valid Supabase session.
       mockAuthedUser(null)
 
-      await expect(confirmInviteByPhone(true)).rejects.toThrow('NEXT_REDIRECT')
+      await expect(confirmInviteByPhone(TENANT_ID, true)).rejects.toThrow('NEXT_REDIRECT')
 
       expect(redirect).toHaveBeenCalledWith('/login')
       expect(confirmOfficialInvite).not.toHaveBeenCalled()
     })
 
     it('cannot confirm a different phone number than the one on the authenticated session', async () => {
-      // The action takes no phone/tenant/officialId argument from the
-      // caller — user.phone comes only from the verified session, never
-      // from client input. This pins that there is no parameter an
-      // attacker could pass to target someone else's pending invite.
+      // The action takes no phone/officialId argument from the caller —
+      // user.phone comes only from the verified session, never from client
+      // input. tenantId IS a caller-supplied argument (it selects among the
+      // session phone's own pending invites), which this test does not
+      // exercise — it only pins that the phone still cannot be substituted.
       mockAuthedUser({ id: 'attacker-user', phone: '+46700000000' })
       vi.mocked(confirmOfficialInvite).mockResolvedValue(null)
 
-      await confirmInviteByPhone(true)
+      await confirmInviteByPhone(TENANT_ID, true)
 
       // The phone passed to confirmOfficialInvite is exactly the session's
       // own phone — there is no argument on confirmInviteByPhone the caller
       // could use to substitute a different one.
-      const [, phoneArg] = vi.mocked(confirmOfficialInvite).mock.calls[0]
+      const [, , phoneArg] = vi.mocked(confirmOfficialInvite).mock.calls[0]
       expect(phoneArg).toBe('+46700000000')
     })
 
@@ -139,8 +160,8 @@ describe('confirmInviteByPhone', () => {
       mockAuthedUser({ id: 'user-1', phone: '+46701234567' })
       vi.mocked(confirmOfficialInvite).mockResolvedValueOnce('viadal').mockResolvedValueOnce(null) // simulates the RPC's second caller losing the row lock
 
-      const first = confirmInviteByPhone(true).catch((e: Error) => e.message)
-      const second = confirmInviteByPhone(true).catch((e: Error) => e.message)
+      const first = confirmInviteByPhone(TENANT_ID, true).catch((e: Error) => e.message)
+      const second = confirmInviteByPhone(TENANT_ID, true).catch((e: Error) => e.message)
 
       const [firstResult, secondResult] = await Promise.all([first, second])
 

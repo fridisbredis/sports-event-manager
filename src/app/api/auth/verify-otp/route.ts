@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkLoginVerifyRateLimit, type RateLimitResult } from '@/lib/rate-limit'
+import { stripE164Plus } from '@/lib/phone'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
@@ -26,7 +27,8 @@ export async function POST(request: NextRequest) {
 
   let rateLimit: RateLimitResult
   try {
-    rateLimit = await checkLoginVerifyRateLimit(phone)
+    // One shape per number — see send-otp/route.ts.
+    rateLimit = await checkLoginVerifyRateLimit(stripE164Plus(phone))
   } catch (err) {
     const cause =
       err instanceof Error ? (err.cause as { message?: unknown } | undefined)?.message : undefined
