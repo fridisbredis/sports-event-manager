@@ -671,6 +671,7 @@ describe('canViewOfficialSurfaces', () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
       tenants: { data: { is_active: true }, error: null },
+      officials: { data: { id: 'off-admin' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
@@ -970,10 +971,11 @@ describe('resolveTenantForOfficial', () => {
     })
   })
 
-  it('returns officialId null for a tenant_admin, who passes without an officials row', async () => {
+  it('returns officialId null for a tenant_admin with no officials row, who still passes', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
       user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      officials: { data: null, error: null },
     })
 
     expect(await resolveTenantForOfficial('viadal', 'user-1')).toEqual({
@@ -1058,18 +1060,12 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
     expect(officialsBuilder.eq).not.toHaveBeenCalledWith('tenant_id', OTHER_TENANT_ID)
   })
 
-  // A hybrid user holding both tenant_admin and official rows for the SAME
-  // tenant hits the tenant_admin early-return branch in
-  // resolveOfficialSurfaceAccess, which never queries `officials` at all.
-  // officialId is therefore null even though a confirmed officials row
-  // exists for them — a real official row is "hidden" by this short-circuit.
-  // This was true before the refactor too (canViewOfficialSurfaces never
-  // fetched officials for tenant_admin), so this test pins existing
-  // behavior rather than flagging a new bug — but it is exactly the kind of
-  // assumption a future caller of officialId could get burned by if they
-  // expect it to reflect "does this user have an officials row" rather than
-  // "did the official-role branch run".
-  it('does not surface officialId for a hybrid tenant_admin+official user, even with a confirmed row', async () => {
+  // The inverse of what this test used to pin. A tenant_admin — hybrid or
+  // not — used to hit an early return that never queried `officials`, so a
+  // confirmed row was hidden and MYSCH-01 rendered "No assignments yet" for
+  // an admin who was in fact assigned, without ever hitting the database.
+  // The admin branch now runs the same lookup, so the row surfaces.
+  it('surfaces officialId for a hybrid tenant_admin+official user with a confirmed row', async () => {
     const officialsBuilder = chain({ data: { id: 'off-1' }, error: null })
     vi.mocked(createSupabaseServiceClient).mockReturnValue({
       from: vi.fn((table: string) => {
@@ -1094,8 +1090,48 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
 
     const result = await resolveTenantForOfficial('viadal', 'user-1')
 
-    expect(result?.officialId).toBeNull()
-    expect(officialsBuilder.select).not.toHaveBeenCalled()
+    expect(result?.officialId).toBe('off-1')
+    expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+  })
+
+  // A tenant_admin whose roster row exists (F-MNT-20 backfill applied) must
+  // get it back, so assignments made to them on SCHED-01 appear on MYSCH-01.
+  it('surfaces officialId for a tenant_admin holding a roster row', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      officials: { data: { id: 'off-admin' }, error: null },
+    })
+
+    const result = await resolveTenantForOfficial('viadal', 'user-1')
+
+    expect(result?.officialId).toBe('off-admin')
+  })
+
+  // The degrade path: until the backfill runs, an admin has no roster row.
+  // They must keep access (an empty schedule), never be locked out — the
+  // official branch fails closed here, the admin branch must not.
+  it('keeps a tenant_admin allowed with a null officialId when no roster row exists', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      officials: { data: null, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+    expect((await resolveTenantForOfficial('viadal', 'user-1'))?.officialId).toBeNull()
+  })
+
+  // A failed lookup must not lock an admin out of surfaces they reach by
+  // role, where an official has no such fallback and still denies.
+  it('keeps a tenant_admin allowed when the officials lookup errors', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      officials: { data: null, error: { message: 'boom' } },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
   })
 
   // A present-but-falsy official id (empty string) is not a real Postgres

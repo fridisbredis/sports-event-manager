@@ -305,8 +305,9 @@ export async function hasAdminAccessToTenant(userId: string, tenantId: string): 
 // Result of the official-surface access check, carrying the confirmed
 // official row's id alongside the verdict so a caller that already needs it
 // (resolveTenantForOfficial) does not have to re-run the same query with a
-// second, RLS-scoped client. `officialId` is null for the tenant_admin/
-// system_admin branches, which pass without an officials row at all.
+// second, RLS-scoped client. `officialId` is null for system_admins, who pass
+// globally without a per-tenant row, and for a tenant_admin who has no roster
+// row yet — both are allowed, with no row-backed schedule to show.
 type OfficialSurfaceAccess = { allowed: boolean; officialId: string | null }
 
 // Official surfaces — the mobile screens under (official)/[tenantSlug] — are
@@ -317,7 +318,14 @@ type OfficialSurfaceAccess = { allowed: boolean; officialId: string | null }
 // hasAdminAccessToTenant, including the is_active exemption.
 // Per docs/flows/officials-management-registration.md, an official only gains
 // sign-in and access to these screens once Confirmed — Invited is SMS-link-only.
-// tenant_admin/system_admin have no officials row and are exempt from this check.
+// A tenant_admin's ACCESS does not depend on an officials row, but their
+// officialId does: per Peter's decision of 2026-06-24 an admin is schedulable
+// and carries a roster row (F-MNT-20), so assignments made to them must show
+// up on MYSCH-01. The admin branch therefore runs the same lookup rather than
+// returning early with a null id — the early return rendered an assigned
+// admin's schedule empty without ever querying. Admins keep `allowed: true`
+// when no row is found, so a tenant whose backfill has not run degrades to an
+// empty schedule instead of a lockout.
 async function resolveOfficialSurfaceAccess(
   userId: string,
   tenantId: string
@@ -332,11 +340,9 @@ async function resolveOfficialSurfaceAccess(
   if (isGlobalSystemAdmin(context.roleRows)) return { allowed: true, officialId: null }
   if (!context.tenantIsActive) return deny
 
-  if (hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])) {
-    return { allowed: true, officialId: null }
-  }
+  const isTenantAdmin = hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])
 
-  if (!hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return deny
+  if (!isTenantAdmin && !hasTenantScopedRole(context.roleRows, tenantId, ['official'])) return deny
 
   // Ask for a confirmed row and take the first, rather than asking for "the" row:
   // removal is a soft delete, so a re-invited official has both a 'removed' row and a
@@ -357,7 +363,11 @@ async function resolveOfficialSurfaceAccess(
 
   if (error) {
     logger.error('Failed to fetch official invite status', error)
-    return deny
+    // An admin's access does not depend on this row, so a failed lookup must
+    // not lock them out of surfaces they reach by role. They lose the row-
+    // backed screens (an empty MYSCH-01) but keep the rest, where an official
+    // has nothing to fall back on and still fails closed.
+    return isTenantAdmin ? { allowed: true, officialId: null } : deny
   }
 
   // official.id is a non-null uuid primary key in practice, but this guard
@@ -365,7 +375,7 @@ async function resolveOfficialSurfaceAccess(
   // rather than trusting the shape, so `allowed: true` can never pair with
   // an officialId that would silently fail a caller's `if (officialId)`
   // check downstream.
-  if (!official?.id) return deny
+  if (!official?.id) return isTenantAdmin ? { allowed: true, officialId: null } : deny
 
   return { allowed: true, officialId: official.id }
 }
