@@ -335,7 +335,19 @@ async function main() {
     .from('user_roles')
     .insert({ user_id: tenantAdminId, tenant_id: tenant.id, role: 'tenant_admin' })
   if (adminRoleError) throw adminRoleError
-  console.log(`  tenant_admin: ${SEED_PHONES.tenantAdmin}`)
+
+  // F-MNT-20: an admin is always schedulable and appears on the roster as
+  // implicitly Confirmed (Peter, 2026-06-24). Without this the seeded admin
+  // has a user_roles row and no officials row — the exact shape of the bug —
+  // so OFF-01 omits them, /{slug}/account 404s and SCHED-01's pool excludes
+  // them. Delegated to the RPC rather than inserted here so the seed cannot
+  // drift from the real rule (migration 20260911130436).
+  const { error: adminRosterError } = await admin.rpc('ensure_admin_roster_row', {
+    p_tenant_id: tenant.id,
+    p_user_id: tenantAdminId,
+  })
+  if (adminRosterError) throw adminRosterError
+  console.log(`  tenant_admin (also on the roster, schedulable): ${SEED_PHONES.tenantAdmin}`)
 
   // Three officials covering the invite_status states the app branches on
   // (see canViewOfficialSurfaces and the SEC-05 announcement filter bug).

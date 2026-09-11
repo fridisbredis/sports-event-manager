@@ -96,26 +96,18 @@ test.describe('tenant admin', () => {
   // resolveOfficialSurfaceAccess admits tenant_admins to the official surfaces
   // too — OFF-01 puts the admin on the roster as implicitly confirmed, so they
   // are expected to see their own shifts.
-  for (const path of OFFICIAL_PATHS.filter((p) => !p.endsWith('/account'))) {
+  //
+  // F-MNT-20: ACCT-01 used to be excluded from this loop. It renders from an
+  // `officials` row and calls notFound() when there is none, and the tenant
+  // admin had a user_roles row only, so it 404'd while every other official
+  // surface resolved. ensure_admin_roster_row (migration 20260911130436) plus
+  // the backfill (20260911130546) give the admin that row, so the whole set is
+  // reachable and the filter this loop used to carry is gone.
+  for (const path of OFFICIAL_PATHS) {
     test(`can reach ${path}`, async ({ tenantAdminPage }) => {
       await expectReachable(tenantAdminPage, path)
     })
   }
-
-  // The one official surface an admin does not reach: ACCT-01 renders from an
-  // `officials` row, and page.tsx calls notFound() when there is none.
-  //
-  // This asserts today's behaviour, not the spec. OFF-01 says the admin should
-  // appear on the roster as implicitly Confirmed, which would give them a row
-  // and make this a 200 — scripts/seed-dev.ts creates the tenant admin with a
-  // user_roles row only. Whether the gap is in the seed or in the app is a
-  // product question; if the admin ever gets a roster row, this test flips to
-  // expectReachable and the filter above goes away.
-  test('gets 404 on the official account screen, having no officials row', async ({
-    tenantAdminPage,
-  }) => {
-    await expectNotFound(tenantAdminPage, `/${SEED_TENANT_SLUG}/account`)
-  })
 
   test('cannot reach another tenant', async ({ tenantAdminPage }) => {
     // getAdminTenant() resolves the slug against this user's roles, so an
