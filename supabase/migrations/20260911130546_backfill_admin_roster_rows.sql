@@ -28,6 +28,8 @@
 -- unusable account must not block the backfill for everyone else. None
 -- exist on prod today (all 25 auth.users rows have phones) — this is for
 -- dev and local stacks, where partially provisioned users are common.
+-- 22023 is the ONLY tolerated failure; every other SQLSTATE aborts the
+-- migration, so a real bug in the RPC cannot masquerade as a clean run.
 --
 -- Forward-fix: destructive (inserts rows; no existing row is updated or
 --              deleted by the backfill itself, but the RPC it calls may
@@ -85,10 +87,17 @@ begin
       if (v_result ->> 'created')::boolean then
         v_made := v_made + 1;
       end if;
-    exception when others then
-      -- Most likely 22023: an admin account with no phone on auth.users.
-      -- Skip rather than abort the whole backfill.
-      raise notice 'Skipped admin % on tenant %: %', r.user_id, r.tenant_id, sqlerrm;
+    exception when sqlstate '22023' then
+      -- The one tolerated failure: an admin account with no phone on
+      -- auth.users, which ensure_admin_roster_row raises 22023 for. Skip it
+      -- rather than abort the backfill for everyone else.
+      --
+      -- Deliberately NOT `when others` (Eduardo, review of PR #187): that
+      -- swallows a genuine RPC bug — a bad predicate, a constraint violation,
+      -- a permission error — as a notice, and the migration would report
+      -- success having backfilled nothing. Anything but 22023 must fail loudly.
+      raise notice 'Skipped admin % on tenant % (no phone on auth.users): %',
+        r.user_id, r.tenant_id, sqlerrm;
     end;
   end loop;
 
