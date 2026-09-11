@@ -552,6 +552,7 @@ describe('hasAdminAccessToTenant', () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
       tenants: { data: { is_active: false }, error: null },
+      officials: { data: null, error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(true)
@@ -699,6 +700,7 @@ describe('canViewOfficialSurfaces', () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
       tenants: { data: { is_active: false }, error: null },
+      officials: { data: null, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
@@ -1120,6 +1122,64 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
     expect((await resolveTenantForOfficial('viadal', 'user-1'))?.officialId).toBeNull()
+  })
+
+  // The shape that actually broke in dev, and the reason this was mistaken
+  // for a tenant-specific data problem: a user holding a GLOBAL system_admin
+  // row plus a confirmed officials row in the tenant they were viewing. The
+  // system_admin branch returned first, so officialId was null in EVERY
+  // tenant and MYSCH-01 rendered empty without querying — while a colleague
+  // holding only `official` in the same tenant saw their shifts.
+  it('surfaces officialId for a system_admin who also holds a roster row in this tenant', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: {
+        data: [
+          { role: 'system_admin', tenant_id: null },
+          { role: 'official', tenant_id: TENANT_ID },
+        ],
+        error: null,
+      },
+      officials: { data: { id: 'off-sysadmin' }, error: null },
+    })
+
+    expect((await resolveTenantForOfficial('viadal', 'user-1'))?.officialId).toBe('off-sysadmin')
+  })
+
+  // A system_admin with no roster row here keeps global access and simply has
+  // no schedule of their own — never a lockout.
+  it('keeps a system_admin allowed with a null officialId when they hold no roster row', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
+      user_roles: { data: [{ role: 'system_admin', tenant_id: null }], error: null },
+      officials: { data: null, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+    expect((await resolveTenantForOfficial('viadal', 'user-1'))?.officialId).toBeNull()
+  })
+
+  // The is_active exemption is the one thing that must NOT regress by routing
+  // system_admins through the shared lookup: they reach inactive tenants,
+  // where a tenant_admin and an official are both denied.
+  it('keeps a system_admin allowed in an inactive tenant, still resolving their row', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: false } },
+      user_roles: { data: [{ role: 'system_admin', tenant_id: null }], error: null },
+      officials: { data: { id: 'off-sysadmin' }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('still denies a tenant_admin in an inactive tenant', async () => {
+    mockServiceClientByTable({
+      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: false } },
+      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      officials: { data: { id: 'off-admin' }, error: null },
+    })
+
+    expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
   })
 
   // A failed lookup must not lock an admin out of surfaces they reach by
