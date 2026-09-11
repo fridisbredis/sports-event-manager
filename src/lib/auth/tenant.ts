@@ -117,6 +117,7 @@ export async function getPendingOfficialInvitesByPhone(
     .select('tenant_id, invite_token_expires_at, tenants(name, slug)')
     .eq('phone', phone)
     .eq('invite_status', 'invited')
+    .order('created_at', { ascending: true })
     .range(0, PENDING_INVITE_CEILING)
 
   if (error) {
@@ -138,10 +139,9 @@ export async function getPendingOfficialInvitesByPhone(
       })
       return []
     }
-    const expired = !row.invite_token_expires_at || new Date(row.invite_token_expires_at) <= new Date()
-    return [
-      { tenantId: row.tenant_id, tenantName: tenant.name, tenantSlug: tenant.slug, expired },
-    ]
+    const expired =
+      !row.invite_token_expires_at || new Date(row.invite_token_expires_at) <= new Date()
+    return [{ tenantId: row.tenant_id, tenantName: tenant.name, tenantSlug: tenant.slug, expired }]
   })
 }
 

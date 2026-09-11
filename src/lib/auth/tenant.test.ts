@@ -36,7 +36,17 @@ vi.mock('next/cache', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'or', 'limit', 'range', 'is', 'update', 'insert']) {
+  for (const method of [
+    'select',
+    'eq',
+    'or',
+    'limit',
+    'order',
+    'range',
+    'is',
+    'update',
+    'insert',
+  ]) {
     builder[method] = vi.fn(() => builder)
   }
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
@@ -345,7 +355,9 @@ describe('confirmOfficialInvite', () => {
     })
     vi.mocked(logAuthEvent).mockRejectedValueOnce(new Error('audit db unreachable'))
 
-    await expect(confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)).resolves.toBe('viadal')
+    await expect(confirmOfficialInvite('user-1', TENANT_ID, '0701234567', true)).resolves.toBe(
+      'viadal'
+    )
   })
 })
 
@@ -404,7 +416,12 @@ describe('getPendingOfficialInvitesByPhone', () => {
 
     expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
       { tenantId: TENANT_ID, tenantName: 'Viadal', tenantSlug: 'viadal', expired: false },
-      { tenantId: OTHER_TENANT_ID, tenantName: 'Other Club', tenantSlug: 'other-club', expired: false },
+      {
+        tenantId: OTHER_TENANT_ID,
+        tenantName: 'Other Club',
+        tenantSlug: 'other-club',
+        expired: false,
+      },
     ])
   })
 
@@ -423,15 +440,18 @@ describe('getPendingOfficialInvitesByPhone', () => {
     })
 
     expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
-      { tenantId: OTHER_TENANT_ID, tenantName: 'Other Club', tenantSlug: 'other-club', expired: false },
+      {
+        tenantId: OTHER_TENANT_ID,
+        tenantName: 'Other Club',
+        tenantSlug: 'other-club',
+        expired: false,
+      },
     ])
     // The dropped row's orphaned tenant_id, never the phone number, is what
     // makes the warning actionable — logging the phone would be pointless
     // (the other row proves the phone is fine) and is PII this file
     // otherwise never logs (see the query-error test below).
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining(TENANT_ID)
-    )
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining(TENANT_ID))
   })
 
   it('marks a row with a past invite_token_expires_at as expired', async () => {

@@ -55,9 +55,7 @@ const MULTIPLE_INVITES_WITH_EXPIRED: PendingOfficialInvite[] = [
   },
 ]
 
-const SINGLE_EXPIRED_INVITE: PendingOfficialInvite[] = [
-  { ...SINGLE_INVITE[0], expired: true },
-]
+const SINGLE_EXPIRED_INVITE: PendingOfficialInvite[] = [{ ...SINGLE_INVITE[0], expired: true }]
 
 const ALL_EXPIRED_INVITES: PendingOfficialInvite[] = [
   { ...MULTIPLE_INVITES_WITH_EXPIRED[0], expired: true },
@@ -142,7 +140,14 @@ describe('ConfirmInviteForm', () => {
     // Only one non-expired invite exists here, so it's auto-selected (same
     // rule as the single-invite case) — clicking the disabled expired option
     // is a no-op rather than something that needs to un-fill the selection.
-    expect(screen.getByText('confirmInvite.confirmButton')).not.toBeDisabled()
+    const confirmButton = screen.getByText('confirmInvite.confirmButton')
+    expect(confirmButton).not.toBeDisabled()
+
+    fireEvent.click(confirmButton)
+
+    // Pins the actual invariant: a click on the expired option must not be
+    // able to redirect the confirm to the expired tenant.
+    expect(confirmInviteByPhone).toHaveBeenCalledWith(MULTIPLE_INVITES[0].tenantId, true)
   })
 
   it('keeps confirm disabled when the only pending invite is expired', () => {
