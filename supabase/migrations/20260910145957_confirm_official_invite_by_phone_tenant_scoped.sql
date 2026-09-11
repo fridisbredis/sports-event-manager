@@ -130,6 +130,10 @@ begin
     raise exception 'not_found' using errcode = 'P0001';
   end if;
 
+  -- NULL here is a real legacy state (officials invited before 0010 added
+  -- this column, never backfilled) rather than an oversight — intentionally
+  -- treated the same as expired since neither can confirm; the fix for
+  -- both is the same, an admin resend, which stamps a fresh token + expiry.
   if v_official.invite_token_expires_at is null
      or v_official.invite_token_expires_at <= now() then
     raise exception 'expired' using errcode = 'P0001';
@@ -182,7 +186,10 @@ comment on function public.confirm_official_invite_by_phone(uuid, text, uuid, bo
   'BY/LIMIT is needed) and re-checks invite_status in the UPDATE WHERE '
   'clause so concurrent callers cannot both succeed. Enforces the same '
   'invite_token_expires_at deadline as the token-based '
-  'confirm_official_invite. Grants the official role via an atomic upsert '
+  'confirm_official_invite; a NULL deadline (pre-0010 officials, never '
+  'backfilled) is treated as expired on purpose rather than left as an '
+  'unreachable edge case — resend is the recovery path either way. '
+  'Grants the official role via an atomic upsert '
   'that also catches a user who already held ''participant'' in this '
   'tenant (migration 0047) but never overwrites any OTHER existing role '
   '(tenant_admin) — those are left untouched and role_granted is false. '
