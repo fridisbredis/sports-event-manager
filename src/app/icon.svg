@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Sports Event Manager">
+  <rect width="32" height="32" rx="7" fill="#006FEE" />
+  <path d="M8.8 6.4v19.2" stroke="#fff" stroke-width="3" stroke-linecap="round" />
+  <path d="M12.4 9.2h5.6v5.1h-5.6zM18h5.6v5.1H18z" fill="#fff" fill-opacity="0.4" />
+  <path d="M18 9.2h5.6v5.1H18zM12.4 14.3h5.6v5.1h-5.6z" fill="#fff" />
+</svg>
