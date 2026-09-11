@@ -96,6 +96,24 @@ describe('POST /api/auth/send-otp', () => {
     expect(res.status).toBe(200)
   })
 
+  // The schema accepts both spellings, and the rate-limit key does no normalization
+  // of its own — so the route must collapse them before keying, or a direct API
+  // caller alternating '+46...' and '46...' gets two buckets and double the ceiling.
+  // The '+'-prefix test above only asserts the value reaches GoTrue, which is why
+  // this gap survived: it never looked at what the rate limiter was handed.
+  it('strips the + before keying the rate limit, so both spellings share one bucket', async () => {
+    vi.mocked(checkLoginSendRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { signInWithOtp: vi.fn().mockResolvedValue({ error: null }) },
+    } as never)
+
+    await POST(makeRequest({ phone: `+${PHONE}` }))
+    await POST(makeRequest({ phone: PHONE }))
+
+    expect(checkLoginSendRateLimit).toHaveBeenNthCalledWith(1, PHONE)
+    expect(checkLoginSendRateLimit).toHaveBeenNthCalledWith(2, PHONE)
+  })
+
   it('never forwards GoTrue error.message to the client', async () => {
     vi.mocked(checkLoginSendRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
     const signInWithOtp = vi.fn().mockResolvedValue({

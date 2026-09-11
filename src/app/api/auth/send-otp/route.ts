@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkLoginSendRateLimit, type RateLimitResult } from '@/lib/rate-limit'
+import { stripE164Plus } from '@/lib/phone'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
@@ -26,7 +27,11 @@ export async function POST(request: NextRequest) {
 
   let rateLimit: RateLimitResult
   try {
-    rateLimit = await checkLoginSendRateLimit(phone)
+    // The schema accepts E.164 with or without the leading '+', and the rate-limit
+    // key does no normalization of its own — so '+46...' and '46...' would hash to
+    // two separate buckets, handing a direct API caller double the ceiling. Collapse
+    // to one shape first, exactly as POST /api/officials does for invites.
+    rateLimit = await checkLoginSendRateLimit(stripE164Plus(phone))
   } catch (err) {
     const cause =
       err instanceof Error ? (err.cause as { message?: unknown } | undefined)?.message : undefined
