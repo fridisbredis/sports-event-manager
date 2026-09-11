@@ -5,7 +5,7 @@
 # Takes a full data + schema + roles dump of the PROD Supabase database and
 # uploads it to Azure Blob Storage, so a `destructive` migration (a backfill,
 # a DROP COLUMN) that runs cleanly but against the wrong rows has something
-# to recover from. See F-REL-20 in docs/quality-requirements.md for why this
+# to recover from. See REL-04 in docs/quality-requirements.md for why this
 # exists: PITR is deliberately off (cost), and Supabase Preview Branching was
 # evaluated and rejected as a substitute — a branch replays
 # supabase/migrations/ against a fresh/seeded database, so it verifies

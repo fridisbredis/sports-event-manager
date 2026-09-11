@@ -3,7 +3,7 @@
 # scripts/ops/restore-prod-db.sh
 #
 # Downloads a snapshot created by scripts/ops/snapshot-prod-db.sh and restores
-# it. See F-REL-20 in docs/quality-requirements.md.
+# it. See REL-04 in docs/quality-requirements.md.
 #
 # SAFETY: this script NEVER restores directly to prod. It always restores to
 # a target you name explicitly — the local stack, for a rehearsal
