@@ -41,14 +41,18 @@
 -- fails loudly (42883, function does not exist) instead of silently
 -- resolving to the wrong body.
 --
--- Grant: the only existing grant on this function is `execute ... to
+-- Grant: the only intended grant on this function is `execute ... to
 -- service_role` (0018, re-stated unchanged on every prior signature change
--- in 0045) — never `authenticated`. tenant.ts's confirmOfficialInvite calls
--- it exclusively via the service-role client. A brand-new parameter list is
--- a brand-new catalog object with no inherited ACL, so the revoke/grant
--- pair below is restated for the new 4-arg signature exactly as before —
--- not broadened to `authenticated`, since nothing needs to call this
--- directly from a signed-in user's own session.
+-- in 0045). tenant.ts's confirmOfficialInvite calls it exclusively via the
+-- service-role client — nothing needs to call this directly from a
+-- signed-in user's own session. A brand-new parameter list is a brand-new
+-- catalog object, and Postgres' default ACL for `public` stamps `anon`/
+-- `authenticated` with EXECUTE on every new function there regardless of
+-- this file's `revoke all ... from public` — PUBLIC and named roles are
+-- distinct grants, so revoking from PUBLIC does not touch either. The
+-- revoke/grant pair below explicitly revokes EXECUTE from `anon` and
+-- `authenticated` too, so the ACL matches the stated intent instead of
+-- relying on the WHERE clause to fail closed for those roles.
 --
 -- Forward-fix: replace
 --   Rollback: restore the 3-arg function body verbatim from migration
@@ -200,11 +204,14 @@ comment on function public.confirm_official_invite_by_phone(uuid, text, uuid, bo
   'resolve to the tenant-blind body.';
 
 -- Only service_role calls this (tenant.ts's confirmOfficialInvite, via the
--- service client) — never authenticated directly. A new parameter list is a
--- new catalog object with no inherited ACL, so both statements are restated
--- for the 4-arg signature exactly as 0018/0045 stated them for the prior
--- signatures — not broadened.
+-- service client) — never anon or authenticated directly. A new parameter
+-- list is a new catalog object, and Postgres' default ACL for `public`
+-- grants EXECUTE to `anon`/`authenticated` on every new function created
+-- there; `revoke all ... from public` does not remove those role-specific
+-- grants (PUBLIC and named roles are different things). The explicit
+-- revokes below close that gap so only service_role can call this.
 revoke all on function public.confirm_official_invite_by_phone(uuid, text, uuid, boolean) from public;
+revoke execute on function public.confirm_official_invite_by_phone(uuid, text, uuid, boolean) from anon, authenticated;
 grant execute on function public.confirm_official_invite_by_phone(uuid, text, uuid, boolean) to service_role;
 
 -- ============================================================================
@@ -226,4 +233,10 @@ grant execute on function public.confirm_official_invite_by_phone(uuid, text, uu
 --   select prosrc from pg_proc where proname = 'confirm_official_invite_by_phone';
 --   -- should NOT contain 'order by created_at' or 'limit 1'
 --   -- should contain 'and tenant_id = p_tenant_id'
+--
+--   select p.proacl
+--   from pg_proc p
+--   join pg_namespace n on n.oid = p.pronamespace
+--   where n.nspname = 'public' and p.proname = 'confirm_official_invite_by_phone';
+--   -- should show execute for service_role only — no anon, no authenticated
 -- ============================================================================
