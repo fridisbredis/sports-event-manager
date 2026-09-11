@@ -64,7 +64,8 @@
 --          ALTER TABLE event_stages
 --            ADD CONSTRAINT event_stages_event_id_fkey
 --              FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;
---   Data:     no data loss. This migration adds a constraint and a trigger
+--   Data:     see 20260909133414_pre-migration_2026-09-11T11-32-57Z.tar.gz
+--             no data loss. This migration adds a constraint and a trigger
 --             only; it does not modify any existing row. The composite FK's
 --             ADD CONSTRAINT validates all existing rows against the new
 --             pairing rule, which is why this is classed destructive rather
