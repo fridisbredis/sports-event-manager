@@ -25,7 +25,10 @@ export default async function RootPage() {
   // No roles yet — check if this is an official completing their invite via
   // the phone-fallback path (no invite link visited). SEC-09: consent must be
   // shown before confirmOfficialInvite is called, so route to the
-  // interstitial instead of confirming here directly.
+  // interstitial instead of confirming here directly. This boolean check
+  // doesn't look at expiry — an all-expired invite still lands on
+  // /confirm-invite, which renders its own "invite expired" state, so an
+  // extra redirect hop there is harmless.
   if (user.phone && (await hasPendingOfficialInviteByPhone(user.phone))) {
     redirect('/confirm-invite')
   }
