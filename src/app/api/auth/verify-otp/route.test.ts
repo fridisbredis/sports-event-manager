@@ -103,6 +103,24 @@ describe('POST /api/auth/verify-otp', () => {
     expect(res.status).toBe(200)
   })
 
+  // One shape per number before keying — see send-otp/route.test.ts. Matters more
+  // here than on send: this is the OTP-guess ceiling, so two buckets means twice
+  // as many guesses at a six-digit code.
+  it('strips the + before keying the rate limit, so both spellings share one bucket', async () => {
+    vi.mocked(checkLoginVerifyRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: {
+        verifyOtp: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
+      },
+    } as never)
+
+    await POST(makeRequest({ phone: `+${PHONE}`, token: TOKEN }))
+    await POST(makeRequest({ phone: PHONE, token: TOKEN }))
+
+    expect(checkLoginVerifyRateLimit).toHaveBeenNthCalledWith(1, PHONE)
+    expect(checkLoginVerifyRateLimit).toHaveBeenNthCalledWith(2, PHONE)
+  })
+
   it('never forwards GoTrue error.message to the client', async () => {
     vi.mocked(checkLoginVerifyRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
     const verifyOtp = vi.fn().mockResolvedValue({
