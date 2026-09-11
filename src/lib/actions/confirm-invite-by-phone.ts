@@ -52,5 +52,5 @@ export async function confirmInviteByPhone(
   const tenantSlug = await confirmOfficialInvite(user.id, tenantId, user.phone, privacyAccepted)
   if (!tenantSlug) return { error: 'not_found' }
 
-  redirect(`/${tenantSlug}/assignments`)
+  redirect(`/${tenantSlug}/home`)
 }

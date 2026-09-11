@@ -36,7 +36,7 @@ vi.mock('next/cache', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'or', 'limit', 'is', 'update', 'insert']) {
+  for (const method of ['select', 'eq', 'or', 'limit', 'range', 'is', 'update', 'insert']) {
     builder[method] = vi.fn(() => builder)
   }
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
@@ -408,7 +408,8 @@ describe('getPendingOfficialInvitesByPhone', () => {
     ])
   })
 
-  it('drops a row whose joined tenant is missing rather than returning a partial shape', async () => {
+  it('drops a row whose joined tenant is missing rather than returning a partial shape, and warns', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     mockServiceClientWithOfficialsLookup({
       data: [
         { tenant_id: TENANT_ID, invite_token_expires_at: FUTURE_ISO, tenants: null },
@@ -424,6 +425,13 @@ describe('getPendingOfficialInvitesByPhone', () => {
     expect(await getPendingOfficialInvitesByPhone('0701234567')).toEqual([
       { tenantId: OTHER_TENANT_ID, tenantName: 'Other Club', tenantSlug: 'other-club', expired: false },
     ])
+    // The dropped row's orphaned tenant_id, never the phone number, is what
+    // makes the warning actionable — logging the phone would be pointless
+    // (the other row proves the phone is fine) and is PII this file
+    // otherwise never logs (see the query-error test below).
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(TENANT_ID)
+    )
   })
 
   it('marks a row with a past invite_token_expires_at as expired', async () => {

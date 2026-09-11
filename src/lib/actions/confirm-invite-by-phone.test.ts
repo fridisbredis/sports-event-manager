@@ -79,14 +79,14 @@ describe('confirmInviteByPhone', () => {
     expect(result).toEqual({ error: 'not_found' })
   })
 
-  it('redirects to the tenant assignments page on success, passing tenantId and consent through', async () => {
+  it('redirects to the tenant home page on success, passing tenantId and consent through', async () => {
     mockAuthedUser({ id: 'user-1', phone: '+46701234567' })
     vi.mocked(confirmOfficialInvite).mockResolvedValue('viadal')
 
     await expect(confirmInviteByPhone(TENANT_ID, true)).rejects.toThrow('NEXT_REDIRECT')
 
     expect(confirmOfficialInvite).toHaveBeenCalledWith('user-1', TENANT_ID, '+46701234567', true)
-    expect(redirect).toHaveBeenCalledWith('/viadal/assignments')
+    expect(redirect).toHaveBeenCalledWith('/viadal/home')
   })
 
   // Adversarial: this action is a POST endpoint under the hood (Next.js

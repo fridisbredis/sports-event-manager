@@ -14,15 +14,16 @@ export default function ConfirmInviteForm({ invites }: ConfirmInviteFormProps) {
   const { t } = useTranslation('auth')
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
-  // Auto-selected when there's exactly one pending invite (the common case,
-  // unchanged from before this picker existed); left empty until the user
-  // picks one when there are several, which keeps the confirm button
-  // disabled via the check below.
+  const selectable = invites.filter((invite) => !invite.expired)
+  // Auto-selected only when exactly one invite is actually selectable — an
+  // expired invite can never be confirmed, so auto-selecting it would enable
+  // the confirm button on a request that's guaranteed to fail server-side.
   const [selectedTenantId, setSelectedTenantId] = useState(
-    invites.length === 1 ? invites[0].tenantId : ''
+    selectable.length === 1 ? selectable[0].tenantId : ''
   )
 
   const showPicker = invites.length > 1
+  const allExpired = selectable.length === 0
 
   async function handleConfirm() {
     if (!privacyAccepted || !selectedTenantId) return
@@ -32,6 +33,21 @@ export default function ConfirmInviteForm({ invites }: ConfirmInviteFormProps) {
     if (result?.error) {
       toastError(t('confirmInvite.error'))
     }
+  }
+
+  if (allExpired) {
+    return (
+      <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
+        <div className="flex-1 overflow-y-auto pt-12">
+          <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmInvite.title')}</h1>
+          <hr className="border-dashed border-gray-200 mb-8" />
+          <p className="text-sm font-medium text-gray-900 mb-2">
+            {t('confirmInvite.expiredStateTitle')}
+          </p>
+          <p className="text-sm text-gray-500">{t('confirmInvite.expiredStateMessage')}</p>
+        </div>
+      </main>
+    )
   }
 
   return (

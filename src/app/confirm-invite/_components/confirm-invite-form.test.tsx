@@ -55,6 +55,15 @@ const MULTIPLE_INVITES_WITH_EXPIRED: PendingOfficialInvite[] = [
   },
 ]
 
+const SINGLE_EXPIRED_INVITE: PendingOfficialInvite[] = [
+  { ...SINGLE_INVITE[0], expired: true },
+]
+
+const ALL_EXPIRED_INVITES: PendingOfficialInvite[] = [
+  { ...MULTIPLE_INVITES_WITH_EXPIRED[0], expired: true },
+  MULTIPLE_INVITES_WITH_EXPIRED[1],
+]
+
 // The privacy prefix text sits next to a separate <a> link inside the same
 // button, so an exact-string getByText match would fail — this matches the
 // <span> wrapper by its own (non-exact) text instead. A real click on it
@@ -130,7 +139,29 @@ describe('ConfirmInviteForm', () => {
     fireEvent.click(expiredOption)
     acceptPrivacy()
 
-    expect(screen.getByText('confirmInvite.confirmButton')).toBeDisabled()
+    // Only one non-expired invite exists here, so it's auto-selected (same
+    // rule as the single-invite case) — clicking the disabled expired option
+    // is a no-op rather than something that needs to un-fill the selection.
+    expect(screen.getByText('confirmInvite.confirmButton')).not.toBeDisabled()
+  })
+
+  it('keeps confirm disabled when the only pending invite is expired', () => {
+    render(<ConfirmInviteForm invites={SINGLE_EXPIRED_INVITE} />)
+
+    expect(screen.getByText('confirmInvite.expiredStateTitle')).toBeInTheDocument()
+    expect(screen.getByText('confirmInvite.expiredStateMessage')).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.queryByText('confirmation.privacyCheckPrefix')).not.toBeInTheDocument()
+    expect(screen.queryByText('confirmInvite.confirmButton')).not.toBeInTheDocument()
+  })
+
+  it('shows the expired state when every pending invite is expired', () => {
+    render(<ConfirmInviteForm invites={ALL_EXPIRED_INVITES} />)
+
+    expect(screen.getByText('confirmInvite.expiredStateTitle')).toBeInTheDocument()
+    expect(screen.getByText('confirmInvite.expiredStateMessage')).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.queryByText('confirmInvite.confirmButton')).not.toBeInTheDocument()
   })
 
   it('shows an error toast when confirmInviteByPhone resolves with an error', async () => {

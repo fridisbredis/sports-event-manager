@@ -6,9 +6,15 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { adminDashboardCacheTag, officialHomeCacheTag } from '@/lib/cache/tags'
 import { logger } from '@/lib/logger'
+import { checkReadCeiling } from '@/lib/db/bounded-read'
 import type { User } from '@supabase/supabase-js'
 
 const tenantIdSchema = z.string().uuid()
+
+// Same ceiling used for other admin-facing lists (admin/officials, (system)/admin) —
+// a phone shouldn't have invited-rows in more tenants than the platform has, so this
+// is a data-integrity trip-wire rather than a real-world limit.
+const PENDING_INVITE_CEILING = 500
 
 export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'participant'
 
@@ -93,11 +99,14 @@ export type PendingOfficialInvite = {
 // has an 'invited' officials row for it. Used by /confirm-invite to decide
 // between auto-selecting the one tenant (exactly one result) and rendering
 // a picker (two or more) — hasPendingOfficialInviteByPhone (above) is kept
-// unchanged for the root page's cheap boolean redirect-gate check, since it
-// doesn't need tenant names. Expired invites are still included (not
-// filtered out) but flagged via `expired: true`, computed with the same
-// semantics as confirm_official_invite_by_phone (20260910145957) — null or
-// past invite_token_expires_at — so the picker can disable them instead of
+// unchanged for the root page's cheap boolean redirect-gate check: it doesn't
+// need tenant names, and it also doesn't need to know about expiry, since an
+// all-expired invite still routes to /confirm-invite, which renders its own
+// "invite expired" state rather than confirming anything. Expired invites
+// from this function are still included (not filtered out) but flagged via
+// `expired: true`, computed with the same semantics as
+// confirm_official_invite_by_phone (20260910145957) — null or past
+// invite_token_expires_at — so the picker can disable them instead of
 // letting the user pick one that will fail with 'expired' at confirm time.
 export async function getPendingOfficialInvitesByPhone(
   phone: string
@@ -108,15 +117,27 @@ export async function getPendingOfficialInvitesByPhone(
     .select('tenant_id, invite_token_expires_at, tenants(name, slug)')
     .eq('phone', phone)
     .eq('invite_status', 'invited')
+    .range(0, PENDING_INVITE_CEILING)
 
   if (error) {
     logger.error('Failed to fetch pending phone-fallback official invites', error)
     return []
   }
 
-  return (data ?? []).flatMap((row) => {
+  const rows = checkReadCeiling(data ?? [], {
+    ceiling: PENDING_INVITE_CEILING,
+    page: 'confirm-invite',
+    message: 'Pending phone-fallback invite list hit its read ceiling — later invites are missing',
+  })
+
+  return rows.flatMap((row) => {
     const tenant = row.tenants as { name: string; slug: string } | null
-    if (!tenant) return []
+    if (!tenant) {
+      logger.warn('Pending phone-fallback invite row has no matching tenant — dropping it', {
+        tenantId: row.tenant_id,
+      })
+      return []
+    }
     const expired = !row.invite_token_expires_at || new Date(row.invite_token_expires_at) <= new Date()
     return [
       { tenantId: row.tenant_id, tenantName: tenant.name, tenantSlug: tenant.slug, expired },
@@ -168,11 +189,9 @@ export async function confirmOfficialInvite(
   // (official)/[tenantSlug]/home/page.tsx keyed on their own user_id — so a
   // stale window would serve that user the pre-confirm shape of their own
   // write.
-  // Unlike the token-flow confirm route, this path does NOT redirect to
-  // /home: the only caller (actions/confirm-invite-by-phone.ts) redirects to
-  // `/${tenantSlug}/assignments`, which has no route under
-  // (official)/[tenantSlug]/. That is a separate pre-existing defect; the
-  // invalidation is still correct for whenever /home is next loaded.
+  // The only caller (actions/confirm-invite-by-phone.ts) redirects to
+  // `/${tenantSlug}/home` right after this call, so this invalidation is
+  // read-your-own-writes for the page the user lands on immediately.
   revalidateTag(officialHomeCacheTag(tenantId, userId), { expire: 0 })
 
   // PERF-06 / F-PERF-04 Phase 3: the same invite_status flip also moves one
