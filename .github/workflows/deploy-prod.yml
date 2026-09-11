@@ -92,7 +92,16 @@ jobs:
               # header), only that a human ran it and pasted the filename,
               # which is the point: it forces the manual step to have
               # already happened before this push can proceed.
-              if grep -qE '^--[[:space:]]*Data:.*[0-9]{4}_pre-migration_[0-9TZ:-]+\.tar\.gz' "$file"; then
+              #
+              # {4,14} covers both migration naming schemes: the legacy
+              # 00NN numbers (0001-0058) and the YYYYMMDDHHMMSS timestamps
+              # used from 0059 onward (see .claude/CLAUDE.md "Migration
+              # naming"). snapshot-prod-db.sh passes the version prefix
+              # through verbatim into the filename, so a timestamp-named
+              # migration produces a 14-digit prefix. The original {4} was
+              # written before that switch and rejected every
+              # timestamp-named snapshot.
+              if grep -qE '^--[[:space:]]*Data:.*[0-9]{4,14}_pre-migration_[0-9TZ:-]+\.tar\.gz' "$file"; then
                 echo "OK   $file — snapshot filename present"
               else
                 echo "FAIL $file — destructive migration with no snapshot filename in its Data: line"
