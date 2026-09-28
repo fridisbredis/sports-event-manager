@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { LogOut } from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { LogoutButton } from '@/components/logout-button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
@@ -101,7 +103,11 @@ export default function AccountForm({
           </div>
         </div>
       )}
-      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-24'}>
+      {/* Mobile bottom padding clears both the tab bar (64px) and the fixed
+          Save bar that sits on top of it (~60px with its padding) — pb-24
+          was sized before the log-out button existed and left it partly
+          underneath. */}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-40'}>
         {/* Avatar */}
         <div className="flex justify-center mb-6">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-status-neutral-bg">
@@ -194,6 +200,15 @@ export default function AccountForm({
             </Link>
           </>
         )}
+
+        {/* Signing out is a destructive-ish account action rather than a
+            navigation, so it sits apart from the cards above and outside the
+            tab bar's five slots. The admin surfaces put it at the foot of the
+            sidebar; this is the equivalent place on a screen that has none. */}
+        <LogoutButton className="flex w-full items-center justify-center gap-2 rounded-control border-1 border-edge bg-white px-4 py-3 text-[15px] font-semibold text-ink-soft transition-colors hover:border-edge-field hover:text-ink">
+          <LogOut className="size-4 shrink-0" strokeWidth={2} />
+          {t('account.logOut')}
+        </LogoutButton>
       </div>
 
       {/* Mobile: Save button fixed at bottom above tab bar */}

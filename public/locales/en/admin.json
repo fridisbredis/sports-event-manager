@@ -312,7 +312,8 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",
-    "saveError": "Something went wrong. Please try again."
+    "saveError": "Something went wrong. Please try again.",
+    "logOut": "Log out"
   },
   "adminAccount": {
     "title": "Account",
