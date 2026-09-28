@@ -250,12 +250,18 @@ export default function EventConfigForm({
 
       {/* Two-column layout.
 
-          auto-fit + minmax(480px, 1fr) rather than a fixed ratio: the columns
-          hold their full width and drop to a single column the moment both no
-          longer fit, instead of squeezing progressively and wrapping content
-          inside the cards on the way down. 480px is the width below which the
-          Schedule & setup stage rows start wrapping. */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(480px,1fr))] items-start gap-7">
+          auto-fit + minmax rather than a fixed ratio: the columns hold their
+          width and drop to a single column the moment both no longer fit,
+          instead of squeezing progressively and wrapping content inside the
+          cards on the way down.
+
+          380px, not the prototype's 480px. The stage row's fixed parts (expand
+          toggle, type badge, Edit/Delete) measure ~210px together, so 380px
+          leaves the stage name ~170px before anything is forced to wrap — and
+          the admin content area is the viewport less a 224px sidebar and 64px
+          of padding, so a 480px floor would hold the layout at one column until
+          ~1210px even though two fit comfortably well below that. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] items-start gap-7">
         {/* Left: Identity */}
         <section>
           <h2 className="section-label mb-5">{t('eventConfig.identity')}</h2>

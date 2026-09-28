@@ -239,7 +239,13 @@ export default function OfficialsList({
                     <Chip
                       size="sm"
                       variant="flat"
-                      color={official.invite_status === 'confirmed' ? 'default' : 'warning'}
+                      // Exact badge colours from the design handoff, which
+                      // HeroUI's `default`/`warning` palettes do not match.
+                      style={
+                        official.invite_status === 'confirmed'
+                          ? { backgroundColor: '#DCF3E4', color: '#14532D' }
+                          : { backgroundColor: '#FEF3C7', color: '#78350F' }
+                      }
                     >
                       {official.invite_status === 'confirmed'
                         ? t('officials.confirmed')
