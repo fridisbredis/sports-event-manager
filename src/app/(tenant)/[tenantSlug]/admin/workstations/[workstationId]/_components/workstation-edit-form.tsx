@@ -280,9 +280,7 @@ export default function WorkstationEditForm({
           >
             {t('workstations.backToList')}
           </Button>
-          <h1 className="text-2xl font-semibold text-gray-900">
-            {name || t('workstations.namePlaceholder')}
-          </h1>
+          <h1 className="page-title">{name || t('workstations.namePlaceholder')}</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button color="danger" variant="light" onPress={handleDelete} isDisabled={isBusy}>

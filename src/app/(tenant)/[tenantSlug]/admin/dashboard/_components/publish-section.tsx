@@ -31,10 +31,16 @@ export async function PublishSection({
   }
 
   return (
-    <SectionCard>
+    <SectionCard className={isPublished ? 'card-accent-success' : undefined}>
       <h2 className="section-label mb-4">{t('dashboard.publishStatus')}</h2>
       {isPublished ? (
-        <p className="text-sm text-gray-700">{t('dashboard.publishedVisible')}</p>
+        <p className="flex items-center gap-2.5 text-[15px] text-ink-soft">
+          <span
+            aria-hidden="true"
+            className="h-2.5 w-2.5 shrink-0 rounded-full bg-status-ok-dot ring-[3px] ring-status-ok-bg"
+          />
+          {t('dashboard.publishedVisible')}
+        </p>
       ) : canPublish ? (
         <>
           <p className="text-sm text-gray-700 mb-5">{t('dashboard.draftNotVisible')}</p>

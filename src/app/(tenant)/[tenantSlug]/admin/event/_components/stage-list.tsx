@@ -157,8 +157,10 @@ export default function StageList({ stages, onChange }: Props) {
           </span>
           <Button
             type="button"
+            variant="bordered"
+            size="sm"
             onPress={openAdd}
-            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-md px-3 py-1.5 bg-white hover:border-gray-300 transition-colors"
+            className="rounded-control border-tenant-primary bg-white px-4 font-semibold text-tenant-primary"
           >
             {t('eventConfig.addStage')}
           </Button>
@@ -187,16 +189,16 @@ export default function StageList({ stages, onChange }: Props) {
                   </Button>
 
                   {/* Name */}
-                  <span className="flex-1 text-sm font-medium text-gray-900 truncate min-w-0">
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink">
                     {stage.name || '—'}
                   </span>
 
                   {/* Type badge */}
                   <span
-                    className={`shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                    className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
                       stage.stage_type === 'race'
-                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
-                        : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
+                        ? 'bg-tenant-accent-tint text-tenant-accent-tint-text'
+                        : 'bg-status-neutral-bg text-status-neutral-text'
                     }`}
                   >
                     {stage.stage_type === 'race'
@@ -205,13 +207,18 @@ export default function StageList({ stages, onChange }: Props) {
                   </span>
 
                   {/* Time range */}
-                  <span className="shrink-0 whitespace-nowrap text-xs text-gray-400 tabular-nums text-right">
+                  <span className="shrink-0 whitespace-nowrap text-right text-[13px] text-ink-muted tabular-nums">
                     {formatTimeRange(stage.start_time, stage.end_time)}
                   </span>
 
                   {/* Actions */}
                   <div className="shrink-0 flex items-center gap-1">
-                    <Button size="sm" variant="light" onPress={() => openEdit(i)}>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      onPress={() => openEdit(i)}
+                      className="font-medium text-tenant-primary-tint-text"
+                    >
                       {t('actions.edit')}
                     </Button>
                     <Button
@@ -220,6 +227,7 @@ export default function StageList({ stages, onChange }: Props) {
                       variant="light"
                       color="danger"
                       onPress={() => handleDelete(i)}
+                      className="font-medium text-danger-text"
                       isDisabled={isLastRace}
                       title={
                         isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')

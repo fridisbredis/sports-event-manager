@@ -22,6 +22,18 @@
     background-color: #f7f8fa;
   }
 
+  /* Page title. The handoff specifies 28-30px at weight 800 with tight
+     tracking — noticeably heavier than the 600 used before, which is what
+     gives the admin pages their headline. */
+  .page-title {
+    font-family: theme('fontFamily.display');
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: theme('letterSpacing.tight');
+    color: theme('colors.ink.DEFAULT');
+    line-height: 1.15;
+  }
+
   /* Uppercase section label — "IDENTITY", "STAGES", "PUBLISH STATUS". */
   .section-label {
     font-family: theme('fontFamily.display');
@@ -33,13 +45,21 @@
   }
 
   /* The faint top accent line on cards. 28% strength, not a bold stripe. */
-  .card-accent-primary {
+  .card-accent-primary.card-accent-primary {
     box-shadow:
       theme('boxShadow.card'),
       inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white);
   }
 
-  .card-accent-secondary {
+  /* Publish status is a health signal, so its accent is fixed green rather
+     than the tenant's theme colour. */
+  .card-accent-success.card-accent-success {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 0 2px 0 rgba(21, 128, 61, 0.45);
+  }
+
+  .card-accent-secondary.card-accent-secondary {
     box-shadow:
       theme('boxShadow.card'),
       inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-secondary)) 28%, white);

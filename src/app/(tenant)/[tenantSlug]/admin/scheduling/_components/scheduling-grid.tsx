@@ -401,7 +401,7 @@ export function SchedulingGrid({
 
       {/* Print-only header — replaces the interactive chrome when printing */}
       <div className="print-only mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
+        <h1 className="page-title">{t('scheduling.title')}</h1>
         <p className="text-sm text-gray-600">
           {selectedStage?.name}
           {selectedDay ? ` — ${formatDayLabel(selectedDay)}` : ''}
@@ -410,7 +410,7 @@ export function SchedulingGrid({
 
       {/* Header */}
       <div className="no-print flex items-center gap-4 mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
+        <h1 className="page-title">{t('scheduling.title')}</h1>
 
         <div className="flex-1" />
 

@@ -187,7 +187,7 @@ export default function OfficialsList({
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">{t('officials.title')}</h1>
+        <h1 className="page-title">{t('officials.title')}</h1>
         <Button color="primary" onPress={() => setAddModalOpen(true)}>
           {t('officials.add')}
         </Button>
@@ -241,10 +241,10 @@ export default function OfficialsList({
                       variant="flat"
                       // Exact badge colours from the design handoff, which
                       // HeroUI's `default`/`warning` palettes do not match.
-                      style={
+                      className={
                         official.invite_status === 'confirmed'
-                          ? { backgroundColor: '#DCF3E4', color: '#14532D' }
-                          : { backgroundColor: '#FEF3C7', color: '#78350F' }
+                          ? 'bg-status-ok-bg text-status-ok-text'
+                          : 'bg-status-pending-bg text-status-pending-text'
                       }
                     >
                       {official.invite_status === 'confirmed'

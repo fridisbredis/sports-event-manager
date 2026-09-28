@@ -44,6 +44,20 @@ const config: Config = {
           DEFAULT: '#E3E6EB', // dividers, card borders
           soft: '#EEF0F3', // lighter dividers
         },
+        // Status colours from the handoff. Tenant-independent on purpose: a
+        // published/confirmed badge must read the same in every theme, since
+        // it reports state rather than branding.
+        status: {
+          'ok-bg': '#DCF3E4',
+          'ok-text': '#14532D',
+          'ok-dot': '#15803D',
+          'pending-bg': '#FEF3C7',
+          'pending-text': '#78350F',
+          'ok-border': '#9FD4B2',
+          'ok-soft': '#F0FAF3',
+          'neutral-bg': '#F1F3F6',
+          'neutral-text': '#4B5563',
+        },
         danger: {
           text: '#B91C1C', // destructive list actions
           solid: '#BE123C', // destructive modal button

@@ -220,7 +220,7 @@ export default function WorkstationForm({
           >
             {t('workstations.backToList')}
           </Button>
-          <h1 className="text-2xl font-semibold text-gray-900">{t('workstations.addTitle')}</h1>
+          <h1 className="page-title">{t('workstations.addTitle')}</h1>
         </div>
         <Button
           color={saveSuccess ? 'success' : 'primary'}

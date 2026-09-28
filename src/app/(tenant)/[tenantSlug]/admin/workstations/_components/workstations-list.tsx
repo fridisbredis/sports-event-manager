@@ -219,7 +219,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
   if (stages.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('workstations.title')}</h1>
+        <h1 className="page-title mb-6">{t('workstations.title')}</h1>
         <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
           <svg
             className="mb-4 h-12 w-12 text-gray-300"
@@ -244,7 +244,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('workstations.title')}</h1>
+      <h1 className="page-title mb-6">{t('workstations.title')}</h1>
       <Accordion variant="splitted" defaultExpandedKeys={stages.map((s) => s.id)}>
         {stages.map((stage) => (
           <AccordionItem

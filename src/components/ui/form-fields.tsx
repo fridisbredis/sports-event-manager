@@ -21,7 +21,10 @@ import {
 // also renders a `border-medium` (2px) border and a `shadow-sm` by default
 // — thinned to `border-1` and dropped to match the app's flatter 1px-border
 // style elsewhere.
-const WHITE_FIELD = 'bg-white border-1 shadow-none'
+// The border colour is the design handoff's #8C94A1 (`edge-field`), chosen to
+// clear WCAG 3:1 against white for a UI boundary — HeroUI's own default is
+// lighter than that and does not.
+const WHITE_FIELD = 'bg-white border-1 border-edge-field shadow-none'
 
 export function Input(props: InputProps) {
   return (

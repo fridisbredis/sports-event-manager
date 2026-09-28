@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { Chip, Card, CardBody } from '@heroui/react'
+import { Chip } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import {
@@ -214,19 +215,29 @@ export default function EventConfigForm({
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-gray-900">{t('eventConfig.title')}</h1>
-          <Chip color={isPublished ? 'success' : 'warning'} variant="flat" size="sm">
+          <h1 className="page-title">{t('eventConfig.title')}</h1>
+          <Chip
+            variant="flat"
+            size="sm"
+            // Exact published/draft colours from the design handoff; HeroUI's
+            // success/warning palettes are a different green and amber.
+            className={
+              isPublished
+                ? 'bg-status-ok-bg text-status-ok-text'
+                : 'bg-status-pending-bg text-status-pending-text'
+            }
+          >
             {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
           </Chip>
         </div>
         <div className="flex items-center gap-3">
           <Button
-            variant="bordered"
             onPress={handleSave}
             isDisabled={isSaving || isPublishing || isUploading}
             isLoading={isSaving}
-            color={saveSuccess && !isSaving ? 'success' : 'default'}
-            size="sm"
+            // Save is the page's primary action and reads as a solid themed
+            // button; the transient "Saved" confirmation still turns green.
+            color={saveSuccess && !isSaving ? 'success' : 'primary'}
           >
             {isSaving
               ? t('eventConfig.saving')
@@ -240,7 +251,6 @@ export default function EventConfigForm({
               onPress={handlePublish}
               isDisabled={isSaving || isPublishing}
               isLoading={isPublishing}
-              size="sm"
             >
               {isPublishing ? t('eventConfig.publishing') : t('eventConfig.publish')}
             </Button>
@@ -265,108 +275,104 @@ export default function EventConfigForm({
         {/* Left: Identity */}
         <section>
           <h2 className="section-label mb-5">{t('eventConfig.identity')}</h2>
-          <Card>
-            <CardBody className="p-6 space-y-4">
-              <LogoUploadField
-                logoUrl={logoUrl}
-                logoError={logoError}
-                isUploading={isUploading}
-                uploadError={uploadError}
-                fileInputRef={fileInputRef}
-                onFileChange={handleLogoFileChange}
-                onImageError={() => setLogoError(true)}
-                onRemove={() => {
-                  setLogoUrl('')
-                  setLogoError(false)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-              />
+          <AppCard className="card-accent-primary" bodyClassName="space-y-4 p-6">
+            <LogoUploadField
+              logoUrl={logoUrl}
+              logoError={logoError}
+              isUploading={isUploading}
+              uploadError={uploadError}
+              fileInputRef={fileInputRef}
+              onFileChange={handleLogoFileChange}
+              onImageError={() => setLogoError(true)}
+              onRemove={() => {
+                setLogoUrl('')
+                setLogoError(false)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+            />
 
-              <ColorPalettePicker
-                colorPalette={colorPalette}
-                isSavingPalette={isSavingPalette}
-                paletteError={paletteError}
-                onSelect={handleColorPaletteSelect}
-              />
+            <ColorPalettePicker
+              colorPalette={colorPalette}
+              isSavingPalette={isSavingPalette}
+              paletteError={paletteError}
+              onSelect={handleColorPaletteSelect}
+            />
 
-              <Input
-                label={t('eventConfig.eventName')}
-                isRequired
-                value={name}
-                onValueChange={(val) => {
-                  setName(val)
-                  setSaveSuccess(false)
-                  markDirty()
-                  if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
-                }}
-                placeholder={t('eventConfig.eventNamePlaceholder')}
-                isInvalid={!!errors.name}
-                errorMessage={errors.name}
-              />
+            <Input
+              label={t('eventConfig.eventName')}
+              isRequired
+              value={name}
+              onValueChange={(val) => {
+                setName(val)
+                setSaveSuccess(false)
+                markDirty()
+                if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
+              }}
+              placeholder={t('eventConfig.eventNamePlaceholder')}
+              isInvalid={!!errors.name}
+              errorMessage={errors.name}
+            />
 
-              <Input
-                label={t('eventConfig.type')}
-                value={eventType}
-                onValueChange={(val) => {
-                  setEventType(val)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-                placeholder={t('eventConfig.typePlaceholder')}
-              />
+            <Input
+              label={t('eventConfig.type')}
+              value={eventType}
+              onValueChange={(val) => {
+                setEventType(val)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+              placeholder={t('eventConfig.typePlaceholder')}
+            />
 
-              <Textarea
-                label={t('eventConfig.description')}
-                value={description}
-                onValueChange={(val) => {
-                  setDescription(val)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-                minRows={4}
-                placeholder={t('eventConfig.descriptionPlaceholder')}
-              />
+            <Textarea
+              label={t('eventConfig.description')}
+              value={description}
+              onValueChange={(val) => {
+                setDescription(val)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+              minRows={4}
+              placeholder={t('eventConfig.descriptionPlaceholder')}
+            />
 
-              <DatesAndGranularitySection
-                isPublished={isPublished}
-                dateRangeLabel={derivedDateRange(stages)}
-                granularity={granularity}
-                onGranularityChange={(minutes) => {
-                  setGranularity(minutes)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-              />
+            <DatesAndGranularitySection
+              isPublished={isPublished}
+              dateRangeLabel={derivedDateRange(stages)}
+              granularity={granularity}
+              onGranularityChange={(minutes) => {
+                setGranularity(minutes)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+            />
 
-              <FacilitiesEditor
-                facilities={facilities}
-                facilityInput={facilityInput}
-                onFacilityInputChange={setFacilityInput}
-                onKeyDown={handleFacilityKeyDown}
-                onRemoveFacility={removeFacility}
-              />
-            </CardBody>
-          </Card>
+            <FacilitiesEditor
+              facilities={facilities}
+              facilityInput={facilityInput}
+              onFacilityInputChange={setFacilityInput}
+              onKeyDown={handleFacilityKeyDown}
+              onRemoveFacility={removeFacility}
+            />
+          </AppCard>
         </section>
 
         {/* Right: Schedule & Setup */}
         <section>
           <h2 className="section-label mb-5">{t('eventConfig.scheduleSetup')}</h2>
-          <Card>
-            <CardBody className="p-0">
-              {/* Stages */}
-              <StageList
-                stages={stages}
-                onChange={(updated) => {
-                  setStages(updated)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-              />
-              {errors.stages && <p className="text-xs text-red-500 px-6 pb-4">{errors.stages}</p>}
-            </CardBody>
-          </Card>
+          <AppCard className="card-accent-primary" bodyClassName="p-0">
+            {/* Stages */}
+            <StageList
+              stages={stages}
+              onChange={(updated) => {
+                setStages(updated)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+            />
+            {errors.stages && <p className="text-xs text-red-500 px-6 pb-4">{errors.stages}</p>}
+          </AppCard>
         </section>
       </div>
     </div>

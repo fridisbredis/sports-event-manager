@@ -235,7 +235,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
       <div className="max-w-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">{t('communication.title')}</h1>
+          <h1 className="page-title">{t('communication.title')}</h1>
         </div>
 
         {/* Channel toggle */}

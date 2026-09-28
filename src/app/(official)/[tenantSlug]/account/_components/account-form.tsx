@@ -88,7 +88,7 @@ export default function AccountForm({
     <>
       {isDesktop && (
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-xl font-semibold text-gray-900">{t('account.title')}</h1>
+          <h1 className="page-title">{t('account.title')}</h1>
           <div className="flex items-center gap-3">
             <Button
               type="button"

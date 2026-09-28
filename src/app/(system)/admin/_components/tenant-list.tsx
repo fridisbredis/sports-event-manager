@@ -45,7 +45,7 @@ export function TenantList({ tenants }: Props) {
     <>
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">{t('systemAdmin.tenants')}</h1>
+          <h1 className="page-title">{t('systemAdmin.tenants')}</h1>
           <div className="flex items-center gap-4">
             <Link href="/admin/health" className="text-sm text-blue-600 hover:underline">
               {t('systemAdmin.systemStatus')}
