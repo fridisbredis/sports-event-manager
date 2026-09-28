@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { Chip } from '@heroui/react'
 import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +25,7 @@ import { DatesAndGranularitySection } from './dates-and-granularity-section'
 import { FacilitiesEditor } from './facilities-editor'
 import { derivedDateRange } from '../_utils'
 import type { TenantPaletteKey } from '@/lib/theme/tenant-colors'
+import { tenantThemeVars } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
   tenantSlug: string
@@ -72,8 +72,6 @@ export default function EventConfigForm({
   const location = initialLocation
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
-  const router = useRouter()
-
   const [colorPalette, setColorPalette] = useState(initialColorPalette)
 
   // The palette saves on click and the server then revalidates this route, so
@@ -83,12 +81,20 @@ export default function EventConfigForm({
   // — the selection appears to snap back to the previously stored colour.
   // Re-seeding during render (rather than in an effect) applies the new value
   // before the user ever sees a frame with the stale one.
+  // What the database currently holds, as opposed to what is being previewed.
+  // Save compares the two to decide whether the tenant row needs writing at
+  // all, and a failed palette write rolls the preview back to this.
+  const [savedPalette, setSavedPalette] = useState(initialColorPalette)
+
+  // A fresh server payload (after a save, or any revalidate of this route)
+  // re-seeds both: useState alone keeps its mount-time value forever, which
+  // would leave the picker showing a palette the database no longer holds.
   const [renderedPalette, setRenderedPalette] = useState(initialColorPalette)
   if (renderedPalette !== initialColorPalette) {
     setRenderedPalette(initialColorPalette)
+    setSavedPalette(initialColorPalette)
     setColorPalette(initialColorPalette)
   }
-  const [isSavingPalette, startPaletteSave] = useTransition()
   const [paletteError, setPaletteError] = useState<string | undefined>()
   const [granularity, setGranularity] = useState(initialGranularity)
   const [stages, setStages] = useState<StageInput[]>(initialStages)
@@ -141,26 +147,29 @@ export default function EventConfigForm({
     }
   }
 
+  // Repaint the theme straight onto :root. TenantThemeStyle is a server
+  // component — it emits its <style> when the layout renders, so on its own the
+  // colour could not change until the server re-rendered, which meant waiting
+  // on a round trip to see the choice. Setting the variables here makes the
+  // preview immediate; the server's own <style> takes over unchanged on the
+  // next render, because it resolves to exactly these values.
+  function paintTheme(key: string) {
+    const root = document.documentElement
+    for (const [name, value] of tenantThemeVars(key)) {
+      root.style.setProperty(name, value)
+    }
+  }
+
+  // Picking a palette only previews it. The choice is written when the form is
+  // saved, like every other field here — so a palette tried on and abandoned
+  // leaves nothing behind, and the unsaved-changes guard can warn about it.
   function handleColorPaletteSelect(key: TenantPaletteKey) {
-    if (key === colorPalette || isSavingPalette) return
-    const previous = colorPalette
+    if (key === colorPalette) return
     setColorPalette(key)
+    paintTheme(key)
     setPaletteError(undefined)
-    startPaletteSave(async () => {
-      const result = await updateTenantColorPalette(tenantSlug, tenantId, key)
-      if (result.error) {
-        setColorPalette(previous)
-        setPaletteError(t('eventConfig.colorThemeError'))
-        toastError(t('eventConfig.colorThemeError'))
-        return
-      }
-      // The action revalidates the layout server-side, but that only marks the
-      // cache stale — nothing pulls the new render into this already-mounted
-      // page. Without this refresh the theme variables the layout emits stay on
-      // whatever they were at page load, so the swatch updates while the rest
-      // of the UI keeps the old colour until a hard reload.
-      router.refresh()
-    })
+    setSaveSuccess(false)
+    markDirty()
   }
 
   function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -208,10 +217,33 @@ export default function EventConfigForm({
       const result = await saveEvent(buildInput())
       if (result.error) {
         toastError(result.error)
-      } else {
-        setSaveSuccess(true)
-        markClean()
+        return
       }
+
+      // The palette lives on the tenant, not the event, so it is a separate
+      // write — but it belongs to the same Save press. Only sent when it
+      // actually changed, to keep an unrelated save off the tenants table.
+      if (colorPalette !== savedPalette) {
+        const paletteResult = await updateTenantColorPalette(
+          tenantSlug,
+          tenantId,
+          colorPalette as TenantPaletteKey
+        )
+        if (paletteResult.error) {
+          // The event saved; only the theme did not. Put the preview back to
+          // what is actually stored so the page does not claim a colour the
+          // database never took.
+          setColorPalette(savedPalette)
+          paintTheme(savedPalette)
+          setPaletteError(t('eventConfig.colorThemeError'))
+          toastError(t('eventConfig.colorThemeError'))
+          return
+        }
+        setSavedPalette(colorPalette)
+      }
+
+      setSaveSuccess(true)
+      markClean()
     })
   }
 
@@ -317,7 +349,7 @@ export default function EventConfigForm({
 
             <ColorPalettePicker
               colorPalette={colorPalette}
-              isSavingPalette={isSavingPalette}
+              isSavingPalette={isSaving}
               paletteError={paletteError}
               onSelect={handleColorPaletteSelect}
             />
