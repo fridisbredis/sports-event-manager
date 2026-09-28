@@ -44,7 +44,8 @@
 --                 and o.created_at >= '<this migration's run time>';
 --             The created_at bound is what protects Peter's and Lotta's
 --             2026-07-07 rows, which this migration must not touch.
---   Data:     no data loss. Only inserts. The snapshot of what existed
+--   Data:     restore with scripts/ops/restore-prod-db.sh 20260911130546_pre-migration_2026-09-28T07-33-53Z.tar.gz
+--             no data loss. Only inserts. The snapshot of what existed
 --             before is the query recorded below, run on prod
 --             2026-09-11: exactly one admin (c68f9235-1469-42b5-bbb7-f52ad81b256c,
 --             viadal-2026) lacked a row; the other two already had one.
