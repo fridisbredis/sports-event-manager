@@ -141,8 +141,29 @@ closer to the decision's wording and is probably required anyway, since
 Ticketed as F-MNT-20 in `docs/quality-requirements.md` after Eduardo pointed out
 in review of PR #177 that this lived only in a test document and so had no owner.
 
-The tests assert today's behaviour and carry the discrepancy in a comment, so
-the gap stays visible without the suite going red.
+**Resolved 2026-09-11** (migrations `20260911130436_ensure_admin_roster_row_rpc.sql`
+and `20260911130546_backfill_admin_roster_rows.sql`; not yet applied to dev or
+prod). The "how" is settled: a real `officials` row, written by an
+`ensure_admin_roster_row` RPC. Two things in the write-up above turned out to be
+wrong once measured, and are worth recording:
+
+- **Not tenant creation.** `create_tenant_with_defaults` is called by a
+  _system_admin_ and grants tenant_admin to nobody, so no admin exists to write a
+  row for at that point. No application code path grants tenant_admin at all —
+  only `scripts/seed-dev.ts` and manual DB work — so the row belongs to the
+  role-grant moment, and the RPC waits for the SYS-02 flow that will make that
+  reachable in-app.
+- **Not 5 tenants.** Only viadal-2026 has any tenant_admin, and 2 of its 3 admins
+  already held confirmed rows created through the ordinary invite flow on
+  2026-07-07 — Peter and Lotta had worked around this by hand, which is probably
+  why it was never reported as a live bug. The backfill inserts exactly one row.
+
+The FK suspicion was right: synthesising on read would not have fixed SCHED-01,
+since `assignments.official_id` needs a row to point at. Verified by assigning the
+seeded admin to a work area on the local stack.
+
+The three assertions that carried this discrepancy now assert presence instead of
+absence.
 
 ### F5 — Permission matrix holds
 
@@ -271,9 +292,13 @@ path — worth resolving as part of this.
 ---
 
 **[BUG] Event admin missing from the officials roster, unschedulable, 404s on their own account screen**
-Priority: Medium — ticketed as F-MNT-20
+Priority: Medium — ticketed as F-MNT-20 — **RESOLVED 2026-09-11, pending dev/prod apply**
 
-See F4. Peter decided (2026-06-24) that an admin is always schedulable and
+See F4 for what was actually done, including two corrections to the plan below:
+the row belongs to the role-grant moment rather than to tenant creation, and the
+prod backfill is one row, not five tenants.
+
+Original description: Peter decided (2026-06-24) that an admin is always schedulable and
 appears on the roster automatically as implicitly Confirmed. Not implemented:
 the tenant admin has a `user_roles` row but no `officials` row, so OFF-01 omits
 them, `/{slug}/account` returns 404, and SCHED-01's Confirmed-only pool excludes
