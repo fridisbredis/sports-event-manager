@@ -3,17 +3,24 @@
 -- ============================================================================
 --
 -- Part of the admin-dashboard color update
--- (docs/design_handoff_admin_dashboard/). That round re-themed the UI with a
--- WCAG 2.2 AA-compliant Blue/Green/Orange system: every theme color was
--- re-tuned in lightness (hue preserved) so text clears 4.5:1 against white and
--- UI borders clear 3:1.
+-- (docs/design_handoff_admin_dashboard/). That round re-themed the UI so every
+-- theme color clears WCAG 2.2 AA: text at 4.5:1 against white, UI borders at
+-- 3:1. Most colors were re-tuned in lightness with the hue preserved; the
+-- 'green' key is the exception — its old primary and accent sat at 2.42:1 and
+-- 2.77:1, too far under to fix by lightness alone, so it was replaced with a
+-- teal (#0E7490 / #334155 / #0369A1, at 5.36:1, 10.35:1 and 5.93:1). The key
+-- is still spelled 'green' because it is a stored value; see below.
 --
 -- Deliberately, this migration changes no data and no constraint.
 --
 -- What changed was the *hex values behind* each palette key, not the keys
--- themselves. Those values live in src/lib/theme/tenant-colors.ts and are
--- emitted as CSS custom properties at request time by TenantThemeStyle — they
--- have never been stored in Postgres. The set of legal keys is still exactly
+-- themselves — including for 'green', where the key now resolves to a teal.
+-- Renaming that key would mean rewriting stored rows in every environment for
+-- a cosmetic gain, so the name is deliberately left as it is.
+--
+-- Those values live in src/lib/theme/tenant-colors.ts and are emitted as CSS
+-- custom properties at request time by TenantThemeStyle — they have never
+-- been stored in Postgres. The set of legal keys is still exactly
 -- ('blue', 'green', 'orange'), so the CHECK added by migration 0016 is still
 -- correct as written and is left untouched.
 --
@@ -48,5 +55,7 @@ COMMENT ON COLUMN public.tenants.color_palette IS
   'green, orange (enforced by the CHECK from migration 0016). Stores the key '
   'only: the hex/HSL values for each theme, including the hover and tint '
   'tokens, live in that file and are emitted as CSS custom properties by '
-  'TenantThemeStyle. Do not store color values in this column. Palette values '
-  'are WCAG 2.2 AA-tuned; see docs/design_handoff_admin_dashboard/README.md.';
+  'TenantThemeStyle. Do not store color values in this column. Note that the '
+  'key names the slot, not the hue: ''green'' currently resolves to a teal, '
+  'having been replaced when the original green failed AA. Palette values are '
+  'WCAG 2.2 AA-tuned; see docs/design_handoff_admin_dashboard/README.md.';

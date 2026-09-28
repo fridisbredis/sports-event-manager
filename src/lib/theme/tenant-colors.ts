@@ -32,15 +32,20 @@ export const TENANT_PALETTES = {
     accentTint: '199.2 80.6% 93.9%', // #E3F4FC
     accentTintText: '201.1 100% 34.5%', // #0072B0
   },
+  // Teal. Replaces an earlier green palette whose primary and accent sat
+  // under AA against white (2.42:1 and 2.77:1); these are the values from
+  // the handoff's corrected column — 5.36:1, 10.35:1 and 5.93:1. The key is
+  // still named `green` because it is a stored tenant setting: renaming it
+  // would need a data migration to match.
   green: {
-    primary: '142.4 71.8% 29.2%', //  #15803D
-    primaryHover: '146.4 73.7% 22.4%', // #0F6334
-    primaryTint: '140.9 48.9% 90.8%', // #DCF3E4
-    primaryTintText: '146.4 73.7% 22.4%', // #0F6334
-    secondary: '175.3 77.4% 26.1%', // #0F766E
-    accent: '85.2 78.1% 26.9%', //    #4D7A0F
-    accentTint: '151.8 81% 95.9%', // #ECFDF5
-    accentTintText: '85.2 78.1% 26.9%', // #4D7A0F
+    primary: '192.9 82.3% 31%', //    #0E7490
+    primaryHover: '192.9 82.3% 24%', // #0B5A70
+    primaryTint: '192.9 84% 95.1%', // #E8F8FD
+    primaryTintText: '192.9 82.3% 24%', // #0B5A70
+    secondary: '215.3 25% 26.7%', //  #334155
+    accent: '201.3 96.3% 32.2%', //   #0369A1
+    accentTint: '201.3 80.6% 94.5%', // #E6F4FC
+    accentTintText: '201.3 96.3% 32.2%', // #0369A1
   },
   orange: {
     primary: '17.5 88.3% 40.4%', //   #C2410C
