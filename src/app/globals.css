@@ -1,3 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Headings use Manrope throughout, per the design handoff. Setting it here
+     rather than on each heading keeps the rule in one place; anything that
+     needs the system stack can still opt out with `font-sans`. */
+  h1,
+  h2,
+  h3 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: theme('letterSpacing.tight');
+  }
+}
+
+@layer components {
+  /* Page background for admin surfaces: a short gradient that settles into a
+     flat tone, so long pages do not keep shading as they scroll. */
+  .app-surface {
+    background: linear-gradient(180deg, #f4f6fa 0%, #f7f8fa 320px);
+    background-color: #f7f8fa;
+  }
+
+  /* Uppercase section label — "IDENTITY", "STAGES", "PUBLISH STATUS". */
+  .section-label {
+    font-family: theme('fontFamily.display');
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: theme('letterSpacing.label-wide');
+    color: theme('colors.ink.faint');
+    text-transform: uppercase;
+  }
+
+  /* The faint top accent line on cards. 28% strength, not a bold stripe. */
+  .card-accent-primary {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white);
+  }
+
+  .card-accent-secondary {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-secondary)) 28%, white);
+  }
+}
