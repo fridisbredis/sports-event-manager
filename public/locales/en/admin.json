@@ -383,7 +383,7 @@
       "unresolved24h": "Unresolved (24h)",
       "noteUnknown": "Couldn't fetch live data right now — check the console for current status.",
       "noteOk": "Only shows the project this environment (dev or prod) reports to, not the other one.",
-      "unresolvedIn": "Unresolved in {{project}} ↗",
+      "unresolvedIn": "Unresolved in {{project}}",
       "openUnresolved": "Open unresolved issues in Sentry",
       "devProjectOverview": "viadal-event-dev (project overview)",
       "prodProjectOverview": "viadal-event-prod (project overview)"
