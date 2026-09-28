@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { Chip } from '@heroui/react'
 import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
@@ -71,7 +72,22 @@ export default function EventConfigForm({
   const location = initialLocation
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
+  const router = useRouter()
+
   const [colorPalette, setColorPalette] = useState(initialColorPalette)
+
+  // The palette saves on click and the server then revalidates this route, so
+  // a fresh `initialColorPalette` arrives as a prop on the next render. Without
+  // this, `useState` keeps whatever it was seeded with at mount and the picker
+  // drifts out of step with both the database and the theme the layout paints
+  // — the selection appears to snap back to the previously stored colour.
+  // Re-seeding during render (rather than in an effect) applies the new value
+  // before the user ever sees a frame with the stale one.
+  const [renderedPalette, setRenderedPalette] = useState(initialColorPalette)
+  if (renderedPalette !== initialColorPalette) {
+    setRenderedPalette(initialColorPalette)
+    setColorPalette(initialColorPalette)
+  }
   const [isSavingPalette, startPaletteSave] = useTransition()
   const [paletteError, setPaletteError] = useState<string | undefined>()
   const [granularity, setGranularity] = useState(initialGranularity)
@@ -136,7 +152,14 @@ export default function EventConfigForm({
         setColorPalette(previous)
         setPaletteError(t('eventConfig.colorThemeError'))
         toastError(t('eventConfig.colorThemeError'))
+        return
       }
+      // The action revalidates the layout server-side, but that only marks the
+      // cache stale — nothing pulls the new render into this already-mounted
+      // page. Without this refresh the theme variables the layout emits stay on
+      // whatever they were at page load, so the swatch updates while the rest
+      // of the UI keeps the old colour until a hard reload.
+      router.refresh()
     })
   }
 
