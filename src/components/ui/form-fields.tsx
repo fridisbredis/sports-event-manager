@@ -45,6 +45,24 @@ const WHITE_FIELD = [
 // matching the border.
 const FIELD_LABEL = 'group-data-[focus=true]:!text-tenant-primary-tint-text'
 
+// Listbox rows in any popover — a Select's options, a Dropdown's menu.
+// HeroUI highlights both hover and the selected row with its grey
+// `default-100`; in a themed app that reads as a dead spot next to
+// everything else the palette touches. Exported so the plain HeroUI
+// Dropdowns (which don't go through the Select wrapper below) can share it.
+//
+// `data-[hover=true]` and `data-[selected=true]` are the attributes HeroUI
+// sets on the item itself, so no group selector is needed. The `!` prefixes
+// are required: HeroUI's own colour classes land on the same element at
+// equal specificity, and without them the grey simply wins by source order.
+export const LISTBOX_ITEM = [
+  'data-[hover=true]:!bg-tenant-primary-tint',
+  'data-[hover=true]:!text-tenant-primary-tint-text',
+  'data-[selected=true]:!bg-tenant-primary-tint',
+  'data-[selected=true]:!text-tenant-primary-tint-text',
+  'data-[focus-visible=true]:!bg-tenant-primary-tint',
+].join(' ')
+
 export function Input(props: InputProps) {
   return (
     <HeroInput
@@ -82,6 +100,13 @@ export function Select(props: SelectProps) {
         ...props.classNames,
         label: `${FIELD_LABEL} ${props.classNames?.label ?? ''}`,
         trigger: `${WHITE_FIELD} ${props.classNames?.trigger ?? ''}`,
+      }}
+      listboxProps={{
+        ...props.listboxProps,
+        itemClasses: {
+          ...props.listboxProps?.itemClasses,
+          base: `${LISTBOX_ITEM} ${props.listboxProps?.itemClasses?.base ?? ''}`,
+        },
       }}
     />
   )

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
 import { Button } from '@/components/ui/button'
+import { LISTBOX_ITEM } from '@/components/ui/form-fields'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
   generateSlotsForDay,
@@ -441,6 +442,9 @@ export function SchedulingGrid({
           </DropdownTrigger>
           <DropdownMenu
             selectionMode="single"
+            // Shared with the Select fields so hover and the selected row
+            // pick up the tenant palette instead of HeroUI's grey.
+            itemClasses={{ base: LISTBOX_ITEM }}
             selectedKeys={new Set([selectedStageId])}
             onAction={(key) => {
               const id = String(key)
