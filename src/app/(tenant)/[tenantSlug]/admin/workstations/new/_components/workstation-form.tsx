@@ -215,8 +215,8 @@ export default function WorkstationForm({
             variant="light"
             size="sm"
             onPress={() => router.push(`/${tenantSlug}/admin/workstations`)}
-            className="mb-1 px-0 text-default-400"
-            startContent={<span>←</span>}
+            className="mb-1 px-0 font-semibold text-tenant-primary"
+            startContent={<span aria-hidden="true">←</span>}
           >
             {t('workstations.backToList')}
           </Button>
@@ -242,10 +242,8 @@ export default function WorkstationForm({
         <div className="space-y-8">
           {/* Stage */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.stageLabel')}
-            </h2>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-600">
+            <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
+            <div className="rounded-lg bg-status-neutral-bg px-4 py-3 text-[15px] text-ink-soft">
               {preselectedStage
                 ? `${preselectedStage.name} — ${preselectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
                 : t('workstations.allStages')}
@@ -254,9 +252,7 @@ export default function WorkstationForm({
 
           {/* Identity */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.identity')}
-            </h2>
+            <h2 className="section-label mb-4">{t('workstations.identity')}</h2>
             <div className="space-y-4">
               <Input
                 label={t('workstations.nameLabel')}
@@ -304,9 +300,7 @@ export default function WorkstationForm({
         <div className="space-y-8">
           {/* Capacity */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.colCapacity')}
-            </h2>
+            <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
             <Input
               type="number"
               label={t('workstations.capacityLabel')}

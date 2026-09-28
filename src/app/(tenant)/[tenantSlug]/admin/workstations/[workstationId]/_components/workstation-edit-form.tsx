@@ -275,15 +275,21 @@ export default function WorkstationEditForm({
             variant="light"
             size="sm"
             onPress={() => guardedNavigate(`/${tenantSlug}/admin/workstations`)}
-            className="mb-1 px-0 text-default-400"
-            startContent={<span>←</span>}
+            className="mb-1 px-0 font-semibold text-tenant-primary"
+            startContent={<span aria-hidden="true">←</span>}
           >
             {t('workstations.backToList')}
           </Button>
           <h1 className="page-title">{name || t('workstations.namePlaceholder')}</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Button color="danger" variant="light" onPress={handleDelete} isDisabled={isBusy}>
+          <Button
+            color="danger"
+            variant="light"
+            onPress={handleDelete}
+            isDisabled={isBusy}
+            className="font-semibold text-danger-text"
+          >
             {t('workstations.delete')}
           </Button>
           <Button
@@ -307,10 +313,8 @@ export default function WorkstationEditForm({
         <div className="space-y-8">
           {/* Stage */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.stageLabel')}
-            </h2>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-600">
+            <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
+            <div className="rounded-lg bg-status-neutral-bg px-4 py-3 text-[15px] text-ink-soft">
               {selectedStage
                 ? `${selectedStage.name} — ${selectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
                 : t('workstations.allStages')}
@@ -319,9 +323,7 @@ export default function WorkstationEditForm({
 
           {/* Identity */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.identity')}
-            </h2>
+            <h2 className="section-label mb-4">{t('workstations.identity')}</h2>
             <div className="space-y-4">
               <Input
                 label={t('workstations.nameLabel')}
@@ -373,9 +375,7 @@ export default function WorkstationEditForm({
         <div className="space-y-8">
           {/* Capacity */}
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              {t('workstations.colCapacity')}
-            </h2>
+            <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
             <Input
               type="number"
               label={t('workstations.capacityLabel')}

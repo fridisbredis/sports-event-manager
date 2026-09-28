@@ -88,7 +88,7 @@ export function OperatingWindowsEditor({
                 variant="light"
                 size="sm"
                 onPress={() => onRemoveWindow(i)}
-                className="text-default-400 whitespace-nowrap"
+                className="whitespace-nowrap font-semibold text-danger-text"
               >
                 {t('workstations.removeWindow')}
               </Button>
@@ -121,7 +121,11 @@ export function OperatingWindowsEditor({
             )}
           </div>
         ))}
-        <Button variant="light" size="sm" onPress={onAddWindow} className="text-default-500 px-0">
+        <Button
+          variant="light"
+          onPress={onAddWindow}
+          className="px-0 font-semibold text-tenant-primary"
+        >
           {t('workstations.addWindow')}
         </Button>
       </div>

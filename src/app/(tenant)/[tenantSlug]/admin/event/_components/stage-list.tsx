@@ -150,7 +150,7 @@ export default function StageList({ stages, onChange }: Props) {
     <>
       <div className="overflow-hidden rounded-large">
         {/* Header row */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between border-b border-edge px-4 py-3.5">
           <span className="section-label">
             {t('eventConfig.stagesLabel')}
             <span className="text-danger-text">*</span>
@@ -167,7 +167,7 @@ export default function StageList({ stages, onChange }: Props) {
         </div>
 
         {/* Stage rows */}
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-edge-soft">
           {effectiveStages.map((stage, i) => {
             const isLastRace = stage.stage_type === 'race' && raceStageCount <= 1
             const isExpanded = expanded.has(i)
@@ -244,30 +244,30 @@ export default function StageList({ stages, onChange }: Props) {
                     className={`ml-7 grid gap-x-6 gap-y-3 px-4 pb-3 ${stage.stage_type === 'race' ? 'grid-cols-[repeat(auto-fit,minmax(140px,1fr))]' : 'grid-cols-1'}`}
                   >
                     <div>
-                      <p className="text-xs font-medium text-gray-400 mb-0.5">
+                      <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
                         {t('eventConfig.stageVenueLabel')}
                       </p>
-                      <p className="text-xs text-gray-700">{stage.venue || '–'}</p>
+                      <p className="text-[14px] text-ink-soft">{stage.venue || '–'}</p>
                     </div>
                     {stage.stage_type === 'race' && (
                       <>
                         <div>
-                          <p className="text-xs font-medium text-gray-400 mb-0.5">
+                          <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
                             {stage.race_type === 'time'
                               ? t('eventConfig.categoryTimes')
                               : t('eventConfig.categoryDistances')}
                           </p>
-                          <p className="text-xs text-gray-700">
+                          <p className="text-[14px] text-ink-soft">
                             {stage.distances.length > 0
                               ? stage.distances.map((d) => d.label).join(', ')
                               : '–'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-gray-400 mb-0.5">
+                          <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
                             {t('eventConfig.stageFormalStartEnd')}
                           </p>
-                          <p className="text-xs text-gray-700">
+                          <p className="text-[14px] text-ink-soft">
                             {stage.start_time
                               ? `${formatTime(stage.start_time)}${stage.end_time ? ` / ${formatTime(stage.end_time)}` : ''}`
                               : '–'}

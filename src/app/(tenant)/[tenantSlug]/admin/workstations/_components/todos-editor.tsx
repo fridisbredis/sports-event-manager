@@ -53,15 +53,19 @@ export function TodosEditor({ todos, todoRefs, onAddTodo, onRemoveTodo, onUpdate
                 variant="light"
                 size="sm"
                 onPress={() => onRemoveTodo(i)}
-                className="text-xs text-default-400 min-w-0 px-1"
+                className="min-w-0 px-1 font-semibold text-danger-text"
               >
                 {t('workstations.removeTodo')}
               </Button>
             </div>
           ))}
         </div>
-        <div className="px-3 py-2.5 border-t border-gray-100">
-          <Button variant="light" size="sm" onPress={onAddTodo} className="text-default-500 px-0">
+        <div className="border-t border-edge px-4 py-3">
+          <Button
+            variant="light"
+            onPress={onAddTodo}
+            className="px-0 font-semibold text-tenant-primary"
+          >
             {t('workstations.addTodo')}
           </Button>
         </div>
