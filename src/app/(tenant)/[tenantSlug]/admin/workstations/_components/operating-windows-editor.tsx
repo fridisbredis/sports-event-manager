@@ -1,5 +1,6 @@
 import { SelectItem, Checkbox } from '@heroui/react'
 import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/ui/link-button'
 import { Time } from '@internationalized/date'
 import { useTranslation } from '@/lib/i18n/client'
 import { Select, TimeInput } from '@/components/ui/form-fields'
@@ -84,14 +85,14 @@ export function OperatingWindowsEditor({
                 hourCycle={24}
                 className="flex-1"
               />
-              <Button
-                variant="light"
+              <LinkButton
                 size="sm"
+                tone="danger"
                 onPress={() => onRemoveWindow(i)}
-                className="text-default-400 whitespace-nowrap"
+                className="whitespace-nowrap"
               >
                 {t('workstations.removeWindow')}
-              </Button>
+              </LinkButton>
             </div>
             {errors?.[i] && <p className="mt-1.5 text-xs text-red-500">{errors[i]}</p>}
             {isMultiDay && (
@@ -121,9 +122,7 @@ export function OperatingWindowsEditor({
             )}
           </div>
         ))}
-        <Button variant="light" size="sm" onPress={onAddWindow} className="text-default-500 px-0">
-          {t('workstations.addWindow')}
-        </Button>
+        <LinkButton onPress={onAddWindow}>{t('workstations.addWindow')}</LinkButton>
       </div>
     </section>
   )

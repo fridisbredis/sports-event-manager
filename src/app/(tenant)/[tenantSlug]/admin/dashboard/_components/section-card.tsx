@@ -1,11 +1,13 @@
 'use client'
 
-import { Card, CardBody } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 
-export function SectionCard({ children }: { children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardBody className="p-6">{children}</CardBody>
-    </Card>
-  )
+export function SectionCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return <AppCard className={className}>{children}</AppCard>
 }

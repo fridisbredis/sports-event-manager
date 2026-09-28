@@ -33,7 +33,7 @@ export function EventHeaderCard({ name, eventType, logoUrl, description }: Props
               <Chip
                 size="sm"
                 variant="flat"
-                className="mt-1.5 capitalize bg-primary/15 text-primary"
+                className="mt-1.5 bg-tenant-primary-tint capitalize font-medium text-tenant-primary-tint-text"
               >
                 {eventType}
               </Chip>

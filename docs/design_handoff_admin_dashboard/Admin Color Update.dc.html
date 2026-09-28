@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:linear-gradient(180deg,#F4F6FA 0%,#F7F8FA 320px);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;color:#111827;-webkit-font-smoothing:antialiased}
+a{color:#0062D1}a:hover{color:#0052B0}
+*{box-sizing:border-box}
+button{font-family:inherit;transition:background .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease,transform .15s ease}
+.card{transition:box-shadow .18s ease,border-color .18s ease,transform .18s ease}
+</style>
+</helmet>
+<div style="{{ rootVars }}">
+<div style="display:flex;min-height:100vh;background:#F7F8FA">
+
+<aside style="width:252px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #E3E6EB;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;box-shadow:1px 0 0 rgba(17,24,39,0.02)">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:22px 22px 20px;border-bottom:1px solid #E3E6EB">
+    <span style="font-size:12px;font-weight:600;letter-spacing:0.12em;color:#5B6472">ADMIN</span>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6472" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18M16 15l-3-3 3-3"></path></svg>
+  </div>
+  <nav style="display:flex;flex-direction:column;padding:0;gap:2px">
+    <sc-for list="{{ nav }}" as="item" hint-placeholder-count="6">
+      <button onClick="{{ item.go }}" style="display:flex;align-items:center;gap:12px;padding:11px 22px;border-radius:0;border:0;background:{{ item.bg }};color:{{ item.fg }};font-size:15px;font-weight:{{ item.fw }};text-align:left;cursor:pointer;box-shadow:{{ item.bar }}" style-hover="background:#F1F3F6">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <sc-if value="{{ item.i_dash }}"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></sc-if>
+          <sc-if value="{{ item.i_cfg }}"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"></path></sc-if>
+          <sc-if value="{{ item.i_area }}"><path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></sc-if>
+          <sc-if value="{{ item.i_off }}"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></sc-if>
+          <sc-if value="{{ item.i_sch }}"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5M16 2v4M8 2v4M3 10h5"></path><circle cx="16" cy="16" r="6"></circle><path d="M16 14v2l1 1"></path></sc-if>
+          <sc-if value="{{ item.i_com }}"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></sc-if>
+          <sc-if value="{{ item.i_tok }}"><circle cx="13.5" cy="6.5" r="1.5"></circle><circle cx="17.5" cy="10.5" r="1.5"></circle><circle cx="8.5" cy="7.5" r="1.5"></circle><circle cx="6.5" cy="12.5" r="1.5"></circle><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"></path></sc-if>
+        </svg>
+        <span>{{ item.label }}</span>
+      </button>
+    </sc-for>
+  </nav>
+  <div style="margin-top:auto;border-top:1px solid #E3E6EB;padding:10px 0;display:flex;flex-direction:column;gap:2px">
+    <button onClick="{{ goAccount }}" style="display:flex;align-items:center;gap:12px;padding:11px 22px;border:0;background:{{ accountBg }};color:{{ accountFg }};font-size:15px;font-weight:{{ accountFw }};cursor:pointer;text-align:left" style-hover="background:#F1F3F6">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="10" r="3"></circle><path d="M7 20.7v-.7a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v.7"></path></svg>Account
+    </button>
+    <div style="display:flex;align-items:center;gap:12px;padding:11px 22px;font-size:15px;color:#374151">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>Log out
+    </div>
+  </div>
+</aside>
+
+<main style="flex:1;min-width:0;padding:32px 40px 64px;max-width:1240px">
+
+<sc-if value="{{ v.dashboard }}" hint-placeholder-val="{{ true }}">
+  <div data-screen-label="Dashboard" style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:flex-start;gap:18px;padding-bottom:20px;border-bottom:1px solid #E7E9ED">
+      <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--p,#0062D1),var(--s,#3D53E8));display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path></svg>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:30px;font-weight:800;letter-spacing:-0.02em;color:#111827">Viadal 2026</h1>
+        <div style="font-size:14.5px;color:#4B5563">Time run · 1 Jul – 29 Aug 2026</div>
+      </div>
+      <span style="padding:6px 14px;border-radius:999px;background:#DCF3E4;color:#14532D;font-size:13px;font-weight:700;box-shadow:0 1px 2px rgba(20,83,45,0.08)">Published</span>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px">
+      <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px rgba(17,24,39,0.03),inset 0 2px 0 rgba(21,128,61,0.45)">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">PUBLISH STATUS</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:15px;color:#1F2937"><span style="width:9px;height:9px;border-radius:50%;background:#15803D;box-shadow:0 0 0 3px #DCF3E4"></span>Published — visible to officials and participants.</div>
+      </div>
+      <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px rgba(17,24,39,0.03),inset 0 2px 0 color-mix(in srgb, var(--p,#0062D1) 28%, white)">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">OFFICIALS</div>
+        <div style="display:flex;gap:32px">
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:32px;font-weight:700;color:#111827;letter-spacing:-0.02em">4</span><span style="font-size:13px;color:#4B5563">Invited</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:32px;font-weight:700;color:var(--p,#0062D1);letter-spacing:-0.02em">2</span><span style="font-size:13px;color:#4B5563">Confirmed</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px rgba(17,24,39,0.03),inset 0 2px 0 color-mix(in srgb, var(--s,#1E40AF) 28%, white)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">SCHEDULING WARNINGS</div>
+        <span style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;border:1px solid #9FD4B2;background:#F0FAF3;color:#14532D;font-size:13px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg>All clear</span>
+      </div>
+      <div style="display:flex;gap:40px">
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:32px;font-weight:700;color:#111827;letter-spacing:-0.02em">0</span><span style="font-size:13px;color:#4B5563">Over capacity</span></div>
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:32px;font-weight:700;color:#111827;letter-spacing:-0.02em">0</span><span style="font-size:13px;color:#4B5563">Double-booked</span></div>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1;margin-top:8px">ADMIN AREAS</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+      <sc-for list="{{ areas }}" as="a" hint-placeholder-count="6">
+        <button onClick="{{ a.go }}" class="card" style="display:flex;align-items:center;justify-content:space-between;padding:20px 22px;background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;font-size:15px;font-weight:600;color:#111827;cursor:pointer;text-align:left;box-shadow:0 1px 2px rgba(17,24,39,0.03)" style-hover="border-color:var(--p,#0062D1);color:var(--ptx,#0052B0);box-shadow:0 6px 16px -6px var(--p,#0062D1);transform:translateY(-1px)">
+          <span>{{ a.label }}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p,#0062D1)" stroke-width="2.4" stroke-linecap="round"><path d="m9 18 6-6-6-6"></path></svg>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.config }}">
+  <div data-screen-label="Event configuration" style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.02em;color:#111827">Event configuration</h1>
+      <span style="padding:4px 10px;border-radius:999px;background:#DCF3E4;color:#14532D;font-size:13px;font-weight:600">Published</span>
+      <button style="margin-left:auto;padding:10px 22px;border-radius:9px;border:0;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--ph,#0052B0);box-shadow:0 3px 8px -2px var(--p,#0062D1)">Save</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:28px;align-items:start;margin-top:6px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.12em;color:#8A93A1">IDENTITY</div>
+        <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:20px;box-shadow:0 1px 2px rgba(17,24,39,0.03),inset 0 2px 0 color-mix(in srgb, var(--p,#0062D1) 28%, white)">
+          <div style="display:flex;gap:16px;align-items:center">
+            <div style="width:72px;height:72px;border:1.5px dashed #8C94A1;border-radius:10px;background:#F7F8FA;display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5B6472" stroke-width="2.4"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path></svg></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:#111827">Event logo</span>
+              <button style="padding:7px 12px;border-radius:8px;border:1px solid #8C94A1;background:#FFFFFF;font-size:13px;color:#111827;cursor:pointer">Choose image…</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:#111827">Color theme</span>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <sc-for list="{{ themePicker }}" as="t" hint-placeholder-count="3">
+                <button onClick="{{ t.pick }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;border:{{ t.border }};background:{{ t.bg }};cursor:pointer;opacity:{{ t.op }}">
+                  <span style="display:flex">
+                    <span style="width:22px;height:22px;border-radius:50%;background:{{ t.c1 }};border:2px solid #FFFFFF"></span>
+                    <span style="width:22px;height:22px;border-radius:50%;background:{{ t.c2 }};border:2px solid #FFFFFF;margin-left:-8px"></span>
+                    <span style="width:22px;height:22px;border-radius:50%;background:{{ t.c3 }};border:2px solid #FFFFFF;margin-left:-8px"></span>
+                  </span>
+                  <span style="font-size:13px;color:#374151;font-weight:{{ t.fw }}">{{ t.label }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Event name <span style="color:#B91C1C">*</span></span><span style="font-size:15px;font-weight:500;color:#111827">Viadal 2026</span></div>
+          <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Type</span><span style="font-size:15px;font-weight:500;color:#111827">Time run</span></div>
+          <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;min-height:88px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#6B7280">Description</span><span style="font-size:15px;font-weight:500;color:#111827">6 days race</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6B7280">Dates / duration</span><div style="padding:10px 12px;border-radius:8px;background:#EEF0F3;color:#111827;font-size:14px;font-weight:500">1 Jul – 29 Aug 2026</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6B7280">Scheduling granularity</span><div style="padding:10px 12px;border-radius:8px;background:#EEF0F3;color:#111827;font-size:14px;font-weight:500">60 min</div></div>
+          </div>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:#5B6472;text-wrap:pretty">Dates and scheduling granularity can't be edited after publishing (out of scope in v1).</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.12em;color:#8A93A1">SCHEDULE &amp; SETUP</div>
+        <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(17,24,39,0.03),inset 0 2px 0 color-mix(in srgb, var(--s,#1E40AF) 28%, white)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E6EB">
+            <span style="font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">STAGES<span style="color:#B91C1C">*</span></span>
+            <button style="padding:7px 14px;border-radius:8px;border:1px solid var(--s,#3D53E8);background:#FFFFFF;color:var(--s,#3D53E8);font-size:13px;font-weight:600;cursor:pointer" style-hover="background:var(--at,#E3F4FC)">+ Add stage</button>
+          </div>
+          <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:15px 20px;border-bottom:1px solid #EEF0F3" style-hover="background:#FAFBFC">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:120px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.4" stroke-linecap="round" style="flex-shrink:0"><path d="m9 18 6-6-6-6"></path></svg>
+                <span style="font-family:'Manrope',sans-serif;font-size:15px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
+                <sc-if value="{{ s.race }}"><span style="padding:3px 10px;border-radius:999px;background:var(--at,#E3F4FC);color:var(--atx,#0072B0);font-size:12px;font-weight:600;white-space:nowrap">Race</span></sc-if>
+                <sc-if value="{{ s.nonrace }}"><span style="padding:3px 10px;border-radius:999px;background:#EEF0F3;color:#374151;font-size:12px;font-weight:600;white-space:nowrap">Non-race</span></sc-if>
+                <span style="font-size:13px;color:#4B5563;font-variant-numeric:tabular-nums;white-space:nowrap">{{ s.time }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:16px;margin-left:auto;flex-shrink:0">
+                <span onClick="{{ openEditStage }}" style="font-size:13px;font-weight:600;color:var(--s,#3D53E8);cursor:pointer;white-space:nowrap">Edit</span>
+                <span style="font-size:13px;font-weight:600;color:#B91C1C;cursor:pointer;white-space:nowrap">Delete</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.areas }}">
+  <div data-screen-label="Work areas" style="display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0 0 4px;font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.02em;color:#111827">Work areas</h1>
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+      <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 1px 2px rgba(17,24,39,0.03)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:16.5px;font-weight:700;color:#111827">{{ g.name }}</span>
+          <span style="padding:3px 10px;border-radius:999px;background:var(--at,#E3F4FC);color:var(--atx,#0072B0);font-size:12px;font-weight:600">Race</span>
+          <span style="font-size:13px;color:#4B5563">{{ g.dates }}</span>
+          <span style="margin-left:auto;font-size:13px;color:#4B5563">{{ g.count }}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) 100px;gap:12px;padding:10px 12px;border-radius:8px;background:#F1F3F6;font-size:12px;font-weight:600;color:#374151">
+          <span>Name</span><span>Operating windows</span><span>Capacity</span>
+        </div>
+        <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+          <button onClick="{{ openDetail }}" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) 100px;gap:12px;padding:11px 12px;border:0;border-radius:9px;background:transparent;text-align:left;font-size:14px;cursor:pointer" style-hover="background:var(--pt,#E8F1FD)">
+            <span style="display:flex;align-items:center;gap:9px;font-weight:500;color:#111827"><span style="width:9px;height:9px;border-radius:50%;background:{{ r.dot }};flex-shrink:0"></span>{{ r.name }}</span><span style="color:#1F2937;font-variant-numeric:tabular-nums">{{ r.win }}</span><span style="color:#1F2937">{{ r.cap }}</span>
+          </button>
+        </sc-for>
+        <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #E3E6EB">
+          <span style="padding:4px 12px;font-size:14px;font-weight:600;color:var(--s,#3D53E8);cursor:pointer">+ Add work area</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.detail }}">
+  <div data-screen-label="Work area detail" style="display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:flex-end;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:8px;flex:1">
+        <button onClick="{{ goAreas }}" style="display:flex;align-items:center;gap:6px;border:0;background:none;padding:0;font-size:14px;font-weight:500;color:var(--s,#3D53E8);cursor:pointer;width:max-content"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>Work areas</button>
+        <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:26px;font-weight:800;letter-spacing:-0.02em;color:#111827">Social Media</h1>
+      </div>
+      <button style="padding:9px 14px;border-radius:9px;border:0;background:none;color:#B91C1C;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#FEF2F2">Delete work area</button>
+      <button style="padding:10px 24px;border-radius:9px;border:0;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--ph,#0052B0);box-shadow:0 3px 8px -2px var(--p,#0062D1)">Save</button>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:28px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">STAGE</div>
+        <div style="padding:11px 12px;border-radius:10px;background:#EEF0F3;color:#374151;font-size:15px">Förberedelser — Race</div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1;margin-top:12px">IDENTITY</div>
+        <div style="border:2px solid var(--p,#0062D1);box-shadow:0 0 0 3px var(--pt,#E8F1FD);border-radius:10px;padding:7px 11px;background:#FFFFFF;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--ptx,#0052B0);font-weight:600">Name</span><span style="font-size:15px;color:#111827">Social Media</span></div>
+        <div style="border:1px solid #8C94A1;border-radius:10px;padding:10px 12px;min-height:88px;background:#FFFFFF;font-size:15px;color:#5B6472">Description</div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1;margin-top:12px">OPERATING WINDOWS</div>
+        <p style="margin:0;font-size:13px;color:#4B5563;text-wrap:pretty">To run until midnight, set the end time to 00:00 — it will roll over into the next day.</p>
+        <div style="border:1px solid #E3E6EB;border-radius:12px;background:#FFFFFF;padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="flex:1;border:1px solid #8C94A1;border-radius:8px;padding:9px 12px;font-size:15px;font-variant-numeric:tabular-nums">11:00</div>
+            <span style="color:#374151">–</span>
+            <div style="flex:1;border:1px solid #8C94A1;border-radius:8px;padding:9px 12px;font-size:15px;font-variant-numeric:tabular-nums">11:00</div>
+            <span style="font-size:13px;font-weight:600;color:#B91C1C;padding:0 6px;cursor:pointer">Remove</span>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#1F2937"><span style="width:18px;height:18px;border:1.5px solid #6B7380;border-radius:4px;background:#FFFFFF"></span>Limit to 1 day</label>
+        </div>
+        <span style="font-size:14px;font-weight:600;color:var(--s,#3D53E8);cursor:pointer">+ Add window</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">CAPACITY</div>
+        <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;background:#FFFFFF;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#374151">Maximum officials at once</span><span style="font-size:15px;color:#111827">1</span></div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1;margin-top:12px">CHECKLISTS / TO-DOS</div>
+        <div style="border:1px solid #E3E6EB;border-radius:12px;background:#FFFFFF">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #EEF0F3">
+            <span style="width:18px;height:18px;border:1.5px solid #6B7380;border-radius:4px;flex-shrink:0"></span>
+            <span style="flex:1;font-size:14px;color:#5B6472">e.g. Verify rider numbers against start</span>
+            <span style="font-size:13px;font-weight:600;color:#B91C1C">Remove</span>
+          </div>
+          <div style="padding:14px;font-size:14px;font-weight:600;color:var(--s,#3D53E8)">+ Add to-do</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.officials }}">
+  <div data-screen-label="Officials" style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px">
+      <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.02em;color:#111827">Officials Roster</h1>
+      <button onClick="{{ openAddOfficial }}" style="padding:10px 20px;border-radius:9px;border:0;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0" style-hover="background:var(--ph,#0052B0);box-shadow:0 3px 8px -2px var(--p,#0062D1)">Add official</button>
+    </div>
+    <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;padding:12px;box-shadow:0 1px 2px rgba(17,24,39,0.03),inset 0 2px 0 color-mix(in srgb, var(--p,#0062D1) 28%, white)">
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 130px minmax(0,1.3fr);gap:12px;padding:10px 14px;border-radius:8px;background:#F1F3F6;font-size:12px;font-weight:600;color:#374151"><span>Name</span><span>Mobile number</span><span>Status</span><span>Actions</span></div>
+      <sc-for list="{{ officials }}" as="o" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 130px minmax(0,1.3fr);gap:12px;align-items:center;padding:16px 14px;min-height:58px;border-bottom:1px solid #EEF0F3" style-hover="background:#FAFBFC">
+          <span style="display:flex;align-items:center;gap:12px;font-size:15px;font-weight:500;color:#111827"><span style="width:32px;height:32px;border-radius:50%;background:{{ o.avBg }};color:{{ o.avFg }};display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;flex-shrink:0">{{ o.initials }}</span>{{ o.name }}</span>
+          <span style="font-size:14px;color:#374151;font-variant-numeric:tabular-nums">{{ o.phone }}</span>
+          <span>
+            <sc-if value="{{ o.invited }}"><span style="padding:4px 10px;border-radius:999px;background:#FEF3C7;color:#78350F;font-size:13px;font-weight:600">Invited</span></sc-if>
+            <sc-if value="{{ o.confirmed }}"><span style="padding:4px 10px;border-radius:999px;background:#DCF3E4;color:#14532D;font-size:13px;font-weight:600">Confirmed</span></sc-if>
+          </span>
+          <span style="display:flex;gap:20px">
+            <sc-if value="{{ o.resend }}"><span style="font-size:13px;font-weight:600;color:var(--s,#3D53E8);cursor:pointer;white-space:nowrap">Re-send invite</span></sc-if>
+            <sc-if value="{{ o.remove }}"><span onClick="{{ o.removeClick }}" style="font-size:13px;font-weight:600;color:#B91C1C;cursor:pointer;white-space:nowrap">Remove</span></sc-if>
+          </span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.scheduling }}">
+  <div data-screen-label="Scheduling" style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h1 style="margin:0 auto 0 0;font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.02em;color:#111827">Scheduling</h1>
+      <div style="position:relative">
+        <button onClick="{{ toggleSchedDropdown }}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #8C94A1;border-radius:8px;background:#FFFFFF;font-size:14px;color:#111827;cursor:pointer" style-hover="border-color:#5B6472">{{ schedStageLabel }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <sc-if value="{{ schedDropdownOpen }}">
+          <div style="position:absolute;top:calc(100% + 6px);left:0;background:#FFFFFF;border:1px solid #E3E6EB;border-radius:12px;box-shadow:0 12px 28px -8px rgba(17,24,39,0.18);min-width:220px;padding:6px;z-index:30;display:flex;flex-direction:column;gap:1px">
+            <sc-for list="{{ schedStageOptions }}" as="opt" hint-placeholder-count="5">
+              <button onClick="{{ opt.pick }}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:0;border-radius:8px;background:{{ opt.bg }};font-size:14px;font-weight:500;color:#111827;text-align:left;cursor:pointer" style-hover="background:#F1F3F6">
+                {{ opt.name }}
+                <sc-if value="{{ opt.sel }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--p,#0062D1)" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:flex;gap:4px">
+        <span style="padding:8px 10px;border:1px solid #8C94A1;border-radius:8px;background:#FFFFFF;display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="m15 18-6-6 6-6"></path></svg></span>
+        <span style="padding:8px 24px;border:1px solid #8C94A1;border-radius:8px;background:#FFFFFF;font-size:14px;font-weight:500">Onsdag 1 Juli</span>
+        <span style="padding:8px 10px;border:1px solid #8C94A1;border-radius:8px;background:#FFFFFF;display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="m9 18 6-6-6-6"></path></svg></span>
+      </div>
+      <button style="padding:8px 16px;border:1px solid #8C94A1;border-radius:8px;background:#FFFFFF;font-size:14px;cursor:pointer">Print</button>
+    </div>
+    <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#EEF0F3;width:max-content">
+      <button onClick="{{ setPerson }}" style="padding:7px 14px;border-radius:8px;border:0;font-size:14px;font-weight:{{ personBtnFw }};color:{{ personBtnFg }};background:{{ personBtnBg }};cursor:pointer;box-shadow:{{ personBtnShadow }}">By person</button>
+      <button onClick="{{ setArea }}" style="padding:7px 14px;border-radius:8px;border:0;font-size:14px;font-weight:{{ areaBtnFw }};color:{{ areaBtnFg }};background:{{ areaBtnBg }};cursor:pointer;box-shadow:{{ areaBtnShadow }}">By work area</button>
+    </div>
+
+    <sc-if value="{{ vSchedArea }}" hint-placeholder-val="{{ true }}">
+    <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;overflow:auto;box-shadow:0 1px 2px rgba(17,24,39,0.03)">
+      <div style="display:grid;grid-template-columns:200px repeat(10,minmax(64px,1fr));min-width:900px">
+        <div style="padding:14px 16px;font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1;border-bottom:1px solid #E3E6EB;border-right:1px solid #E3E6EB">WORK AREA</div>
+        <sc-for list="{{ hours }}" as="h" hint-placeholder-count="10"><div style="padding:14px 4px;text-align:center;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #E3E6EB;font-variant-numeric:tabular-nums">{{ h }}</div></sc-for>
+      </div>
+      <sc-for list="{{ areaSched }}" as="a" hint-placeholder-count="2">
+        <div style="display:grid;grid-template-columns:200px repeat(10,minmax(64px,1fr));min-width:900px;border-bottom:1px solid #EEF0F3">
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-right:1px solid #E3E6EB">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+            <span style="width:9px;height:9px;border-radius:50%;background:{{ a.dot }};flex-shrink:0"></span>
+            <div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:14px;font-weight:600;color:#111827">{{ a.name }}</span><span style="font-size:12px;color:#4B5563">{{ a.cap }}</span></div>
+          </div>
+          <sc-for list="{{ a.frac }}" as="c" hint-placeholder-count="10">
+            <div style="padding:6px 4px;display:flex">
+              <sc-if value="{{ c.hatch }}"><div style="flex:1;border-radius:6px;background:repeating-linear-gradient(135deg,#E3E6EB 0 5px,#F7F8FA 5px 10px)"></div></sc-if>
+              <sc-if value="{{ c.filled }}"><div style="flex:1;border-radius:6px;background:{{ c.bg }};border:1px solid {{ c.border }};color:{{ c.fg }};font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;min-height:40px;white-space:nowrap">{{ c.label }}</div></sc-if>
+              <sc-if value="{{ c.open }}"><div style="flex:1;border-radius:6px;background:#FFFFFF;border:1px solid #8C94A1;color:#374151;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;min-height:40px;white-space:nowrap">{{ c.label }}</div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-for list="{{ a.slotRows }}" as="sr" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:200px repeat(10,minmax(64px,1fr));min-width:900px;border-bottom:1px solid #EEF0F3">
+            <div style="display:flex;align-items:center;padding:10px 16px 10px 46px;border-right:1px solid #E3E6EB;font-size:13px;color:#8C94A1">{{ sr.label }}</div>
+            <sc-for list="{{ sr.cells }}" as="c" hint-placeholder-count="10">
+              <div style="padding:6px 4px;display:flex">
+                <sc-if value="{{ c.hatch }}"><div style="flex:1;border-radius:6px;background:repeating-linear-gradient(135deg,#E3E6EB 0 5px,#F7F8FA 5px 10px)"></div></sc-if>
+                <sc-if value="{{ c.name }}"><div style="flex:1;border-radius:6px;background:{{ a.at }};border:1px solid {{ a.dotBorder }};color:{{ a.dot }};font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;min-height:38px;white-space:nowrap">{{ c.name }}</div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ vSchedPerson }}">
+    <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:16px;overflow:auto;box-shadow:0 1px 2px rgba(17,24,39,0.03)">
+      <div style="display:grid;grid-template-columns:200px repeat(10,minmax(64px,1fr));min-width:900px">
+        <div style="padding:14px 16px;font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1;border-bottom:1px solid #E3E6EB;border-right:1px solid #E3E6EB">OFFICIAL</div>
+        <sc-for list="{{ hours }}" as="h" hint-placeholder-count="10"><div style="padding:14px 4px;text-align:center;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #E3E6EB;font-variant-numeric:tabular-nums">{{ h }}</div></sc-for>
+      </div>
+      <sc-for list="{{ byPerson }}" as="p" hint-placeholder-count="2">
+        <div style="display:grid;grid-template-columns:200px repeat(10,minmax(64px,1fr));min-width:900px;border-bottom:1px solid #EEF0F3">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-right:1px solid #E3E6EB">
+            <span style="width:28px;height:28px;border-radius:50%;background:{{ p.avBg }};color:{{ p.avFg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">{{ p.initials }}</span>
+            <span style="font-size:14px;font-weight:600;color:#111827">{{ p.name }}</span>
+          </div>
+          <sc-for list="{{ p.cells }}" as="c" hint-placeholder-count="10">
+            <div style="padding:6px 4px;display:flex">
+              <sc-if value="{{ c.hatch }}"><div style="flex:1;border-radius:6px;background:repeating-linear-gradient(135deg,#E3E6EB 0 5px,#F7F8FA 5px 10px)"></div></sc-if>
+              <sc-if value="{{ c.assigned }}"><div style="flex:1;border-radius:6px;background:{{ c.bg }};border:1px solid {{ c.border }};color:{{ c.fg }};font-size:12.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:40px;line-height:1.3;white-space:nowrap"><span>{{ c.area }}</span><span style="font-size:11px;opacity:0.85">{{ c.frac }}</span></div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:#374151">
+      <span style="display:flex;align-items:center;gap:8px"><span style="padding:2px 6px;border:1px solid #8C94A1;border-radius:4px;font-weight:600">2/3</span>Assigned / capacity</span>
+      <span style="display:flex;align-items:center;gap:8px"><span style="width:28px;height:18px;border-radius:4px;background:#EFF6FF;border:1px solid #1D4ED8"></span>Filled (färg per arbetsområde)</span>
+      <span style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border:1.5px solid #B91C1C;border-radius:4px;color:#B91C1C;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700">!</span>Double-booked (same person, overlapping slots)</span>
+      <span style="display:flex;align-items:center;gap:8px"><span style="width:28px;height:18px;border-radius:4px;background:repeating-linear-gradient(135deg,#FDBA74 0 4px,#FFF7ED 4px 8px);border:2px solid #C2410C;display:flex;align-items:center;justify-content:center;color:#9A3412;font-size:11px;font-weight:800">!</span>Over capacity</span>
+      <span style="display:flex;align-items:center;gap:8px"><span style="width:28px;height:18px;border-radius:4px;background:repeating-linear-gradient(135deg,#E3E6EB 0 4px,#F7F8FA 4px 8px);border:1px solid #D4D8DE"></span>Outside operating window — disabled</span>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.communication }}">
+  <div data-screen-label="Communication" style="display:flex;flex-direction:column;gap:24px;max-width:900px">
+    <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:26px;font-weight:800;letter-spacing:-0.02em;color:#111827">Communication</h1>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:14px;color:#374151;margin-right:4px">Channel</span>
+      <span style="padding:7px 16px;border-radius:999px;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600">Participants</span>
+      <span style="padding:6px 15px;border-radius:999px;border:1px solid #8C94A1;background:#FFFFFF;color:#111827;font-size:14px;font-weight:500">Officials</span>
+    </div>
+    <div style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:inset 0 2px 0 color-mix(in srgb, var(--p,#0062D1) 28%, white)">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">NEW ANNOUNCEMENT</div>
+      <div style="border:1px solid #8C94A1;border-radius:10px;min-height:110px;padding:12px;font-size:15px;color:#5B6472">Write an announcement…</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span style="font-size:13px;color:#4B5563">Recipients get an SMS unless they've opted out.</span>
+        <button disabled="" style="padding:10px 22px;border-radius:9px;border:1px solid #D4D8DE;background:#EEF0F3;color:#5B6472;font-size:14px;font-weight:600;cursor:not-allowed">Publish</button>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">TIMELINE — PARTICIPANTS</div>
+    <div style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;gap:6px;box-shadow:inset 4px 0 0 color-mix(in srgb, var(--s,#1E40AF) 28%, white)">
+      <span style="font-size:15px;color:#111827">Hej alla! Hoppas ni är vid gott mod.</span>
+      <span style="font-size:13px;color:#4B5563">6 Jul, 15:55</span>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.account }}">
+  <div data-screen-label="Account" style="display:flex;flex-direction:column;gap:24px;max-width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.02em;color:#111827">Account</h1>
+      <button style="padding:10px 22px;border-radius:9px;border:0;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--ph,#0052B0);box-shadow:0 3px 8px -2px var(--p,#0062D1)">Save</button>
+    </div>
+    <div style="display:flex;justify-content:center;padding:8px 0">
+      <span style="width:96px;height:96px;border-radius:50%;background:#EEF0F3;color:#5B6472;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:700">F</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:14px;color:#374151">Name (editable)</span>
+      <div style="border:1px solid #8C94A1;border-radius:10px;padding:11px 14px;font-size:15px;color:#111827;background:#FFFFFF">Frida</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:14px;color:#374151">Mobile number (read-only)</span>
+      <div style="border:1px solid #E3E6EB;border-radius:10px;padding:11px 14px;font-size:15px;color:#374151;background:#F7F8FA;font-variant-numeric:tabular-nums">+46 76 810 93 04</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">NOTIFICATIONS</span>
+      <div class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600;color:#111827">SMS updates</span><span style="font-size:13px;color:#4B5563">You'll receive non-urgent SMS updates</span></div>
+        <span style="width:44px;height:26px;border-radius:999px;background:var(--p,#0062D1);display:flex;align-items:center;padding:3px;flex-shrink:0"><span style="width:20px;height:20px;border-radius:50%;background:#FFFFFF;margin-left:auto"></span></span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#8A93A1">YOUR SCHEDULE</span>
+      <button class="card" style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;text-align:left" style-hover="border-color:var(--p,#0062D1)">
+        <span style="width:22px;height:22px;border:1.5px solid #8C94A1;border-radius:6px;flex-shrink:0"></span>
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font-size:15px;font-weight:600;color:#111827">16 assignments</span><span style="font-size:13px;color:#4B5563">View your schedule</span></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8C94A1" stroke-width="2.4" stroke-linecap="round"><path d="m9 18 6-6-6-6"></path></svg>
+      </button>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ v.tokens }}">
+  <div data-screen-label="Färgtokens" style="display:flex;flex-direction:column;gap:20px;max-width:980px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1 style="margin:0;font-family:'Manrope',sans-serif;font-size:28px;font-weight:800;letter-spacing:-0.02em;color:#111827">Färgtokens &amp; kontrast</h1>
+      <p style="margin:0;font-size:14px;line-height:1.55;color:#374151;text-wrap:pretty">Kontrast mot vit (#FFFFFF). Krav WCAG 2.2 AA: 4.5:1 för text, 3:1 för UI-gränser. Palettens hex justerades i ljushet (samma kulör) tills de klarar AA.</p>
+    </div>
+    <sc-for list="{{ tokenThemes }}" as="tt" hint-placeholder-count="2">
+      <div style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;overflow:hidden">
+        <div style="padding:14px 18px;border-bottom:1px solid #E3E6EB;font-size:15px;font-weight:700;color:#111827">{{ tt.name }}</div>
+        <div style="display:grid;grid-template-columns:130px minmax(0,1fr) minmax(0,1fr);gap:12px;padding:10px 18px;background:#F1F3F6;font-size:12px;font-weight:600;color:#374151"><span>Roll</span><span>Före</span><span>Efter</span></div>
+        <sc-for list="{{ tt.rows }}" as="r" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:130px minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid #EEF0F3;font-size:14px">
+            <span style="font-weight:600;color:#111827">{{ r.role }}</span>
+            <span style="display:flex;align-items:center;gap:10px">
+              <span style="width:28px;height:28px;border-radius:6px;background:{{ r.before }}"></span>
+              <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#374151">{{ r.before }}</span>
+              <span style="font-variant-numeric:tabular-nums;color:#374151">{{ r.rb }}</span>
+              <sc-if value="{{ r.passB }}"><span style="padding:2px 8px;border-radius:999px;background:#DCF3E4;color:#14532D;font-size:12px;font-weight:600">AA</span></sc-if>
+              <sc-if value="{{ r.failB }}"><span style="padding:2px 8px;border-radius:999px;background:#FEE2E2;color:#991B1B;font-size:12px;font-weight:600;white-space:nowrap">Under AA</span></sc-if>
+            </span>
+            <span style="display:flex;align-items:center;gap:10px">
+              <span style="width:28px;height:28px;border-radius:6px;background:{{ r.after }}"></span>
+              <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#111827;font-weight:600">{{ r.after }}</span>
+              <span style="font-variant-numeric:tabular-nums;color:#111827;font-weight:600">{{ r.ra }}</span>
+              <span style="padding:2px 8px;border-radius:999px;background:#DCF3E4;color:#14532D;font-size:12px;font-weight:600">AA</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+    <div style="background:#FFFFFF;border:1px solid #E3E6EB;border-radius:14px;overflow:hidden">
+      <div style="padding:14px 18px;border-bottom:1px solid #E3E6EB;font-size:15px;font-weight:700;color:#111827">Neutraler &amp; status (gemensamma)</div>
+      <sc-for list="{{ neutrals }}" as="n" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:center;padding:11px 18px;border-bottom:1px solid #EEF0F3;font-size:14px">
+          <span style="color:#111827">{{ n.role }}</span>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#4B5563">{{ n.before }}</span>
+          <span style="display:flex;align-items:center;gap:10px"><span style="width:22px;height:22px;border-radius:5px;background:{{ n.after }};border:1px solid #E3E6EB"></span><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600">{{ n.after }}</span><span style="color:#374151">{{ n.ratio }}</span></span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+</main>
+
+<sc-if value="{{ modalEditStage }}">
+  <div style="position:fixed;inset:0;background:rgba(17,24,39,0.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
+    <div style="background:#FFFFFF;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow:auto;padding:28px;display:flex;flex-direction:column;gap:20px;box-shadow:0 24px 48px -12px rgba(17,24,39,0.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 style="margin:0;font-family:'Manrope',sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.02em;color:#111827">Edit stage</h2>
+        <button onClick="{{ closeModal }}" style="border:0;background:none;padding:4px;cursor:pointer;color:#5B6472;display:flex" style-hover="color:#111827"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Stage name <span style="color:#B91C1C">*</span></span><span style="font-size:15px;font-weight:500;color:#111827">Förberedelser</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:13px;font-weight:600;color:#111827">Type</span>
+        <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#EEF0F3;width:max-content">
+          <span style="padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;color:#FFFFFF;background:var(--p,#0062D1)">Race</span>
+          <span style="padding:8px 20px;border-radius:8px;font-size:14px;font-weight:500;color:#374151">Non-race</span>
+        </div>
+      </div>
+      <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Start / end time</span><span style="font-size:15px;font-weight:500;color:#111827;font-variant-numeric:tabular-nums">7/1/2026, 11:00 – 8/3/2026, 11:00</span></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6472" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>
+      </div>
+      <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Venue</span><span style="font-size:15px;font-weight:500;color:#111827">Valfritt</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:13px;font-weight:600;color:#111827">Category type</span>
+        <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#EEF0F3;width:max-content">
+          <span style="padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;color:#FFFFFF;background:var(--p,#0062D1)">Distance</span>
+          <span style="padding:8px 20px;border-radius:8px;font-size:14px;font-weight:500;color:#374151">Time</span>
+        </div>
+      </div>
+      <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Distance(s)</span><span style="font-size:15px;font-weight:500;color:#111827">1km</span></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:4px">
+        <button onClick="{{ closeModal }}" style="padding:10px 20px;border-radius:9px;border:0;background:none;color:#374151;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#F1F3F6">Cancel</button>
+        <button onClick="{{ closeModal }}" style="padding:10px 24px;border-radius:9px;border:0;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--ph,#0052B0)">Save stage</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ modalAddOfficial }}">
+  <div style="position:fixed;inset:0;background:rgba(17,24,39,0.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
+    <div style="background:#FFFFFF;border-radius:16px;width:100%;max-width:480px;padding:28px;display:flex;flex-direction:column;gap:20px;box-shadow:0 24px 48px -12px rgba(17,24,39,0.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 style="margin:0;font-family:'Manrope',sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.02em;color:#111827">Add official</h2>
+        <button onClick="{{ closeModal }}" style="border:0;background:none;padding:4px;cursor:pointer;color:#5B6472;display:flex" style-hover="color:#111827"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Name</span><span style="font-size:15px;color:#9CA3AF">Full name</span></div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:12px">
+        <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Country</span><span style="font-size:15px;color:#111827">🇸🇪 SE (+46)</span></div>
+        <div style="border:1px solid #8C94A1;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#6B7280">Mobile number</span><span style="font-size:15px;color:#9CA3AF">70 000 00 00</span></div>
+      </div>
+      <p style="margin:0;font-size:13px;color:#5B6472">An SMS invite is sent to this number.</p>
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:4px">
+        <button onClick="{{ closeModal }}" style="padding:10px 20px;border-radius:9px;border:0;background:none;color:#374151;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#F1F3F6">Cancel</button>
+        <button onClick="{{ closeModal }}" style="padding:10px 24px;border-radius:9px;border:0;background:var(--p,#0062D1);color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:var(--ph,#0052B0)">Send invite</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ modalRemoveOfficial }}">
+  <div style="position:fixed;inset:0;background:rgba(17,24,39,0.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px">
+    <div style="background:#FFFFFF;border-radius:16px;width:100%;max-width:440px;padding:28px;display:flex;flex-direction:column;gap:20px;box-shadow:0 24px 48px -12px rgba(17,24,39,0.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 style="margin:0;font-family:'Manrope',sans-serif;font-size:19px;font-weight:800;letter-spacing:-0.02em;color:#111827">Remove official?</h2>
+        <button onClick="{{ closeModal }}" style="border:0;background:none;padding:4px;cursor:pointer;color:#5B6472;display:flex" style-hover="color:#111827"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+      </div>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:#374151">Removing {{ removeName }} also frees any work-area assignments they hold. This can't be undone.</p>
+      <div style="display:flex;justify-content:flex-end;gap:12px">
+        <button onClick="{{ closeModal }}" style="padding:10px 20px;border-radius:9px;border:0;background:none;color:#374151;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#F1F3F6">Cancel</button>
+        <button onClick="{{ closeModal }}" style="padding:10px 24px;border-radius:9px;border:0;background:#BE123C;color:#FFFFFF;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#9F1239">Remove</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Blue&quot;,&quot;Green&quot;],&quot;default&quot;:&quot;Blue&quot;,&quot;tsType&quot;:&quot;'Blue'|'Green'&quot;},&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dashboard&quot;,&quot;config&quot;,&quot;areas&quot;,&quot;detail&quot;,&quot;officials&quot;,&quot;scheduling&quot;,&quot;communication&quot;,&quot;tokens&quot;],&quot;default&quot;:&quot;dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const THEMES = {
+  blue: { label: 'Blue', p: '#0062D1', ph: '#0052B0', pt: '#E8F1FD', ptx: '#0052B0', s: '#1E40AF', atx: '#0072B0', at: '#E3F4FC',
+    orig: { p: '#0071F0', s: '#3D53E8', a: '#0DA2E7' } },
+  green: { label: 'Green', p: '#15803D', ph: '#0F6334', pt: '#DCF3E4', ptx: '#0F6334', s: '#0F766E', atx: '#4D7A0F', at: '#ECFDF5',
+    orig: { p: '#199950', s: '#2E9E2E', a: '#84BD28' } },
+  orange: { label: 'Orange', p: '#C2410C', ph: '#A3380A', pt: '#FFEDD5', ptx: '#92400E', s: '#B45309', atx: '#92400E', at: '#FFEDD5',
+    orig: { p: '#EF6206', s: '#F38B06', a: '#FAB005' } }
+};
+function lum(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function ratio(a, b = '#FFFFFF') { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+const fmt = r => r.toFixed(2) + ':1';
+const PALETTE = [
+  { bg: '#DCEAFE', fg: '#1D4ED8' }, { bg: '#E5DFFC', fg: '#7C3AED' }, { bg: '#D3F5E7', fg: '#0F766E' },
+  { bg: '#FCE1E4', fg: '#BE123C' }, { bg: '#FCEFD1', fg: '#B45309' }, { bg: '#F7E1FA', fg: '#A21CAF' },
+  { bg: '#DCF5E1', fg: '#15803D' }, { bg: '#DEE3FC', fg: '#4338CA' }
+];
+const AREA_NAMES = ['Social Media', 'Skaffa toaletter', 'Ringa', 'Tidtagning', 'Depån', 'Toalett och dusch', 'On break'];
+const AREA_COLOR = {}; AREA_NAMES.forEach((n, i) => AREA_COLOR[n] = PALETTE[i % PALETTE.length]);
+const initials = name => name.split(/[\s—]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const soft = (c, pct = 35) => `color-mix(in srgb, ${c} ${pct}%, white)`;
+const NAV = [
+  ['dashboard', 'Dashboard', 'i_dash'], ['config', 'Event configuration', 'i_cfg'], ['areas', 'Work areas', 'i_area'],
+  ['officials', 'Officials', 'i_off'], ['scheduling', 'Scheduling', 'i_sch'], ['communication', 'Communication', 'i_com'],
+  ['tokens', 'Färgtokens (WCAG)', 'i_tok']
+];
+class Component extends DCLogic {
+  state = { view: null, theme: null, schedMode: null, modal: null, removeName: '', schedDropdownOpen: false, schedStage: 'Förberedelser' };
+  renderVals() {
+    const theme = this.state.theme ?? (this.props.theme === 'Green' ? 'green' : 'blue');
+    const view = this.state.view ?? (this.props.startView ?? 'dashboard');
+    const T = THEMES[theme];
+    const go = k => () => { this.setState({ view: k }); window.scrollTo(0, 0); };
+    const activeKey = view === 'detail' ? 'areas' : view;
+    const v = {}; ['dashboard','config','areas','detail','officials','scheduling','communication','tokens','account'].forEach(k => v[k] = k === view);
+    const closeModal = () => this.setState({ modal: null });
+    const openEditStage = () => this.setState({ modal: 'editStage' });
+    const openAddOfficial = () => this.setState({ modal: 'addOfficial' });
+    const stageNames = ['Förberedelser', '6dagars', '24hours', 'Efterarbete', 'Testar'];
+    const toggleSchedDropdown = () => this.setState(s => ({ schedDropdownOpen: !s.schedDropdownOpen }));
+    const schedStage = this.state.schedStage;
+    const schedStageOptions = stageNames.map(name => ({ name, sel: name === schedStage,
+      bg: name === schedStage ? T.pt : 'transparent',
+      pick: () => this.setState({ schedStage: name, schedDropdownOpen: false }) }));
+    const nav = NAV.map(([k, label, ic]) => ({
+      label, go: go(k), [ic]: true,
+      bg: k === activeKey ? T.pt : 'transparent', fg: k === activeKey ? T.ptx : '#374151',
+      fw: k === activeKey ? 600 : 400, bar: k === activeKey ? `inset 3px 0 0 ${T.p}` : 'none'
+    }));
+    const themePicker = ['blue', 'green', 'orange'].map(k => {
+      const t = THEMES[k], sel = k === theme, avail = !!t.p;
+      return { label: t.label, pick: avail ? () => this.setState({ theme: k }) : undefined,
+        c1: t.p || t.orig.p, c2: t.s || t.orig.s, c3: t.atx || t.orig.a,
+        border: sel ? `1px solid ${T.p}` : '1px solid #E3E6EB', bg: sel ? T.pt : '#FFFFFF', fw: sel ? 600 : 400, op: avail ? 1 : 0.55 };
+    });
+    const row = (role, b, a) => { const rb = ratio(b); return { role, before: b, after: a, rb: fmt(rb), ra: fmt(ratio(a)), passB: rb >= 4.5, failB: rb < 4.5 }; };
+    const tokenThemes = ['blue', 'green', 'orange'].map(k => { const t = THEMES[k]; return { name: t.label, rows: [
+      row('Primary', t.orig.p, t.p), row('Secondary', t.orig.s, t.s), row('Accent (text)', t.orig.a, t.atx)
+    ] }; });
+    const nr = (role, before, after) => ({ role, before, after, ratio: fmt(ratio(after)) });
+    const neutrals = [
+      nr('Etiketter / hjälptext', '#9CA3AF', '#5B6472'), nr('Sekundär text', '#6B7280', '#4B5563'),
+      nr('Fältram (3:1)', '#E5E7EB', '#8C94A1'), nr('Delete / fel', '#E11D48', '#B91C1C'),
+      nr('Invited-text', '#B45309', '#78350F'), nr('Published / success-text', '#15803D', '#14532D')
+    ];
+    const hours = ['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+    const hatchRow = () => hours.map(() => ({ hatch: true }));
+    const schedMode = this.state.schedMode ?? 'area';
+    const setArea = () => this.setState({ schedMode: 'area' });
+    const setPerson = () => this.setState({ schedMode: 'person' });
+    const assigned = (area, frac) => { const c = AREA_COLOR[area] || PALETTE[0]; return { assigned: true, area, frac, bg: c.bg, border: soft(c.fg), fg: c.fg }; };
+    const byPerson = [
+      { name: '46703021113', initials: '4', avBg: '#EEF0F3', avFg: '#5B6472', cells: hatchRow() },
+      { name: 'Frida', initials: 'F', avBg: PALETTE[0].bg, avFg: PALETTE[0].fg, cells: [
+        assigned('Tidtagning', '1/2'), assigned('Tidtagning', '1/2'), assigned('Tidtagning', '1/2'),
+        assigned('Depån', '1/5'), assigned('Tidtagning', '1/2'), assigned('Tidtagning', '1/2'),
+        assigned('Tidtagning', '1/2'), assigned('Tidtagning', '1/2'), assigned('Tidtagning', '1/2'), assigned('Tidtagning', '1/2')
+      ] }
+    ];
+    return {
+      rootVars: { '--p': T.p, '--ph': T.ph, '--pt': T.pt, '--ptx': T.ptx, '--s': T.s, '--atx': T.atx, '--at': T.at },
+      v, nav, themePicker, tokenThemes, neutrals, hours,
+      openDetail: go('detail'), goAreas: go('areas'), goAccount: go('account'),
+      accountBg: activeKey === 'account' ? T.pt : 'transparent', accountFg: activeKey === 'account' ? T.ptx : '#374151', accountFw: activeKey === 'account' ? 600 : 400,
+      modalEditStage: this.state.modal === 'editStage', modalAddOfficial: this.state.modal === 'addOfficial', modalRemoveOfficial: this.state.modal === 'removeOfficial',
+      closeModal, openEditStage, openAddOfficial, removeName: this.state.removeName,
+      schedDropdownOpen: this.state.schedDropdownOpen, toggleSchedDropdown, schedStageLabel: schedStage, schedStageOptions,
+      schedMode, setArea, setPerson, byPerson,
+      areaBtnBg: schedMode === 'area' ? T.p : 'transparent', areaBtnFg: schedMode === 'area' ? '#FFFFFF' : '#374151', areaBtnFw: schedMode === 'area' ? 700 : 500, areaBtnShadow: 'none',
+      personBtnBg: schedMode === 'person' ? T.p : 'transparent', personBtnFg: schedMode === 'person' ? '#FFFFFF' : '#374151', personBtnFw: schedMode === 'person' ? 700 : 500, personBtnShadow: 'none',
+      vSchedArea: schedMode === 'area', vSchedPerson: schedMode === 'person',
+      areas: [['Event configuration','config'],['Work areas','areas'],['Officials','officials'],['Scheduling','scheduling'],['Communication','communication'],['Account','account']].map(([label, k]) => ({ label, go: go(k) })),
+      stages: [
+        { name: 'Förberedelser', race: true, time: 'Wed 11:00–Mon 11:00' }, { name: '6dagars', race: true, time: 'Mon 12:00–Sun 12:00' },
+        { name: '24hours', race: true, time: 'Sat 12:00–Sun 12:00' }, { name: 'Efterarbete', nonrace: true, time: 'Sun 13:00–Tue 13:00' },
+        { name: 'Testar', race: true, time: 'Sun 12:00–Sat 12:00' }
+      ],
+      groups: [
+        { name: 'Förberedelser', dates: 'Wed 1 Jul – Mon 3 Aug', count: '3 work areas', rows: [
+          { name: 'Social Media', win: '11:00–11:00 · 34 days', cap: 'Up to 1' }, { name: 'Skaffa toaletter', win: 'Thu 2 Jul · 12:00–15:00', cap: 'Up to 1' },
+          { name: 'Ringa', win: 'Wed 15 Jul · 11:00–12:00', cap: 'Up to 2' } ] },
+        { name: '6dagars', dates: 'Mon 3 Aug – Sun 9 Aug', count: '4 work areas', rows: [
+          { name: 'Tidtagning', win: 'Mon 3 Aug · 11:00 – Sun 9 Aug · 13:00', cap: 'Up to 2' },
+          { name: 'Depån', win: '07:00–09:00, 11:00–13:00, 17:00–19:00, 23:00–01:00 · 7 days', cap: 'Up to 5' },
+          { name: 'Toalett och dusch', win: '11:00–15:00 · 7 days', cap: 'Up to 1' }, { name: 'On break', win: '07:00–06:00 · 7 days', cap: 'Up to 1' } ] }
+      ].map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, dot: soft((AREA_COLOR[r.name] || PALETTE[0]).fg, 65) })) })),
+      officials: [
+        { name: 'Frida — Event admin', phone: '+46 76 810 93 04', confirmed: true },
+        { name: 'Testare', phone: '+46 70 000 00 00', invited: true, resend: true, remove: true },
+        { name: 'Testare NO', phone: '+47 41 23 45 67', invited: true, resend: true, remove: true },
+        { name: 'Testare DK', phone: '+45 20 12 34 56', invited: true, resend: true, remove: true },
+        { name: 'Testare FI', phone: '+358 44 1234567', invited: true, resend: true, remove: true },
+        { name: '46703021113', phone: '+46 70 302 11 13', confirmed: true, remove: true }
+      ].map((o, i) => ({ ...o, initials: initials(o.name), avBg: PALETTE[i % PALETTE.length].bg, avFg: PALETTE[i % PALETTE.length].fg,
+        removeClick: () => this.setState({ modal: 'removeOfficial', removeName: o.name }) })),
+      sched: [
+        { name: 'Social Media', cap: 'Up to 1', cells: hours.map((h, i) => i === 0 ? { hatch: true } : i === 1 ? { full: true, label: '1 / 1' } : { open: true, label: '0 / 1' }) },
+        { name: 'Skaffa toaletter', cap: 'Up to 1', cells: hatchRow() },
+        { name: 'Ringa', cap: 'Up to 2', cells: hatchRow() }
+      ].map(row => { const c = AREA_COLOR[row.name] || PALETTE[0]; return { ...row, dot: soft(c.fg, 65),
+        cells: row.cells.map(cell => cell.full ? { ...cell, bg: c.bg, border: soft(c.fg), fg: c.fg } : cell) }; }),
+      areaSched: [
+        { name: 'Tidtagning', cap: 'Up to 2',
+          frac: hours.map((h, i) => i === 7 ? { open: true, label: '0 / 2' } : { filled: true, label: '1 / 2' }),
+          slotRows: [
+            { label: '#1', cells: hours.map((h, i) => i === 7 ? { blank: true } : { name: 'Frida' }) },
+            { label: '#2', cells: hours.map(() => ({ blank: true })) }
+          ] },
+        { name: 'Depån', cap: 'Up to 5',
+          frac: hours.map((h, i) => (i >= 2 && i <= 4) ? { hatch: true } : i === 6 ? { filled: true, label: '1 / 5' } : { open: true, label: '0 / 5' }),
+          slotRows: [
+            { label: '#1', cells: hours.map((h, i) => (i >= 2 && i <= 4) ? { hatch: true } : i === 6 ? { name: 'Frida' } : { blank: true }) },
+            { label: '#2', cells: hours.map((h, i) => (i >= 2 && i <= 4) ? { hatch: true } : { blank: true }) }
+          ] }
+      ].map(a => { const c = AREA_COLOR[a.name] || PALETTE[0]; return { ...a, dot: soft(c.fg, 65), dotBorder: soft(c.fg),
+        frac: a.frac.map(f => f.filled ? { ...f, bg: c.bg, border: soft(c.fg), fg: c.fg } : f) }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -28,9 +28,9 @@ export default async function TenantLayout({ children, params }: Props) {
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette ?? 'blue'} />
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-surface flex min-h-screen">
         <SidebarNav tenantSlug={tenantSlug} adminLabel={t('navigation.adminLabel')} />
-        <div className="flex-1 min-w-0">{children}</div>
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
     </>
   )

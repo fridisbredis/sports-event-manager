@@ -40,7 +40,7 @@ export default async function SystemHealthPage() {
       <Link href="/admin" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
         {t('health.backToTenants')}
       </Link>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1 mt-3">{t('health.title')}</h1>
+      <h1 className="page-title mb-1 mt-3">{t('health.title')}</h1>
       <p className="text-sm text-gray-500 mb-6">{t('health.subtitle')}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

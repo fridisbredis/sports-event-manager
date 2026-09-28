@@ -150,29 +150,31 @@ export default function StageList({ stages, onChange }: Props) {
     <>
       <div className="overflow-hidden rounded-large">
         {/* Header row */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="flex items-center justify-between border-b border-edge px-4 py-3.5">
+          <span className="section-label">
             {t('eventConfig.stagesLabel')}
-            <span className="text-red-400">*</span>
+            <span className="text-destructive">*</span>
           </span>
           <Button
             type="button"
+            variant="bordered"
+            size="sm"
             onPress={openAdd}
-            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-md px-3 py-1.5 bg-white hover:border-gray-300 transition-colors"
+            className="rounded-control border-tenant-primary bg-white px-4 font-semibold text-tenant-primary"
           >
             {t('eventConfig.addStage')}
           </Button>
         </div>
 
         {/* Stage rows */}
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-edge-soft">
           {effectiveStages.map((stage, i) => {
             const isLastRace = stage.stage_type === 'race' && raceStageCount <= 1
             const isExpanded = expanded.has(i)
             return (
               <div key={i} className="bg-white">
                 {/* Collapsed row */}
-                <div className="flex items-center gap-2 px-4 py-3 transition-colors">
+                <div className="flex flex-nowrap items-center gap-2 px-4 py-3 transition-colors">
                   {/* Expand toggle */}
                   <Button
                     isIconOnly
@@ -187,16 +189,16 @@ export default function StageList({ stages, onChange }: Props) {
                   </Button>
 
                   {/* Name */}
-                  <span className="flex-1 text-sm font-medium text-gray-900 truncate min-w-0">
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink">
                     {stage.name || '—'}
                   </span>
 
                   {/* Type badge */}
                   <span
-                    className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
                       stage.stage_type === 'race'
-                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
-                        : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
+                        ? 'bg-tenant-accent-tint text-tenant-accent-tint-text'
+                        : 'bg-status-neutral-bg text-status-neutral-text'
                     }`}
                   >
                     {stage.stage_type === 'race'
@@ -205,13 +207,18 @@ export default function StageList({ stages, onChange }: Props) {
                   </span>
 
                   {/* Time range */}
-                  <span className="shrink-0 text-xs text-gray-400 tabular-nums w-40 text-right">
+                  <span className="shrink-0 whitespace-nowrap text-right text-[13px] text-ink-muted tabular-nums">
                     {formatTimeRange(stage.start_time, stage.end_time)}
                   </span>
 
                   {/* Actions */}
                   <div className="shrink-0 flex items-center gap-1">
-                    <Button size="sm" variant="light" onPress={() => openEdit(i)}>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      onPress={() => openEdit(i)}
+                      className="font-medium text-tenant-primary-tint-text"
+                    >
                       {t('actions.edit')}
                     </Button>
                     <Button
@@ -220,6 +227,7 @@ export default function StageList({ stages, onChange }: Props) {
                       variant="light"
                       color="danger"
                       onPress={() => handleDelete(i)}
+                      className="font-medium text-destructive"
                       isDisabled={isLastRace}
                       title={
                         isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')
@@ -233,33 +241,33 @@ export default function StageList({ stages, onChange }: Props) {
                 {/* Expanded details */}
                 {isExpanded && (
                   <div
-                    className={`px-4 pb-3 ml-7 grid gap-6 w-1/2 ${stage.stage_type === 'race' ? 'grid-cols-3' : 'grid-cols-1'}`}
+                    className={`ml-7 grid gap-x-6 gap-y-3 px-4 pb-3 ${stage.stage_type === 'race' ? 'grid-cols-[repeat(auto-fit,minmax(140px,1fr))]' : 'grid-cols-1'}`}
                   >
                     <div>
-                      <p className="text-xs font-medium text-gray-400 mb-0.5">
+                      <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
                         {t('eventConfig.stageVenueLabel')}
                       </p>
-                      <p className="text-xs text-gray-700">{stage.venue || '–'}</p>
+                      <p className="text-[14px] text-ink-soft">{stage.venue || '–'}</p>
                     </div>
                     {stage.stage_type === 'race' && (
                       <>
                         <div>
-                          <p className="text-xs font-medium text-gray-400 mb-0.5">
+                          <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
                             {stage.race_type === 'time'
                               ? t('eventConfig.categoryTimes')
                               : t('eventConfig.categoryDistances')}
                           </p>
-                          <p className="text-xs text-gray-700">
+                          <p className="text-[14px] text-ink-soft">
                             {stage.distances.length > 0
                               ? stage.distances.map((d) => d.label).join(', ')
                               : '–'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-gray-400 mb-0.5">
+                          <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
                             {t('eventConfig.stageFormalStartEnd')}
                           </p>
-                          <p className="text-xs text-gray-700">
+                          <p className="text-[14px] text-ink-soft">
                             {stage.start_time
                               ? `${formatTime(stage.start_time)}${stage.end_time ? ` / ${formatTime(stage.end_time)}` : ''}`
                               : '–'}

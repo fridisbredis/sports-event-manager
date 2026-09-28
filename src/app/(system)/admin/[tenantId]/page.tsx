@@ -38,7 +38,7 @@ export default async function TenantDetailPage({ params }: Props) {
         </Link>
       </div>
 
-      <h1 className="text-2xl font-semibold text-gray-900 mb-8">{tenant.name}</h1>
+      <h1 className="page-title mb-8">{tenant.name}</h1>
 
       <AppCard bodyClassName="p-0 overflow-hidden">
         <TenantDetail

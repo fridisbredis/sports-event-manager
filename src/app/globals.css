@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Headings use Manrope throughout, per the design handoff. Setting it here
+     rather than on each heading keeps the rule in one place; anything that
+     needs the system stack can still opt out with `font-sans`. */
+  h1,
+  h2,
+  h3 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: theme('letterSpacing.tight');
+  }
+}
+
+@layer components {
+  /* Page background for admin surfaces: a short gradient that settles into a
+     flat tone, so long pages do not keep shading as they scroll. */
+  .app-surface {
+    background: linear-gradient(180deg, #f4f6fa 0%, #f7f8fa 320px);
+    background-color: #f7f8fa;
+  }
+
+  /* Page title. The handoff specifies 28-30px at weight 800 with tight
+     tracking — noticeably heavier than the 600 used before, which is what
+     gives the admin pages their headline. */
+  .page-title {
+    font-family: theme('fontFamily.display');
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: theme('letterSpacing.tight');
+    color: theme('colors.ink.DEFAULT');
+    line-height: 1.15;
+  }
+
+  /* Uppercase section label — "IDENTITY", "STAGES", "PUBLISH STATUS". */
+  .section-label {
+    font-family: theme('fontFamily.display');
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: theme('letterSpacing.label-wide');
+    color: theme('colors.ink.faint');
+    text-transform: uppercase;
+  }
+
+  /* The faint top accent line on cards. 28% strength, not a bold stripe. */
+  .card-accent-primary.card-accent-primary {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white);
+  }
+
+  /* Publish status is a health signal, so its accent is fixed green rather
+     than the tenant's theme colour. */
+  .card-accent-success.card-accent-success {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 0 2px 0 rgba(21, 128, 61, 0.45);
+  }
+
+  .card-accent-secondary.card-accent-secondary {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-secondary)) 28%, white);
+  }
+
+  /* Same accent, rotated to the leading edge — for rows in a list where a
+     top line would read as a divider between items rather than as a mark on
+     one. Wider than the 2px top line because a vertical edge reads thinner
+     at the same weight. */
+  .card-accent-left.card-accent-left {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 3px 0 0 color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white);
+  }
+}

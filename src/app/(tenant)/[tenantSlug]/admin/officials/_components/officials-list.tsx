@@ -19,6 +19,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { LinkButton } from '@/components/ui/link-button'
+import { workAreaColor } from '@/lib/theme/work-area-colors'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError, extractErrorMessage, parseRetryAfterMinutes } from '@/lib/toast'
@@ -36,6 +39,18 @@ interface Props {
   tenantId: string
   officials: OfficialListItem[]
   currentUserId: string
+}
+
+/**
+ * Up to two initials for the avatar. Falls back to the first two characters
+ * for single-word names and digit-only placeholders (phone numbers show up as
+ * names for officials who have not set one yet).
+ */
+function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '?'
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase()
 }
 
 export default function OfficialsList({
@@ -187,7 +202,7 @@ export default function OfficialsList({
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">{t('officials.title')}</h1>
+        <h1 className="page-title">{t('officials.title')}</h1>
         <Button color="primary" onPress={() => setAddModalOpen(true)}>
           {t('officials.add')}
         </Button>
@@ -213,7 +228,19 @@ export default function OfficialsList({
           </Button>
         </AppCard>
       ) : (
-        <Table isStriped aria-label={t('officials.title')}>
+        <Table
+          aria-label={t('officials.title')}
+          classNames={{
+            // The shared card surface plus the theme accent line along the
+            // top — the same treatment the dashboard and event-config cards
+            // get. `card-accent-primary` is defined with a doubled selector so
+            // it outranks both CARD_SURFACE's shadow-card and the
+            // `shadow-small` HeroUI's wrapper sets on this same element.
+            wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
+            th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+            td: 'py-4',
+          }}
+        >
           <TableHeader>
             <TableColumn>{t('officials.name')}</TableColumn>
             <TableColumn>{t('officials.phone')}</TableColumn>
@@ -227,19 +254,37 @@ export default function OfficialsList({
 
               return (
                 <TableRow key={official.id}>
-                  <TableCell className="font-medium text-gray-900">
-                    {isCurrentUser
-                      ? `${official.name} — ${t('officials.youLabel')}`
-                      : official.name}
+                  <TableCell className="text-[15px] font-medium text-ink">
+                    <span className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+                        style={{
+                          backgroundColor: workAreaColor(official.id).bg,
+                          color: workAreaColor(official.id).fg,
+                        }}
+                      >
+                        {initialsOf(official.name)}
+                      </span>
+                      {isCurrentUser
+                        ? `${official.name} — ${t('officials.youLabel')}`
+                        : official.name}
+                    </span>
                   </TableCell>
-                  <TableCell className="text-gray-500">
+                  <TableCell className="text-[15px] text-ink-soft">
                     {formatPhoneForDisplay(official.phone)}
                   </TableCell>
                   <TableCell>
                     <Chip
                       size="sm"
                       variant="flat"
-                      color={official.invite_status === 'confirmed' ? 'default' : 'warning'}
+                      // Exact badge colours from the design handoff, which
+                      // HeroUI's `default`/`warning` palettes do not match.
+                      className={
+                        official.invite_status === 'confirmed'
+                          ? 'bg-status-ok-bg text-status-ok-text'
+                          : 'bg-status-pending-bg text-status-pending-text'
+                      }
                     >
                       {official.invite_status === 'confirmed'
                         ? t('officials.confirmed')
@@ -248,24 +293,23 @@ export default function OfficialsList({
                   </TableCell>
                   <TableCell>
                     {!isCurrentUser && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-5">
                         {official.invite_status === 'invited' && (
-                          <Button
+                          <LinkButton
                             size="sm"
-                            variant="bordered"
                             isLoading={isResending}
                             onPress={() => setResendTarget(official)}
                           >
                             {t('officials.resendInvite')}
-                          </Button>
+                          </LinkButton>
                         )}
-                        <Button
+                        <LinkButton
                           size="sm"
-                          variant="bordered"
+                          tone="danger"
                           onPress={() => setRemoveTarget(official)}
                         >
                           {t('officials.remove')}
-                        </Button>
+                        </LinkButton>
                       </div>
                     )}
                   </TableCell>

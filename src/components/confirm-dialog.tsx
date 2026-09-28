@@ -40,7 +40,17 @@ export default function ConfirmDialog({
           <Button variant="light" onPress={onCancel}>
             {cancelLabel}
           </Button>
-          <Button color={destructive ? 'danger' : 'primary'} onPress={onConfirm}>
+          <Button
+            color={destructive ? 'danger' : 'primary'}
+            onPress={onConfirm}
+            // The handoff's destructive button is #BE123C; HeroUI's danger
+            // scale is a pinker #F31260.
+            className={
+              destructive
+                ? 'bg-destructive-solid hover:bg-destructive-hover data-[hover=true]:opacity-100'
+                : undefined
+            }
+          >
             {confirmLabel}
           </Button>
         </ModalFooter>

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition, useRef, KeyboardEvent } from 'react'
-import { Chip, Card, CardBody } from '@heroui/react'
+import { Chip } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import {
@@ -24,6 +25,7 @@ import { DatesAndGranularitySection } from './dates-and-granularity-section'
 import { FacilitiesEditor } from './facilities-editor'
 import { derivedDateRange } from '../_utils'
 import type { TenantPaletteKey } from '@/lib/theme/tenant-colors'
+import { tenantThemeVars } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
   tenantSlug: string
@@ -71,7 +73,28 @@ export default function EventConfigForm({
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
   const [colorPalette, setColorPalette] = useState(initialColorPalette)
-  const [isSavingPalette, startPaletteSave] = useTransition()
+
+  // The palette saves on click and the server then revalidates this route, so
+  // a fresh `initialColorPalette` arrives as a prop on the next render. Without
+  // this, `useState` keeps whatever it was seeded with at mount and the picker
+  // drifts out of step with both the database and the theme the layout paints
+  // — the selection appears to snap back to the previously stored colour.
+  // Re-seeding during render (rather than in an effect) applies the new value
+  // before the user ever sees a frame with the stale one.
+  // What the database currently holds, as opposed to what is being previewed.
+  // Save compares the two to decide whether the tenant row needs writing at
+  // all, and a failed palette write rolls the preview back to this.
+  const [savedPalette, setSavedPalette] = useState(initialColorPalette)
+
+  // A fresh server payload (after a save, or any revalidate of this route)
+  // re-seeds both: useState alone keeps its mount-time value forever, which
+  // would leave the picker showing a palette the database no longer holds.
+  const [renderedPalette, setRenderedPalette] = useState(initialColorPalette)
+  if (renderedPalette !== initialColorPalette) {
+    setRenderedPalette(initialColorPalette)
+    setSavedPalette(initialColorPalette)
+    setColorPalette(initialColorPalette)
+  }
   const [paletteError, setPaletteError] = useState<string | undefined>()
   const [granularity, setGranularity] = useState(initialGranularity)
   const [stages, setStages] = useState<StageInput[]>(initialStages)
@@ -124,19 +147,29 @@ export default function EventConfigForm({
     }
   }
 
+  // Repaint the theme straight onto :root. TenantThemeStyle is a server
+  // component — it emits its <style> when the layout renders, so on its own the
+  // colour could not change until the server re-rendered, which meant waiting
+  // on a round trip to see the choice. Setting the variables here makes the
+  // preview immediate; the server's own <style> takes over unchanged on the
+  // next render, because it resolves to exactly these values.
+  function paintTheme(key: string) {
+    const root = document.documentElement
+    for (const [name, value] of tenantThemeVars(key)) {
+      root.style.setProperty(name, value)
+    }
+  }
+
+  // Picking a palette only previews it. The choice is written when the form is
+  // saved, like every other field here — so a palette tried on and abandoned
+  // leaves nothing behind, and the unsaved-changes guard can warn about it.
   function handleColorPaletteSelect(key: TenantPaletteKey) {
-    if (key === colorPalette || isSavingPalette) return
-    const previous = colorPalette
+    if (key === colorPalette) return
     setColorPalette(key)
+    paintTheme(key)
     setPaletteError(undefined)
-    startPaletteSave(async () => {
-      const result = await updateTenantColorPalette(tenantSlug, tenantId, key)
-      if (result.error) {
-        setColorPalette(previous)
-        setPaletteError(t('eventConfig.colorThemeError'))
-        toastError(t('eventConfig.colorThemeError'))
-      }
-    })
+    setSaveSuccess(false)
+    markDirty()
   }
 
   function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -184,10 +217,33 @@ export default function EventConfigForm({
       const result = await saveEvent(buildInput())
       if (result.error) {
         toastError(result.error)
-      } else {
-        setSaveSuccess(true)
-        markClean()
+        return
       }
+
+      // The palette lives on the tenant, not the event, so it is a separate
+      // write — but it belongs to the same Save press. Only sent when it
+      // actually changed, to keep an unrelated save off the tenants table.
+      if (colorPalette !== savedPalette) {
+        const paletteResult = await updateTenantColorPalette(
+          tenantSlug,
+          tenantId,
+          colorPalette as TenantPaletteKey
+        )
+        if (paletteResult.error) {
+          // The event saved; only the theme did not. Put the preview back to
+          // what is actually stored so the page does not claim a colour the
+          // database never took.
+          setColorPalette(savedPalette)
+          paintTheme(savedPalette)
+          setPaletteError(t('eventConfig.colorThemeError'))
+          toastError(t('eventConfig.colorThemeError'))
+          return
+        }
+        setSavedPalette(colorPalette)
+      }
+
+      setSaveSuccess(true)
+      markClean()
     })
   }
 
@@ -214,19 +270,29 @@ export default function EventConfigForm({
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-gray-900">{t('eventConfig.title')}</h1>
-          <Chip color={isPublished ? 'success' : 'warning'} variant="flat" size="sm">
+          <h1 className="page-title">{t('eventConfig.title')}</h1>
+          <Chip
+            variant="flat"
+            size="sm"
+            // Exact published/draft colours from the design handoff; HeroUI's
+            // success/warning palettes are a different green and amber.
+            className={
+              isPublished
+                ? 'bg-status-ok-bg text-status-ok-text'
+                : 'bg-status-pending-bg text-status-pending-text'
+            }
+          >
             {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
           </Chip>
         </div>
         <div className="flex items-center gap-3">
           <Button
-            variant="bordered"
             onPress={handleSave}
             isDisabled={isSaving || isPublishing || isUploading}
             isLoading={isSaving}
-            color={saveSuccess && !isSaving ? 'success' : 'default'}
-            size="sm"
+            // Save is the page's primary action and reads as a solid themed
+            // button; the transient "Saved" confirmation still turns green.
+            color={saveSuccess && !isSaving ? 'success' : 'primary'}
           >
             {isSaving
               ? t('eventConfig.saving')
@@ -240,7 +306,6 @@ export default function EventConfigForm({
               onPress={handlePublish}
               isDisabled={isSaving || isPublishing}
               isLoading={isPublishing}
-              size="sm"
             >
               {isPublishing ? t('eventConfig.publishing') : t('eventConfig.publish')}
             </Button>
@@ -248,117 +313,121 @@ export default function EventConfigForm({
         </div>
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-[2fr_3fr] gap-5">
+      {/* Two-column layout.
+
+          auto-fit + minmax rather than a fixed ratio: the columns hold their
+          width and drop to a single column the moment both no longer fit,
+          instead of squeezing progressively and wrapping content inside the
+          cards on the way down.
+
+          380px, not the prototype's 480px. The stage row's fixed parts (expand
+          toggle, type badge, Edit/Delete) measure ~210px together, so 380px
+          leaves the stage name ~170px before anything is forced to wrap — and
+          the admin content area is the viewport less a 224px sidebar and 64px
+          of padding, so a 480px floor would hold the layout at one column until
+          ~1210px even though two fit comfortably well below that. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] items-start gap-7">
         {/* Left: Identity */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
-            {t('eventConfig.identity')}
-          </h2>
-          <Card>
-            <CardBody className="p-6 space-y-4">
-              <LogoUploadField
-                logoUrl={logoUrl}
-                logoError={logoError}
-                isUploading={isUploading}
-                uploadError={uploadError}
-                fileInputRef={fileInputRef}
-                onFileChange={handleLogoFileChange}
-                onImageError={() => setLogoError(true)}
-                onRemove={() => {
-                  setLogoUrl('')
-                  setLogoError(false)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-              />
+          <h2 className="section-label mb-5">{t('eventConfig.identity')}</h2>
+          <AppCard className="card-accent-primary" bodyClassName="space-y-4 p-6">
+            <LogoUploadField
+              logoUrl={logoUrl}
+              logoError={logoError}
+              isUploading={isUploading}
+              uploadError={uploadError}
+              fileInputRef={fileInputRef}
+              onFileChange={handleLogoFileChange}
+              onImageError={() => setLogoError(true)}
+              onRemove={() => {
+                setLogoUrl('')
+                setLogoError(false)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+            />
 
-              <ColorPalettePicker
-                colorPalette={colorPalette}
-                isSavingPalette={isSavingPalette}
-                paletteError={paletteError}
-                onSelect={handleColorPaletteSelect}
-              />
+            <ColorPalettePicker
+              colorPalette={colorPalette}
+              isSavingPalette={isSaving}
+              paletteError={paletteError}
+              onSelect={handleColorPaletteSelect}
+            />
 
-              <Input
-                label={t('eventConfig.eventName')}
-                isRequired
-                value={name}
-                onValueChange={(val) => {
-                  setName(val)
-                  setSaveSuccess(false)
-                  markDirty()
-                  if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
-                }}
-                placeholder={t('eventConfig.eventNamePlaceholder')}
-                isInvalid={!!errors.name}
-                errorMessage={errors.name}
-              />
+            <Input
+              label={t('eventConfig.eventName')}
+              isRequired
+              value={name}
+              onValueChange={(val) => {
+                setName(val)
+                setSaveSuccess(false)
+                markDirty()
+                if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
+              }}
+              placeholder={t('eventConfig.eventNamePlaceholder')}
+              isInvalid={!!errors.name}
+              errorMessage={errors.name}
+            />
 
-              <Input
-                label={t('eventConfig.type')}
-                value={eventType}
-                onValueChange={(val) => {
-                  setEventType(val)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-                placeholder={t('eventConfig.typePlaceholder')}
-              />
+            <Input
+              label={t('eventConfig.type')}
+              value={eventType}
+              onValueChange={(val) => {
+                setEventType(val)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+              placeholder={t('eventConfig.typePlaceholder')}
+            />
 
-              <Textarea
-                label={t('eventConfig.description')}
-                value={description}
-                onValueChange={(val) => {
-                  setDescription(val)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-                minRows={4}
-                placeholder={t('eventConfig.descriptionPlaceholder')}
-              />
+            <Textarea
+              label={t('eventConfig.description')}
+              value={description}
+              onValueChange={(val) => {
+                setDescription(val)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+              minRows={4}
+              placeholder={t('eventConfig.descriptionPlaceholder')}
+            />
 
-              <DatesAndGranularitySection
-                isPublished={isPublished}
-                dateRangeLabel={derivedDateRange(stages)}
-                granularity={granularity}
-                onGranularityChange={(minutes) => {
-                  setGranularity(minutes)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-              />
+            <DatesAndGranularitySection
+              isPublished={isPublished}
+              dateRangeLabel={derivedDateRange(stages)}
+              granularity={granularity}
+              onGranularityChange={(minutes) => {
+                setGranularity(minutes)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+            />
 
-              <FacilitiesEditor
-                facilities={facilities}
-                facilityInput={facilityInput}
-                onFacilityInputChange={setFacilityInput}
-                onKeyDown={handleFacilityKeyDown}
-                onRemoveFacility={removeFacility}
-              />
-            </CardBody>
-          </Card>
+            <FacilitiesEditor
+              facilities={facilities}
+              facilityInput={facilityInput}
+              onFacilityInputChange={setFacilityInput}
+              onKeyDown={handleFacilityKeyDown}
+              onRemoveFacility={removeFacility}
+            />
+          </AppCard>
         </section>
 
         {/* Right: Schedule & Setup */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
-            {t('eventConfig.scheduleSetup')}
-          </h2>
-          <Card>
-            <CardBody className="p-0">
-              {/* Stages */}
-              <StageList
-                stages={stages}
-                onChange={(updated) => {
-                  setStages(updated)
-                  setSaveSuccess(false)
-                  markDirty()
-                }}
-              />
-              {errors.stages && <p className="text-xs text-red-500 px-6 pb-4">{errors.stages}</p>}
-            </CardBody>
-          </Card>
+          <h2 className="section-label mb-5">{t('eventConfig.scheduleSetup')}</h2>
+          <AppCard className="card-accent-primary" bodyClassName="p-0">
+            {/* Stages */}
+            <StageList
+              stages={stages}
+              onChange={(updated) => {
+                setStages(updated)
+                setSaveSuccess(false)
+                markDirty()
+              }}
+            />
+            {errors.stages && <p className="text-xs text-red-500 px-6 pb-4">{errors.stages}</p>}
+          </AppCard>
         </section>
       </div>
     </div>

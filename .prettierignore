@@ -6,3 +6,8 @@ build
 dist
 *.lock
 package-lock.json
+
+# Generated design prototype from the handoff bundle — a reference artefact we
+# read, never edit. Reformatting it rewrites ~4000 lines of machine-authored
+# markup for no gain and buries any real change to it in noise.
+docs/design_handoff_admin_dashboard/*.dc.html

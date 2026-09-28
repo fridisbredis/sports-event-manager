@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { workAreaBorderColor, workAreaColor } from '@/lib/theme/work-area-colors'
 import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
@@ -74,7 +75,7 @@ export function ByPersonGrid({
 
   if (officials.length === 0) {
     return (
-      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-gray-500`}>
+      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-ink-label`}>
         {t('scheduling.noConfirmedOfficials')}
       </div>
     )
@@ -87,13 +88,13 @@ export function ByPersonGrid({
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr>
-            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-40 border-r border-b border-gray-100">
+            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-40 border-b border-r border-edge-soft">
               {t('scheduling.colOfficial')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="sticky top-0 z-20 bg-white text-center px-1 py-3 text-xs font-medium text-gray-500 w-20 border-b border-gray-100"
+                className="sticky top-0 z-20 w-20 border-b border-edge-soft bg-white px-1 py-3 text-center text-[13px] font-semibold text-ink"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -101,67 +102,94 @@ export function ByPersonGrid({
           </tr>
         </thead>
         <tbody>
-          {officials.map((official) => (
-            <tr key={official.id} className="border-b border-gray-50 last:border-0">
-              <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-gray-100">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
-                    {initials(official.name)}
+          {officials.map((official) => {
+            const personColor = workAreaColor(official.id)
+            return (
+              <tr key={official.id} className="border-b border-edge-soft last:border-0">
+                <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-edge-soft">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {/* Same per-person colour the officials roster uses, so a
+                      face is recognisable across screens. */}
+                    <div
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                      style={{
+                        backgroundColor: personColor.bg,
+                        color: personColor.fg,
+                      }}
+                    >
+                      {initials(official.name)}
+                    </div>
+                    <span className="truncate text-sm text-ink" title={official.name}>
+                      {official.name}
+                    </span>
                   </div>
-                  <span className="text-sm text-gray-800 truncate" title={official.name}>
-                    {official.name}
-                  </span>
-                </div>
-              </td>
-              {slots.map((slot) => {
-                const slotStart = slot.toISOString()
-                const assignment = assignmentMap.get(`${official.id}:${slotStart}`)
-                const ws = assignment
-                  ? stageWorkstations.find((w) => w.id === assignment.workstation_id)
-                  : undefined
-                const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
-                const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
+                </td>
+                {slots.map((slot) => {
+                  const slotStart = slot.toISOString()
+                  const assignment = assignmentMap.get(`${official.id}:${slotStart}`)
+                  const ws = assignment
+                    ? stageWorkstations.find((w) => w.id === assignment.workstation_id)
+                    : undefined
+                  const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
+                  const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
 
-                const cellStyle = assignment
-                  ? isDoubleBooked
-                    ? 'bg-orange-50 border border-orange-200'
-                    : 'bg-gray-100 border border-gray-200'
-                  : ''
+                  // Double-booking is a warning and keeps its orange styling —
+                  // the work-area palette is decorative and must not mask it.
+                  const color = ws ? workAreaColor(ws.id) : undefined
+                  const cellStyle = assignment
+                    ? isDoubleBooked
+                      ? 'bg-orange-50 border border-orange-200'
+                      : 'border'
+                    : ''
+                  const cellColors =
+                    assignment && !isDoubleBooked && color
+                      ? {
+                          backgroundColor: color.bg,
+                          borderColor: workAreaBorderColor(color),
+                          color: color.fg,
+                        }
+                      : undefined
 
-                const isPending = pendingCells.has(`p:${official.id}:${slotStart}`)
+                  const isPending = pendingCells.has(`p:${official.id}:${slotStart}`)
 
-                return (
-                  <td key={slotStart} className="px-1 py-2 relative">
-                    {isPending ? (
-                      <Skeleton className="w-full h-10 rounded-md" />
-                    ) : assignment ? (
-                      <button
-                        onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
-                      >
-                        <span className="w-full truncate text-center text-[11px] leading-none">
-                          {ws?.name ?? '—'}
-                        </span>
-                        <span
-                          className={`shrink-0 text-[10px] leading-none tabular-nums ${isDoubleBooked ? 'text-orange-400' : 'text-gray-400'}`}
+                  return (
+                    <td key={slotStart} className="px-1 py-2 relative">
+                      {isPending ? (
+                        <Skeleton className="w-full h-10 rounded-md" />
+                      ) : assignment ? (
+                        <button
+                          onClick={(e) =>
+                            onCellClick(official.id, slot, undefined, e.currentTarget)
+                          }
+                          className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium transition-colors hover:brightness-95 ${cellStyle} ${cellColors ? '' : 'text-gray-700'}`}
+                          style={cellColors}
                         >
-                          {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
-                          {isDoubleBooked && ' ⊗'}
-                        </span>
-                      </button>
-                    ) : activeSlotSet.has(slotStart) ? (
-                      <button
-                        onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
-                      />
-                    ) : (
-                      <div className="w-full h-10 rounded-md" style={STRIPED_UNAVAILABLE_STYLE} />
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
+                          <span className="w-full truncate text-center text-[11px] leading-none">
+                            {ws?.name ?? '—'}
+                          </span>
+                          <span
+                            className={`shrink-0 text-[10px] leading-none tabular-nums ${isDoubleBooked ? 'text-orange-400' : cellColors ? 'opacity-70' : 'text-gray-400'}`}
+                          >
+                            {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
+                            {isDoubleBooked && ' ⊗'}
+                          </span>
+                        </button>
+                      ) : activeSlotSet.has(slotStart) ? (
+                        <button
+                          onClick={(e) =>
+                            onCellClick(official.id, slot, undefined, e.currentTarget)
+                          }
+                          className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
+                        />
+                      ) : (
+                        <div className="w-full h-10 rounded-md" style={STRIPED_UNAVAILABLE_STYLE} />
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
 import { Button } from '@/components/ui/button'
+import { LISTBOX_ITEM } from '@/components/ui/form-fields'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
   generateSlotsForDay,
@@ -401,7 +402,7 @@ export function SchedulingGrid({
 
       {/* Print-only header — replaces the interactive chrome when printing */}
       <div className="print-only mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
+        <h1 className="page-title">{t('scheduling.title')}</h1>
         <p className="text-sm text-gray-600">
           {selectedStage?.name}
           {selectedDay ? ` — ${formatDayLabel(selectedDay)}` : ''}
@@ -410,7 +411,7 @@ export function SchedulingGrid({
 
       {/* Header */}
       <div className="no-print flex items-center gap-4 mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">{t('scheduling.title')}</h1>
+        <h1 className="page-title">{t('scheduling.title')}</h1>
 
         <div className="flex-1" />
 
@@ -441,6 +442,9 @@ export function SchedulingGrid({
           </DropdownTrigger>
           <DropdownMenu
             selectionMode="single"
+            // Shared with the Select fields so hover and the selected row
+            // pick up the tenant palette instead of HeroUI's grey.
+            itemClasses={{ base: LISTBOX_ITEM }}
             selectedKeys={new Set([selectedStageId])}
             onAction={(key) => {
               const id = String(key)
@@ -562,24 +566,39 @@ export function SchedulingGrid({
         </div>
       )}
 
-      {/* View toggle */}
-      <div className="no-print flex gap-1 mb-5">
-        <Button
-          size="sm"
-          color={view === 'by-person' ? 'primary' : 'default'}
-          variant={view === 'by-person' ? 'solid' : 'bordered'}
-          onPress={() => setView('by-person')}
-        >
-          {t('scheduling.viewByPerson')}
-        </Button>
-        <Button
-          size="sm"
-          color={view === 'by-work-area' ? 'primary' : 'default'}
-          variant={view === 'by-work-area' ? 'solid' : 'bordered'}
-          onPress={() => setView('by-work-area')}
-        >
-          {t('scheduling.viewByWorkArea')}
-        </Button>
+      {/* View toggle — a segmented control rather than two separate buttons:
+          the two views are one either/or choice, and the shared track makes
+          that read at a glance. Plain <button>s, not our Button, because
+          HeroUI's own padding and min-width fight the flush segments. */}
+      <div
+        role="tablist"
+        aria-label={t('scheduling.viewToggleLabel')}
+        className="no-print mb-5 inline-flex gap-1 rounded-control bg-status-neutral-bg p-1"
+      >
+        {(
+          [
+            ['by-person', t('scheduling.viewByPerson')],
+            ['by-work-area', t('scheduling.viewByWorkArea')],
+          ] as const
+        ).map(([key, label]) => {
+          const isActive = view === key
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setView(key)}
+              className={`rounded-[7px] px-4 py-1.5 text-sm font-semibold transition-colors ${
+                isActive
+                  ? 'bg-tenant-primary text-white shadow-card'
+                  : 'text-ink-soft hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Grid */}

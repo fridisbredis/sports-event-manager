@@ -33,7 +33,12 @@ export function FacilitiesEditor({
       {facilities.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {facilities.map((f, i) => (
-            <Chip key={i} onClose={() => onRemoveFacility(i)} variant="flat">
+            <Chip
+              key={i}
+              onClose={() => onRemoveFacility(i)}
+              variant="flat"
+              className="bg-tenant-primary-tint font-medium text-tenant-primary-tint-text"
+            >
               {f.label}
             </Chip>
           ))}

@@ -1,6 +1,6 @@
 import type { MutableRefObject } from 'react'
 import { Input } from '@heroui/react'
-import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
@@ -49,21 +49,14 @@ export function TodosEditor({ todos, todoRefs, onAddTodo, onRemoveTodo, onUpdate
                   input: 'text-sm text-gray-900 placeholder:text-gray-400',
                 }}
               />
-              <Button
-                variant="light"
-                size="sm"
-                onPress={() => onRemoveTodo(i)}
-                className="text-xs text-default-400 min-w-0 px-1"
-              >
+              <LinkButton size="sm" tone="danger" onPress={() => onRemoveTodo(i)}>
                 {t('workstations.removeTodo')}
-              </Button>
+              </LinkButton>
             </div>
           ))}
         </div>
-        <div className="px-3 py-2.5 border-t border-gray-100">
-          <Button variant="light" size="sm" onPress={onAddTodo} className="text-default-500 px-0">
-            {t('workstations.addTodo')}
-          </Button>
+        <div className="border-t border-edge px-4 py-3">
+          <LinkButton onPress={onAddTodo}>{t('workstations.addTodo')}</LinkButton>
         </div>
       </div>
     </section>

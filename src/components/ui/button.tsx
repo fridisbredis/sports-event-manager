@@ -13,10 +13,23 @@ const BORDERED_VARIANTS: ButtonProps['variant'][] = ['bordered', 'faded', 'ghost
 
 export function Button(props: ButtonProps) {
   const isBordered = BORDERED_VARIANTS.includes(props.variant)
-  return (
-    <HeroButton
-      {...props}
-      className={isBordered ? `border-1 ${props.className ?? ''}` : props.className}
-    />
-  )
+
+  // HeroUI darkens solid buttons on hover with a blanket opacity change. The
+  // design handoff instead specifies a distinct hover colour per theme
+  // (--tenant-primary-hover), so solid primary buttons use that and opt out of
+  // the opacity shift. Other variants and colours keep HeroUI's own behaviour.
+  const isSolidPrimary =
+    (props.variant ?? 'solid') === 'solid' && (props.color ?? 'default') === 'primary'
+
+  const classes = [
+    isBordered ? 'border-1' : '',
+    isSolidPrimary
+      ? 'rounded-control data-[hover=true]:opacity-100 hover:bg-tenant-primary-hover'
+      : '',
+    props.className ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return <HeroButton {...props} className={classes || undefined} />
 }

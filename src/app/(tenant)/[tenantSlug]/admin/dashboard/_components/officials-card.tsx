@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, CardBody } from '@heroui/react'
+import { AppCard } from '@/components/ui/app-card'
 import { BigStat } from './big-stat'
 
 interface OfficialsCardProps {
@@ -19,16 +19,12 @@ export function OfficialsCard({
   confirmedLabel,
 }: OfficialsCardProps) {
   return (
-    <Card>
-      <CardBody className="p-6">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          {title}
-        </h2>
-        <div className="flex items-end gap-8">
-          <BigStat value={invited} label={invitedLabel} />
-          <BigStat value={confirmed} label={confirmedLabel} />
-        </div>
-      </CardBody>
-    </Card>
+    <AppCard className="card-accent-primary">
+      <h2 className="section-label mb-4">{title}</h2>
+      <div className="flex items-end gap-8">
+        <BigStat value={invited} label={invitedLabel} />
+        <BigStat value={confirmed} label={confirmedLabel} emphasis />
+      </div>
+    </AppCard>
   )
 }

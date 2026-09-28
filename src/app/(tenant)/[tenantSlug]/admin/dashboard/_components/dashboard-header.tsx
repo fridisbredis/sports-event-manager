@@ -18,19 +18,31 @@ export function DashboardHeader({
   draftLabel,
 }: DashboardHeaderProps) {
   return (
-    <div className="flex items-start justify-between mb-8">
+    <div className="mb-6 flex items-start justify-between border-b border-edge pb-5">
       <div className="flex items-center gap-4">
-        <div className="w-14 h-14 shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+        {/* With no logo the tile is a filled theme-gradient plate rather than
+            an empty grey box — it reads as the event's mark either way. */}
+        <div
+          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-card-sm border-edge"
+          style={
+            logoUrl
+              ? undefined
+              : {
+                  backgroundImage:
+                    'linear-gradient(135deg, hsl(var(--tenant-primary)), hsl(var(--tenant-secondary)))',
+                }
+          }
+        >
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="w-full h-full object-cover" />
           ) : (
             <svg
-              className="w-6 h-6 text-gray-300"
+              className="h-6 w-6 text-white"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1.8"
             >
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <path d="M3 16l5-5 4 4 3-3 4 4" strokeLinecap="round" strokeLinejoin="round" />
@@ -39,8 +51,8 @@ export function DashboardHeader({
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{eventName}</h1>
-          <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
+          <h1 className="page-title">{eventName}</h1>
+          <p className="mt-1.5 text-[14.5px] text-ink-muted">{subtitle}</p>
         </div>
       </div>
       <PublishedPill

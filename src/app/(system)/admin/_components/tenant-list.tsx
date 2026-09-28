@@ -16,6 +16,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 
 interface Tenant {
   id: string
@@ -45,7 +46,7 @@ export function TenantList({ tenants }: Props) {
     <>
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">{t('systemAdmin.tenants')}</h1>
+          <h1 className="page-title">{t('systemAdmin.tenants')}</h1>
           <div className="flex items-center gap-4">
             <Link href="/admin/health" className="text-sm text-blue-600 hover:underline">
               {t('systemAdmin.systemStatus')}
@@ -78,7 +79,18 @@ export function TenantList({ tenants }: Props) {
             </Button>
           </AppCard>
         ) : (
-          <Table isStriped aria-label={t('systemAdmin.tenants')}>
+          <Table
+            aria-label={t('systemAdmin.tenants')}
+            classNames={{
+              // Same treatment as the officials roster: the shared card
+              // surface plus the theme accent line. The accent class carries a
+              // doubled selector so it outranks the `shadow-small` HeroUI's
+              // wrapper sets on this element.
+              wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
+              th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+              td: 'py-4',
+            }}
+          >
             <TableHeader>
               <TableColumn>{t('systemAdmin.tenantColumn')}</TableColumn>
               <TableColumn>{t('systemAdmin.statusColumn')}</TableColumn>
