@@ -14,6 +14,7 @@ import {
 } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
 import { workAreaColor, workAreaDotColor } from '@/lib/theme/work-area-colors'
 
@@ -121,24 +122,21 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
   const dateStr = formatStageDate(stage)
 
   return (
-    <div className="flex items-center gap-3 w-full">
-      <span className="font-medium text-gray-900 text-sm">{stage.name}</span>
+    <div className="flex w-full items-center gap-3">
+      <span className="text-[17px] font-bold tracking-tight text-ink">{stage.name}</span>
       <Chip
         size="sm"
         variant="flat"
-        style={
+        className={
           stage.stage_type === 'race'
-            ? {
-                color: 'hsl(var(--tenant-accent-tint-text))',
-                backgroundColor: 'hsl(var(--tenant-accent-tint))',
-              }
-            : undefined
+            ? 'bg-tenant-accent-tint font-medium text-tenant-accent-tint-text'
+            : 'bg-status-neutral-bg font-medium text-status-neutral-text'
         }
       >
         {typeLabel}
       </Chip>
-      {dateStr && <span className="text-xs text-gray-400">{dateStr}</span>}
-      <span className="ml-auto text-xs text-gray-400">
+      {dateStr && <span className="text-[14px] text-ink-muted">{dateStr}</span>}
+      <span className="ml-auto text-[14px] text-ink-muted">
         {t('workstations.workAreaCount', { count })}
       </span>
     </div>
@@ -161,11 +159,20 @@ function StageContent({
   return (
     <div>
       {count > 0 && (
-        <Table isStriped removeWrapper aria-label={stage.name}>
+        <Table
+          removeWrapper
+          aria-label={stage.name}
+          classNames={{
+            // A single tinted header band and plain white rows, per the
+            // reference — striping fights the per-row colour dots.
+            th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+            td: 'py-4',
+          }}
+        >
           <TableHeader>
             <TableColumn>{t('workstations.nameLabel')}</TableColumn>
             <TableColumn>{t('workstations.colOperatingWindows')}</TableColumn>
-            <TableColumn>{t('workstations.colCapacity')}</TableColumn>
+            <TableColumn align="end">{t('workstations.colCapacity')}</TableColumn>
           </TableHeader>
           <TableBody>
             {workstations.map((ws) => {
@@ -176,7 +183,7 @@ function StageContent({
                   className="cursor-pointer"
                   onClick={() => router.push(`/${tenantSlug}/admin/workstations/${ws.id}`)}
                 >
-                  <TableCell className="font-medium text-gray-900">
+                  <TableCell className="text-[15px] font-medium text-ink">
                     <span className="flex items-center gap-2.5">
                       {/* Decorative only — the name beside it already
                           identifies the row, so the dot carries no meaning of
@@ -189,8 +196,10 @@ function StageContent({
                       {ws.name}
                     </span>
                   </TableCell>
-                  <TableCell className="text-gray-600">{formatWindowsSummary(windows)}</TableCell>
-                  <TableCell className="text-gray-600">
+                  <TableCell className="text-[15px] text-ink-soft">
+                    {formatWindowsSummary(windows)}
+                  </TableCell>
+                  <TableCell className="text-right text-[15px] text-ink-soft">
                     {t('workstations.upTo', { n: ws.capacity_ceiling })}
                   </TableCell>
                 </TableRow>
@@ -199,11 +208,11 @@ function StageContent({
           </TableBody>
         </Table>
       )}
-      <div className="pt-3.5">
+      <div className="mt-2 flex justify-end border-t border-edge pt-3">
         <Button
           variant="light"
-          size="sm"
           onPress={() => router.push(`/${tenantSlug}/admin/workstations/new?stageId=${stage.id}`)}
+          className="font-semibold text-tenant-primary"
         >
           + {t('workstations.addWorkArea')}
         </Button>
@@ -245,7 +254,18 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
   return (
     <div>
       <h1 className="page-title mb-6">{t('workstations.title')}</h1>
-      <Accordion variant="splitted" defaultExpandedKeys={stages.map((s) => s.id)}>
+      <Accordion
+        variant="splitted"
+        defaultExpandedKeys={stages.map((s) => s.id)}
+        // HeroUI's splitted variant ships its own card look; point it at the
+        // shared surface so these panels match every other card in the app.
+        itemClasses={{
+          base: `${CARD_SURFACE} px-6 py-1`,
+          trigger: 'py-4',
+          content: 'pb-4 pt-0',
+        }}
+        className="gap-4 px-0"
+      >
         {stages.map((stage) => (
           <AccordionItem
             key={stage.id}
