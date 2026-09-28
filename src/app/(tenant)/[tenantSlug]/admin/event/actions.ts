@@ -265,13 +265,26 @@ export async function updateTenantColorPalette(
 
   if (!(colorPalette in TENANT_PALETTES)) return { error: 'Unknown color palette' }
 
-  const { error } = await supabase
+  // `select()` so the row count comes back: an UPDATE whose rows are all
+  // filtered out by RLS is not an error in Postgres — it reports success
+  // having changed nothing. Without this check a missing policy looks exactly
+  // like a successful save, which is how the picker once appeared to store a
+  // theme it never wrote.
+  const { data, error } = await supabase
     .from('tenants')
     .update({ color_palette: colorPalette })
     .eq('id', parsedTenantId.data)
+    .select('id')
 
   if (error)
     return { error: await translateDbError('updateTenantColorPalette: update failed', error) }
+
+  if (!data || data.length === 0) {
+    logger.error('updateTenantColorPalette: update matched no rows', {
+      tenantId: parsedTenantId.data,
+    })
+    return { error: 'Not authorized' }
+  }
 
   revalidatePath(`/${tenantSlug}`, 'layout')
 
