@@ -64,13 +64,22 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
         key={segment}
         href={href}
         title={collapsed ? label : undefined}
+        aria-current={isActive ? 'page' : undefined}
         className={`flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
           collapsed ? 'justify-center px-0' : ''
-        } ${
+        } ${isActive ? 'font-semibold' : 'text-ink-soft hover:bg-gray-50 hover:text-ink'}`}
+        // The active item takes the tenant's primary tint with a 3px inset bar
+        // in the primary colour, per the design handoff. Inline because the
+        // values are per-tenant CSS variables, not fixed Tailwind colours.
+        style={
           isActive
-            ? 'bg-gray-100 text-gray-900 font-medium'
-            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-        }`}
+            ? {
+                backgroundColor: 'hsl(var(--tenant-primary-tint))',
+                color: 'hsl(var(--tenant-primary-tint-text))',
+                boxShadow: 'inset 3px 0 0 hsl(var(--tenant-primary))',
+              }
+            : undefined
+        }
       >
         <Icon className="size-4 shrink-0" strokeWidth={2} />
         {!collapsed && label}
@@ -80,7 +89,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
 
   return (
     <aside
-      className={`sticky top-0 shrink-0 border-r border-gray-200 bg-white flex flex-col h-screen transition-[width] duration-150 ${
+      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-edge bg-white transition-[width] duration-150 ${
         collapsed ? 'w-16' : 'w-56'
       }`}
     >
@@ -89,11 +98,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
           collapsed ? 'justify-center px-0' : 'justify-between'
         }`}
       >
-        {!collapsed && (
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-            {adminLabel}
-          </span>
-        )}
+        {!collapsed && <span className="section-label">{adminLabel}</span>}
         <button
           onClick={toggleCollapsed}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}

@@ -19,6 +19,19 @@ const config: Config = {
         display: ['var(--font-manrope)', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Per-tenant colors, resolved from the CSS variables TenantThemeStyle
+        // emits. They exist as Tailwind colors so utilities like
+        // `hover:bg-tenant-primary-hover` work; the actual value still varies
+        // per tenant at runtime.
+        tenant: {
+          primary: 'hsl(var(--tenant-primary))',
+          'primary-hover': 'hsl(var(--tenant-primary-hover))',
+          'primary-tint': 'hsl(var(--tenant-primary-tint))',
+          'primary-tint-text': 'hsl(var(--tenant-primary-tint-text))',
+          secondary: 'hsl(var(--tenant-secondary))',
+          'accent-tint': 'hsl(var(--tenant-accent-tint))',
+          'accent-tint-text': 'hsl(var(--tenant-accent-tint-text))',
+        },
         ink: {
           DEFAULT: '#111827', // body text
           soft: '#374151', // secondary text
