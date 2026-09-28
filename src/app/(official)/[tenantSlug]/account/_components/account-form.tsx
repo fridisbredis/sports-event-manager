@@ -92,8 +92,7 @@ export default function AccountForm({
           <div className="flex items-center gap-3">
             <Button
               type="button"
-              variant="bordered"
-              color={saveState === 'saved' ? 'success' : 'default'}
+              color={saveState === 'saved' ? 'success' : 'primary'}
               isLoading={saveState === 'saving'}
               onPress={handleSave}
             >
@@ -105,8 +104,8 @@ export default function AccountForm({
       <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-24'}>
         {/* Avatar */}
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-xl font-semibold text-gray-500">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-status-neutral-bg">
+            <span className="text-2xl font-semibold text-ink-soft">
               {name
                 .split(' ')
                 .map((w) => w[0])
@@ -130,23 +129,19 @@ export default function AccountForm({
 
         {/* Phone field */}
         <div className="mb-8">
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            {t('account.phoneLabel')}
-          </label>
-          <div className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 select-none">
+          <label className="mb-1.5 block text-sm text-ink-soft">{t('account.phoneLabel')}</label>
+          <div className="w-full select-none rounded-control border-1 border-edge bg-white px-3.5 py-2.5 text-[15px] text-ink-muted">
             {formatPhoneForDisplay(phone)}
           </div>
         </div>
 
         {/* Notifications section */}
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          {t('account.notificationsHeading')}
-        </p>
+        <p className="section-label mb-3">{t('account.notificationsHeading')}</p>
         <AppCard className="mb-8" bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-900">{t('account.smsUpdatesLabel')}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-[15px] font-semibold text-ink">{t('account.smsUpdatesLabel')}</p>
+              <p className="mt-0.5 text-sm text-ink-muted">
                 {smsOptOut ? t('account.smsUpdatesHintOff') : t('account.smsUpdatesHintOn')}
               </p>
             </div>
@@ -154,6 +149,7 @@ export default function AccountForm({
             <Switch
               isSelected={!smsOptOut}
               onValueChange={handleToggle}
+              color="primary"
               aria-label={t('account.smsUpdatesLabel')}
             />
           </div>
@@ -162,26 +158,24 @@ export default function AccountForm({
         {/* Schedule section — conditional */}
         {assignmentCount > 0 && (
           <>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-              {t('account.scheduleHeading')}
-            </p>
+            <p className="section-label mb-3">{t('account.scheduleHeading')}</p>
             <Link
               href={`/${tenantSlug}/schedule`}
-              className={`flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 mb-8 hover:bg-gray-50 transition-colors`}
+              className={`flex items-center gap-4 ${CARD_SURFACE} mb-8 px-4 py-4 transition-colors hover:bg-surface`}
             >
-              <div className="w-8 h-8 rounded-lg border-2 border-gray-300 shrink-0" />
+              <div className="h-8 w-8 shrink-0 rounded-lg border-2 border-edge-field" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-[15px] font-semibold text-ink">
                   {t('account.assignmentCount', { count: assignmentCount })}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">{t('account.viewSchedule')}</p>
+                <p className="mt-0.5 text-sm text-ink-muted">{t('account.viewSchedule')}</p>
               </div>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={1.5}
-                className="w-5 h-5 shrink-0 text-gray-400"
+                className="h-5 w-5 shrink-0 text-ink-label"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
               </svg>
