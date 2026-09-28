@@ -74,9 +74,7 @@ export function WsSlotModal({
 
               {assignedInSlot.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    {t('scheduling.slotModalAssigned')}
-                  </p>
+                  <p className="section-label mb-2">{t('scheduling.slotModalAssigned')}</p>
                   {assignedInSlot.map((a) => {
                     const off = officials.find((o) => o.id === a.official_id)
                     return (
@@ -101,7 +99,7 @@ export function WsSlotModal({
 
               {assignedInSlot.length === 0 && availableOfficialsAll.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  <p className="section-label mb-2">
                     {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
                   </p>
                   <Input

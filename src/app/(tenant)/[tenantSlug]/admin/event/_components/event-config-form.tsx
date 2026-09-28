@@ -248,13 +248,17 @@ export default function EventConfigForm({
         </div>
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-[2fr_3fr] gap-5">
+      {/* Two-column layout.
+
+          auto-fit + minmax(480px, 1fr) rather than a fixed ratio: the columns
+          hold their full width and drop to a single column the moment both no
+          longer fit, instead of squeezing progressively and wrapping content
+          inside the cards on the way down. 480px is the width below which the
+          Schedule & setup stage rows start wrapping. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(480px,1fr))] items-start gap-7">
         {/* Left: Identity */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
-            {t('eventConfig.identity')}
-          </h2>
+          <h2 className="section-label mb-5">{t('eventConfig.identity')}</h2>
           <Card>
             <CardBody className="p-6 space-y-4">
               <LogoUploadField
@@ -342,9 +346,7 @@ export default function EventConfigForm({
 
         {/* Right: Schedule & Setup */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-5">
-            {t('eventConfig.scheduleSetup')}
-          </h2>
+          <h2 className="section-label mb-5">{t('eventConfig.scheduleSetup')}</h2>
           <Card>
             <CardBody className="p-0">
               {/* Stages */}

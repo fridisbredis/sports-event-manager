@@ -151,9 +151,9 @@ export default function StageList({ stages, onChange }: Props) {
       <div className="overflow-hidden rounded-large">
         {/* Header row */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <span className="section-label">
             {t('eventConfig.stagesLabel')}
-            <span className="text-red-400">*</span>
+            <span className="text-danger-text">*</span>
           </span>
           <Button
             type="button"
@@ -172,7 +172,7 @@ export default function StageList({ stages, onChange }: Props) {
             return (
               <div key={i} className="bg-white">
                 {/* Collapsed row */}
-                <div className="flex items-center gap-2 px-4 py-3 transition-colors">
+                <div className="flex flex-nowrap items-center gap-2 px-4 py-3 transition-colors">
                   {/* Expand toggle */}
                   <Button
                     isIconOnly
@@ -193,7 +193,7 @@ export default function StageList({ stages, onChange }: Props) {
 
                   {/* Type badge */}
                   <span
-                    className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    className={`shrink-0 inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
                       stage.stage_type === 'race'
                         ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
                         : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
@@ -205,7 +205,7 @@ export default function StageList({ stages, onChange }: Props) {
                   </span>
 
                   {/* Time range */}
-                  <span className="shrink-0 text-xs text-gray-400 tabular-nums w-40 text-right">
+                  <span className="shrink-0 whitespace-nowrap text-xs text-gray-400 tabular-nums text-right">
                     {formatTimeRange(stage.start_time, stage.end_time)}
                   </span>
 
@@ -233,7 +233,7 @@ export default function StageList({ stages, onChange }: Props) {
                 {/* Expanded details */}
                 {isExpanded && (
                   <div
-                    className={`px-4 pb-3 ml-7 grid gap-6 w-1/2 ${stage.stage_type === 'race' ? 'grid-cols-3' : 'grid-cols-1'}`}
+                    className={`ml-7 grid gap-x-6 gap-y-3 px-4 pb-3 ${stage.stage_type === 'race' ? 'grid-cols-[repeat(auto-fit,minmax(140px,1fr))]' : 'grid-cols-1'}`}
                   >
                     <div>
                       <p className="text-xs font-medium text-gray-400 mb-0.5">

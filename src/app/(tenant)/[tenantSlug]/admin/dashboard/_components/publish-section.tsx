@@ -32,9 +32,7 @@ export async function PublishSection({
 
   return (
     <SectionCard>
-      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-        {t('dashboard.publishStatus')}
-      </h2>
+      <h2 className="section-label mb-4">{t('dashboard.publishStatus')}</h2>
       {isPublished ? (
         <p className="text-sm text-gray-700">{t('dashboard.publishedVisible')}</p>
       ) : canPublish ? (
