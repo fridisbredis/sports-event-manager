@@ -4,26 +4,35 @@ import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 export function SchedulingLegend() {
   const { t } = useTranslation('admin')
   return (
-    <div className="no-print mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
-      <span className="flex items-center gap-1.5">
-        <span className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded font-mono text-gray-700">
+    <div className="no-print mt-5 flex flex-wrap gap-x-6 gap-y-2.5 text-xs text-ink-label">
+      <span className="flex items-center gap-2">
+        <span className="rounded border border-edge bg-white px-1.5 py-0.5 font-mono text-ink-soft">
           2/3
         </span>
         {t('scheduling.legendCapacity')}
       </span>
-      <span className="flex items-center gap-1.5">
-        <span className="inline-flex items-center justify-center w-4 h-4 border border-gray-400 rounded-sm text-gray-500 text-[10px]">
-          ⊗
+      {/* A filled cell takes its work area's colour, so the swatch can only
+          stand for "some palette colour" — the tenant primary tint is the
+          neutral stand-in rather than picking one work area's hue. */}
+      <span className="flex items-center gap-2">
+        <span className="inline-block h-4 w-8 rounded-sm border border-tenant-primary bg-tenant-primary-tint" />
+        {t('scheduling.legendFilled')}
+      </span>
+      <span className="flex items-center gap-2">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-destructive text-[11px] text-destructive">
+          !
         </span>
         {t('scheduling.legendDoubleBooked')}
       </span>
-      <span className="flex items-center gap-1.5">
-        <span className="w-8 h-4 rounded-sm bg-orange-50 border border-orange-200 inline-block" />
+      <span className="flex items-center gap-2">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-orange-400 bg-orange-100 text-[11px] text-orange-600">
+          !
+        </span>
         {t('scheduling.legendOverCapacity')}
       </span>
-      <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-2">
         <span
-          className="w-8 h-4 rounded-sm inline-block border border-gray-200"
+          className="inline-block h-4 w-8 rounded-sm border border-edge"
           style={STRIPED_UNAVAILABLE_STYLE}
         />
         {t('scheduling.legendOutsideWindow')}

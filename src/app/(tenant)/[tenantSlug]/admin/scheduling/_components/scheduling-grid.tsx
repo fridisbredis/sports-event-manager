@@ -562,24 +562,39 @@ export function SchedulingGrid({
         </div>
       )}
 
-      {/* View toggle */}
-      <div className="no-print flex gap-1 mb-5">
-        <Button
-          size="sm"
-          color={view === 'by-person' ? 'primary' : 'default'}
-          variant={view === 'by-person' ? 'solid' : 'bordered'}
-          onPress={() => setView('by-person')}
-        >
-          {t('scheduling.viewByPerson')}
-        </Button>
-        <Button
-          size="sm"
-          color={view === 'by-work-area' ? 'primary' : 'default'}
-          variant={view === 'by-work-area' ? 'solid' : 'bordered'}
-          onPress={() => setView('by-work-area')}
-        >
-          {t('scheduling.viewByWorkArea')}
-        </Button>
+      {/* View toggle — a segmented control rather than two separate buttons:
+          the two views are one either/or choice, and the shared track makes
+          that read at a glance. Plain <button>s, not our Button, because
+          HeroUI's own padding and min-width fight the flush segments. */}
+      <div
+        role="tablist"
+        aria-label={t('scheduling.viewToggleLabel')}
+        className="no-print mb-5 inline-flex gap-1 rounded-control bg-status-neutral-bg p-1"
+      >
+        {(
+          [
+            ['by-person', t('scheduling.viewByPerson')],
+            ['by-work-area', t('scheduling.viewByWorkArea')],
+          ] as const
+        ).map(([key, label]) => {
+          const isActive = view === key
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setView(key)}
+              className={`rounded-[7px] px-4 py-1.5 text-sm font-semibold transition-colors ${
+                isActive
+                  ? 'bg-tenant-primary text-white shadow-card'
+                  : 'text-ink-soft hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Grid */}

@@ -83,7 +83,7 @@ export function ByWorkAreaGrid({
 
   if (stageWorkstations.length === 0) {
     return (
-      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-gray-500`}>
+      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-ink-label`}>
         {t('scheduling.noWorkAreas')}
       </div>
     )
@@ -113,13 +113,13 @@ export function ByWorkAreaGrid({
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr>
-            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-44 border-r border-b border-gray-100">
+            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-44 border-b border-r border-edge-soft">
               {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="sticky top-0 z-20 bg-white text-center px-1 py-3 text-xs font-medium text-gray-500 w-20 border-b border-gray-100"
+                className="sticky top-0 z-20 w-20 border-b border-edge-soft bg-white px-1 py-3 text-center text-[13px] font-semibold text-ink"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -137,8 +137,8 @@ export function ByWorkAreaGrid({
             return (
               <React.Fragment key={ws.id}>
                 {/* Summary row (always visible) */}
-                <tr className="border-b border-gray-50">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-3 border-r border-gray-100">
+                <tr className="border-b border-edge-soft">
+                  <td className="sticky left-0 z-10 bg-white px-3 py-3 border-r border-edge-soft">
                     <div className="flex items-center gap-2">
                       <Button
                         isIconOnly
@@ -168,10 +168,10 @@ export function ByWorkAreaGrid({
                         style={{ backgroundColor: workAreaDotColor(color) }}
                       />
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate" title={ws.name}>
+                        <div className="truncate text-sm font-semibold text-ink" title={ws.name}>
                           {ws.name}
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-ink-label">
                           {t('workstations.upTo', { n: ws.capacity_ceiling })}
                         </div>
                       </div>
@@ -205,7 +205,7 @@ export function ByWorkAreaGrid({
                             isOver
                               ? 'bg-orange-50 border-orange-200 text-orange-700'
                               : count === 0
-                                ? 'bg-white border-gray-200 text-gray-400'
+                                ? 'border-edge bg-white text-ink-label'
                                 : ''
                           }`}
                           // A filled cell takes its work area's colour, with a
@@ -240,10 +240,10 @@ export function ByWorkAreaGrid({
                   Array.from({ length: ws.capacity_ceiling }, (_, i) => i + 1).map((slotIdx) => (
                     <tr
                       key={`${ws.id}-slot-${slotIdx}`}
-                      className="border-b border-gray-50 bg-gray-50/40"
+                      className="border-b border-edge-soft bg-gray-50/40"
                     >
-                      <td className="sticky left-0 z-10 bg-gray-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
-                        <span className="text-xs text-gray-400 font-mono">#{slotIdx}</span>
+                      <td className="sticky left-0 z-10 bg-gray-50 pl-12 pr-3 py-1.5 border-r border-edge-soft">
+                        <span className="font-mono text-xs text-ink-label">#{slotIdx}</span>
                       </td>
                       {slots.map((slot, slotArrIdx) => {
                         const slotStart = slot.toISOString()
@@ -289,7 +289,16 @@ export function ByWorkAreaGrid({
                                 onClick={() => onWsExpandedSlotClick(ws.id, ws.name, slotIdx, slot)}
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
                                 title={officialName}
-                                className={`w-full h-10 rounded-md border px-2 text-center text-xs truncate transition-colors hover:brightness-95 bg-gray-100 border-gray-200 text-gray-700 ${inDragRange ? 'ring-2 ring-blue-400' : ''}`}
+                                // The assigned-person cell carries the same
+                                // work-area colour as the summary row above it,
+                                // so a glance down a column reads as one area.
+                                // White ground keeps the name legible; the hue
+                                // lives in the border and the text.
+                                style={{
+                                  borderColor: workAreaBorderColor(color),
+                                  color: color.fg,
+                                }}
+                                className={`w-full h-10 truncate rounded-md border bg-white px-2 text-center text-xs transition-colors hover:brightness-95 ${inDragRange ? 'ring-2 ring-tenant-primary' : ''}`}
                               >
                                 {shortName(officialName)}
                               </button>
@@ -301,8 +310,8 @@ export function ByWorkAreaGrid({
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
                                 className={`w-full h-10 rounded-md border transition-colors ${
                                   inDragRange
-                                    ? 'border-blue-300 bg-blue-50'
-                                    : 'border-transparent hover:border-gray-200 hover:bg-white'
+                                    ? 'border-tenant-primary bg-tenant-primary-tint'
+                                    : 'border-transparent hover:border-edge hover:bg-white'
                                 }`}
                               />
                             )}
@@ -314,8 +323,11 @@ export function ByWorkAreaGrid({
 
                 {/* Overflow row — assignments with slot_index > capacity_ceiling */}
                 {isExpanded && hasOverflow && (
-                  <tr key={`${ws.id}-overflow`} className="border-b border-gray-50 bg-orange-50/20">
-                    <td className="sticky left-0 z-10 bg-orange-50 pl-12 pr-3 py-1.5 border-r border-gray-100">
+                  <tr
+                    key={`${ws.id}-overflow`}
+                    className="border-b border-edge-soft bg-orange-50/20"
+                  >
+                    <td className="sticky left-0 z-10 bg-orange-50 pl-12 pr-3 py-1.5 border-r border-edge-soft">
                       <span className="text-xs text-orange-500 font-medium">
                         {t('scheduling.overflowRow')}
                       </span>
