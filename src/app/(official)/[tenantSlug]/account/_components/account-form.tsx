@@ -163,7 +163,19 @@ export default function AccountForm({
               href={`/${tenantSlug}/schedule`}
               className={`flex items-center gap-4 ${CARD_SURFACE} mb-8 px-4 py-4 transition-colors hover:bg-surface`}
             >
-              <div className="h-8 w-8 shrink-0 rounded-lg border-2 border-edge-field" />
+              {/* A calendar, since the row leads to the schedule — the
+                  empty square it replaced read as an unchecked checkbox. */}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.7}
+                className="h-8 w-8 shrink-0 text-tenant-primary"
+              >
+                <rect x="3" y="5" width="18" height="16" rx="2.5" />
+                <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
+              </svg>
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold text-ink">
                   {t('account.assignmentCount', { count: assignmentCount })}
