@@ -240,7 +240,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
 
         {/* Channel toggle */}
         <div className="flex items-center gap-3 mb-6">
-          <span className="text-sm font-medium text-default-500">{t('communication.channel')}</span>
+          <span className="text-sm text-ink-soft">{t('communication.channel')}</span>
           <div className="flex gap-1">
             {(['participants', 'officials'] as AnnouncementChannel[]).map((ch) => (
               <Button
@@ -251,6 +251,16 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
                 variant={channel === ch ? 'solid' : 'bordered'}
                 size="sm"
                 radius="full"
+                // The unselected pill is white with a light edge and ink
+                // text; HeroUI's own `bordered` default is grey on grey and
+                // reads as disabled next to the filled one. `rounded-full`
+                // is restated because the solid branch of this same Button
+                // gets `rounded-control` from the wrapper.
+                className={
+                  channel === ch
+                    ? '!rounded-full px-5 font-semibold'
+                    : '!rounded-full border-edge bg-white px-5 font-semibold text-ink'
+                }
               >
                 {t(`communication.${ch}`)}
               </Button>
@@ -259,10 +269,8 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
         </div>
 
         {/* New announcement card */}
-        <AppCard className="mb-6" bodyClassName="p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            {t('communication.newAnnouncement')}
-          </p>
+        <AppCard className="card-accent-primary mb-6" bodyClassName="p-5">
+          <p className="section-label mb-3">{t('communication.newAnnouncement')}</p>
           <Textarea
             value={draft}
             onValueChange={setDraft}
@@ -270,7 +278,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
             minRows={4}
           />
           <div className="flex items-center justify-between mt-3">
-            <span className="text-xs text-default-400">{t('communication.smsNote')}</span>
+            <span className="text-sm text-ink-soft">{t('communication.smsNote')}</span>
             <Button
               type="button"
               color="primary"
@@ -285,15 +293,13 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
 
         {/* Timeline */}
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            {timelineLabel}
-          </p>
+          <p className="section-label mb-3">{timelineLabel}</p>
 
           {filtered.length === 0 ? (
             <AppCard bodyClassName="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="w-12 h-12 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-edge">
                 <svg
-                  className="w-6 h-6 text-gray-300"
+                  className="h-6 w-6 text-ink-faint"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -309,10 +315,10 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
               <div className="text-center">
                 {isFirstPage ? (
                   <>
-                    <p className="text-sm font-medium text-default-500">
+                    <p className="text-sm font-medium text-ink-soft">
                       {t('communication.noAnnouncementsYet')}
                     </p>
-                    <p className="text-xs text-default-400 mt-0.5">
+                    <p className="mt-0.5 text-sm text-ink-label">
                       {t('communication.noAnnouncementsHint')}
                     </p>
                   </>
@@ -321,7 +327,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
                   // announcements than the other runs out first. That is not
                   // "nothing published" — say so, and offer the way back.
                   <>
-                    <p className="text-sm font-medium text-default-500">
+                    <p className="text-sm font-medium text-ink-soft">
                       {t('communication.noOlderAnnouncements')}
                     </p>
                     <Button
@@ -338,14 +344,17 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
               </div>
             </AppCard>
           ) : (
-            <AppCard bodyClassName="p-0 divide-y divide-gray-100">
+            /* Each announcement is its own card with a leading accent edge
+               rather than rows inside one divided card — the reference reads
+               them as separate published items, not as a table. */
+            <div className="space-y-3">
               {filtered.map((a) => (
-                <div key={a.id} className="px-5 py-4">
-                  <p className="text-sm text-gray-900 leading-snug">{a.body}</p>
-                  <p className="text-xs text-default-400 mt-1">{formatDate(a.published_at)}</p>
-                </div>
+                <AppCard key={a.id} className="card-accent-left" bodyClassName="px-5 py-4">
+                  <p className="text-[15px] leading-snug text-ink">{a.body}</p>
+                  <p className="mt-1 text-sm text-ink-label">{formatDate(a.published_at)}</p>
+                </AppCard>
               ))}
-            </AppCard>
+            </div>
           )}
 
           {(!isFirstPage || channelHasMore) && (

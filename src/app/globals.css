@@ -64,4 +64,14 @@
       theme('boxShadow.card'),
       inset 0 2px 0 color-mix(in srgb, hsl(var(--tenant-secondary)) 28%, white);
   }
+
+  /* Same accent, rotated to the leading edge — for rows in a list where a
+     top line would read as a divider between items rather than as a mark on
+     one. Wider than the 2px top line because a vertical edge reads thinner
+     at the same weight. */
+  .card-accent-left.card-accent-left {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 3px 0 0 color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white);
+  }
 }
