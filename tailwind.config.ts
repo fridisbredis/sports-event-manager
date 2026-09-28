@@ -39,6 +39,9 @@ const config: Config = {
           label: '#5B6472', // labels
           faint: '#8A93A1', // uppercase section labels, help text
         },
+        // The page ground the admin surfaces sit on; also used for inset
+        // wells such as the logo placeholder.
+        surface: '#F7F8FA',
         edge: {
           field: '#8C94A1', // field borders — 3:1 vs white
           DEFAULT: '#E3E6EB', // dividers, card borders

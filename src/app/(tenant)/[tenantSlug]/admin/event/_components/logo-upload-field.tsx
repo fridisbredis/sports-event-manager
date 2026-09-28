@@ -27,7 +27,7 @@ export function LogoUploadField({
 
   return (
     <div className="flex items-start gap-4">
-      <div className="w-20 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden">
+      <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border-[1.5px] border-dashed border-edge-field bg-surface">
         {logoUrl && !logoError ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -38,11 +38,11 @@ export function LogoUploadField({
           />
         ) : (
           <svg
-            className="w-8 h-8 text-gray-300"
+            className="h-6 w-6 text-ink-label"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.5"
+            strokeWidth="2.4"
           >
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <path d="M3 16l5-5 4 4 3-3 4 4" strokeLinecap="round" strokeLinejoin="round" />
@@ -51,7 +51,10 @@ export function LogoUploadField({
         )}
       </div>
       <div className="flex-1">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label
+          htmlFor="logo-file-input"
+          className="mb-2 block font-display text-sm font-bold text-ink"
+        >
           {t('eventConfig.logoLabel')}
         </label>
         <input
@@ -69,6 +72,7 @@ export function LogoUploadField({
             isDisabled={isUploading}
             isLoading={isUploading}
             onPress={() => fileInputRef.current?.click()}
+            className="rounded-lg border-edge-field bg-white text-[13px] text-ink"
           >
             {isUploading
               ? t('eventConfig.logoUploading')
@@ -77,7 +81,7 @@ export function LogoUploadField({
                 : t('eventConfig.logoChoose')}
           </Button>
           {logoUrl && !isUploading && (
-            <Button variant="light" size="sm" onPress={onRemove} className="text-xs text-gray-400">
+            <Button variant="light" size="sm" onPress={onRemove} className="text-xs text-ink-label">
               {t('eventConfig.logoRemove')}
             </Button>
           )}
