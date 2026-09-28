@@ -94,6 +94,14 @@ describe('AccountForm log out', () => {
 })
 
 describe('AccountForm layout split', () => {
+  it('keeps the schedule row on the admin layout even with no assignments', () => {
+    // It is the admin's only way into their own schedule, so it must not
+    // disappear precisely when they want to check that they have no shifts.
+    render(<AccountForm {...baseProps} assignmentCount={0} layout="desktop" />)
+    expect(screen.queryByText('account.scheduleHeading')).toBeTruthy()
+    expect(screen.getByText('account.assignmentCount:{"count":0}')).toBeTruthy()
+  })
+
   it('shows the schedule row only on the admin (desktop) layout', () => {
     // The admin sidebar has no link to the admin's own shifts, so the account
     // screen carries it. An official reaches theirs from the bottom tab bar.

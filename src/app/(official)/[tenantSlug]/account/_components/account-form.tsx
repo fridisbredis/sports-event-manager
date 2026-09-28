@@ -163,8 +163,10 @@ export default function AccountForm({
 
         {/* Schedule section — admin only. An official already has My schedule
             in the bottom tab bar, so the same link here is a second door to
-            one room; an admin's sidebar has no equivalent. */}
-        {isDesktop && assignmentCount > 0 && (
+            one room; an admin's sidebar has no equivalent, which is why this
+            one shows even at zero: it is their only way in, and an admin with
+            no shifts still needs to be able to look and see that. */}
+        {isDesktop && (
           <>
             <p className="section-label mb-3">{t('account.scheduleHeading')}</p>
             <Link
