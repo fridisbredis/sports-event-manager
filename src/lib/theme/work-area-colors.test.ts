@@ -6,6 +6,31 @@ import {
   workAreaDotColor,
 } from './work-area-colors'
 
+// sRGB -> OKLab. Perceptual distance in this space is what decides whether two
+// pastels actually look different; hue angle alone does not (the eye resolves
+// greens far more coarsely than reds or blues).
+function toOklab(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))
+  const r = lin(((n >> 16) & 255) / 255)
+  const g = lin(((n >> 8) & 255) / 255)
+  const b = lin((n & 255) / 255)
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ]
+}
+
+function perceptualDistance(a: string, b: string): number {
+  const [l1, a1, b1] = toOklab(a)
+  const [l2, a2, b2] = toOklab(b)
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2)
+}
+
 function relativeLuminance(hex: string): number {
   const n = parseInt(hex.slice(1), 16)
   const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
@@ -34,6 +59,39 @@ describe('WORK_AREA_COLORS', () => {
     for (const { bg, fg } of WORK_AREA_COLORS) {
       expect(bg).toMatch(/^#[0-9A-F]{6}$/)
       expect(fg).toMatch(/^#[0-9A-F]{6}$/)
+    }
+  })
+
+  // Guards the property the palette exists for: that two work areas or two
+  // officials sitting next to each other are actually distinguishable. An
+  // earlier revision spaced hues evenly around the circle, which clustered
+  // eight of the thirty into green/teal with pairs 0.005 apart — visually
+  // identical at avatar size. Anything under ~0.01 is too close to call.
+  it('keeps every pair of backgrounds perceptually distinguishable', () => {
+    let closest = { distance: Infinity, pair: '' }
+    for (let i = 0; i < WORK_AREA_COLORS.length; i++) {
+      for (let j = i + 1; j < WORK_AREA_COLORS.length; j++) {
+        const distance = perceptualDistance(WORK_AREA_COLORS[i].bg, WORK_AREA_COLORS[j].bg)
+        if (distance < closest.distance) {
+          closest = {
+            distance,
+            pair: `${WORK_AREA_COLORS[i].name}/${WORK_AREA_COLORS[j].name}`,
+          }
+        }
+      }
+    }
+    expect(closest.distance, `closest pair was ${closest.pair}`).toBeGreaterThan(0.01)
+  })
+
+  // Separation has to hold for every colour, not just on average: one colour
+  // that sits close to two others is exactly the "these look the same" case,
+  // even when the palette-wide minimum looks fine.
+  it('gives every colour at least two clearly distinct neighbours', () => {
+    for (const color of WORK_AREA_COLORS) {
+      const distances = WORK_AREA_COLORS.filter((other) => other !== color)
+        .map((other) => perceptualDistance(color.bg, other.bg))
+        .sort((a, b) => a - b)
+      expect(distances[1], `${color.name} has two near-identical neighbours`).toBeGreaterThan(0.012)
     }
   })
 
