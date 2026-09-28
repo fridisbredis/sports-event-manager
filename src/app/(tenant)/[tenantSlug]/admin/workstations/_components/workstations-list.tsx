@@ -128,8 +128,8 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
         style={
           stage.stage_type === 'race'
             ? {
-                color: 'hsl(var(--heroui-accent))',
-                backgroundColor: 'color-mix(in srgb, hsl(var(--heroui-accent)) 15%, white)',
+                color: 'hsl(var(--tenant-accent-tint-text))',
+                backgroundColor: 'hsl(var(--tenant-accent-tint))',
               }
             : undefined
         }
