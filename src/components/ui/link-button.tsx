@@ -20,7 +20,7 @@ export function LinkButton({
 }: Omit<ButtonProps, 'variant' | 'color'> & { tone?: 'primary' | 'danger' }) {
   const toneClasses =
     tone === 'danger'
-      ? 'text-danger-text hover:text-danger-hover'
+      ? 'text-destructive hover:text-destructive-hover'
       : 'text-tenant-primary hover:text-tenant-primary-hover'
 
   return (

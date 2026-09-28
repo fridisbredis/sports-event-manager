@@ -61,8 +61,13 @@ const config: Config = {
           'neutral-bg': '#F1F3F6',
           'neutral-text': '#4B5563',
         },
-        danger: {
-          text: '#B91C1C', // destructive list actions
+        // NB: deliberately NOT named `danger`. HeroUI defines its own `danger`
+        // palette, and extending that key here replaces it wholesale — which
+        // dropped its DEFAULT and left `color="danger"` buttons with no
+        // background at all (white text on white). These are our destructive
+        // text colours only; HeroUI's own danger scale is left intact.
+        destructive: {
+          DEFAULT: '#B91C1C', // destructive list actions
           solid: '#BE123C', // destructive modal button
           hover: '#9F1239',
         },

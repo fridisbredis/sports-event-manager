@@ -153,7 +153,7 @@ export default function StageList({ stages, onChange }: Props) {
         <div className="flex items-center justify-between border-b border-edge px-4 py-3.5">
           <span className="section-label">
             {t('eventConfig.stagesLabel')}
-            <span className="text-danger-text">*</span>
+            <span className="text-destructive">*</span>
           </span>
           <Button
             type="button"
@@ -227,7 +227,7 @@ export default function StageList({ stages, onChange }: Props) {
                       variant="light"
                       color="danger"
                       onPress={() => handleDelete(i)}
-                      className="font-medium text-danger-text"
+                      className="font-medium text-destructive"
                       isDisabled={isLastRace}
                       title={
                         isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')

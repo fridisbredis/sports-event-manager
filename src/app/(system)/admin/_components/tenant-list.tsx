@@ -16,6 +16,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 
 interface Tenant {
   id: string
@@ -78,7 +79,16 @@ export function TenantList({ tenants }: Props) {
             </Button>
           </AppCard>
         ) : (
-          <Table isStriped aria-label={t('systemAdmin.tenants')}>
+          <Table
+            aria-label={t('systemAdmin.tenants')}
+            classNames={{
+              // Same reason as the officials roster: HeroUI's wrapper shadow
+              // is blue-tinted, so it takes the shared card surface instead.
+              wrapper: `${CARD_SURFACE} p-4 !shadow-card`,
+              th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+              td: 'py-4',
+            }}
+          >
             <TableHeader>
               <TableColumn>{t('systemAdmin.tenantColumn')}</TableColumn>
               <TableColumn>{t('systemAdmin.statusColumn')}</TableColumn>

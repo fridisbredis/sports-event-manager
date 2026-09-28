@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LinkButton } from '@/components/ui/link-button'
 import { workAreaColor } from '@/lib/theme/work-area-colors'
 import { useTranslation } from '@/lib/i18n/client'
@@ -230,6 +231,11 @@ export default function OfficialsList({
         <Table
           aria-label={t('officials.title')}
           classNames={{
+            // HeroUI's own wrapper carries `shadow-small`, whose shadow tokens
+            // are tinted blue-grey rather than neutral — that read as a blue
+            // edge around the card. Replaced with the shared card surface so
+            // this panel matches every other one.
+            wrapper: `${CARD_SURFACE} p-4 !shadow-card`,
             th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
             td: 'py-4',
           }}
