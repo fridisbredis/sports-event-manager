@@ -82,9 +82,11 @@ export function TenantList({ tenants }: Props) {
           <Table
             aria-label={t('systemAdmin.tenants')}
             classNames={{
-              // Same reason as the officials roster: HeroUI's wrapper shadow
-              // is blue-tinted, so it takes the shared card surface instead.
-              wrapper: `${CARD_SURFACE} p-4 !shadow-card`,
+              // Same treatment as the officials roster: the shared card
+              // surface plus the theme accent line. The accent class carries a
+              // doubled selector so it outranks the `shadow-small` HeroUI's
+              // wrapper sets on this element.
+              wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
               th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
               td: 'py-4',
             }}

@@ -231,11 +231,12 @@ export default function OfficialsList({
         <Table
           aria-label={t('officials.title')}
           classNames={{
-            // HeroUI's own wrapper carries `shadow-small`, whose shadow tokens
-            // are tinted blue-grey rather than neutral — that read as a blue
-            // edge around the card. Replaced with the shared card surface so
-            // this panel matches every other one.
-            wrapper: `${CARD_SURFACE} p-4 !shadow-card`,
+            // The shared card surface plus the theme accent line along the
+            // top — the same treatment the dashboard and event-config cards
+            // get. `card-accent-primary` is defined with a doubled selector so
+            // it outranks both CARD_SURFACE's shadow-card and the
+            // `shadow-small` HeroUI's wrapper sets on this same element.
+            wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
             th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
             td: 'py-4',
           }}
