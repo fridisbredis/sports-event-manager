@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, shortName } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { workAreaBorderColor, workAreaColor, workAreaDotColor } from '@/lib/theme/work-area-colors'
 import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
@@ -128,6 +129,7 @@ export function ByWorkAreaGrid({
         <tbody>
           {stageWorkstations.map((ws) => {
             const isExpanded = expandedWorkAreas.has(ws.id)
+            const color = workAreaColor(ws.id)
 
             const overflowBySlot = getOverflowBySlot(activeAssignments, ws.id, ws.capacity_ceiling)
             const hasOverflow = overflowBySlot.size > 0
@@ -160,6 +162,11 @@ export function ByWorkAreaGrid({
                           />
                         </svg>
                       </Button>
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: workAreaDotColor(color) }}
+                      />
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate" title={ws.name}>
                           {ws.name}
@@ -194,13 +201,27 @@ export function ByWorkAreaGrid({
                     return (
                       <td key={slotStart} className="px-1 py-2">
                         <div
-                          className={`flex w-full h-10 flex-col items-center justify-center rounded-md px-2 text-xs font-medium text-center ${
+                          className={`flex w-full h-10 flex-col items-center justify-center rounded-md border px-2 text-xs font-medium text-center ${
                             isOver
-                              ? 'bg-orange-50 border border-orange-200 text-orange-700'
+                              ? 'bg-orange-50 border-orange-200 text-orange-700'
                               : count === 0
-                                ? 'bg-white border border-gray-200 text-gray-400'
-                                : 'bg-gray-100 border border-gray-200 text-gray-700'
+                                ? 'bg-white border-gray-200 text-gray-400'
+                                : ''
                           }`}
+                          // A filled cell takes its work area's colour, with a
+                          // softened border rather than the full-strength hue —
+                          // the handoff asks for a calm grid, not an alarm-like
+                          // one. Over-capacity keeps the orange warning styling,
+                          // which carries meaning the palette must not override.
+                          style={
+                            !isOver && count > 0
+                              ? {
+                                  backgroundColor: color.bg,
+                                  borderColor: workAreaBorderColor(color),
+                                  color: color.fg,
+                                }
+                              : undefined
+                          }
                         >
                           {count} / {ws.capacity_ceiling}
                           {isOver && (

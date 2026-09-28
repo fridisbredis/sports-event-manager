@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
+import { workAreaColor, workAreaDotColor } from '@/lib/theme/work-area-colors'
 
 interface OperatingWindow {
   window_start: string
@@ -175,7 +176,19 @@ function StageContent({
                   className="cursor-pointer"
                   onClick={() => router.push(`/${tenantSlug}/admin/workstations/${ws.id}`)}
                 >
-                  <TableCell className="font-medium text-gray-900">{ws.name}</TableCell>
+                  <TableCell className="font-medium text-gray-900">
+                    <span className="flex items-center gap-2.5">
+                      {/* Decorative only — the name beside it already
+                          identifies the row, so the dot carries no meaning of
+                          its own and is hidden from assistive tech. */}
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: workAreaDotColor(workAreaColor(ws.id)) }}
+                      />
+                      {ws.name}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-gray-600">{formatWindowsSummary(windows)}</TableCell>
                   <TableCell className="text-gray-600">
                     {t('workstations.upTo', { n: ws.capacity_ceiling })}

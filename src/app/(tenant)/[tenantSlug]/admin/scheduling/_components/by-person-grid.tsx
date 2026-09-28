@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { workAreaBorderColor, workAreaColor } from '@/lib/theme/work-area-colors'
 import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
@@ -122,11 +123,22 @@ export function ByPersonGrid({
                 const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
                 const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
 
+                // Double-booking is a warning and keeps its orange styling —
+                // the work-area palette is decorative and must not mask it.
+                const color = ws ? workAreaColor(ws.id) : undefined
                 const cellStyle = assignment
                   ? isDoubleBooked
                     ? 'bg-orange-50 border border-orange-200'
-                    : 'bg-gray-100 border border-gray-200'
+                    : 'border'
                   : ''
+                const cellColors =
+                  assignment && !isDoubleBooked && color
+                    ? {
+                        backgroundColor: color.bg,
+                        borderColor: workAreaBorderColor(color),
+                        color: color.fg,
+                      }
+                    : undefined
 
                 const isPending = pendingCells.has(`p:${official.id}:${slotStart}`)
 
@@ -137,13 +149,14 @@ export function ByPersonGrid({
                     ) : assignment ? (
                       <button
                         onClick={(e) => onCellClick(official.id, slot, undefined, e.currentTarget)}
-                        className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium text-gray-700 transition-colors hover:brightness-95 ${cellStyle}`}
+                        className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium transition-colors hover:brightness-95 ${cellStyle} ${cellColors ? '' : 'text-gray-700'}`}
+                        style={cellColors}
                       >
                         <span className="w-full truncate text-center text-[11px] leading-none">
                           {ws?.name ?? '—'}
                         </span>
                         <span
-                          className={`shrink-0 text-[10px] leading-none tabular-nums ${isDoubleBooked ? 'text-orange-400' : 'text-gray-400'}`}
+                          className={`shrink-0 text-[10px] leading-none tabular-nums ${isDoubleBooked ? 'text-orange-400' : cellColors ? 'opacity-70' : 'text-gray-400'}`}
                         >
                           {ws ? `${wsCount}/${ws.capacity_ceiling}` : ''}
                           {isDoubleBooked && ' ⊗'}
