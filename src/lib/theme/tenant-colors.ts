@@ -47,15 +47,19 @@ export const TENANT_PALETTES = {
     accentTint: '201.3 80.6% 94.5%', // #E6F4FC
     accentTintText: '201.3 96.3% 32.2%', // #0369A1
   },
-  orange: {
-    primary: '17.5 88.3% 40.4%', //   #C2410C
-    primaryHover: '18 88.4% 33.9%', // #A3380A
-    primaryTint: '34.3 100% 91.8%', // #FFEDD5
-    primaryTintText: '22.7 82.5% 31.4%', // #92400E
-    secondary: '26 90.5% 37.1%', //   #B45309
-    accent: '22.7 82.5% 31.4%', //    #92400E
-    accentTint: '34.3 100% 91.8%', // #FFEDD5
-    accentTintText: '22.7 82.5% 31.4%', // #92400E
+  // Purple. Replaces the orange palette, which no tenant used in either
+  // environment when it was dropped. All three of its roles were under AA
+  // before this round (3.78:1, 4.23:1 and 2.64:1); these are the handoff's
+  // corrected values — 5.70:1, 7.90:1 and 6.32:1.
+  purple: {
+    primary: '262.1 83.3% 57.8%', //  #7C3AED
+    primaryHover: '262.1 83.3% 50.8%', // #6619EA
+    primaryTint: '262.1 84% 95.1%', // #F0E8FD
+    primaryTintText: '262.1 83.3% 50.8%', // #6619EA
+    secondary: '244.5 57.9% 50.6%', // #4338CA
+    accent: '294.7 72.4% 39.8%', //   #A21CAF
+    accentTint: '294.7 80.6% 94.5%', // #FAE6FC
+    accentTintText: '294.7 72.4% 39.8%', // #A21CAF
   },
 } as const satisfies Record<string, TenantPalette>
 
