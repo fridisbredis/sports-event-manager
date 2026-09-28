@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { LinkButton } from '@/components/ui/link-button'
 import { workAreaColor } from '@/lib/theme/work-area-colors'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
@@ -285,26 +286,23 @@ export default function OfficialsList({
                   </TableCell>
                   <TableCell>
                     {!isCurrentUser && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-5">
                         {official.invite_status === 'invited' && (
-                          <Button
+                          <LinkButton
                             size="sm"
-                            variant="light"
                             isLoading={isResending}
                             onPress={() => setResendTarget(official)}
-                            className="px-0 font-semibold text-tenant-primary"
                           >
                             {t('officials.resendInvite')}
-                          </Button>
+                          </LinkButton>
                         )}
-                        <Button
+                        <LinkButton
                           size="sm"
-                          variant="light"
+                          tone="danger"
                           onPress={() => setRemoveTarget(official)}
-                          className="px-0 font-semibold text-danger-text"
                         >
                           {t('officials.remove')}
-                        </Button>
+                        </LinkButton>
                       </div>
                     )}
                   </TableCell>

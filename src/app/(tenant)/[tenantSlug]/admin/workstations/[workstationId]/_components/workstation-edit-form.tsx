@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/ui/link-button'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
@@ -271,27 +272,20 @@ export default function WorkstationEditForm({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <Button
-            variant="light"
+          <LinkButton
             size="sm"
             onPress={() => guardedNavigate(`/${tenantSlug}/admin/workstations`)}
-            className="mb-1 px-0 font-semibold text-tenant-primary"
+            className="mb-1 no-underline hover:no-underline"
             startContent={<span aria-hidden="true">←</span>}
           >
             {t('workstations.backToList')}
-          </Button>
+          </LinkButton>
           <h1 className="page-title">{name || t('workstations.namePlaceholder')}</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            color="danger"
-            variant="light"
-            onPress={handleDelete}
-            isDisabled={isBusy}
-            className="font-semibold text-danger-text"
-          >
+          <LinkButton tone="danger" onPress={handleDelete} isDisabled={isBusy}>
             {t('workstations.delete')}
-          </Button>
+          </LinkButton>
           <Button
             color={saveSuccess ? 'success' : 'primary'}
             variant={saveSuccess ? 'flat' : 'solid'}

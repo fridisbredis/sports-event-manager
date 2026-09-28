@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
 import { createWorkstation } from '../../actions'
@@ -211,15 +212,14 @@ export default function WorkstationForm({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <Button
-            variant="light"
+          <LinkButton
             size="sm"
             onPress={() => router.push(`/${tenantSlug}/admin/workstations`)}
-            className="mb-1 px-0 font-semibold text-tenant-primary"
+            className="mb-1 no-underline hover:no-underline"
             startContent={<span aria-hidden="true">←</span>}
           >
             {t('workstations.backToList')}
-          </Button>
+          </LinkButton>
           <h1 className="page-title">{t('workstations.addTitle')}</h1>
         </div>
         <Button

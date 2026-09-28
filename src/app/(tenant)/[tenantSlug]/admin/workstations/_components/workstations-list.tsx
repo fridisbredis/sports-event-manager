@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
 import { workAreaColor, workAreaDotColor } from '@/lib/theme/work-area-colors'
 
@@ -209,13 +210,11 @@ function StageContent({
         </Table>
       )}
       <div className="mt-2 flex justify-end border-t border-edge pt-3">
-        <Button
-          variant="light"
+        <LinkButton
           onPress={() => router.push(`/${tenantSlug}/admin/workstations/new?stageId=${stage.id}`)}
-          className="font-semibold text-tenant-primary"
         >
           + {t('workstations.addWorkArea')}
-        </Button>
+        </LinkButton>
       </div>
     </div>
   )
