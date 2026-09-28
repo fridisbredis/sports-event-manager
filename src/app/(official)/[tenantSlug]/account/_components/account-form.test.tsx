@@ -74,12 +74,8 @@ describe('AccountForm log out', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders a log out control on both the mobile and desktop layouts', () => {
-    const { unmount } = render(<AccountForm {...baseProps} />)
-    expect(screen.getByText('account.logOut')).toBeTruthy()
-    unmount()
-
-    render(<AccountForm {...baseProps} layout="desktop" />)
+  it('renders a log out control on the official layout', () => {
+    render(<AccountForm {...baseProps} />)
     expect(screen.getByText('account.logOut')).toBeTruthy()
   })
 
@@ -94,5 +90,28 @@ describe('AccountForm log out', () => {
     await waitFor(() => {
       expect(window.location.replace).toHaveBeenCalledWith('/login')
     })
+  })
+})
+
+describe('AccountForm layout split', () => {
+  it('shows the schedule row only on the admin (desktop) layout', () => {
+    // The admin sidebar has no link to the admin's own shifts, so the account
+    // screen carries it. An official reaches theirs from the bottom tab bar.
+    const { unmount } = render(<AccountForm {...baseProps} layout="desktop" />)
+    expect(screen.queryByText('account.scheduleHeading')).toBeTruthy()
+    unmount()
+
+    render(<AccountForm {...baseProps} />)
+    expect(screen.queryByText('account.scheduleHeading')).toBeNull()
+  })
+
+  it('shows log out only on the official (mobile) layout', () => {
+    // The admin layout already carries one at the foot of its sidebar.
+    const { unmount } = render(<AccountForm {...baseProps} layout="desktop" />)
+    expect(screen.queryByText('account.logOut')).toBeNull()
+    unmount()
+
+    render(<AccountForm {...baseProps} />)
+    expect(screen.queryByText('account.logOut')).toBeTruthy()
   })
 })

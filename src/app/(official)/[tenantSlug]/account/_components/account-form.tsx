@@ -161,8 +161,10 @@ export default function AccountForm({
           </div>
         </AppCard>
 
-        {/* Schedule section — conditional */}
-        {assignmentCount > 0 && (
+        {/* Schedule section — admin only. An official already has My schedule
+            in the bottom tab bar, so the same link here is a second door to
+            one room; an admin's sidebar has no equivalent. */}
+        {isDesktop && assignmentCount > 0 && (
           <>
             <p className="section-label mb-3">{t('account.scheduleHeading')}</p>
             <Link
@@ -201,14 +203,15 @@ export default function AccountForm({
           </>
         )}
 
-        {/* Signing out is a destructive-ish account action rather than a
-            navigation, so it sits apart from the cards above and outside the
-            tab bar's five slots. The admin surfaces put it at the foot of the
-            sidebar; this is the equivalent place on a screen that has none. */}
-        <LogoutButton className="flex w-full items-center justify-center gap-2 rounded-control border-1 border-edge bg-white px-4 py-3 text-[15px] font-semibold text-ink-soft transition-colors hover:border-edge-field hover:text-ink">
-          <LogOut className="size-4 shrink-0" strokeWidth={2} />
-          {t('account.logOut')}
-        </LogoutButton>
+        {/* Log out — official only. The admin layout already carries one at
+            the foot of its sidebar, and two on the same screen is one too
+            many. This is the equivalent place on a layout with no sidebar. */}
+        {!isDesktop && (
+          <LogoutButton className="flex w-full items-center justify-center gap-2 rounded-control border-1 border-edge bg-white px-4 py-3 text-[15px] font-semibold text-ink-soft transition-colors hover:border-edge-field hover:text-ink">
+            <LogOut className="size-4 shrink-0" strokeWidth={2} />
+            {t('account.logOut')}
+          </LogoutButton>
+        )}
       </div>
 
       {/* Mobile: Save button fixed at bottom above tab bar */}
