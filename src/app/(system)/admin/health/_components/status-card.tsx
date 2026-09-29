@@ -2,10 +2,12 @@ import { AppCard } from '@/components/ui/app-card'
 
 type Status = 'ok' | 'error' | 'unknown'
 
+// The handoff's status pairs rather than raw Tailwind palette steps, so an
+// "Up" badge here reads identically to a Confirmed/Published badge elsewhere.
 const STATUS_STYLES: Record<Status, string> = {
-  ok: 'bg-green-100 text-green-800',
-  error: 'bg-red-100 text-red-800',
-  unknown: 'bg-gray-100 text-gray-600',
+  ok: 'bg-status-ok-bg text-status-ok-text',
+  error: 'bg-destructive/10 text-destructive',
+  unknown: 'bg-status-neutral-bg text-status-neutral-text',
 }
 
 interface StatusCardLink {
@@ -26,10 +28,10 @@ export function StatusCard({ title, status, statusLabels, facts, links, note }: 
   return (
     <AppCard>
       <div className="flex items-start justify-between gap-4">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <h3 className="text-base font-bold tracking-tight text-ink">{title}</h3>
         {status && statusLabels && (
           <span
-            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
+            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[status]}`}
           >
             {statusLabels[status]}
           </span>
@@ -37,26 +39,26 @@ export function StatusCard({ title, status, statusLabels, facts, links, note }: 
       </div>
 
       {facts && facts.length > 0 && (
-        <dl className="mt-3 space-y-1">
+        <dl className="mt-4 space-y-2">
           {facts.map((fact) => (
-            <div key={fact.label} className="flex justify-between text-sm">
-              <dt className="text-gray-500">{fact.label}</dt>
-              <dd className="text-gray-900 font-medium">{fact.value}</dd>
+            <div key={fact.label} className="flex items-baseline justify-between gap-4 text-sm">
+              <dt className="text-ink-label">{fact.label}</dt>
+              <dd className="break-all text-right font-mono font-medium text-ink">{fact.value}</dd>
             </div>
           ))}
         </dl>
       )}
 
-      {note && <p className="mt-3 text-xs text-gray-500">{note}</p>}
+      {note && <p className="mt-3 text-xs leading-relaxed text-ink-faint">{note}</p>}
 
-      <div className="mt-4 flex flex-wrap gap-3 border-t border-gray-100 pt-3">
+      <div className="mt-4 flex flex-wrap gap-4 border-t border-edge-soft pt-3">
         {links.map((link) => (
           <a
             key={link.href}
             href={link.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            className="text-sm font-medium text-ink underline decoration-edge-field underline-offset-4 transition-colors hover:decoration-ink"
           >
             {link.label} ↗
           </a>

@@ -2,18 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import {
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Chip,
-} from '@heroui/react'
-import { Button } from '@/components/ui/button'
+import { Building2 } from 'lucide-react'
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react'
+import { Chip } from '@/components/ui/chip'
 import { AppCard } from '@/components/ui/app-card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { CreateTenantModal } from './create-tenant-modal'
+import { SystemButton } from './system-button'
 import { setTenantActive } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
@@ -44,51 +39,52 @@ export function TenantList({ tenants }: Props) {
 
   return (
     <>
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="mx-auto max-w-[1240px] px-10 pb-16 pt-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <h1 className="page-title">{t('systemAdmin.tenants')}</h1>
-          <div className="flex items-center gap-4">
-            <Link href="/admin/health" className="text-sm text-blue-600 hover:underline">
+          <div className="flex items-center gap-6">
+            {/* Graphite, not blue: the system surface carries no tenant theme,
+                and the design pairs this with the dark primary button rather
+                than making it the one saturated element on the page. */}
+            <Link
+              href="/admin/health"
+              className="text-sm font-medium text-ink transition-colors hover:text-ink-muted"
+            >
               {t('systemAdmin.systemStatus')}
             </Link>
-            <Button color="primary" onPress={() => setModalOpen(true)}>
+            <SystemButton onPress={() => setModalOpen(true)}>
               {t('systemAdmin.createTenant')}
-            </Button>
+            </SystemButton>
           </div>
         </div>
 
         {tenants.length === 0 ? (
-          <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
-            <svg
-              className="mb-4 h-12 w-12 text-gray-300"
-              viewBox="0 0 48 48"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
+          <AppCard bodyClassName="p-0">
+            <EmptyState
+              Icon={Building2}
+              title={t('systemAdmin.noTenantsYet')}
+              description={t('systemAdmin.noTenantsHint')}
+              // The shared plate takes the tenant tint, which is undefined on
+              // this surface — override it with the same neutral the table
+              // header uses so the icon still sits on a plate, not on nothing.
+              className="[&>div:first-child]:bg-status-neutral-bg [&>div:first-child]:text-ink-muted"
             >
-              <rect x="8" y="8" width="32" height="32" rx="4" />
-              <line x1="16" y1="24" x2="32" y2="24" />
-              <line x1="24" y1="16" x2="24" y2="32" />
-            </svg>
-            <p className="text-base font-medium text-gray-900 mb-1">
-              {t('systemAdmin.noTenantsYet')}
-            </p>
-            <p className="text-sm text-gray-500 mb-6">{t('systemAdmin.noTenantsHint')}</p>
-            <Button color="primary" onPress={() => setModalOpen(true)}>
-              {t('systemAdmin.createTenant')}
-            </Button>
+              <SystemButton onPress={() => setModalOpen(true)}>
+                {t('systemAdmin.createTenant')}
+              </SystemButton>
+            </EmptyState>
           </AppCard>
         ) : (
           <Table
             aria-label={t('systemAdmin.tenants')}
             classNames={{
-              // Same treatment as the officials roster: the shared card
-              // surface plus the theme accent line. The accent class carries a
-              // doubled selector so it outranks the `shadow-small` HeroUI's
-              // wrapper sets on this element.
-              wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
+              wrapper: `${CARD_SURFACE} p-4`,
               th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
-              td: 'py-4',
+              // 58px row min-height from the handoff, via generous cell
+              // padding — the design gives this list noticeably more air than
+              // a default HeroUI table row.
+              td: 'py-5',
+              tr: 'border-b border-edge-soft last:border-b-0',
             }}
           >
             <TableHeader>
@@ -103,27 +99,36 @@ export function TenantList({ tenants }: Props) {
                   <TableCell>
                     <Link
                       href={`/admin/${tenant.id}`}
-                      className="font-medium text-gray-900 hover:underline"
+                      className="font-semibold text-ink hover:underline"
                     >
                       {tenant.name}
                     </Link>
-                    <p className="text-xs text-gray-400 font-mono mt-0.5">{tenant.slug}</p>
+                    <p className="mt-0.5 font-mono text-xs text-ink-faint">{tenant.slug}</p>
                   </TableCell>
                   <TableCell>
-                    <Chip size="sm" color={tenant.is_active ? 'success' : 'default'} variant="flat">
+                    <Chip
+                      size="sm"
+                      variant="flat"
+                      classNames={{
+                        base: tenant.is_active ? 'bg-status-ok-bg' : 'bg-status-neutral-bg',
+                        content: `font-medium ${
+                          tenant.is_active ? 'text-status-ok-text' : 'text-status-neutral-text'
+                        }`,
+                      }}
+                    >
                       {tenant.is_active ? t('systemAdmin.active') : t('systemAdmin.inactive')}
                     </Chip>
                   </TableCell>
-                  <TableCell className="capitalize text-gray-500">{tenant.tier}</TableCell>
+                  <TableCell className="capitalize text-ink-muted">{tenant.tier}</TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant="light"
-                      isLoading={pending === tenant.id}
-                      onPress={() => handleToggleActive(tenant)}
+                    <button
+                      type="button"
+                      disabled={pending === tenant.id}
+                      onClick={() => handleToggleActive(tenant)}
+                      className="rounded-control text-sm font-semibold text-ink transition-colors hover:text-ink-muted disabled:opacity-50"
                     >
                       {tenant.is_active ? t('systemAdmin.deactivate') : t('systemAdmin.activate')}
-                    </Button>
+                    </button>
                   </TableCell>
                 </TableRow>
               ))}

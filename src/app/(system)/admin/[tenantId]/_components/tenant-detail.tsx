@@ -48,20 +48,18 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
   }
 
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="divide-y divide-edge-soft">
       {/* Activation */}
-      <div className="p-8">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          {t('systemAdmin.activation')}
-        </h2>
+      <div className="p-6">
+        <h2 className="section-label mb-4">{t('systemAdmin.activation')}</h2>
         <div className="flex items-center gap-4">
           <button
             role="switch"
             aria-checked={isActive}
             onClick={handleToggleActive}
             disabled={pendingActive}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 disabled:opacity-50 ${
-              isActive ? 'bg-gray-900' : 'bg-gray-200'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50 ${
+              isActive ? 'bg-ink' : 'bg-edge'
             }`}
           >
             <span
@@ -70,23 +68,21 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
               }`}
             />
           </button>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-semibold text-ink">
             {isActive ? t('systemAdmin.active') : t('systemAdmin.inactive')}
           </span>
         </div>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-ink-label">
           {isActive ? t('systemAdmin.tenantCanAccess') : t('systemAdmin.tenantCannotAccess')}
         </p>
       </div>
 
       {/* Feature tier */}
-      <div className="p-8">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          {t('systemAdmin.featureTier')}
-        </h2>
+      <div className="p-6">
+        <h2 className="section-label mb-4">{t('systemAdmin.featureTier')}</h2>
         <div className="flex flex-col gap-3">
           {TIERS.map((tierOption) => (
-            <label key={tierOption} className="flex items-center gap-3 cursor-pointer">
+            <label key={tierOption} className="flex cursor-pointer items-center gap-3">
               <input
                 type="radio"
                 name="tier"
@@ -94,13 +90,13 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
                 checked={tier === tierOption}
                 onChange={() => handleTierChange(tierOption)}
                 disabled={pendingTier}
-                className="h-4 w-4 text-gray-900 border-gray-300 focus:ring-gray-900"
+                className="size-4 border-edge-field text-ink accent-ink focus:ring-ink"
               />
-              <span className="text-sm text-gray-900">{t(`systemAdmin.${tierOption}`)}</span>
+              <span className="text-sm text-ink">{t(`systemAdmin.${tierOption}`)}</span>
             </label>
           ))}
         </div>
-        <p className="mt-3 text-sm text-gray-500">{t('systemAdmin.tierHint')}</p>
+        <p className="mt-3 text-sm text-ink-label">{t('systemAdmin.tierHint')}</p>
       </div>
     </div>
   )

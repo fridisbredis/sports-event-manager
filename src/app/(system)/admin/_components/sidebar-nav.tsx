@@ -2,10 +2,28 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut } from 'lucide-react'
+import { ChevronLeft, LayoutPanelLeft, LogOut } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 
-export function SidebarNav() {
+interface Props {
+  /** Where "Back to tenant admin" points, or null when the user administers no tenant. */
+  backToTenantHref: string | null
+  labels: {
+    tenants: string
+    backToTenantAdmin: string
+    logOut: string
+  }
+}
+
+// The system-admin sidebar deliberately does NOT use the tenant theme tint the
+// tenant-admin sidebar uses for its active item. This layout sits above every
+// tenant and renders no TenantThemeStyle, so --tenant-* is undefined here and a
+// tinted row would come out colourless. Graphite is also the right signal: the
+// system surface belongs to no single tenant's branding.
+const ACTIVE_ITEM = 'bg-status-neutral-bg font-semibold text-ink shadow-[inset_3px_0_0_#111827]'
+const IDLE_ITEM = 'text-ink-soft hover:bg-gray-50 hover:text-ink'
+
+export function SidebarNav({ backToTenantHref, labels }: Props) {
   const pathname = usePathname()
   // Excludes /admin/health: it's reached via a link from the tenant list
   // (SYS-03), not a sidebar tab, so this is the first admin route where
@@ -15,23 +33,32 @@ export function SidebarNav() {
     (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/health'))
 
   return (
-    <div className="flex flex-col flex-1">
-      <nav className="py-2 flex-1">
+    <div className="flex flex-1 flex-col min-h-0">
+      <nav className="flex-1 overflow-y-auto py-2">
         <Link
           href="/admin"
-          className={`block px-6 py-2.5 text-sm transition-colors ${
-            isActive
-              ? 'bg-gray-100 text-gray-900 font-medium'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          aria-current={isActive ? 'page' : undefined}
+          className={`flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
+            isActive ? ACTIVE_ITEM : IDLE_ITEM
           }`}
         >
-          Tenants
+          <LayoutPanelLeft className="size-4 shrink-0" strokeWidth={2} />
+          {labels.tenants}
         </Link>
       </nav>
-      <div className="border-t border-gray-100 py-2">
-        <LogoutButton className="flex w-full items-center gap-3 text-left px-6 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+      <div className="border-t border-edge-soft py-2">
+        {backToTenantHref && (
+          <Link
+            href={backToTenantHref}
+            className="flex items-center gap-3 px-6 py-2.5 text-sm text-ink-label transition-colors hover:bg-gray-50 hover:text-ink"
+          >
+            <ChevronLeft className="size-4 shrink-0" strokeWidth={2} />
+            {labels.backToTenantAdmin}
+          </Link>
+        )}
+        <LogoutButton className="flex w-full items-center gap-3 px-6 py-2.5 text-left text-sm text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink">
           <LogOut className="size-4 shrink-0" strokeWidth={2} />
-          Log out
+          {labels.logOut}
         </LogoutButton>
       </div>
     </div>
