@@ -122,21 +122,35 @@ export default function AccountForm({
           </div>
         </div>
 
-        {/* Name field */}
+        {/* Name field. The "Edit" affordance sits inside the field, at its
+            trailing edge, rather than as a description line underneath — it
+            reads as part of the control it applies to, and keeps the label /
+            field / label / field rhythm with the phone row below unbroken.
+            It is a hint, not a control: the input is always editable, so it
+            carries aria-hidden and no press target of its own. */}
         <div className="mb-5">
           <Input
             label={t('account.nameLabel')}
             value={name}
             onValueChange={handleNameChange}
-            description={t('account.editHint')}
             labelPlacement="outside"
+            endContent={
+              <span
+                aria-hidden="true"
+                className="shrink-0 text-[15px] font-semibold text-tenant-primary"
+              >
+                {t('account.editHint')}
+              </span>
+            }
           />
         </div>
 
-        {/* Phone field */}
+        {/* Phone field. Grey rather than white: it is the one field on the
+            screen that cannot be typed in, and the flat grey says so before
+            the "(read-only)" in the label has to. */}
         <div className="mb-8">
           <label className="mb-1.5 block text-sm text-ink-soft">{t('account.phoneLabel')}</label>
-          <div className="w-full select-none rounded-control border-1 border-edge bg-white px-3.5 py-2.5 text-[15px] text-ink-muted">
+          <div className="w-full select-none rounded-control border-1 border-edge bg-surface px-3.5 py-2.5 text-[15px] text-ink-muted">
             {formatPhoneForDisplay(phone)}
           </div>
         </div>
