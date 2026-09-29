@@ -1,21 +1,29 @@
+import { ShieldCheck } from 'lucide-react'
+import { getServerTranslation } from '@/lib/i18n/server'
 import { SidebarNav } from './_components/sidebar-nav'
 
 interface Props {
   children: React.ReactNode
 }
 
-export default function SystemAdminLayout({ children }: Props) {
+export default async function SystemAdminLayout({ children }: Props) {
+  const t = await getServerTranslation('en', 'admin')
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <aside className="w-56 shrink-0 border-r border-gray-200 bg-white flex flex-col min-h-screen">
-        <div className="px-6 py-5 border-b border-gray-100">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-            System admin
-          </span>
+    <div className="app-surface flex min-h-screen">
+      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-edge bg-white">
+        <div className="flex items-center justify-between border-b border-edge-soft px-6 py-5">
+          <span className="section-label">{t('systemAdmin.sidebarLabel')}</span>
+          <ShieldCheck className="size-4 shrink-0 text-ink-faint" strokeWidth={2} />
         </div>
-        <SidebarNav />
+        <SidebarNav
+          labels={{
+            tenants: t('systemAdmin.tenants'),
+            logOut: t('systemAdmin.logOut'),
+          }}
+        />
       </aside>
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

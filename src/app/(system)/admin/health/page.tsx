@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
@@ -36,14 +37,23 @@ export default async function SystemHealthPage() {
   const sentryProjectName = process.env.SENTRY_PROJECT
 
   return (
-    <div className="p-8 max-w-5xl">
-      <Link href="/admin" className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+    <div className="mx-auto max-w-[1240px] px-10 pb-16 pt-8">
+      <Link
+        href="/admin"
+        className="-ml-1 inline-flex items-center gap-1 text-sm font-medium text-ink-label transition-colors hover:text-ink"
+      >
+        <ChevronLeft className="size-4" strokeWidth={2} />
         {t('health.backToTenants')}
       </Link>
-      <h1 className="page-title mb-1 mt-3">{t('health.title')}</h1>
-      <p className="text-sm text-gray-500 mb-6">{t('health.subtitle')}</p>
+      <h1 className="page-title mb-2 mt-3">{t('health.title')}</h1>
+      <p className="mb-6 max-w-[62ch] text-sm leading-relaxed text-ink-label">
+        {t('health.subtitle')}
+      </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* One column, not the 2-up grid this had before: each card is a
+          label/value list whose values (a project ref, a phone number) are
+          long enough that two narrow columns wrapped them. */}
+      <div className="flex max-w-3xl flex-col gap-4">
         <StatusCard
           title={t('health.supabase.title')}
           status={supabase.status}

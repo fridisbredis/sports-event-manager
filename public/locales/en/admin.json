@@ -340,6 +340,8 @@
     "saveError": "Something went wrong. Please try again."
   },
   "systemAdmin": {
+    "sidebarLabel": "System admin",
+    "logOut": "Log out",
     "tenants": "Tenants",
     "systemStatus": "System status",
     "createTenant": "Create tenant",
@@ -367,7 +369,7 @@
     "tierHint": "Exactly one tier is active per tenant in v1. Selecting one clears the others."
   },
   "health": {
-    "backToTenants": "← Tenants",
+    "backToTenants": "Tenants",
     "title": "System status",
     "subtitle": "Quick overview of dev/prod operations. Some metrics are live, others link out to the service's own console.",
     "status": {
@@ -381,15 +383,15 @@
       "postgrestQuery": "PostgREST query",
       "ok": "OK",
       "error": "Error",
-      "note": "Only tests that a simple query against the project above succeeds — not any other project, and a total Auth outage would give a 404 before the page even loads, not a red card here.",
+      "note": "Only tests that a simple query against the project above succeeds — not a total-outage guarantee.",
       "allProjects": "All projects",
       "openInDashboard": "Open in Supabase Dashboard"
     },
     "twilio": {
       "title": "Twilio",
       "fromNumber": "Sender number",
-      "sentToday": "SMS sent today (this number)",
-      "noteOk": "Dev and prod have their own sender numbers — the count above is only for the number shown. (Per CLAUDE.md they share one Twilio account, but that hasn't been independently verified.)",
+      "sentToday": "SMS sent today",
+      "noteOk": "Dev and prod have their own sender numbers — this count is only for the number shown.",
       "noteUnknown": "Couldn't fetch live data right now — check the console for current status.",
       "console": "Twilio console"
     },

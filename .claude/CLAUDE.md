@@ -171,7 +171,7 @@ Working through PRE_PROD_CHECKLIST:
 - [x] Lo-fi wireframes from Claude Design (key screens as reference)
 - [x] Build admin screens (EVT-01, EVT-02, WS-01, WS-02, OFF-01, SCHED-01, COMM-01)
 - [ ] Build official screens (HOME-01, INFO-01, MYSCH-01, ANN-01, ACCT-01)
-- [ ] Build system admin screens (SYS-01, SYS-02)
+- [x] Build system admin screens (SYS-01, SYS-02, SYS-03)
 - [x] i18next applied to UI strings
 - [ ] Race Results integration
 

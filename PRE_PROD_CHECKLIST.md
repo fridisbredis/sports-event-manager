@@ -17,7 +17,7 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 ### Missing features
 
 - [x] Post-login routing in `src/app/page.tsx` based on user role
-- [ ] System admin view: create/deactivate tenants, toggle feature flags per tenant (SYS-01, SYS-02)
+- [x] System admin view: create/deactivate tenants, toggle feature flags per tenant (SYS-01, SYS-02)
 - [ ] Tenant admin flows: event configuration, officials management, announcements (EVT-01/02, WS-01/02, OFF-01, SCHED-01, COMM-01)
 - [ ] Official view: assignments (HOME-01, INFO-01, MYSCH-01, ANN-01)
 - [ ] Participant view: event info, schedule, Race Results link, personal view with bib/category (flows not yet written) — include an `sms_opt_out` toggle (schema + announcement filtering already done in SEC-05, migration 0019)
@@ -152,7 +152,7 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 - [ ] COMM-01 (Communication)
 - [ ] ACCT-01 (Personal account, shared)
 - [ ] HOME-01, INFO-01, MYSCH-01, ANN-01, AUTH-02 (official mobile screens)
-- [ ] SYS-01, SYS-02 (system admin screens)
+- [x] SYS-01, SYS-02 (system admin screens) — plus SYS-03 (system status)
 - [ ] i18next applied to UI strings
 - [ ] Race Results integration
 
