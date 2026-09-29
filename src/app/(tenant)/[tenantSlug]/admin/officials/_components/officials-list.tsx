@@ -22,6 +22,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LinkButton } from '@/components/ui/link-button'
 import { WORK_AREA_COLORS, workAreaColorMap } from '@/lib/theme/work-area-colors'
+import { AvatarImage } from '@/components/ui/avatar-image'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError, extractErrorMessage, parseRetryAfterMinutes } from '@/lib/toast'
@@ -260,17 +261,17 @@ export default function OfficialsList({
                 <TableRow key={official.id}>
                   <TableCell className="text-[15px] font-medium text-ink">
                     <span className="flex items-center gap-3">
-                      <span
-                        aria-hidden="true"
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+                      <AvatarImage
+                        src={official.avatar_url}
+                        initials={initialsOf(official.name)}
+                        alt={official.name}
+                        className="h-9 w-9 text-[13px] font-bold"
                         style={{
                           backgroundColor: (avatarColors.get(official.id) ?? WORK_AREA_COLORS[0])
                             .bg,
                           color: (avatarColors.get(official.id) ?? WORK_AREA_COLORS[0]).fg,
                         }}
-                      >
-                        {initialsOf(official.name)}
-                      </span>
+                      />
                       {isCurrentUser
                         ? `${official.name} — ${t('officials.youLabel')}`
                         : official.name}

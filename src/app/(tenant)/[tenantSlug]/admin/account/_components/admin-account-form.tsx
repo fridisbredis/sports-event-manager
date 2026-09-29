@@ -85,6 +85,13 @@ export default function AdminAccountForm({
 
       <div className="max-w-lg">
         <AppCard>
+          {/* Initials only, with no upload control. A profile picture is
+              stored on officials.avatar_url, and this form is the fallback
+              rendered only when the admin has no officials row at all —
+              ensure_admin_roster_row (migration 20260911130436) plus its
+              backfill mean every current admin has one, so the picker lives
+              on the shared AccountForm that the row-bearing case renders.
+              There is nothing here to attach a picture to. */}
           <div className="flex justify-center mb-6">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-status-neutral-bg">
               <span className="text-2xl font-semibold text-ink-soft">{initials || '?'}</span>

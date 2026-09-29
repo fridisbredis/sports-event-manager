@@ -60,9 +60,16 @@ export async function translateDbError(
 
 export async function translateStorageError(
   logMessage: string,
-  error: DbErrorLike
+  error: DbErrorLike,
+  // Defaults to the event-logo message this helper was written for. The
+  // avatar upload (ACCT-01) reaches the same Storage failures from a screen
+  // that exists in both the admin and official namespaces, so it passes its
+  // own key and namespace rather than telling an official their "logo"
+  // failed to upload.
+  fallbackKey = 'eventConfig.logoUploadError',
+  namespace: 'admin' | 'official' = 'admin'
 ): Promise<string> {
   logger.error(logMessage, undefined, { message: error.message })
-  const t = await getServerTranslation('en', 'admin')
-  return t('eventConfig.logoUploadError')
+  const t = await getServerTranslation('en', namespace)
+  return t(fallbackKey)
 }

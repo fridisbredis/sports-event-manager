@@ -32,7 +32,9 @@ export default async function OfficialsPage({ params }: Props) {
 
   const { data: officials, error } = await supabase
     .from('officials')
-    .select('id, name, phone, invite_status, user_id, created_at, tenant_id, sms_opt_out')
+    .select(
+      'id, name, phone, invite_status, user_id, created_at, tenant_id, sms_opt_out, avatar_url'
+    )
     .eq('tenant_id', tenant.id)
     .neq('invite_status', 'removed')
     .order('created_at', { ascending: true })

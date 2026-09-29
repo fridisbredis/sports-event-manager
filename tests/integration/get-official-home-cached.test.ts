@@ -103,6 +103,54 @@ describe('get_official_home_cached RPC (PERF-06 Phase 1 fail-closed boundary)', 
     expect((asUserB as { name: string | null }).name).toBe('Official B')
   })
 
+  // Return-shape contract (.claude/reference/migrations.md). `gen types` sees
+  // only `Returns: Json` for every RPC here, so nothing but a test like this
+  // catches a replace migration silently dropping a key the app destructures.
+  // Migration 20260929095047 added 'avatar_url' alongside the existing
+  // 'name'; both are read by HOME-01, so both are pinned here by name rather
+  // than by "the call succeeded".
+  describe('return shape', () => {
+    it("returns exactly the 'name' and 'avatar_url' keys HOME-01 reads", async () => {
+      const admin = serviceClient()
+      const tenant = await createTenant('Home Cache Return Shape')
+      createdTenantIds.push(tenant.id)
+      const { userId } = await createUserWithRole(tenant.id, 'official')
+      await admin.from('officials').delete().eq('tenant_id', tenant.id).eq('user_id', userId)
+      const official = await createOfficialLinkedToUser(
+        tenant.id,
+        userId,
+        'Shape Official',
+        'confirmed'
+      )
+
+      const avatarUrl = `https://example.supabase.co/storage/v1/object/public/avatars/${tenant.id}/${official.id}/1.png`
+      await admin.from('officials').update({ avatar_url: avatarUrl }).eq('id', official.id)
+
+      const { data, error } = await callRpc(admin, tenant.id, userId)
+      expect(error).toBeNull()
+      expect(Object.keys(data as object).sort()).toEqual(['avatar_url', 'name'])
+      expect(data as { name: string | null; avatar_url: string | null }).toEqual({
+        name: 'Shape Official',
+        avatar_url: avatarUrl,
+      })
+    })
+
+    it("returns a null avatar_url for an official who hasn't uploaded a picture", async () => {
+      const admin = serviceClient()
+      const tenant = await createTenant('Home Cache No Avatar')
+      createdTenantIds.push(tenant.id)
+      const { userId } = await createUserWithRole(tenant.id, 'official')
+      await admin.from('officials').delete().eq('tenant_id', tenant.id).eq('user_id', userId)
+      await createOfficialLinkedToUser(tenant.id, userId, 'No Avatar Official', 'confirmed')
+
+      const { data, error } = await callRpc(admin, tenant.id, userId)
+      expect(error).toBeNull()
+      expect((data as { avatar_url: string | null }).avatar_url).toBeNull()
+      // The greeting must still work — this is the fallback-to-initials path.
+      expect((data as { name: string | null }).name).toBe('No Avatar Official')
+    })
+  })
+
   describe('access control: anon/authenticated must be denied', () => {
     const anon: SupabaseClient<Database> = createClient<Database>(
       process.env.SUPABASE_URL!,

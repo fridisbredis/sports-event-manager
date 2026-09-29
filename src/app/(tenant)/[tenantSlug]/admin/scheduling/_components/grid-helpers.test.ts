@@ -174,7 +174,7 @@ describe('applyCellAction', () => {
 })
 
 describe('resolveCellActionLabel', () => {
-  const officials = [{ id: 'o1', name: 'Anna', invite_status: 'confirmed' }]
+  const officials = [{ id: 'o1', name: 'Anna', invite_status: 'confirmed', avatar_url: null }]
   const workstations = [
     {
       id: 'ws-1',

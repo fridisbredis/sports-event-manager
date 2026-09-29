@@ -25,6 +25,7 @@ export interface OfficialData {
   id: string
   name: string
   invite_status: string
+  avatar_url: string | null
 }
 
 export interface AssignmentData {

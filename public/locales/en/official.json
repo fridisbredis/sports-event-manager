@@ -76,6 +76,12 @@
     "saving": "Saving…",
     "saved": "Saved",
     "saveError": "Something went wrong. Please try again.",
-    "logOut": "Log out"
+    "logOut": "Log out",
+    "avatarAdd": "Add a profile picture",
+    "avatarChange": "Change your profile picture",
+    "avatarUploading": "Uploading…",
+    "avatarUploadError": "Couldn't upload that picture. Please try again.",
+    "avatarTypeError": "Choose a JPEG, PNG or WebP image.",
+    "avatarSizeError": "That image is too large. Please choose a smaller one."
   }
 }

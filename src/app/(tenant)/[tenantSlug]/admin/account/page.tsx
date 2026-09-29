@@ -29,7 +29,7 @@ export default async function AdminAccountPage({ params }: Props) {
   // in PATCH /api/account, or the form would edit a row the page never showed.
   const { data: official } = await supabase
     .from('officials')
-    .select('id, name, phone, sms_opt_out')
+    .select('id, name, phone, sms_opt_out, avatar_url')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant.id)
     .eq('invite_status', 'confirmed')
@@ -64,6 +64,7 @@ export default async function AdminAccountPage({ params }: Props) {
     <div className="px-8 py-8">
       <AccountForm
         name={official.name}
+        avatarUrl={official.avatar_url}
         phone={official.phone}
         smsOptOut={official.sms_opt_out}
         tenantId={tenant.id}

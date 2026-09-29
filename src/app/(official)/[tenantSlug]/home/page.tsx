@@ -7,6 +7,7 @@ import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
+import { AvatarImage } from '@/components/ui/avatar-image'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -77,7 +78,7 @@ export default async function OfficialHomePage({ params }: Props) {
         p_user_id: userId,
       })
       if (error) throw error
-      return data as { name: string | null }
+      return data as { name: string | null; avatar_url: string | null }
     },
     ['official-home'], // cache namespace, data-shape only — tenant/user
     // scoping comes entirely from the (tenantId, userId) closure arguments
@@ -94,6 +95,7 @@ export default async function OfficialHomePage({ params }: Props) {
   ])
 
   const name = officialHome?.name ?? ''
+  const avatarUrl = officialHome?.avatar_url ?? null
   const eventName = event?.name ?? tenantSlug
   const initials = name
     .split(' ')
@@ -135,11 +137,13 @@ export default async function OfficialHomePage({ params }: Props) {
           same circle, same initials, so the two screens do not render one
           person's mark two different greys. */}
       <div className="mb-8 flex items-center gap-4">
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-status-neutral-bg">
-          {initials ? (
-            <span className="text-base font-semibold text-ink-soft">{initials}</span>
-          ) : null}
-        </div>
+        <AvatarImage
+          src={avatarUrl}
+          initials={initials}
+          alt={name}
+          className="size-14 bg-status-neutral-bg"
+          initialsClassName="text-base font-semibold text-ink-soft"
+        />
         <div className="min-w-0">
           <h1 className="text-[22px] font-bold leading-snug text-ink">
             {name ? t('home.greeting', { name }) : t('home.greetingAnon')}

@@ -3,6 +3,7 @@ import { ScrollShadow, Skeleton } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
+import { AvatarImage } from '@/components/ui/avatar-image'
 import { useTranslation } from '@/lib/i18n/client'
 import {
   WORK_AREA_COLORS,
@@ -125,15 +126,16 @@ export function ByPersonGrid({
                   <div className="flex items-center gap-2 min-w-0">
                     {/* Same per-person colour the officials roster uses, so a
                       face is recognisable across screens. */}
-                    <div
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                    <AvatarImage
+                      src={official.avatar_url}
+                      initials={initials(official.name)}
+                      alt={official.name}
+                      className="h-7 w-7 text-xs font-semibold"
                       style={{
                         backgroundColor: personColor.bg,
                         color: personColor.fg,
                       }}
-                    >
-                      {initials(official.name)}
-                    </div>
+                    />
                     <span className="truncate text-sm text-ink" title={official.name}>
                       {official.name}
                     </span>
