@@ -1,5 +1,6 @@
 'use client'
 
+import { Building2 } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
 import {
@@ -12,7 +13,7 @@ import {
   Chip,
 } from '@heroui/react'
 import { Button } from '@/components/ui/button'
-import { AppCard } from '@/components/ui/app-card'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { CreateTenantModal } from './create-tenant-modal'
 import { setTenantActive } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
@@ -58,26 +59,15 @@ export function TenantList({ tenants }: Props) {
         </div>
 
         {tenants.length === 0 ? (
-          <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
-            <svg
-              className="mb-4 h-12 w-12 text-gray-300"
-              viewBox="0 0 48 48"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <rect x="8" y="8" width="32" height="32" rx="4" />
-              <line x1="16" y1="24" x2="32" y2="24" />
-              <line x1="24" y1="16" x2="24" y2="32" />
-            </svg>
-            <p className="text-base font-medium text-gray-900 mb-1">
-              {t('systemAdmin.noTenantsYet')}
-            </p>
-            <p className="text-sm text-gray-500 mb-6">{t('systemAdmin.noTenantsHint')}</p>
+          <EmptyStateCard
+            Icon={Building2}
+            title={t('systemAdmin.noTenantsYet')}
+            description={t('systemAdmin.noTenantsHint')}
+          >
             <Button color="primary" onPress={() => setModalOpen(true)}>
               {t('systemAdmin.createTenant')}
             </Button>
-          </AppCard>
+          </EmptyStateCard>
         ) : (
           <Table
             aria-label={t('systemAdmin.tenants')}

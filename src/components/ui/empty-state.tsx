@@ -1,16 +1,21 @@
 import type { LucideIcon } from 'lucide-react'
 import { CARD_SURFACE } from './card-styles'
 
-// The one empty state for the official surfaces. Before this existed, the
-// schedule and announcements screens each carried their own near-identical
-// copy, both marked with a grey "missing image" cross — a broken-image glyph
-// on a screen whose content simply hasn't been created yet reads as a fault
-// rather than as "nothing here so far".
+// The one empty state for the whole app — official tabs and admin screens
+// alike. Before this existed, every screen hand-rolled its own, and most were
+// marked with a grey cross: either a "missing image" glyph or a crossed-out
+// box. A broken-image mark on a screen whose content simply hasn't been
+// created yet reads as a fault rather than as "nothing here so far".
 //
-// The icon is passed in so each tab is marked by its own subject (calendar,
-// bell, info, pin) instead of four screens sharing one anonymous placeholder.
-// The plate uses the tenant tint, the same bubble treatment as the home
-// screen's nav cards, so an empty tab still sits inside the tenant's palette.
+// The icon is passed in so each surface is marked by its own subject
+// (calendar, bell, users, work-area pin) instead of every screen sharing one
+// anonymous placeholder. The plate uses the tenant tint — the same bubble
+// treatment as the official home screen's nav cards — so an empty screen
+// still sits inside the tenant's palette on both sides of the app.
+//
+// `children` is the slot for whatever gets the user out of the empty state:
+// a link back to the newest page, or the primary action that creates the
+// first row ("Add official", "Create tenant").
 export function EmptyState({
   Icon,
   title,
@@ -41,9 +46,9 @@ export function EmptyState({
   )
 }
 
-// Same empty state, but boxed on a card surface. Used where the empty tab sits
-// among other cards on a scrolling page (event info) rather than alone in an
-// otherwise blank tab.
+// Same empty state, but boxed on a card surface. Used where it sits among
+// other cards on a scrolling page (event info), or stands in for a panel the
+// screen would otherwise draw as a card — a table, or the scheduling grid.
 export function EmptyStateCard(props: React.ComponentProps<typeof EmptyState>) {
   return <EmptyState {...props} className={`${CARD_SURFACE} py-12 ${props.className ?? ''}`} />
 }

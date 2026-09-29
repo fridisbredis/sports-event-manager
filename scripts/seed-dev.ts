@@ -46,6 +46,7 @@ const admin = createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
 // Every number here needs a matching entry under [auth.sms.test_otp] in
 // supabase/config.toml, or it cannot be logged in as on the local stack.
 const SEED_PHONES = {
+  systemAdmin: '+46709900007',
   tenantAdmin: '+46709900001',
   officialConfirmed: '+46709900002',
   officialInvited: '+46709900003',
@@ -329,6 +330,35 @@ async function main() {
     if (!found) throw new Error(`Todo (workstation ${workstationId}, position ${position}) missing`)
     return found
   }
+
+  // system_admin is a global role, not a tenant membership: is_system_admin()
+  // (0002) matches on role alone and never reads tenant_id, so the row is
+  // written with tenant_id null — the shape 0021 made legal specifically for
+  // this role, rather than pinning a global admin to an arbitrary tenant to
+  // satisfy the old NOT NULL. No officials row and no ensure_admin_roster_row
+  // call: a system_admin is not on any tenant's roster and is not schedulable.
+  // Without this user the SYS-01/SYS-02 screens cannot be reached locally at
+  // all.
+  const systemAdminId = await upsertAuthUser(SEED_PHONES.systemAdmin)
+  const { data: existingSystemAdmin } = await admin
+    .from('user_roles')
+    .select('id')
+    .eq('user_id', systemAdminId)
+    .eq('role', 'system_admin')
+    .maybeSingle()
+
+  // Unlike every other row this script writes, the system_admin role survives
+  // a reseed: the documented reset is `delete from tenants where slug = …`,
+  // which cascades tenant-scoped rows, and this one has no tenant to cascade
+  // from. Re-inserting it would collide with user_roles' unique (user_id,
+  // tenant_id), so it is only written when absent.
+  if (!existingSystemAdmin) {
+    const { error: systemAdminRoleError } = await admin
+      .from('user_roles')
+      .insert({ user_id: systemAdminId, tenant_id: null, role: 'system_admin' })
+    if (systemAdminRoleError) throw systemAdminRoleError
+  }
+  console.log(`  system_admin (global, no tenant): ${SEED_PHONES.systemAdmin}`)
 
   const tenantAdminId = await upsertAuthUser(SEED_PHONES.tenantAdmin)
   const { error: adminRoleError } = await admin

@@ -268,7 +268,15 @@
     "dragPaintPickPerson_other": "Assign to {{count}} slots",
     "dragPaintSaving": "Saving...",
     "slotModalSearchPlaceholder": "Search by name...",
-    "slotModalNoResults": "No officials match your search."
+    "slotModalNoResults": "No officials match your search.",
+    "noStagesTitle": "No stages configured",
+    "noStagesHint": "Add stages in Event configuration to start scheduling.",
+    "noTimeRangeTitle": "No time range set",
+    "noTimeRangeHint": "Set start and end times for this stage in Event configuration.",
+    "noWorkAreasTitle": "No work areas for this stage",
+    "noWorkAreasHint": "Add work areas in Work areas before assigning officials here.",
+    "noConfirmedOfficialsTitle": "No confirmed officials yet",
+    "noConfirmedOfficialsHint": "Officials must accept their invite before they can be scheduled."
   },
   "communication": {
     "title": "Communication",
