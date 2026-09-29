@@ -2,15 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronLeft, LayoutPanelLeft, LogOut } from 'lucide-react'
+import { LayoutPanelLeft, LogOut } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 
 interface Props {
-  /** Where "Back to tenant admin" points, or null when the user administers no tenant. */
-  backToTenantHref: string | null
   labels: {
     tenants: string
-    backToTenantAdmin: string
     logOut: string
   }
 }
@@ -23,7 +20,7 @@ interface Props {
 const ACTIVE_ITEM = 'bg-status-neutral-bg font-semibold text-ink shadow-[inset_3px_0_0_#111827]'
 const IDLE_ITEM = 'text-ink-soft hover:bg-gray-50 hover:text-ink'
 
-export function SidebarNav({ backToTenantHref, labels }: Props) {
+export function SidebarNav({ labels }: Props) {
   const pathname = usePathname()
   // Excludes /admin/health: it's reached via a link from the tenant list
   // (SYS-03), not a sidebar tab, so this is the first admin route where
@@ -47,15 +44,6 @@ export function SidebarNav({ backToTenantHref, labels }: Props) {
         </Link>
       </nav>
       <div className="border-t border-edge-soft py-2">
-        {backToTenantHref && (
-          <Link
-            href={backToTenantHref}
-            className="flex items-center gap-3 px-6 py-2.5 text-sm text-ink-label transition-colors hover:bg-gray-50 hover:text-ink"
-          >
-            <ChevronLeft className="size-4 shrink-0" strokeWidth={2} />
-            {labels.backToTenantAdmin}
-          </Link>
-        )}
         <LogoutButton className="flex w-full items-center gap-3 px-6 py-2.5 text-left text-sm text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink">
           <LogOut className="size-4 shrink-0" strokeWidth={2} />
           {labels.logOut}
