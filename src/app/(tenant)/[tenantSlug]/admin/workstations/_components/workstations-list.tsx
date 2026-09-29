@@ -1,5 +1,6 @@
 'use client'
 
+import { MapPin } from 'lucide-react'
 import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -14,7 +15,7 @@ import {
   TableCell,
 } from '@heroui/react'
 import { Button } from '@/components/ui/button'
-import { AppCard } from '@/components/ui/app-card'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
@@ -248,24 +249,15 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
     return (
       <div>
         <h1 className="page-title mb-6">{t('workstations.title')}</h1>
-        <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
-          <svg
-            className="mb-4 h-12 w-12 text-gray-300"
-            viewBox="0 0 48 48"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <rect x="8" y="8" width="32" height="32" rx="2" />
-            <line x1="8" y1="8" x2="40" y2="40" />
-            <line x1="40" y1="8" x2="8" y2="40" />
-          </svg>
-          <p className="text-base font-medium text-gray-900 mb-1">{t('workstations.noStages')}</p>
-          <p className="text-sm text-gray-500 mb-6">{t('workstations.noStagesHint')}</p>
+        <EmptyStateCard
+          Icon={MapPin}
+          title={t('workstations.noStages')}
+          description={t('workstations.noStagesHint')}
+        >
           <Button variant="bordered" onPress={() => router.push(`/${tenantSlug}/admin/event`)}>
             {t('workstations.goToEventConfig')}
           </Button>
-        </AppCard>
+        </EmptyStateCard>
       </div>
     )
   }
