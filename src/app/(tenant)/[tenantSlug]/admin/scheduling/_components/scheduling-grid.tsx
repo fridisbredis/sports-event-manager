@@ -1,5 +1,6 @@
 'use client'
 
+import { Clock, Layers } from 'lucide-react'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
@@ -19,6 +20,7 @@ import {
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { getAssignmentsForCell } from './grid-helpers'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
 import { ByPersonGrid } from './by-person-grid'
@@ -376,9 +378,11 @@ export function SchedulingGrid({
 
   if (stages.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-500">
-        <p className="text-sm">{t('scheduling.noStages')}</p>
-      </div>
+      <EmptyStateCard
+        Icon={Layers}
+        title={t('scheduling.noStagesTitle')}
+        description={t('scheduling.noStagesHint')}
+      />
     )
   }
 
@@ -605,9 +609,11 @@ export function SchedulingGrid({
       {officials.length === 0 && stageWorkstations.length === 0 ? (
         <SetupEmptyState />
       ) : slots.length === 0 ? (
-        <div className="border border-gray-200 rounded-md bg-white py-12 text-center text-sm text-gray-500">
-          {t('scheduling.noTimeRange')}
-        </div>
+        <EmptyStateCard
+          Icon={Clock}
+          title={t('scheduling.noTimeRangeTitle')}
+          description={t('scheduling.noTimeRangeHint')}
+        />
       ) : view === 'by-person' ? (
         <ByPersonGrid
           slots={slots}

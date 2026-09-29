@@ -1,5 +1,6 @@
 'use client'
 
+import { Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import {
   Chip,
@@ -18,7 +19,7 @@ import {
 } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
-import { AppCard } from '@/components/ui/app-card'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LinkButton } from '@/components/ui/link-button'
 import { WORK_AREA_COLORS, workAreaColorMap } from '@/lib/theme/work-area-colors'
@@ -214,24 +215,15 @@ export default function OfficialsList({
       </div>
 
       {visibleOfficials.length === 0 ? (
-        <AppCard bodyClassName="flex flex-col items-center justify-center py-20 text-center">
-          <svg
-            className="mb-4 h-12 w-12 text-gray-300"
-            viewBox="0 0 48 48"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <rect x="8" y="8" width="32" height="32" rx="2" />
-            <line x1="8" y1="8" x2="40" y2="40" />
-            <line x1="40" y1="8" x2="8" y2="40" />
-          </svg>
-          <p className="text-base font-medium text-gray-900 mb-1">{t('officials.empty')}</p>
-          <p className="text-sm text-gray-500 mb-6">{t('officials.emptyHint')}</p>
+        <EmptyStateCard
+          Icon={Users}
+          title={t('officials.empty')}
+          description={t('officials.emptyHint')}
+        >
           <Button color="primary" onPress={() => setAddModalOpen(true)}>
             {t('officials.add')}
           </Button>
-        </AppCard>
+        </EmptyStateCard>
       ) : (
         <Table
           aria-label={t('officials.title')}

@@ -1,7 +1,9 @@
+import { Users } from 'lucide-react'
 import { useMemo } from 'react'
 import { ScrollShadow, Skeleton } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { AvatarImage } from '@/components/ui/avatar-image'
 import { useTranslation } from '@/lib/i18n/client'
@@ -91,9 +93,11 @@ export function ByPersonGrid({
 
   if (officials.length === 0) {
     return (
-      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-ink-label`}>
-        {t('scheduling.noConfirmedOfficials')}
-      </div>
+      <EmptyStateCard
+        Icon={Users}
+        title={t('scheduling.noConfirmedOfficialsTitle')}
+        description={t('scheduling.noConfirmedOfficialsHint')}
+      />
     )
   }
 

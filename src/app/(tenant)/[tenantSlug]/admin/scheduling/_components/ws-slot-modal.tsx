@@ -69,7 +69,7 @@ export function WsSlotModal({
             </ModalHeader>
             <ModalBody>
               {assignedInSlot.length === 0 && availableOfficialsAll.length === 0 && (
-                <p className="text-sm text-gray-400">{t('scheduling.slotModalEmpty')}</p>
+                <p className="text-sm text-ink-label">{t('scheduling.slotModalEmpty')}</p>
               )}
 
               {assignedInSlot.length > 0 && (
@@ -111,7 +111,7 @@ export function WsSlotModal({
                     className="mb-2"
                   />
                   {availableOfficials.length === 0 ? (
-                    <p className="text-sm text-gray-400 px-1 py-2">
+                    <p className="text-sm text-ink-label px-1 py-2">
                       {t('scheduling.slotModalNoResults')}
                     </p>
                   ) : (

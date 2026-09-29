@@ -1,5 +1,6 @@
 'use client'
 
+import { Megaphone } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
@@ -7,6 +8,7 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@herou
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
 
@@ -296,53 +298,27 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
           <p className="section-label mb-3">{timelineLabel}</p>
 
           {filtered.length === 0 ? (
-            <AppCard bodyClassName="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-edge">
-                <svg
-                  className="h-6 w-6 text-ink-faint"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
+            isFirstPage ? (
+              <EmptyStateCard
+                Icon={Megaphone}
+                title={t('communication.noAnnouncementsYet')}
+                description={t('communication.noAnnouncementsHint')}
+              />
+            ) : (
+              // One ?page= drives both channels, so a channel with fewer
+              // announcements than the other runs out first. That is not
+              // "nothing published" — say so, and offer the way back.
+              <EmptyStateCard Icon={Megaphone} title={t('communication.noOlderAnnouncements')}>
+                <Button
+                  type="button"
+                  variant="light"
+                  size="sm"
+                  onPress={() => requestAction({ type: 'page', page: 1 })}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <div className="text-center">
-                {isFirstPage ? (
-                  <>
-                    <p className="text-sm font-medium text-ink-soft">
-                      {t('communication.noAnnouncementsYet')}
-                    </p>
-                    <p className="mt-0.5 text-sm text-ink-label">
-                      {t('communication.noAnnouncementsHint')}
-                    </p>
-                  </>
-                ) : (
-                  // One ?page= drives both channels, so a channel with fewer
-                  // announcements than the other runs out first. That is not
-                  // "nothing published" — say so, and offer the way back.
-                  <>
-                    <p className="text-sm font-medium text-ink-soft">
-                      {t('communication.noOlderAnnouncements')}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="light"
-                      size="sm"
-                      className="mt-1"
-                      onPress={() => requestAction({ type: 'page', page: 1 })}
-                    >
-                      {t('communication.backToNewest')}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </AppCard>
+                  {t('communication.backToNewest')}
+                </Button>
+              </EmptyStateCard>
+            )
           ) : (
             /* Each announcement is its own card with a leading accent edge
                rather than rows inside one divided card — the reference reads

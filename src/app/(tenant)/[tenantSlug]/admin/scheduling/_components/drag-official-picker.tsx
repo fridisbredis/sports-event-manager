@@ -39,7 +39,7 @@ export function DragOfficialPicker({
         {t('scheduling.dragPaintPickPerson', { count: dragOfficialPicker.cellStarts.length })}
       </p>
       {availableOfficials.length === 0 ? (
-        <p className="px-3 py-2 text-sm text-gray-400">{t('scheduling.noConfirmedOfficials')}</p>
+        <p className="px-3 py-2 text-sm text-ink-label">{t('scheduling.noConfirmedOfficials')}</p>
       ) : (
         <ScrollShadow className="flex flex-col max-h-64 overflow-y-auto">
           {availableOfficials.map((off) => (

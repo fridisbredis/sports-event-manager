@@ -1,12 +1,11 @@
 'use client'
 
+import { Building2 } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Building2 } from 'lucide-react'
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react'
 import { Chip } from '@/components/ui/chip'
-import { AppCard } from '@/components/ui/app-card'
-import { EmptyState } from '@/components/ui/empty-state'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { CreateTenantModal } from './create-tenant-modal'
 import { SystemButton } from './system-button'
 import { setTenantActive } from '../actions'
@@ -59,21 +58,19 @@ export function TenantList({ tenants }: Props) {
         </div>
 
         {tenants.length === 0 ? (
-          <AppCard bodyClassName="p-0">
-            <EmptyState
-              Icon={Building2}
-              title={t('systemAdmin.noTenantsYet')}
-              description={t('systemAdmin.noTenantsHint')}
-              // The shared plate takes the tenant tint, which is undefined on
-              // this surface — override it with the same neutral the table
-              // header uses so the icon still sits on a plate, not on nothing.
-              className="[&>div:first-child]:bg-status-neutral-bg [&>div:first-child]:text-ink-muted"
-            >
-              <SystemButton onPress={() => setModalOpen(true)}>
-                {t('systemAdmin.createTenant')}
-              </SystemButton>
-            </EmptyState>
-          </AppCard>
+          <EmptyStateCard
+            Icon={Building2}
+            title={t('systemAdmin.noTenantsYet')}
+            description={t('systemAdmin.noTenantsHint')}
+            // The shared plate takes the tenant tint, which is undefined on
+            // this surface — override it with the same neutral the table
+            // header uses so the icon still sits on a plate, not on nothing.
+            className="[&>div:first-child]:bg-status-neutral-bg [&>div:first-child]:text-ink-muted"
+          >
+            <SystemButton onPress={() => setModalOpen(true)}>
+              {t('systemAdmin.createTenant')}
+            </SystemButton>
+          </EmptyStateCard>
         ) : (
           <Table
             aria-label={t('systemAdmin.tenants')}

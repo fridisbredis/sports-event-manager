@@ -1,7 +1,9 @@
+import { MapPin } from 'lucide-react'
 import React, { useMemo } from 'react'
 import { Skeleton } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { isWithinWindow, formatSlotLabel, shortName } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import {
@@ -95,9 +97,11 @@ export function ByWorkAreaGrid({
 
   if (stageWorkstations.length === 0) {
     return (
-      <div className={`${CARD_SURFACE} py-12 text-center text-sm text-ink-label`}>
-        {t('scheduling.noWorkAreas')}
-      </div>
+      <EmptyStateCard
+        Icon={MapPin}
+        title={t('scheduling.noWorkAreasTitle')}
+        description={t('scheduling.noWorkAreasHint')}
+      />
     )
   }
 
