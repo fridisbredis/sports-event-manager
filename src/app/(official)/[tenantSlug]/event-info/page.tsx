@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
+import { Info, MapPin } from 'lucide-react'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
@@ -7,6 +8,7 @@ import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
 import { FacilityChips } from './_components/facility-chips'
+import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
 
 interface EventInfoCached {
@@ -105,9 +107,13 @@ export default async function EventInfoPage({ params }: Props) {
         description={event?.description ?? null}
       />
 
-      {stageList.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.programme')}</SectionLabel>
+      {/* Both sections keep their label when empty rather than vanishing.
+          A stage list that is simply not published yet is a normal state for
+          an official opening the app early, and a screen that silently drops
+          the heading leaves them unsure whether the app failed to load it. */}
+      <div className="mb-8">
+        <SectionLabel>{t('eventInfo.programme')}</SectionLabel>
+        {stageList.length > 0 ? (
           <div className="flex flex-col gap-3">
             {stageList.map((stage) => {
               const timeRange = [formatTime(stage.start_time), formatTime(stage.end_time)]
@@ -125,15 +131,27 @@ export default async function EventInfoPage({ params }: Props) {
               )
             })}
           </div>
-        </div>
-      ) : null}
+        ) : (
+          <EmptyStateCard
+            Icon={Info}
+            title={t('eventInfo.noProgramme')}
+            description={t('eventInfo.noProgrammeDescription')}
+          />
+        )}
+      </div>
 
-      {facilityList.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
+      <div className="mb-8">
+        <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
+        {facilityList.length > 0 ? (
           <FacilityChips facilities={facilityList} />
-        </div>
-      ) : null}
+        ) : (
+          <EmptyStateCard
+            Icon={MapPin}
+            title={t('eventInfo.noFacilities')}
+            description={t('eventInfo.noFacilitiesDescription')}
+          />
+        )}
+      </div>
     </div>
   )
 }

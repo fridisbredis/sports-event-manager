@@ -32,7 +32,11 @@
     "description": "Description",
     "facilities": "Facilities",
     "programme": "Event programme by stage",
-    "raceResults": "Race Results"
+    "raceResults": "Race Results",
+    "noProgramme": "No programme yet",
+    "noProgrammeDescription": "Event details will appear here once published.",
+    "noFacilities": "No facilities listed yet",
+    "noFacilitiesDescription": "You'll see facilities here once the organizer adds them."
   },
   "mySchedule": {
     "title": "My schedule",
@@ -41,7 +45,7 @@
     "byWorkstation": "Work area",
     "noAssignments": "No assignments yet",
     "noAssignmentsDescription": "Your schedule will appear here once you've been assigned.",
-    "noAssignmentsOnDay": "Nothing on this day",
+    "noAssignmentsOnDay": "No assignments on this day",
     "noAssignmentsOnDayDescription": "You have no assignments on this day. Pick another day above.",
     "dayTabsLabel": "Choose a day",
     "workstation": "Work area",
@@ -51,8 +55,8 @@
   },
   "announcements": {
     "title": "Announcements",
-    "noAnnouncements": "No announcements",
-    "noAnnouncementsDescription": "Updates from the organizer will appear here.",
+    "noAnnouncements": "No announcements yet",
+    "noAnnouncementsDescription": "Updates from event organisers will show up here.",
     "older": "Older announcements",
     "newer": "Newer announcements",
     "noOlderAnnouncements": "No older announcements",

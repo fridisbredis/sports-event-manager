@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ImageOff } from 'lucide-react'
+import { CalendarCheck, CalendarX } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
 import { workAreaColorMap, workAreaDotColor, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
@@ -139,24 +140,6 @@ function DaySelector({
         })}
       </div>
     </nav>
-  )
-}
-
-function EmptyIcon() {
-  return (
-    <div className="w-20 h-20 rounded-large border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
-      <ImageOff aria-hidden="true" strokeWidth={1.5} className="size-10 text-ink-faint/50" />
-    </div>
-  )
-}
-
-function EmptyState({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-      <EmptyIcon />
-      <p className="text-base font-semibold text-gray-900 mb-1">{title}</p>
-      <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
-    </div>
   )
 }
 
@@ -436,9 +419,17 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
 
       {/* Content */}
       {hasNoAssignmentsAtAll ? (
-        <EmptyState title={strings.noAssignments} description={strings.noAssignmentsDescription} />
-      ) : selectedDayIsEmpty ? (
         <EmptyState
+          Icon={CalendarCheck}
+          title={strings.noAssignments}
+          description={strings.noAssignmentsDescription}
+        />
+      ) : selectedDayIsEmpty ? (
+        // A different mark from "nothing assigned at all": here there is a
+        // schedule, just not on the day in view, and the copy sends them to
+        // another day tab.
+        <EmptyState
+          Icon={CalendarX}
           title={strings.noAssignmentsOnDay}
           description={strings.noAssignmentsOnDayDescription}
         />
