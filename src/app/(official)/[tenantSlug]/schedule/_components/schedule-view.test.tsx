@@ -382,9 +382,35 @@ describe('ScheduleView day label', () => {
     expect(screen.getAllByRole('link')).toHaveLength(2)
   })
 
-  it('keeps the per-group day headers on the time view across several days', () => {
+  it('leaves the date to the tabs on the time view across several days', () => {
+    // The selected tab already reads 'Wed 12 Aug'. A per-group header under it
+    // spelled the same date out a second time, which is what this asserts is
+    // gone — the long form should appear nowhere on screen.
     renderDays('time', ['2026-08-12', '2026-08-13'], '2026-08-12')
 
+    expect(screen.queryByText('Wednesday 12 August')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Wed 12 Aug' })).toBeTruthy()
+  })
+
+  it('labels each group when one day window crosses midnight', () => {
+    // A night shift puts two dates in one view. The tab row can only name the
+    // day that was selected, so here the headers are the only thing telling
+    // the two groups apart and they stay.
+    localStorage.setItem('official-schedule-view', 'time')
+    render(
+      <ScheduleView
+        assignments={[
+          slot('a', '2026-08-12T22:00:00.000Z', '2026-08-12T23:00:00.000Z', SOCIAL_MEDIA),
+          slot('b', '2026-08-13T00:00:00.000Z', '2026-08-13T01:00:00.000Z', DEPOT),
+        ]}
+        days={['2026-08-12', '2026-08-13']}
+        selectedDay="2026-08-12"
+        tenantSlug="testklubben"
+        strings={STRINGS}
+      />
+    )
+
     expect(screen.getByText('Wednesday 12 August')).toBeTruthy()
+    expect(screen.getByText('Thursday 13 August')).toBeTruthy()
   })
 })
