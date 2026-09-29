@@ -1,10 +1,11 @@
 import Link from 'next/link'
-import { ImageOff } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
+import { EmptyState } from '@/components/ui/empty-state'
 import { AnnouncementCard } from './_components/announcement-card'
 
 interface Props {
@@ -26,14 +27,6 @@ function formatAnnouncementTime(ts: string): string {
   if (tsUTC === yesterdayUTC) return `Yesterday · ${time}`
   const weekday = date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
   return `${weekday} · ${time}`
-}
-
-function EmptyIcon() {
-  return (
-    <div className="flex h-20 w-20 items-center justify-center rounded-card-sm border border-edge bg-surface">
-      <ImageOff aria-hidden="true" strokeWidth={1.5} className="size-10 text-ink-faint/50" />
-    </div>
-  )
 }
 
 export default async function AnnouncementsPage({ params, searchParams }: Props) {
@@ -106,29 +99,19 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
           )}
         </>
       ) : isFirstPage ? (
-        <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
-          <EmptyIcon />
-          <div>
-            <p className="text-base font-semibold text-ink">{t('announcements.noAnnouncements')}</p>
-            <p className="mt-1 text-sm text-ink-label">
-              {t('announcements.noAnnouncementsDescription')}
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          Icon={Bell}
+          title={t('announcements.noAnnouncements')}
+          description={t('announcements.noAnnouncementsDescription')}
+        />
       ) : (
         // Past the end of the list — a bookmarked or hand-edited ?page= — which
         // is not the same as having no announcements at all.
-        <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
-          <EmptyIcon />
-          <div>
-            <p className="text-base font-semibold text-ink">
-              {t('announcements.noOlderAnnouncements')}
-            </p>
-            <Link href="?page=1" className="text-sm font-medium text-primary mt-1 inline-block">
-              {t('announcements.backToNewest')}
-            </Link>
-          </div>
-        </div>
+        <EmptyState Icon={Bell} title={t('announcements.noOlderAnnouncements')}>
+          <Link href="?page=1" className="text-sm font-medium text-primary">
+            {t('announcements.backToNewest')}
+          </Link>
+        </EmptyState>
       )}
     </div>
   )
