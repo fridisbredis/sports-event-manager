@@ -148,6 +148,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     noAssignmentsOnDay: t('mySchedule.noAssignmentsOnDay'),
     noAssignmentsOnDayDescription: t('mySchedule.noAssignmentsOnDayDescription'),
     dayTabsLabel: t('mySchedule.dayTabsLabel'),
+    todoLabel: t('mySchedule.todoLabel'),
   }
 
   return (

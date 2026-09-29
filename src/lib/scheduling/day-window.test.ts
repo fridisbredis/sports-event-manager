@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { dayKey, distinctDays, dayWindow, resolveSelectedDay } from './day-window'
+import {
+  dayKey,
+  distinctDays,
+  dayWindow,
+  resolveSelectedDay,
+  mergeContiguousSlots,
+} from './day-window'
 
 describe('dayKey', () => {
   it('takes the UTC calendar day from an ISO timestamp', () => {
@@ -114,5 +120,77 @@ describe('resolveSelectedDay', () => {
   it('returns null when the official has no days at all', () => {
     expect(resolveSelectedDay(undefined, [], '2026-08-12')).toBeNull()
     expect(resolveSelectedDay('2026-08-12', [], '2026-08-12')).toBeNull()
+  })
+})
+
+describe('mergeContiguousSlots', () => {
+  const slot = (start: string, end: string) => ({ timeslot_start: start, timeslot_end: end })
+
+  it('collapses a run of back-to-back hourly slots into one span', () => {
+    expect(
+      mergeContiguousSlots([
+        slot('2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z'),
+        slot('2026-08-12T12:00:00.000Z', '2026-08-12T13:00:00.000Z'),
+        slot('2026-08-12T13:00:00.000Z', '2026-08-12T14:00:00.000Z'),
+      ])
+    ).toEqual([{ start: '2026-08-12T11:00:00.000Z', end: '2026-08-12T14:00:00.000Z' }])
+  })
+
+  // The whole point of merging: a gap must stay visible, or an official reads
+  // a lunch break as time they are expected to be on station.
+  it('starts a new span across a gap', () => {
+    expect(
+      mergeContiguousSlots([
+        slot('2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z'),
+        slot('2026-08-12T14:00:00.000Z', '2026-08-12T15:00:00.000Z'),
+      ])
+    ).toEqual([
+      { start: '2026-08-12T11:00:00.000Z', end: '2026-08-12T12:00:00.000Z' },
+      { start: '2026-08-12T14:00:00.000Z', end: '2026-08-12T15:00:00.000Z' },
+    ])
+  })
+
+  // Adjacency is an instant comparison, not a string one: PostgREST can return
+  // either shape, and `===` on the raw strings would split a contiguous run.
+  it('joins slots whose boundary timestamps are spelled differently', () => {
+    expect(
+      mergeContiguousSlots([
+        slot('2026-08-12T11:00:00+00:00', '2026-08-12T12:00:00+00:00'),
+        slot('2026-08-12T12:00:00.000Z', '2026-08-12T13:00:00.000Z'),
+      ])
+    ).toEqual([{ start: '2026-08-12T11:00:00+00:00', end: '2026-08-12T13:00:00.000Z' }])
+  })
+
+  it('merges 30-minute slots the same way, without being told the granularity', () => {
+    expect(
+      mergeContiguousSlots([
+        slot('2026-08-12T09:00:00.000Z', '2026-08-12T09:30:00.000Z'),
+        slot('2026-08-12T09:30:00.000Z', '2026-08-12T10:00:00.000Z'),
+      ])
+    ).toEqual([{ start: '2026-08-12T09:00:00.000Z', end: '2026-08-12T10:00:00.000Z' }])
+  })
+
+  // A run that crosses midnight is one span, not two. The wireframe's
+  // 22:00-00:00 row is exactly this case.
+  it('merges across a midnight boundary', () => {
+    expect(
+      mergeContiguousSlots([
+        slot('2026-08-12T22:00:00.000Z', '2026-08-12T23:00:00.000Z'),
+        slot('2026-08-12T23:00:00.000Z', '2026-08-13T00:00:00.000Z'),
+      ])
+    ).toEqual([{ start: '2026-08-12T22:00:00.000Z', end: '2026-08-13T00:00:00.000Z' }])
+  })
+
+  it('does not shorten a span when a duplicate row repeats an earlier slot', () => {
+    expect(
+      mergeContiguousSlots([
+        slot('2026-08-12T11:00:00.000Z', '2026-08-12T13:00:00.000Z'),
+        slot('2026-08-12T13:00:00.000Z', '2026-08-12T12:00:00.000Z'),
+      ])
+    ).toEqual([{ start: '2026-08-12T11:00:00.000Z', end: '2026-08-12T13:00:00.000Z' }])
+  })
+
+  it('returns nothing for no slots', () => {
+    expect(mergeContiguousSlots([])).toEqual([])
   })
 })

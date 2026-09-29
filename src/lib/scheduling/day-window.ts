@@ -61,3 +61,49 @@ export function resolveSelectedDay(
   if (availableDays.includes(today)) return today
   return availableDays[0] ?? null
 }
+
+/** A run of back-to-back slots, collapsed into one span. */
+export interface TimeSpan {
+  /** ISO start of the first slot in the run. */
+  start: string
+  /** ISO end of the last slot in the run. */
+  end: string
+}
+
+/**
+ * Collapses consecutive slots into contiguous spans.
+ *
+ * One `assignments` row is exactly one grid slot — `timeslot_end` is written
+ * as `timeslot_start + scheduling_granularity_min` (`slotEndTime`) — so an
+ * official working 11:00–17:00 at a 1h granularity has seven rows, and
+ * MYSCH-01 listing every start time is what made that line unreadable.
+ *
+ * Adjacency is tested on `end === next start` rather than on the event's
+ * granularity: the boundary is what actually decides whether two slots touch,
+ * it needs no extra prop threaded down from the event, and it stays correct
+ * if a tenant ever changes `scheduling_granularity_min` mid-event — rows
+ * written before the change keep their old width, and a granularity-based
+ * comparison would then merge across a real gap.
+ *
+ * Slots are compared as instants, not strings, so `...T11:00:00+00:00` and
+ * `...T11:00:00.000Z` — both shapes PostgREST can return — still join up.
+ *
+ * Input must be ascending by `start`; the page's queries already `.order` it.
+ */
+export function mergeContiguousSlots(
+  slots: { timeslot_start: string; timeslot_end: string }[]
+): TimeSpan[] {
+  const spans: TimeSpan[] = []
+  for (const slot of slots) {
+    const last = spans[spans.length - 1]
+    if (last && new Date(last.end).getTime() === new Date(slot.timeslot_start).getTime()) {
+      // Guard against an out-of-order or overlapping row shortening a span.
+      if (new Date(slot.timeslot_end).getTime() > new Date(last.end).getTime()) {
+        last.end = slot.timeslot_end
+      }
+    } else {
+      spans.push({ start: slot.timeslot_start, end: slot.timeslot_end })
+    }
+  }
+  return spans
+}
