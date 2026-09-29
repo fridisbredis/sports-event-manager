@@ -99,6 +99,15 @@ function groupByDay(assignments: AssignmentRow[]) {
   return groups
 }
 
+// One day needs no chooser — the heading in the list already names it — and
+// zero days renders an empty state instead. Shared by `DaySelector` and the
+// day heading in `TimeView`: the heading exists to cover exactly the case
+// where the tabs are absent, so the two must read the same rule or a day can
+// end up named twice or not at all.
+function hasDayTabs(days: string[]): boolean {
+  return days.length >= 2
+}
+
 // Day changes are links, not local state: the point of the `?day=` param is
 // that the server fetches one day of shifts instead of the whole event
 // (PERF-06). Holding the day in client state would mean shipping every day to
@@ -114,8 +123,7 @@ function DaySelector({
   tenantSlug: string
   label: string
 }) {
-  // One day needs no chooser, and zero days renders the empty state instead.
-  if (days.length < 2) return null
+  if (!hasDayTabs(days)) return null
 
   return (
     <nav aria-label={label} className="-mx-5 px-5 mb-6 overflow-x-auto">
@@ -143,10 +151,17 @@ function DaySelector({
   )
 }
 
-function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
-  // Still grouped even though the window is one day: the header is what
-  // confirms which date is on screen, and it stays correct if a window ever
-  // spans a boundary.
+function TimeView({
+  assignments,
+  dayNamedAbove,
+}: {
+  assignments: AssignmentRow[]
+  /** The day tabs are on screen, so the selected day is already named there. */
+  dayNamedAbove: boolean
+}) {
+  // Still grouped even though the window is usually one day: grouping stays
+  // correct if a window ever spans a midnight boundary, and that is the one
+  // case where the headings are shown regardless of the tabs.
   const groups = groupByDay(assignments)
 
   // Coloured across the whole day, not per day-group, so a work area keeps
@@ -160,7 +175,16 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
     <div className="flex flex-col gap-6">
       {groups.map((group) => (
         <div key={group.key}>
-          <p className="section-label mb-3">{group.label}</p>
+          {/* The date is named once per screen, never twice. With day tabs
+              above, the selected tab already says which day this is and a
+              heading repeating it is pure noise. Without them — an official
+              with shifts on a single day, where the tabs hide themselves —
+              this heading is the only thing that names the date, so it has to
+              stay. More than one group means the window crossed midnight, and
+              then each date needs naming whatever the tabs show. */}
+          {(!dayNamedAbove || groups.length > 1) && (
+            <p className="section-label mb-3">{group.label}</p>
+          )}
           <div className="flex flex-col gap-3">
             {/* One card per run rather than per slot: a three-hour shift is
                 three `assignments` rows, and a card each read as three
@@ -434,7 +458,7 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
           description={strings.noAssignmentsOnDayDescription}
         />
       ) : view === 'time' ? (
-        <TimeView assignments={assignments} />
+        <TimeView assignments={assignments} dayNamedAbove={hasDayTabs(days)} />
       ) : (
         <WorkAreaView assignments={assignments} todoLabel={strings.todoLabel} />
       )}

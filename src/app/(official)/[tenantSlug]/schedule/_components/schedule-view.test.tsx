@@ -213,6 +213,59 @@ describe('ScheduleView time view', () => {
 // The page-level test mocks this component away entirely, so the view toggle —
 // its click behaviour, keyboard model and localStorage round-trip — had no
 // coverage of its own. These render it for real.
+describe('ScheduleView day heading', () => {
+  beforeEach(() => localStorage.clear())
+
+  function renderDays(days: string[], assignments: AssignmentRow[]) {
+    localStorage.setItem('official-schedule-view', 'time')
+    return render(
+      <ScheduleView
+        assignments={assignments}
+        days={days}
+        selectedDay={days[0] ?? null}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+      />
+    )
+  }
+
+  const ON_12_AUG = [
+    slot('a', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', SOCIAL_MEDIA),
+  ]
+
+  it('names the day when there are no tabs to name it', () => {
+    // A single scheduled day hides the tab strip, so this heading is the only
+    // thing on screen saying which date the shifts belong to.
+    renderDays(['2026-08-12'], ON_12_AUG)
+
+    expect(screen.getByText('Wednesday 12 August')).toBeInTheDocument()
+  })
+
+  it('drops the heading when the day tabs already name the day', () => {
+    // Two days means a tab strip, and the selected tab carries the date. The
+    // heading underneath would just repeat it.
+    renderDays(['2026-08-12', '2026-08-13'], ON_12_AUG)
+
+    expect(screen.queryByText('Wednesday 12 August')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Wed 12 Aug' })).toBeInTheDocument()
+  })
+
+  it('keeps per-day headings when one window crosses midnight', () => {
+    // A night shift lands two dates in one view. The selected tab can only
+    // name one of them, so both groups are labelled regardless of the tabs.
+    renderDays(
+      ['2026-08-12', '2026-08-13'],
+      [
+        slot('a', '2026-08-12T22:00:00.000Z', '2026-08-12T23:00:00.000Z', SOCIAL_MEDIA),
+        slot('b', '2026-08-13T00:00:00.000Z', '2026-08-13T01:00:00.000Z', DEPOT),
+      ]
+    )
+
+    expect(screen.getByText('Wednesday 12 August')).toBeInTheDocument()
+    expect(screen.getByText('Thursday 13 August')).toBeInTheDocument()
+  })
+})
+
 describe('ScheduleView view toggle', () => {
   beforeEach(() => localStorage.clear())
 
