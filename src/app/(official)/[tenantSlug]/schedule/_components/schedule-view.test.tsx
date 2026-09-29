@@ -1,172 +1,334 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import type { ReactNode } from 'react'
 import { ScheduleView, type AssignmentRow } from './schedule-view'
 
-// The page-level test mocks this component away entirely, so everything below
-// the props boundary — the view toggle, its keyboard model, and the localStorage
-// round-trip — was previously unexercised. These tests render it for real.
-
-vi.mock('next/link', () => ({
-  default: ({ children, href }: { children?: ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
-}))
-
-vi.mock('@/components/ui/app-card', () => ({
-  AppCard: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-}))
-
-const strings = {
+const STRINGS = {
   title: 'My schedule',
   readOnly: 'Read-only',
   byTime: 'Time',
   byWorkstation: 'Work area',
   noAssignments: 'No assignments',
-  noAssignmentsDescription: 'none yet',
-  noAssignmentsOnDay: 'Nothing today',
-  noAssignmentsOnDayDescription: 'nothing on this day',
+  noAssignmentsDescription: '',
+  noAssignmentsOnDay: 'Nothing on this day',
+  noAssignmentsOnDayDescription: '',
   dayTabsLabel: 'Days',
+  todoLabel: 'To do',
 }
 
-function assignment(id: string, startHour: number, workstationName: string): AssignmentRow {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return {
-    id,
-    timeslot_start: `2026-09-11T${pad(startHour)}:00:00Z`,
-    timeslot_end: `2026-09-11T${pad(startHour + 1)}:00:00Z`,
-    status: 'assigned',
-    workstations: {
-      id: `ws-${id}`,
-      name: workstationName,
-      description: null,
-      workstation_todos: [],
-    },
-  }
+function slot(id: string, start: string, end: string, ws: AssignmentRow['workstations']) {
+  return { id, timeslot_start: start, timeslot_end: end, status: 'assigned', workstations: ws }
 }
 
-function renderView(overrides: Partial<Parameters<typeof ScheduleView>[0]> = {}) {
+const SOCIAL_MEDIA = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Social Media',
+  description: null,
+  workstation_todos: [],
+}
+const WITH_TODOS = {
+  id: '33333333-3333-4333-8333-333333333333',
+  name: 'Depån',
+  description: 'Cups, jugs and refill point at 5 km',
+  workstation_todos: [
+    { id: 't2', instruction_text: 'Share finish-line photos', position: 2 },
+    { id: 't1', instruction_text: 'Post race-day reminder', position: 1 },
+  ],
+}
+
+const DEPOT = {
+  id: '22222222-2222-4222-8222-222222222222',
+  name: 'Depån',
+  description: null,
+  workstation_todos: [],
+}
+
+function renderView(view: 'time' | 'work-area', assignments: AssignmentRow[]) {
+  localStorage.setItem('official-schedule-view', view)
   return render(
     <ScheduleView
-      assignments={[assignment('a1', 7, 'Finish line')]}
-      days={['2026-09-11']}
-      selectedDay="2026-09-11"
-      tenantSlug="seed-klubben"
-      strings={strings}
-      {...overrides}
+      assignments={assignments}
+      days={['2026-08-12']}
+      selectedDay="2026-08-12"
+      tenantSlug="testklubben"
+      strings={STRINGS}
     />
   )
 }
 
-function toggleOptions() {
-  return screen.getAllByRole('radio')
+// The view toggle defaults to 'time', so the work-area tests persist the
+// choice the way the component itself does.
+function renderWorkAreaView(assignments: AssignmentRow[]) {
+  return renderView('work-area', assignments)
 }
 
-beforeEach(() => {
-  localStorage.clear()
+describe('ScheduleView work-area view', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('shows one merged span instead of one line per slot', async () => {
+    renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T12:00:00.000Z', '2026-08-12T13:00:00.000Z', SOCIAL_MEDIA),
+      slot('c', '2026-08-12T13:00:00.000Z', '2026-08-12T14:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    expect(await screen.findByText('11:00–14:00')).toBeInTheDocument()
+    expect(screen.queryByText('12:00–13:00')).not.toBeInTheDocument()
+  })
+
+  it('keeps a break as a separate line within the same card', async () => {
+    renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T14:00:00.000Z', '2026-08-12T15:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    expect(await screen.findByText('11:00–12:00')).toBeInTheDocument()
+    expect(screen.getByText('14:00–15:00')).toBeInTheDocument()
+    expect(screen.getAllByText('Social Media')).toHaveLength(1)
+  })
+
+  // The edge colour only renders if the custom property and the class land on
+  // the SAME element — `var(--card-accent)` does not resolve from a sibling.
+  // A card that silently loses its accent is exactly the regression this
+  // guards, since nothing else would fail.
+  it('puts the accent variable on the element carrying the accent class', async () => {
+    const { container } = renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    await screen.findByText('Social Media')
+    const accented = container.querySelector('.card-accent-left-themed')
+    expect(accented).not.toBeNull()
+    expect((accented as HTMLElement).style.getPropertyValue('--card-accent')).not.toBe('')
+  })
+
+  it('gives two work areas on one day different accent colours', async () => {
+    const { container } = renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T12:00:00.000Z', '2026-08-12T13:00:00.000Z', DEPOT),
+    ])
+
+    await screen.findByText('Depån')
+    const accents = [...container.querySelectorAll('.card-accent-left-themed')].map((el) =>
+      (el as HTMLElement).style.getPropertyValue('--card-accent')
+    )
+    expect(accents).toHaveLength(2)
+    expect(new Set(accents).size).toBe(2)
+  })
+
+  it('heads the checklist with the to-do label, in position order', async () => {
+    renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', WITH_TODOS),
+    ])
+
+    expect(await screen.findByText('To do')).toBeInTheDocument()
+    const todos = screen
+      .getAllByText(/race-day reminder|finish-line photos/)
+      .map((el) => el.textContent)
+    expect(todos).toEqual(['Post race-day reminder', 'Share finish-line photos'])
+  })
+
+  // An empty heading over nothing reads as a section that failed to load.
+  it('omits the label entirely when the work area has no to-dos', async () => {
+    renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    await screen.findByText('Social Media')
+    expect(screen.queryByText('To do')).not.toBeInTheDocument()
+  })
+
+  // The ring is decorative. If it ever became a real <input type="checkbox">
+  // it would be an affordance that ignores every tap — v1 stores no
+  // completion state (DECISION Peter 2026-06-24).
+  it('exposes the to-dos as a list, with no checkbox control', async () => {
+    renderWorkAreaView([
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', WITH_TODOS),
+    ])
+
+    await screen.findByText('To do')
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
 })
 
+describe('ScheduleView time view', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('shows one card per run, with the run its own time span', async () => {
+    renderView('time', [
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T12:00:00.000Z', '2026-08-12T13:00:00.000Z', SOCIAL_MEDIA),
+      slot('c', '2026-08-12T13:00:00.000Z', '2026-08-12T14:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    expect(await screen.findAllByText('Social Media')).toHaveLength(1)
+    expect(screen.getByText(/11:00/)).toBeInTheDocument()
+    expect(screen.getByText(/14:00/)).toBeInTheDocument()
+  })
+
+  // Two touching slots at two different work areas must stay two cards —
+  // merging on time alone would claim the official was in both places.
+  it('keeps back-to-back slots at different work areas as separate cards', async () => {
+    renderView('time', [
+      slot('a', '2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', DEPOT),
+    ])
+
+    expect(await screen.findByText('Social Media')).toBeInTheDocument()
+    expect(screen.getByText('Depån')).toBeInTheDocument()
+    expect(screen.getAllByText(/08:00|09:00|10:00/).length).toBeGreaterThan(0)
+  })
+
+  it('shows the same work area twice when it recurs after a gap', async () => {
+    renderView('time', [
+      slot('a', '2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T15:00:00.000Z', '2026-08-12T16:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    expect(await screen.findAllByText('Social Media')).toHaveLength(2)
+  })
+
+  it('gives a work area the same accent colour in both views', async () => {
+    const read = (container: HTMLElement) =>
+      [...container.querySelectorAll('.card-accent-left-themed')].map((el) =>
+        (el as HTMLElement).style.getPropertyValue('--card-accent')
+      )
+
+    const rows = [
+      slot('a', '2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', DEPOT),
+    ]
+
+    const timeView = renderView('time', rows)
+    await screen.findByText('Depån')
+    const timeAccents = read(timeView.container)
+    timeView.unmount()
+
+    const workAreaView = renderView('work-area', rows)
+    await screen.findByText('Depån')
+    expect(read(workAreaView.container)).toEqual(timeAccents)
+  })
+})
+
+// The page-level test mocks this component away entirely, so the view toggle —
+// its click behaviour, keyboard model and localStorage round-trip — had no
+// coverage of its own. These render it for real.
 describe('ScheduleView view toggle', () => {
+  beforeEach(() => localStorage.clear())
+
+  const ONE_SLOT = () => [
+    slot('a1', '2026-08-12T07:00:00.000Z', '2026-08-12T08:00:00.000Z', SOCIAL_MEDIA),
+  ]
+
+  function renderToggle() {
+    return renderView('time', ONE_SLOT())
+  }
+
+  // renderView persists a view before mounting, which is exactly what the
+  // default and fallback cases must NOT have — so they mount directly.
+  function renderUnset({ keepStorage = false } = {}) {
+    if (!keepStorage) localStorage.clear()
+    return render(
+      <ScheduleView
+        assignments={ONE_SLOT()}
+        days={['2026-08-12']}
+        selectedDay="2026-08-12"
+        tenantSlug="testklubben"
+        strings={STRINGS}
+      />
+    )
+  }
+
+  function optionNamed(name: string) {
+    return screen.getByRole('radio', { name })
+  }
+
   it('exposes the two views as a radiogroup with Time selected by default', () => {
-    renderView()
+    renderUnset()
 
     expect(screen.getByRole('radiogroup')).toBeTruthy()
-    const [time, workArea] = toggleOptions()
-    expect(time.getAttribute('aria-checked')).toBe('true')
-    expect(workArea.getAttribute('aria-checked')).toBe('false')
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('false')
   })
 
   it('switches to the work-area view on click and persists the choice', () => {
-    renderView()
+    renderToggle()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Work area' }))
+    fireEvent.click(optionNamed('Work area'))
 
-    const [time, workArea] = toggleOptions()
-    expect(workArea.getAttribute('aria-checked')).toBe('true')
-    expect(time.getAttribute('aria-checked')).toBe('false')
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('false')
     expect(localStorage.getItem('official-schedule-view')).toBe('work-area')
   })
 
   it('restores the persisted view on mount', () => {
-    localStorage.setItem('official-schedule-view', 'work-area')
+    renderWorkAreaView(ONE_SLOT())
 
-    renderView()
-
-    expect(screen.getByRole('radio', { name: 'Work area' }).getAttribute('aria-checked')).toBe(
-      'true'
-    )
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
   })
 
   it('ignores an unrecognised persisted value rather than rendering a blank view', () => {
     localStorage.setItem('official-schedule-view', 'not-a-view')
+    renderUnset({ keepStorage: true })
 
-    renderView()
-
-    expect(screen.getByRole('radio', { name: 'Time' }).getAttribute('aria-checked')).toBe('true')
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
   })
 
   it('keeps only the selected option in the tab order', () => {
-    renderView()
+    renderToggle()
 
-    const [time, workArea] = toggleOptions()
-    expect(time.getAttribute('tabindex')).toBe('0')
-    expect(workArea.getAttribute('tabindex')).toBe('-1')
+    expect(optionNamed('Time').getAttribute('tabindex')).toBe('0')
+    expect(optionNamed('Work area').getAttribute('tabindex')).toBe('-1')
   })
 
   it('moves between views with the arrow keys', () => {
-    renderView()
+    renderToggle()
 
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Time' }), { key: 'ArrowRight' })
-    expect(screen.getByRole('radio', { name: 'Work area' }).getAttribute('aria-checked')).toBe(
-      'true'
-    )
+    fireEvent.keyDown(optionNamed('Time'), { key: 'ArrowRight' })
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
 
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Work area' }), { key: 'ArrowLeft' })
-    expect(screen.getByRole('radio', { name: 'Time' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.keyDown(optionNamed('Work area'), { key: 'ArrowLeft' })
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
   })
 
   it('wraps around the ends so the group is a loop', () => {
-    renderView()
+    renderToggle()
 
-    // Left from the first option lands on the last.
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Time' }), { key: 'ArrowLeft' })
-    expect(screen.getByRole('radio', { name: 'Work area' }).getAttribute('aria-checked')).toBe(
-      'true'
-    )
+    fireEvent.keyDown(optionNamed('Time'), { key: 'ArrowLeft' })
+
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
   })
 
   it('jumps to either end with Home and End', () => {
-    renderView()
+    renderToggle()
 
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Time' }), { key: 'End' })
-    expect(screen.getByRole('radio', { name: 'Work area' }).getAttribute('aria-checked')).toBe(
-      'true'
-    )
+    fireEvent.keyDown(optionNamed('Time'), { key: 'End' })
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
 
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Work area' }), { key: 'Home' })
-    expect(screen.getByRole('radio', { name: 'Time' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.keyDown(optionNamed('Work area'), { key: 'Home' })
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
   })
 
   it('leaves other keys to the browser', () => {
-    renderView()
+    renderToggle()
 
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Time' }), { key: 'a' })
+    fireEvent.keyDown(optionNamed('Time'), { key: 'a' })
 
-    expect(screen.getByRole('radio', { name: 'Time' }).getAttribute('aria-checked')).toBe('true')
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
   })
 
   it('moves focus with the selection so the next arrow press comes from the active option', () => {
-    renderView()
+    renderToggle()
 
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Time' }), { key: 'ArrowRight' })
+    fireEvent.keyDown(optionNamed('Time'), { key: 'ArrowRight' })
 
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Work area' }))
+    expect(document.activeElement).toBe(optionNamed('Work area'))
   })
 
   it('renders the toggle even when the selected day has no assignments', () => {
-    renderView({ assignments: [] })
+    renderView('time', [])
 
     expect(screen.getAllByRole('radio')).toHaveLength(2)
-    expect(screen.getByText(strings.noAssignmentsOnDay)).toBeTruthy()
+    expect(screen.getByText(STRINGS.noAssignmentsOnDay)).toBeTruthy()
   })
 })

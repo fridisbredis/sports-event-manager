@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { ImageOff } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
-import { useEffect, useState } from 'react'
-import { dayKey } from '@/lib/scheduling/day-window'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
+import { workAreaColorMap, workAreaDotColor, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 
 type Todo = { id: string; instruction_text: string; position: number }
 type WorkstationRef = {
@@ -33,6 +34,7 @@ interface Strings {
   noAssignmentsOnDay: string
   noAssignmentsOnDayDescription: string
   dayTabsLabel: string
+  todoLabel: string
 }
 // Order matters: it is both the visual order of the two halves and the order
 // the arrow keys step through. `label` keys into Strings so the labels stay
@@ -163,22 +165,42 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
   // confirms which date is on screen, and it stays correct if a window ever
   // spans a boundary.
   const groups = groupByDay(assignments)
+
+  // Coloured across the whole day, not per day-group, so a work area keeps
+  // one colour down the timeline — and the same colour it has on the
+  // work-area tab, since both map over the same day's stations.
+  const colors = workAreaColorMap(
+    assignments.map((a) => a.workstations?.id).filter((id): id is string => id !== undefined)
+  )
+
   return (
     <div className="flex flex-col gap-6">
       {groups.map((group) => (
         <div key={group.key}>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            {group.label}
-          </p>
-          <div className="flex flex-col gap-0">
-            {group.rows.map((a) => {
-              const ws = a.workstations
+          <p className="section-label mb-3">{group.label}</p>
+          <div className="flex flex-col gap-3">
+            {/* One card per run rather than per slot: a three-hour shift is
+                three `assignments` rows, and a card each read as three
+                separate jobs. Runs break on a gap and on a change of work
+                area, so a station worked morning and afternoon stays two
+                entries. */}
+            {groupIntoWorkAreaRuns(group.rows, (a) => a.workstations?.id ?? null).map((run) => {
+              const ws = run.slots[0].workstations
+              const color = (ws && colors.get(ws.id)) ?? WORK_AREA_COLORS[0]
               return (
-                <div key={a.id} className="flex items-center gap-3 py-3">
-                  <span className="w-12 shrink-0 text-sm font-medium text-gray-500 pt-3">
-                    {formatTime(a.timeslot_start)}
+                <div key={run.span.start} className="flex items-start gap-3">
+                  {/* Start and end stacked, not side by side: "08:00-09:00"
+                      on one line pushes the card too narrow on a phone. */}
+                  <span className="w-14 shrink-0 pt-3 text-sm font-medium leading-tight text-gray-500">
+                    {formatTime(run.span.start)}&ndash;
+                    <br />
+                    {formatTime(run.span.end)}
                   </span>
-                  <AppCard className="flex-1 min-w-0" bodyClassName="px-4 py-3">
+                  <AppCard
+                    className="card-accent-left-themed min-w-0 flex-1"
+                    bodyClassName="px-4 py-3"
+                    style={{ '--card-accent': color.fg } as CSSProperties}
+                  >
                     <p className="text-sm font-semibold text-gray-900">{ws?.name ?? '—'}</p>
                     {ws?.description ? (
                       <p className="text-xs text-gray-500 mt-0.5">{ws.description}</p>
@@ -194,55 +216,108 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
   )
 }
 
-function WorkAreaView({ assignments }: { assignments: AssignmentRow[] }) {
-  // Group by workstation id, preserving first-seen order
-  const seen = new Set<string>()
+function WorkAreaView({
+  assignments,
+  todoLabel,
+}: {
+  assignments: AssignmentRow[]
+  todoLabel: string
+}) {
+  // Group by workstation id, preserving first-seen order. Keyed by a Map
+  // rather than re-scanning `groups` per row, so an official with many slots
+  // at one station doesn't make this quadratic.
   const groups: { ws: NonNullable<WorkstationRef>; rows: AssignmentRow[] }[] = []
+  const byId = new Map<string, (typeof groups)[number]>()
 
   for (const a of assignments) {
     if (!a.workstations) continue
     const ws = a.workstations
-    if (!seen.has(ws.id)) {
-      seen.add(ws.id)
-      groups.push({ ws, rows: [a] })
+    const existing = byId.get(ws.id)
+    if (existing) {
+      existing.rows.push(a)
     } else {
-      groups.find((g) => g.ws.id === ws.id)!.rows.push(a)
+      const group = { ws, rows: [a] }
+      byId.set(ws.id, group)
+      groups.push(group)
     }
   }
 
+  // Coloured per work area, not by the tenant theme: on this screen the edge
+  // is what tells two cards apart at a glance. `workAreaColorMap` over the
+  // whole day's stations rather than `workAreaColor` per card, so two
+  // stations on one day can't come out the same colour.
+  const colors = workAreaColorMap(groups.map((g) => g.ws.id))
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3">
       {groups.map(({ ws, rows }) => {
         const sortedTodos = [...ws.workstation_todos].sort((a, b) => a.position - b.position)
+        const color = colors.get(ws.id) ?? WORK_AREA_COLORS[0]
         return (
-          <div key={ws.id}>
-            <p className="text-sm font-semibold text-gray-900 mb-1">
-              {ws.name}
-              {ws.description ? (
-                <span className="font-normal text-gray-500"> · {ws.description}</span>
-              ) : null}
-            </p>
+          <AppCard
+            key={ws.id}
+            className="card-accent-left-themed"
+            bodyClassName="px-4 py-3"
+            style={{ '--card-accent': color.fg } as CSSProperties}
+          >
+            <p className="text-sm font-semibold text-gray-900">{ws.name}</p>
+            {ws.description ? (
+              <p className="text-xs text-gray-500 mt-0.5">{ws.description}</p>
+            ) : null}
             {/* Times only, no dates: the view covers one day, and repeating the
                 date on every station is what made this line unreadable for an
-                official working the same station across several days. */}
-            <p className="text-xs text-gray-500 mb-2">
-              {rows.map((a) => formatTime(a.timeslot_start)).join(', ')}
-            </p>
+                official working the same station across several days.
+
+                One span per line rather than one per slot: a six-hour shift is
+                six rows in `assignments`, and listing each start time read as
+                seven separate jobs instead of one stretch. Gaps still break
+                into separate lines, so a break stays visible. */}
+            <div className="text-sm text-gray-500 mt-1">
+              {mergeContiguousSlots(rows).map((span) => (
+                <p key={span.start}>
+                  {formatTime(span.start)}&ndash;{formatTime(span.end)}
+                </p>
+              ))}
+            </div>
             {/* Text only, deliberately no checkbox. v1 stores no completion state
                 (DECISION Peter 2026-06-24, docs/flows/workstation-checklist-config.md:46),
                 so a checkbox would be an affordance that ignores every tap. The
                 wireframes do show checkboxes — they predate this decision. Add them
                 back when completion tracking lands, not before. */}
             {sortedTodos.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {sortedTodos.map((todo) => (
-                  <p key={todo.id} className="text-sm text-gray-700">
-                    {todo.instruction_text}
-                  </p>
-                ))}
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="section-label mb-2">{todoLabel}</p>
+                <ul className="flex flex-col gap-2">
+                  {sortedTodos.map((todo) => (
+                    <li key={todo.id} className="flex items-start gap-2.5">
+                      {/* A filled bullet, deliberately not a checkbox. It
+                          marks these as things to do without promising a tap
+                          does anything: v1 stores no completion state, so a
+                          real checkbox would ignore every tap and leave an
+                          official unsure whether their work had registered.
+                          Decorative — the text beside it carries the meaning,
+                          and <ul>/<li> already tell assistive tech this is a
+                          list — so it is hidden rather than announced as an
+                          unchecked control. Swap it for a real checkbox when
+                          completion tracking lands, not before.
+
+                          Tinted to the card's own work-area colour via
+                          `workAreaDotColor`, the same pastel the admin
+                          surfaces use for dots and bullets — at full
+                          saturation a column of these would read as a row of
+                          alerts. */}
+                      <span
+                        aria-hidden="true"
+                        className="mt-[5px] h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: workAreaDotColor(color) }}
+                      />
+                      <span className="text-sm text-gray-700">{todo.instruction_text}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : null}
-          </div>
+          </AppCard>
         )
       })}
     </div>
@@ -370,7 +445,7 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
       ) : view === 'time' ? (
         <TimeView assignments={assignments} />
       ) : (
-        <WorkAreaView assignments={assignments} />
+        <WorkAreaView assignments={assignments} todoLabel={strings.todoLabel} />
       )}
     </div>
   )
