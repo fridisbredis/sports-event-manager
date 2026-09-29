@@ -4,7 +4,12 @@ import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, shortName } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { workAreaBorderColor, workAreaColor, workAreaDotColor } from '@/lib/theme/work-area-colors'
+import {
+  WORK_AREA_COLORS,
+  workAreaBorderColor,
+  workAreaColorMap,
+  workAreaDotColor,
+} from '@/lib/theme/work-area-colors'
 import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
@@ -75,6 +80,13 @@ export function ByWorkAreaGrid({
   }, [activeAssignments])
 
   // Official name lookup by id
+  // One colour per work area across the whole grid, so no two rows visible at
+  // the same time share one.
+  const colorMap = useMemo(
+    () => workAreaColorMap(stageWorkstations.map((ws) => ws.id)),
+    [stageWorkstations]
+  )
+
   const officialNameMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const o of officials) map.set(o.id, o.name)
@@ -129,7 +141,7 @@ export function ByWorkAreaGrid({
         <tbody>
           {stageWorkstations.map((ws) => {
             const isExpanded = expandedWorkAreas.has(ws.id)
-            const color = workAreaColor(ws.id)
+            const color = colorMap.get(ws.id) ?? WORK_AREA_COLORS[0]
 
             const overflowBySlot = getOverflowBySlot(activeAssignments, ws.id, ws.capacity_ceiling)
             const hasOverflow = overflowBySlot.size > 0
