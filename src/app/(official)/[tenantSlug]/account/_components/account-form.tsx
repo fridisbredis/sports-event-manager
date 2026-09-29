@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { LogOut } from 'lucide-react'
+import { CalendarDays, ChevronRight, LogOut } from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form-fields'
@@ -106,12 +106,14 @@ export default function AccountForm({
           </div>
         </div>
       )}
-      {/* Mobile bottom padding clears both the tab bar (64px) and the fixed
-          Save bar that sits on top of it (~60px with its padding) — pb-24
-          was sized before the log-out button existed and left it partly
-          underneath. */}
-      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-40'}>
-        {/* Avatar — clickable, opens a file picker and uploads on pick */}
+      {/* Mobile bottom padding clears the fixed Save bar so the log-out
+          button never sits underneath it. The bar occupies ~128px: the tab
+          bar it floats above (64px) plus its own mt-3, button and pb-2.
+          pb-36 (144px) clears that with a modest gap; pb-40 left an
+          obviously empty band below the last control. */}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-36'}>
+        {/* Avatar — clickable, opens a file picker and uploads on pick.
+            AvatarPicker centres itself. */}
         <div className="mb-6">
           <AvatarPicker
             avatarUrl={avatarUrl}
@@ -121,28 +123,46 @@ export default function AccountForm({
           />
         </div>
 
-        {/* Name field */}
+        {/* Name field. The "Edit" affordance sits inside the field, at its
+            trailing edge, rather than as a description line underneath — it
+            reads as part of the control it applies to, and keeps the label /
+            field / label / field rhythm with the phone row below unbroken.
+            It is a hint, not a control: the input is always editable, so it
+            carries aria-hidden and no press target of its own. */}
         <div className="mb-5">
           <Input
             label={t('account.nameLabel')}
             value={name}
             onValueChange={handleNameChange}
-            description={t('account.editHint')}
             labelPlacement="outside"
+            endContent={
+              <span
+                aria-hidden="true"
+                className="shrink-0 text-[15px] font-semibold text-tenant-primary"
+              >
+                {t('account.editHint')}
+              </span>
+            }
           />
         </div>
 
-        {/* Phone field */}
+        {/* Phone field. Grey rather than white: it is the one field on the
+            screen that cannot be typed in, and the flat grey says so before
+            the "(read-only)" in the label has to. */}
         <div className="mb-8">
           <label className="mb-1.5 block text-sm text-ink-soft">{t('account.phoneLabel')}</label>
-          <div className="w-full select-none rounded-control border-1 border-edge bg-white px-3.5 py-2.5 text-[15px] text-ink-muted">
+          <div className="w-full select-none rounded-control border-1 border-edge bg-surface px-3.5 py-2.5 text-[15px] text-ink-muted">
             {formatPhoneForDisplay(phone)}
           </div>
         </div>
 
         {/* Notifications section */}
         <p className="section-label mb-3">{t('account.notificationsHeading')}</p>
-        <AppCard className="mb-8" bodyClassName="px-4 py-4">
+        {/* On desktop this card is followed by the Schedule section, and the
+            wider gap separates two sections. On mobile it is the last card
+            and the only thing after it is the log-out button, which needs
+            less air than a section break. */}
+        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.smsUpdatesLabel')}</p>
@@ -174,32 +194,22 @@ export default function AccountForm({
             >
               {/* A calendar, since the row leads to the schedule — the
                   empty square it replaced read as an unchecked checkbox. */}
-              <svg
+              <CalendarDays
                 aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
                 strokeWidth={1.7}
-                className="h-8 w-8 shrink-0 text-tenant-primary"
-              >
-                <rect x="3" y="5" width="18" height="16" rx="2.5" />
-                <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
-              </svg>
+                className="size-8 shrink-0 text-tenant-primary"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold text-ink">
                   {t('account.assignmentCount', { count: assignmentCount })}
                 </p>
                 <p className="mt-0.5 text-sm text-ink-muted">{t('account.viewSchedule')}</p>
               </div>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
+              <ChevronRight
+                aria-hidden="true"
                 strokeWidth={1.5}
-                className="h-5 w-5 shrink-0 text-ink-label"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
+                className="size-5 shrink-0 text-ink-label"
+              />
             </Link>
           </>
         )}

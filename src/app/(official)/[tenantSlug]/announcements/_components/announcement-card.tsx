@@ -1,18 +1,7 @@
 'use client'
 
-import { Card, CardBody } from '@heroui/react'
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-      <path
-        fillRule="evenodd"
-        d="M5.25 9a6.75 6.75 0 0113.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 01-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 11-7.48 0 24.585 24.585 0 01-4.831-1.244.75.75 0 01-.298-1.205A8.217 8.217 0 005.25 9.75V9zm4.502 8.9a2.25 2.25 0 104.496 0 25.057 25.057 0 01-4.496 0z"
-        clipRule="evenodd"
-      />
-    </svg>
-  )
-}
+import { Bell } from 'lucide-react'
+import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
   time: string
@@ -21,16 +10,21 @@ interface Props {
 
 export function AnnouncementCard({ time, body }: Props) {
   return (
-    <Card shadow="sm">
-      <CardBody className="p-4 flex-row gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-          <BellIcon />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-gray-500">{time}</p>
-          <p className="text-sm text-gray-900 leading-relaxed mt-1">{body}</p>
-        </div>
-      </CardBody>
-    </Card>
+    // card-accent-left is the shared leading-edge accent from globals.css —
+    // the same one the admin side puts on its announcement rows in COMM-01,
+    // so the two views of one announcement are marked identically. It is an
+    // inset shadow rather than a border, which keeps the rail inside
+    // AppCard's radius and off the box model.
+    <AppCard className="card-accent-left" bodyClassName="flex-row gap-3 p-4">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-tenant-primary-tint text-tenant-primary-tint-text">
+        <Bell className="size-5" strokeWidth={2} aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-ink-label">{time}</p>
+        {/* The body is the reason the card exists, so it carries the weight
+            the old text-sm gave away to the timestamp above it. */}
+        <p className="mt-1 text-[17px] leading-relaxed text-ink">{body}</p>
+      </div>
+    </AppCard>
   )
 }

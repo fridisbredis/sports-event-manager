@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ScheduleView, type AssignmentRow } from './schedule-view'
 
 const STRINGS = {
@@ -207,5 +207,128 @@ describe('ScheduleView time view', () => {
     const workAreaView = renderView('work-area', rows)
     await screen.findByText('Depån')
     expect(read(workAreaView.container)).toEqual(timeAccents)
+  })
+})
+
+// The page-level test mocks this component away entirely, so the view toggle —
+// its click behaviour, keyboard model and localStorage round-trip — had no
+// coverage of its own. These render it for real.
+describe('ScheduleView view toggle', () => {
+  beforeEach(() => localStorage.clear())
+
+  const ONE_SLOT = () => [
+    slot('a1', '2026-08-12T07:00:00.000Z', '2026-08-12T08:00:00.000Z', SOCIAL_MEDIA),
+  ]
+
+  function renderToggle() {
+    return renderView('time', ONE_SLOT())
+  }
+
+  // renderView persists a view before mounting, which is exactly what the
+  // default and fallback cases must NOT have — so they mount directly.
+  function renderUnset({ keepStorage = false } = {}) {
+    if (!keepStorage) localStorage.clear()
+    return render(
+      <ScheduleView
+        assignments={ONE_SLOT()}
+        days={['2026-08-12']}
+        selectedDay="2026-08-12"
+        tenantSlug="testklubben"
+        strings={STRINGS}
+      />
+    )
+  }
+
+  function optionNamed(name: string) {
+    return screen.getByRole('radio', { name })
+  }
+
+  it('exposes the two views as a radiogroup with Time selected by default', () => {
+    renderUnset()
+
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('switches to the work-area view on click and persists the choice', () => {
+    renderToggle()
+
+    fireEvent.click(optionNamed('Work area'))
+
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('false')
+    expect(localStorage.getItem('official-schedule-view')).toBe('work-area')
+  })
+
+  it('restores the persisted view on mount', () => {
+    renderWorkAreaView(ONE_SLOT())
+
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('ignores an unrecognised persisted value rather than rendering a blank view', () => {
+    localStorage.setItem('official-schedule-view', 'not-a-view')
+    renderUnset({ keepStorage: true })
+
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('keeps only the selected option in the tab order', () => {
+    renderToggle()
+
+    expect(optionNamed('Time').getAttribute('tabindex')).toBe('0')
+    expect(optionNamed('Work area').getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('moves between views with the arrow keys', () => {
+    renderToggle()
+
+    fireEvent.keyDown(optionNamed('Time'), { key: 'ArrowRight' })
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.keyDown(optionNamed('Work area'), { key: 'ArrowLeft' })
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('wraps around the ends so the group is a loop', () => {
+    renderToggle()
+
+    fireEvent.keyDown(optionNamed('Time'), { key: 'ArrowLeft' })
+
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('jumps to either end with Home and End', () => {
+    renderToggle()
+
+    fireEvent.keyDown(optionNamed('Time'), { key: 'End' })
+    expect(optionNamed('Work area').getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.keyDown(optionNamed('Work area'), { key: 'Home' })
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('leaves other keys to the browser', () => {
+    renderToggle()
+
+    fireEvent.keyDown(optionNamed('Time'), { key: 'a' })
+
+    expect(optionNamed('Time').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('moves focus with the selection so the next arrow press comes from the active option', () => {
+    renderToggle()
+
+    fireEvent.keyDown(optionNamed('Time'), { key: 'ArrowRight' })
+
+    expect(document.activeElement).toBe(optionNamed('Work area'))
+  })
+
+  it('renders the toggle even when the selected day has no assignments', () => {
+    renderView('time', [])
+
+    expect(screen.getAllByRole('radio')).toHaveLength(2)
+    expect(screen.getByText(STRINGS.noAssignmentsOnDay)).toBeTruthy()
   })
 })
