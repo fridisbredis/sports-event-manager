@@ -1,7 +1,6 @@
 'use client'
 
-import { Card, CardBody } from '@heroui/react'
-import { CalendarIcon, ClockIcon, MapPinIcon } from './icons'
+import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
   stageNumber: number
@@ -12,36 +11,29 @@ interface Props {
 }
 
 export function StageCard({ stageNumber, name, date, timeRange, venue }: Props) {
+  // Date, time and venue are one block of facts about the stage, not three
+  // labelled fields — the reference drops the per-row icons and lets them
+  // stack as plain lines, which reads faster and stops three grey glyphs from
+  // competing with the numbered badge for attention.
+  const details = [date, timeRange, venue].filter(Boolean)
+
   return (
-    <Card shadow="sm">
-      <CardBody className="p-4 flex-row gap-3">
-        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
-          {stageNumber}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gray-900">{name}</p>
-          <div className="mt-2 flex flex-col gap-1.5">
-            {date ? (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <CalendarIcon />
-                <span>{date}</span>
-              </div>
-            ) : null}
-            {timeRange ? (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <ClockIcon />
-                <span>{timeRange}</span>
-              </div>
-            ) : null}
-            {venue ? (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <MapPinIcon />
-                <span>{venue}</span>
-              </div>
-            ) : null}
+    <AppCard bodyClassName="flex-row gap-3.5 p-4">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-tenant-primary text-sm font-bold text-white">
+        {stageNumber}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[17px] font-bold leading-snug text-ink">{name}</p>
+        {details.length > 0 ? (
+          <div className="mt-1 flex flex-col gap-0.5">
+            {details.map((line) => (
+              <p key={line} className="text-[15px] leading-relaxed text-ink-muted">
+                {line}
+              </p>
+            ))}
           </div>
-        </div>
-      </CardBody>
-    </Card>
+        ) : null}
+      </div>
+    </AppCard>
   )
 }
