@@ -107,3 +107,62 @@ export function mergeContiguousSlots(
   }
   return spans
 }
+
+/** A contiguous run of slots at one work area, in timeline order. */
+export interface WorkAreaRun<T> {
+  /** The work area's id — null for a slot with no work area attached. */
+  workAreaId: string | null
+  /** The run's own span, from its first slot's start to its last slot's end. */
+  span: TimeSpan
+  /** The slots making up the run, ascending. */
+  slots: T[]
+}
+
+/**
+ * Splits a day's slots into runs: consecutive slots at the SAME work area
+ * collapse into one run, and a change of work area always starts a new one.
+ *
+ * This is the timeline counterpart to `mergeContiguousSlots`. That function
+ * merges on time alone, which is right once slots are already grouped by work
+ * area, but wrong for a chronological list: an official who finishes at the
+ * water station at 09:00 and starts at the finish line at 09:00 has two
+ * touching slots at two different places, and merging them on time alone
+ * would render one card claiming they were in both.
+ *
+ * A run also breaks on a gap, so a station worked morning and afternoon is
+ * two entries in the timeline rather than one span hiding the break.
+ *
+ * Input must be ascending by start; the page's queries already `.order` it.
+ */
+export function groupIntoWorkAreaRuns<T extends { timeslot_start: string; timeslot_end: string }>(
+  slots: T[],
+  workAreaIdOf: (slot: T) => string | null
+): WorkAreaRun<T>[] {
+  const runs: WorkAreaRun<T>[] = []
+
+  for (const slot of slots) {
+    const id = workAreaIdOf(slot)
+    const last = runs[runs.length - 1]
+    const continuesRun =
+      last !== undefined &&
+      last.workAreaId === id &&
+      new Date(last.span.end).getTime() === new Date(slot.timeslot_start).getTime()
+
+    if (continuesRun) {
+      last.slots.push(slot)
+      // Guard against an out-of-order or overlapping row shortening the span,
+      // matching `mergeContiguousSlots`.
+      if (new Date(slot.timeslot_end).getTime() > new Date(last.span.end).getTime()) {
+        last.span.end = slot.timeslot_end
+      }
+    } else {
+      runs.push({
+        workAreaId: id,
+        span: { start: slot.timeslot_start, end: slot.timeslot_end },
+        slots: [slot],
+      })
+    }
+  }
+
+  return runs
+}

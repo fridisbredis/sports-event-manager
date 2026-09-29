@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AppCard } from '@/components/ui/app-card'
 import { useEffect, useState, type CSSProperties } from 'react'
-import { dayKey, mergeContiguousSlots } from '@/lib/scheduling/day-window'
+import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
 import { workAreaColorMap, workAreaDotColor, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 
 type Todo = { id: string; instruction_text: string; position: number }
@@ -167,22 +167,42 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
   // confirms which date is on screen, and it stays correct if a window ever
   // spans a boundary.
   const groups = groupByDay(assignments)
+
+  // Coloured across the whole day, not per day-group, so a work area keeps
+  // one colour down the timeline — and the same colour it has on the
+  // work-area tab, since both map over the same day's stations.
+  const colors = workAreaColorMap(
+    assignments.map((a) => a.workstations?.id).filter((id): id is string => id !== undefined)
+  )
+
   return (
     <div className="flex flex-col gap-6">
       {groups.map((group) => (
         <div key={group.key}>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            {group.label}
-          </p>
-          <div className="flex flex-col gap-0">
-            {group.rows.map((a) => {
-              const ws = a.workstations
+          <p className="section-label mb-3">{group.label}</p>
+          <div className="flex flex-col gap-3">
+            {/* One card per run rather than per slot: a three-hour shift is
+                three `assignments` rows, and a card each read as three
+                separate jobs. Runs break on a gap and on a change of work
+                area, so a station worked morning and afternoon stays two
+                entries. */}
+            {groupIntoWorkAreaRuns(group.rows, (a) => a.workstations?.id ?? null).map((run) => {
+              const ws = run.slots[0].workstations
+              const color = (ws && colors.get(ws.id)) ?? WORK_AREA_COLORS[0]
               return (
-                <div key={a.id} className="flex items-center gap-3 py-3">
-                  <span className="w-12 shrink-0 text-sm font-medium text-gray-500 pt-3">
-                    {formatTime(a.timeslot_start)}
+                <div key={run.span.start} className="flex items-start gap-3">
+                  {/* Start and end stacked, not side by side: "08:00-09:00"
+                      on one line pushes the card too narrow on a phone. */}
+                  <span className="w-14 shrink-0 pt-3 text-sm font-medium leading-tight text-gray-500">
+                    {formatTime(run.span.start)}&ndash;
+                    <br />
+                    {formatTime(run.span.end)}
                   </span>
-                  <AppCard className="flex-1 min-w-0" bodyClassName="px-4 py-3">
+                  <AppCard
+                    className="card-accent-left-themed min-w-0 flex-1"
+                    bodyClassName="px-4 py-3"
+                    style={{ '--card-accent': color.fg } as CSSProperties}
+                  >
                     <p className="text-sm font-semibold text-gray-900">{ws?.name ?? '—'}</p>
                     {ws?.description ? (
                       <p className="text-xs text-gray-500 mt-0.5">{ws.description}</p>

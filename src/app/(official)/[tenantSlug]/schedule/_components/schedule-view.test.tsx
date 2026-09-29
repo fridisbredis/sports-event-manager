@@ -42,10 +42,8 @@ const DEPOT = {
   workstation_todos: [],
 }
 
-function renderWorkAreaView(assignments: AssignmentRow[]) {
-  // The view toggle defaults to 'time'; the work-area view is what this file
-  // is about, so persist the choice the way the component itself does.
-  localStorage.setItem('official-schedule-view', 'work-area')
+function renderView(view: 'time' | 'work-area', assignments: AssignmentRow[]) {
+  localStorage.setItem('official-schedule-view', view)
   return render(
     <ScheduleView
       assignments={assignments}
@@ -55,6 +53,12 @@ function renderWorkAreaView(assignments: AssignmentRow[]) {
       strings={STRINGS}
     />
   )
+}
+
+// The view toggle defaults to 'time', so the work-area tests persist the
+// choice the way the component itself does.
+function renderWorkAreaView(assignments: AssignmentRow[]) {
+  return renderView('work-area', assignments)
 }
 
 describe('ScheduleView work-area view', () => {
@@ -144,5 +148,64 @@ describe('ScheduleView work-area view', () => {
     await screen.findByText('To do')
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView time view', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('shows one card per run, with the run its own time span', async () => {
+    renderView('time', [
+      slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T12:00:00.000Z', '2026-08-12T13:00:00.000Z', SOCIAL_MEDIA),
+      slot('c', '2026-08-12T13:00:00.000Z', '2026-08-12T14:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    expect(await screen.findAllByText('Social Media')).toHaveLength(1)
+    expect(screen.getByText(/11:00/)).toBeInTheDocument()
+    expect(screen.getByText(/14:00/)).toBeInTheDocument()
+  })
+
+  // Two touching slots at two different work areas must stay two cards —
+  // merging on time alone would claim the official was in both places.
+  it('keeps back-to-back slots at different work areas as separate cards', async () => {
+    renderView('time', [
+      slot('a', '2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', DEPOT),
+    ])
+
+    expect(await screen.findByText('Social Media')).toBeInTheDocument()
+    expect(screen.getByText('Depån')).toBeInTheDocument()
+    expect(screen.getAllByText(/08:00|09:00|10:00/).length).toBeGreaterThan(0)
+  })
+
+  it('shows the same work area twice when it recurs after a gap', async () => {
+    renderView('time', [
+      slot('a', '2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T15:00:00.000Z', '2026-08-12T16:00:00.000Z', SOCIAL_MEDIA),
+    ])
+
+    expect(await screen.findAllByText('Social Media')).toHaveLength(2)
+  })
+
+  it('gives a work area the same accent colour in both views', async () => {
+    const read = (container: HTMLElement) =>
+      [...container.querySelectorAll('.card-accent-left-themed')].map((el) =>
+        (el as HTMLElement).style.getPropertyValue('--card-accent')
+      )
+
+    const rows = [
+      slot('a', '2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', SOCIAL_MEDIA),
+      slot('b', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', DEPOT),
+    ]
+
+    const timeView = renderView('time', rows)
+    await screen.findByText('Depån')
+    const timeAccents = read(timeView.container)
+    timeView.unmount()
+
+    const workAreaView = renderView('work-area', rows)
+    await screen.findByText('Depån')
+    expect(read(workAreaView.container)).toEqual(timeAccents)
   })
 })

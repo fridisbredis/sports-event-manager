@@ -5,6 +5,7 @@ import {
   dayWindow,
   resolveSelectedDay,
   mergeContiguousSlots,
+  groupIntoWorkAreaRuns,
 } from './day-window'
 
 describe('dayKey', () => {
@@ -192,5 +193,84 @@ describe('mergeContiguousSlots', () => {
 
   it('returns nothing for no slots', () => {
     expect(mergeContiguousSlots([])).toEqual([])
+  })
+})
+
+describe('groupIntoWorkAreaRuns', () => {
+  const slot = (start: string, end: string, ws: string | null) => ({
+    timeslot_start: start,
+    timeslot_end: end,
+    ws,
+  })
+  const runs = (rows: ReturnType<typeof slot>[]) => groupIntoWorkAreaRuns(rows, (r) => r.ws)
+
+  it('collapses consecutive slots at the same work area into one run', () => {
+    const result = runs([
+      slot('2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', 'water'),
+      slot('2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', 'water'),
+    ])
+    expect(result).toHaveLength(1)
+    expect(result[0].span).toEqual({
+      start: '2026-08-12T08:00:00.000Z',
+      end: '2026-08-12T10:00:00.000Z',
+    })
+    expect(result[0].slots).toHaveLength(2)
+  })
+
+  // The case `mergeContiguousSlots` alone would get wrong: two touching slots
+  // at two different places must not fuse into one card claiming the official
+  // was in both.
+  it('starts a new run when the work area changes, even with no gap', () => {
+    const result = runs([
+      slot('2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', 'water'),
+      slot('2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', 'finish'),
+    ])
+    expect(result.map((r) => r.workAreaId)).toEqual(['water', 'finish'])
+    expect(result[0].span.end).toBe('2026-08-12T09:00:00.000Z')
+    expect(result[1].span.start).toBe('2026-08-12T09:00:00.000Z')
+  })
+
+  it('starts a new run across a gap at the same work area', () => {
+    const result = runs([
+      slot('2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', 'water'),
+      slot('2026-08-12T15:00:00.000Z', '2026-08-12T16:00:00.000Z', 'water'),
+    ])
+    expect(result).toHaveLength(2)
+    expect(result.map((r) => r.span.start)).toEqual([
+      '2026-08-12T08:00:00.000Z',
+      '2026-08-12T15:00:00.000Z',
+    ])
+  })
+
+  // The screenshot's day: water 08-09, finish 11-14, water 15-16. The same
+  // station appearing twice must stay two timeline entries.
+  it('keeps the same work area as separate runs when it recurs later', () => {
+    const result = runs([
+      slot('2026-09-11T08:00:00.000Z', '2026-09-11T09:00:00.000Z', 'water'),
+      slot('2026-09-11T11:00:00.000Z', '2026-09-11T12:00:00.000Z', 'finish'),
+      slot('2026-09-11T12:00:00.000Z', '2026-09-11T13:00:00.000Z', 'finish'),
+      slot('2026-09-11T13:00:00.000Z', '2026-09-11T14:00:00.000Z', 'finish'),
+      slot('2026-09-11T15:00:00.000Z', '2026-09-11T16:00:00.000Z', 'water'),
+    ])
+    expect(
+      result.map((r) => [r.workAreaId, r.span.start.slice(11, 16), r.span.end.slice(11, 16)])
+    ).toEqual([
+      ['water', '08:00', '09:00'],
+      ['finish', '11:00', '14:00'],
+      ['water', '15:00', '16:00'],
+    ])
+  })
+
+  it('treats slots with no work area as their own runs', () => {
+    const result = runs([
+      slot('2026-08-12T08:00:00.000Z', '2026-08-12T09:00:00.000Z', null),
+      slot('2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', null),
+    ])
+    expect(result).toHaveLength(1)
+    expect(result[0].workAreaId).toBeNull()
+  })
+
+  it('returns nothing for no slots', () => {
+    expect(runs([])).toEqual([])
   })
 })
