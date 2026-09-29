@@ -65,10 +65,14 @@ function formatTime(iso: string): string {
 
 function weekdayFromDateString(dateStr: string): string {
   // Append T00:00Z so the Date is parsed as UTC midnight, giving the correct weekday.
-  return new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', {
+  const weekday = new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', {
     weekday: 'short',
     timeZone: 'UTC',
   })
+  // The weekday alone cannot be ordered by eye — two stages weeks apart can
+  // both read 'Thu', making a correctly sorted list look shuffled. The ISO
+  // date disambiguates and sorts visually the same way the list does.
+  return `${weekday} ${dateStr}`
 }
 
 function formatTimeRange(start: string | null, end: string | null): string {
