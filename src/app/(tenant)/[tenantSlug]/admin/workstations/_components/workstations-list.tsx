@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Accordion,
@@ -17,7 +18,16 @@ import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
-import { workAreaColor, workAreaDotColor } from '@/lib/theme/work-area-colors'
+import {
+  WORK_AREA_COLORS,
+  workAreaColorMap,
+  workAreaDotColor,
+  type WorkAreaColor,
+} from '@/lib/theme/work-area-colors'
+
+// Every rendered id is in the map by construction; this only satisfies the
+// type at the lookup site.
+const FALLBACK_COLOR: WorkAreaColor = WORK_AREA_COLORS[0]
 
 interface OperatingWindow {
   window_start: string
@@ -148,10 +158,12 @@ function StageContent({
   stage,
   workstations,
   tenantSlug,
+  colors,
 }: {
   stage: Stage
   workstations: Workstation[]
   tenantSlug: string
+  colors: Map<string, WorkAreaColor>
 }) {
   const router = useRouter()
   const { t } = useTranslation('admin')
@@ -192,7 +204,9 @@ function StageContent({
                       <span
                         aria-hidden="true"
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: workAreaDotColor(workAreaColor(ws.id)) }}
+                        style={{
+                          backgroundColor: workAreaDotColor(colors.get(ws.id) ?? FALLBACK_COLOR),
+                        }}
                       />
                       {ws.name}
                     </span>
@@ -223,6 +237,12 @@ function StageContent({
 export default function WorkstationsList({ tenantSlug, stages, workstations }: Props) {
   const router = useRouter()
   const { t } = useTranslation('admin')
+
+  // Colour across every work area in the tenant, not per stage: the same
+  // colour appearing in two stage panels reads as a repeat just as much as
+  // two in one table would. Must sit above the early return below — hooks
+  // cannot be called conditionally.
+  const colors = useMemo(() => workAreaColorMap(workstations.map((ws) => ws.id)), [workstations])
 
   if (stages.length === 0) {
     return (
@@ -279,6 +299,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
               stage={stage}
               workstations={workstations.filter((ws) => ws.stage_id === stage.id)}
               tenantSlug={tenantSlug}
+              colors={colors}
             />
           </AccordionItem>
         ))}

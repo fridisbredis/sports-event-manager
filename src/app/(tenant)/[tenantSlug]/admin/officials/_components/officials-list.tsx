@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Chip,
   Table,
@@ -21,7 +21,7 @@ import { Input, Select } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LinkButton } from '@/components/ui/link-button'
-import { workAreaColor } from '@/lib/theme/work-area-colors'
+import { WORK_AREA_COLORS, workAreaColorMap } from '@/lib/theme/work-area-colors'
 import { useTranslation } from '@/lib/i18n/client'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError, extractErrorMessage, parseRetryAfterMinutes } from '@/lib/toast'
@@ -191,6 +191,10 @@ export default function OfficialsList({
 
   const visibleOfficials = officials.filter((o) => o.invite_status !== 'removed')
 
+  // Keyed off the full roster rather than `visibleOfficials`, so removing
+  // someone never repaints the avatars of the people who remain.
+  const avatarColors = useMemo(() => workAreaColorMap(officials.map((o) => o.id)), [officials])
+
   function closeAddModal() {
     setAddModalOpen(false)
     setName('')
@@ -260,8 +264,9 @@ export default function OfficialsList({
                         aria-hidden="true"
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
                         style={{
-                          backgroundColor: workAreaColor(official.id).bg,
-                          color: workAreaColor(official.id).fg,
+                          backgroundColor: (avatarColors.get(official.id) ?? WORK_AREA_COLORS[0])
+                            .bg,
+                          color: (avatarColors.get(official.id) ?? WORK_AREA_COLORS[0]).fg,
                         }}
                       >
                         {initialsOf(official.name)}
