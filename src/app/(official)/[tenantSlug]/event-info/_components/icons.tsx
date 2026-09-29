@@ -1,74 +1,22 @@
+// Stands in for a tenant that has not uploaded a logo. A filled theme-gradient
+// plate rather than the old grey "missing image" cross: on a screen whose whole
+// job is to introduce the event, a broken-image mark is a poor first
+// impression, while the plate reads as the event's mark either way.
+//
+// The 135deg primary-to-secondary gradient is the same one the admin
+// dashboard's logo tile uses (dashboard-header.tsx), so a tenant with no logo
+// is marked identically on both sides of the app.
 export function LogoPlaceholder({ size }: { size: number }) {
   return (
     <div
-      style={{ width: size, height: size }}
-      className="shrink-0 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="w-1/2 h-1/2 text-gray-300"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M3 21L21 3" />
-        <rect x="3" y="3" width="18" height="18" rx="1" />
-      </svg>
-    </div>
-  )
-}
-
-export function CalendarIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-4 h-4 shrink-0 text-gray-400"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
-      />
-    </svg>
-  )
-}
-
-export function ClockIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-4 h-4 shrink-0 text-gray-400"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 6v6l4 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  )
-}
-
-export function MapPinIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-4 h-4 shrink-0 text-gray-400"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
-      />
-    </svg>
+      style={{
+        width: size,
+        height: size,
+        backgroundImage:
+          'linear-gradient(135deg, hsl(var(--tenant-primary)), hsl(var(--tenant-secondary)))',
+      }}
+      aria-hidden="true"
+      className="shrink-0 rounded-xl"
+    />
   )
 }

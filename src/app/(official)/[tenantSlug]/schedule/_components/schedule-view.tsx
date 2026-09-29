@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { ImageOff } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
@@ -36,6 +36,13 @@ interface Strings {
   dayTabsLabel: string
   todoLabel: string
 }
+// Order matters: it is both the visual order of the two halves and the order
+// the arrow keys step through. `label` keys into Strings so the labels stay
+// translated rather than hard-coded here.
+const VIEW_OPTIONS = [
+  { value: 'time', label: 'byTime' },
+  { value: 'work-area', label: 'byWorkstation' },
+] as const satisfies ReadonlyArray<{ value: View; label: keyof Strings }>
 
 interface Props {
   assignments: AssignmentRow[]
@@ -138,16 +145,7 @@ function DaySelector({
 function EmptyIcon() {
   return (
     <div className="w-20 h-20 rounded-large border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        className="w-10 h-10 text-gray-300"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
-      </svg>
+      <ImageOff aria-hidden="true" strokeWidth={1.5} className="size-10 text-ink-faint/50" />
     </div>
   )
 }
@@ -343,6 +341,32 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
     localStorage.setItem('official-schedule-view', v)
   }
 
+  // Arrow keys move between the two halves and Home/End jump to an end, which
+  // is the keyboard contract a radiogroup promises. Selection follows focus,
+  // so moving to an option also switches the view — with only two options and
+  // no expensive work behind the switch, that is the expected behaviour.
+  function handleToggleKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
+    const current = VIEW_OPTIONS.findIndex((o) => o.value === view)
+    let next = current
+
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = current + 1
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = current - 1
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = VIEW_OPTIONS.length - 1
+    else return
+
+    e.preventDefault()
+    // Wrap, so the group is a loop rather than two dead ends.
+    const wrapped = (next + VIEW_OPTIONS.length) % VIEW_OPTIONS.length
+    const target = VIEW_OPTIONS[wrapped]
+    handleViewChange(target.value)
+    // Focus has to follow the selection, or the next arrow press is read from
+    // a button that is no longer the active one.
+    e.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      [wrapped]?.focus()
+  }
+
   // Two distinct emptinesses. No days at all means nobody has scheduled this
   // official yet. Days but nothing on the selected one means the shift was
   // removed between the day-list read and the windowed read — rare, but it
@@ -354,36 +378,53 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
     <div className="px-5 pt-10 pb-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">{strings.title}</h1>
-        <span className="text-xs font-medium text-gray-400 border border-gray-200 rounded-full px-2.5 py-1">
+        <h1 className="page-title">{strings.title}</h1>
+        <span className="rounded-full border border-edge px-3 py-1 text-sm font-medium text-ink-faint">
           {strings.readOnly}
         </span>
       </div>
 
-      {/* View toggle */}
-      <div className="flex rounded-large border border-gray-200 overflow-hidden mb-6">
-        <Button
-          onClick={() => handleViewChange('time')}
-          radius="none"
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
-            view === 'time'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+      {/* View toggle. A sliding segmented control: one grey track holding a
+          single filled thumb that moves between the two halves, rather than
+          two bordered buttons that each light up in place. The thumb is an
+          absolutely-positioned sibling translated across the track, so the
+          movement is one transform rather than two colour swaps — that
+          motion is what makes the control read as a slider.
+
+          Semantically it is a radiogroup, not two buttons: the two options
+          are one either/or choice, which is what lets a screen reader
+          announce "1 of 2" and arrow keys move between them. */}
+      <div
+        role="radiogroup"
+        aria-label={strings.title}
+        className="relative mb-6 flex rounded-large bg-surface p-1"
+      >
+        {/* The moving thumb. aria-hidden because the pressed state is already
+            carried by each option's aria-checked. */}
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-large bg-tenant-primary transition-transform duration-200 ease-out motion-reduce:transition-none ${
+            view === 'work-area' ? 'translate-x-full' : 'translate-x-0'
           }`}
-        >
-          {strings.byTime}
-        </Button>
-        <Button
-          onClick={() => handleViewChange('work-area')}
-          radius="none"
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
-            view === 'work-area'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          {strings.byWorkstation}
-        </Button>
+        />
+        {VIEW_OPTIONS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={view === value}
+            // Only the active option is a tab stop; arrow keys move within the
+            // group, which is the expected keyboard model for a radiogroup.
+            tabIndex={view === value ? 0 : -1}
+            onClick={() => handleViewChange(value)}
+            onKeyDown={handleToggleKeyDown}
+            className={`relative z-10 flex-1 rounded-large py-2 text-sm font-semibold transition-colors ${
+              view === value ? 'text-white' : 'text-ink-soft hover:text-ink'
+            }`}
+          >
+            {strings[label]}
+          </button>
+        ))}
       </div>
 
       <DaySelector

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ImageOff } from 'lucide-react'
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
@@ -29,17 +30,8 @@ function formatAnnouncementTime(ts: string): string {
 
 function EmptyIcon() {
   return (
-    <div className="w-20 h-20 rounded-xl border border-gray-200 bg-gray-100 flex items-center justify-center">
-      <svg
-        viewBox="0 0 24 24"
-        className="w-10 h-10 text-gray-300"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M3 21L21 3" />
-        <rect x="3" y="3" width="18" height="18" rx="1" />
-      </svg>
+    <div className="flex h-20 w-20 items-center justify-center rounded-card-sm border border-edge bg-surface">
+      <ImageOff aria-hidden="true" strokeWidth={1.5} className="size-10 text-ink-faint/50" />
     </div>
   )
 }
@@ -82,7 +74,7 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
 
   return (
     <div className="px-5 pt-10 pb-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('announcements.title')}</h1>
+      <h1 className="page-title mb-6">{t('announcements.title')}</h1>
 
       {items.length > 0 ? (
         <>
@@ -117,10 +109,8 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
         <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
           <EmptyIcon />
           <div>
-            <p className="text-base font-semibold text-gray-900">
-              {t('announcements.noAnnouncements')}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-base font-semibold text-ink">{t('announcements.noAnnouncements')}</p>
+            <p className="mt-1 text-sm text-ink-label">
               {t('announcements.noAnnouncementsDescription')}
             </p>
           </div>
@@ -131,7 +121,7 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
         <div className="flex flex-col items-center justify-center pt-24 gap-4 text-center">
           <EmptyIcon />
           <div>
-            <p className="text-base font-semibold text-gray-900">
+            <p className="text-base font-semibold text-ink">
               {t('announcements.noOlderAnnouncements')}
             </p>
             <Link href="?page=1" className="text-sm font-medium text-primary mt-1 inline-block">

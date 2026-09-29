@@ -96,7 +96,7 @@ export default async function EventInfoPage({ params }: Props) {
 
   return (
     <div className="px-5 pt-10 pb-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('eventInfo.title')}</h1>
+      <h1 className="page-title mb-6">{t('eventInfo.title')}</h1>
 
       <EventHeaderCard
         name={event?.name ?? '—'}
