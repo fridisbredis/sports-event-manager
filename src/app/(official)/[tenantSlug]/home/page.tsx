@@ -6,6 +6,7 @@ import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
+import { AvatarImage } from '@/components/ui/avatar-image'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -135,7 +136,7 @@ export default async function OfficialHomePage({ params }: Props) {
         p_user_id: userId,
       })
       if (error) throw error
-      return data as { name: string | null }
+      return data as { name: string | null; avatar_url: string | null }
     },
     ['official-home'], // cache namespace, data-shape only — tenant/user
     // scoping comes entirely from the (tenantId, userId) closure arguments
@@ -152,6 +153,7 @@ export default async function OfficialHomePage({ params }: Props) {
   ])
 
   const name = officialHome?.name ?? ''
+  const avatarUrl = officialHome?.avatar_url ?? null
   const eventName = event?.name ?? tenantSlug
   const initials = name
     .split(' ')
@@ -191,11 +193,13 @@ export default async function OfficialHomePage({ params }: Props) {
     <div className="px-5 pt-10 pb-6">
       {/* Greeting */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-          {initials ? (
-            <span className="text-sm font-semibold text-gray-600">{initials}</span>
-          ) : null}
-        </div>
+        <AvatarImage
+          src={avatarUrl}
+          initials={initials}
+          alt={name}
+          className="w-14 h-14 bg-gray-200"
+          initialsClassName="text-sm font-semibold text-gray-600"
+        />
         <div>
           <h1 className="text-xl font-bold text-gray-900">
             {name ? t('home.greeting', { name }) : t('home.greetingAnon')}

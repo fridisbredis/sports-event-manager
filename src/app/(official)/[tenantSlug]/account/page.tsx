@@ -29,7 +29,7 @@ export default async function OfficialAccountPage({ params }: Props) {
   // at confirm time, so this filter excludes exactly the removed rows.
   const { data: official } = await supabase
     .from('officials')
-    .select('id, name, phone, sms_opt_out')
+    .select('id, name, phone, sms_opt_out, avatar_url')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant.id)
     .eq('invite_status', 'confirmed')
@@ -51,6 +51,7 @@ export default async function OfficialAccountPage({ params }: Props) {
       </div>
       <AccountForm
         name={official.name}
+        avatarUrl={official.avatar_url}
         phone={official.phone}
         smsOptOut={official.sms_opt_out}
         tenantId={tenant.id}

@@ -408,6 +408,7 @@ export type Database = {
       }
       officials: {
         Row: {
+          avatar_url: string | null
           created_at: string
           gdpr_warning_sent_at: string | null
           id: string
@@ -422,6 +423,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           gdpr_warning_sent_at?: string | null
           id?: string
@@ -436,6 +438,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           gdpr_warning_sent_at?: string | null
           id?: string
@@ -771,6 +774,10 @@ export type Database = {
     }
     Functions: {
       anonymize_inactive_users: { Args: never; Returns: undefined }
+      can_write_avatar_object: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: { p_duration_seconds: number; p_key: string; p_limit: number }
         Returns: {

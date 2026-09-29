@@ -166,6 +166,7 @@ const officials: OfficialListItem[] = [
     invite_status: 'confirmed',
     user_id: currentUserId,
     sms_opt_out: false,
+    avatar_url: null,
     created_at: '2026-01-01T00:00:00Z',
   },
   {
@@ -176,6 +177,7 @@ const officials: OfficialListItem[] = [
     invite_status: 'invited',
     user_id: null,
     sms_opt_out: false,
+    avatar_url: null,
     created_at: '2026-01-01T00:00:00Z',
   },
 ]

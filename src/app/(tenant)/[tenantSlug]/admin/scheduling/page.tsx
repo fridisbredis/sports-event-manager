@@ -82,7 +82,7 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
 
     supabase
       .from('officials')
-      .select('id, name, invite_status')
+      .select('id, name, invite_status, avatar_url')
       .eq('tenant_id', tenant.id)
       .eq('invite_status', 'confirmed')
       .order('name', { ascending: true }),

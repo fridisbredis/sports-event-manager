@@ -54,6 +54,7 @@ vi.mock('@heroui/react', () => ({
 
 const baseProps = {
   name: 'Frida',
+  avatarUrl: null,
   phone: '+46709900002',
   smsOptOut: false,
   tenantId: 't1',

@@ -14,9 +14,11 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
+import { AvatarPicker } from './avatar-picker'
 
 interface AccountFormProps {
   name: string
+  avatarUrl: string | null
   phone: string
   smsOptOut: boolean
   tenantId: string
@@ -28,6 +30,7 @@ interface AccountFormProps {
 
 export default function AccountForm({
   name: initialName,
+  avatarUrl,
   phone,
   smsOptOut: initialSmsOptOut,
   tenantId,
@@ -108,18 +111,14 @@ export default function AccountForm({
           was sized before the log-out button existed and left it partly
           underneath. */}
       <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-40'}>
-        {/* Avatar */}
-        <div className="flex justify-center mb-6">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-status-neutral-bg">
-            <span className="text-2xl font-semibold text-ink-soft">
-              {name
-                .split(' ')
-                .map((w) => w[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase()}
-            </span>
-          </div>
+        {/* Avatar — clickable, opens a file picker and uploads on pick */}
+        <div className="mb-6">
+          <AvatarPicker
+            avatarUrl={avatarUrl}
+            name={name}
+            tenantId={tenantId}
+            i18nNamespace={i18nNamespace}
+          />
         </div>
 
         {/* Name field */}
