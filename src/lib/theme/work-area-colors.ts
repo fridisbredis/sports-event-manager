@@ -12,10 +12,12 @@
 // the closest pair is now 0.0127 apart, and the tightest of those are the
 // handoff's own colours, kept verbatim.
 //
-// Note this is about telling colours apart, not about collisions. With a
-// 30-colour palette, six people have a ~41% chance of sharing one (the
-// birthday problem) — that is inherent to hashing into a fixed set, not a
-// defect here, and the colours are decorative, so a repeat is cosmetic.
+// The above is about telling colours apart. Collisions — two ids hashing to
+// the SAME colour — are a separate problem, and one that per-id hashing
+// cannot solve: with 30 colours, seven ids have a ~50% chance of at least one
+// repeat (the birthday problem). Render a list through `workAreaColorMap`
+// rather than calling `workAreaColor` per row; it resolves the repeats within
+// the set. `workAreaColor` remains correct for a single id shown on its own.
 //
 // A note on the handoff's own eight: violet (4.42:1), amber (4.40:1) and green
 // (4.34:1) fall just short of WCAG AA 4.5:1 for normal-size text. They are
@@ -78,12 +80,70 @@ export const WORK_AREA_COLORS: readonly WorkAreaColor[] = [
  * recreating it draws a new one.
  */
 export function workAreaColor(workAreaId: string): WorkAreaColor {
+  return WORK_AREA_COLORS[paletteIndex(workAreaId)]
+}
+
+/** The hashed palette slot for an id, before any collision resolution. */
+function paletteIndex(id: string): number {
   let hash = 0x811c9dc5
-  for (let i = 0; i < workAreaId.length; i++) {
-    hash ^= workAreaId.charCodeAt(i)
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i)
     hash = Math.imul(hash, 0x01000193)
   }
-  return WORK_AREA_COLORS[(hash >>> 0) % WORK_AREA_COLORS.length]
+  return (hash >>> 0) % WORK_AREA_COLORS.length
+}
+
+/**
+ * Colors a whole set of ids at once, resolving collisions within the set.
+ *
+ * `workAreaColor` hashes each id independently, so two ids in the same list
+ * can land on the same color — with 30 colors, seven work areas have a ~50%
+ * chance of at least one such pair (the birthday problem). Seen side by side
+ * in one table that reads as a bug, whatever the maths says: Testklubben had
+ * Social Media and Ringa both on `teal2`, and Depån and "Toalett och dusch"
+ * both on `magenta`.
+ *
+ * Each id keeps its hashed color when that color is still free. Contended
+ * ones fall through to the next free slot, probing forward from the hash so
+ * the choice stays derived from the id rather than from list position.
+ *
+ * Two properties this deliberately preserves:
+ *
+ * - **Order independence.** Ids are resolved in a canonical (sorted) order,
+ *   not in list order, so re-sorting a table by name or capacity does not
+ *   repaint it. Callers pass ids in whatever order they render.
+ * - **Stability under growth.** Adding a work area only ever recolors ones
+ *   that were already sharing a color, because an uncontended id is never
+ *   displaced.
+ *
+ * Beyond 30 ids collisions are unavoidable and the extras wrap around, which
+ * is the same cosmetic repeat as before. Returns a Map keyed by id.
+ */
+export function workAreaColorMap(ids: readonly string[]): Map<string, WorkAreaColor> {
+  const result = new Map<string, WorkAreaColor>()
+  const taken = new Set<number>()
+
+  // Sorting decouples the assignment from render order: the same set of ids
+  // gets the same colors whichever way the caller happens to have sorted it.
+  const unique = [...new Set(ids)].sort()
+
+  for (const id of unique) {
+    const first = paletteIndex(id)
+    let index = first
+    // Probe forward for a free slot. Bounded by the palette length, so a set
+    // larger than the palette simply reuses colors instead of looping.
+    for (let step = 0; step < WORK_AREA_COLORS.length; step++) {
+      const candidate = (first + step) % WORK_AREA_COLORS.length
+      if (!taken.has(candidate)) {
+        index = candidate
+        break
+      }
+    }
+    taken.add(index)
+    result.set(id, WORK_AREA_COLORS[index])
+  }
+
+  return result
 }
 
 /**

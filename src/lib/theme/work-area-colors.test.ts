@@ -3,6 +3,7 @@ import {
   WORK_AREA_COLORS,
   workAreaBorderColor,
   workAreaColor,
+  workAreaColorMap,
   workAreaDotColor,
 } from './work-area-colors'
 
@@ -152,5 +153,87 @@ describe('decorative derivations', () => {
     const color = WORK_AREA_COLORS[0]
     expect(workAreaDotColor(color)).toBe(`color-mix(in srgb, ${color.fg} 65%, white)`)
     expect(workAreaBorderColor(color)).toBe(`color-mix(in srgb, ${color.fg} 35%, white)`)
+  })
+})
+
+describe('workAreaColorMap', () => {
+  // The bug this function exists for. These are the real Testklubben ids from
+  // dev: Social Media and Ringa both hashed to `teal2`, and Depån and
+  // "Toalett och dusch" both to `magenta`, so a seven-row table showed two
+  // pairs of identical dots.
+  const TESTKLUBBEN = [
+    '1a80659f-f12b-4480-89e9-5d96b24d74aa', // Social Media
+    '4406e933-a172-4490-a88d-c3397aa7f5c7', // Skaffa toaletter
+    '3d588d3c-e640-4c36-ac16-316d0f47e843', // Ringa
+    '1562e56f-7906-420a-ba09-f28dfc47ba66', // Tidtagning
+    'c6dec134-1110-48a4-91cf-f1950ce337e5', // Depån
+    '66594b9f-a94b-45da-8228-d676d0419a32', // Toalett och dusch
+    '10cf806a-e0b2-47d2-8204-ddd1b4d0d574', // On break
+  ]
+
+  it('gives the colliding Testklubben work areas distinct colors', () => {
+    const map = workAreaColorMap(TESTKLUBBEN)
+    const names = TESTKLUBBEN.map((id) => map.get(id)!.name)
+    expect(new Set(names).size).toBe(TESTKLUBBEN.length)
+  })
+
+  it('assigns a distinct color to every id, up to the palette size', () => {
+    for (const size of [2, 7, 15, 30]) {
+      const ids = Array.from({ length: size }, (_, i) => `work-area-${i}-of-${size}`)
+      const map = workAreaColorMap(ids)
+      const names = ids.map((id) => map.get(id)!.name)
+      expect(new Set(names).size, `${size} ids should get ${size} colors`).toBe(size)
+    }
+  })
+
+  it('is independent of the order ids are passed in', () => {
+    const ids = TESTKLUBBEN
+    const forward = workAreaColorMap(ids)
+    const reversed = workAreaColorMap([...ids].reverse())
+    const shuffled = workAreaColorMap([ids[3], ids[0], ids[6], ids[1], ids[5], ids[2], ids[4]])
+    for (const id of ids) {
+      expect(reversed.get(id)).toEqual(forward.get(id))
+      expect(shuffled.get(id)).toEqual(forward.get(id))
+    }
+  })
+
+  it('keeps an uncontended id on the color it hashes to', () => {
+    // A single id has nothing to contend with, so it must match the per-id
+    // function exactly — that is what keeps colors stable as a list grows.
+    for (let i = 0; i < 50; i++) {
+      const id = `lonely-${i}`
+      expect(workAreaColorMap([id]).get(id)).toEqual(workAreaColor(id))
+    }
+  })
+
+  it('does not repaint unrelated work areas when one is added', () => {
+    const existing = TESTKLUBBEN.slice(0, 5)
+    const before = workAreaColorMap(existing)
+    const after = workAreaColorMap([...existing, 'a-brand-new-work-area-id'])
+    // Ids that were not sharing a color keep it. Ones that were may move, and
+    // that is the point of the function.
+    const moved = existing.filter((id) => before.get(id)!.name !== after.get(id)!.name)
+    expect(moved).toEqual([])
+  })
+
+  it('handles duplicate ids without consuming extra colors', () => {
+    const map = workAreaColorMap(['a', 'b', 'a', 'b', 'a'])
+    expect(map.size).toBe(2)
+    expect(map.get('a')).not.toEqual(map.get('b'))
+  })
+
+  it('wraps around rather than failing past the palette size', () => {
+    const ids = Array.from({ length: 45 }, (_, i) => `overflow-${i}`)
+    const map = workAreaColorMap(ids)
+    expect(map.size).toBe(45)
+    for (const id of ids) {
+      expect(WORK_AREA_COLORS).toContain(map.get(id))
+    }
+    // All 30 colors get used before any repeats.
+    expect(new Set(ids.map((id) => map.get(id)!.name)).size).toBe(30)
+  })
+
+  it('returns an empty map for an empty list', () => {
+    expect(workAreaColorMap([]).size).toBe(0)
   })
 })

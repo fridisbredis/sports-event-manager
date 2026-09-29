@@ -4,7 +4,11 @@ import { Button } from '@/components/ui/button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { workAreaBorderColor, workAreaColor } from '@/lib/theme/work-area-colors'
+import {
+  WORK_AREA_COLORS,
+  workAreaBorderColor,
+  workAreaColorMap,
+} from '@/lib/theme/work-area-colors'
 import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
@@ -45,6 +49,17 @@ export function ByPersonGrid({
     }
     return map
   }, [activeAssignments])
+
+  // Two independent colour spaces: one for the person avatars down the left,
+  // one for the work-area cells. They are kept separate so an official can
+  // never displace a work area's colour or vice versa. The avatar map is
+  // keyed off `officials` so it matches the officials roster, which colours
+  // the same people from the same list.
+  const personColors = useMemo(() => workAreaColorMap(officials.map((o) => o.id)), [officials])
+  const wsColors = useMemo(
+    () => workAreaColorMap(stageWorkstations.map((ws) => ws.id)),
+    [stageWorkstations]
+  )
 
   const countMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -103,7 +118,7 @@ export function ByPersonGrid({
         </thead>
         <tbody>
           {officials.map((official) => {
-            const personColor = workAreaColor(official.id)
+            const personColor = personColors.get(official.id) ?? WORK_AREA_COLORS[0]
             return (
               <tr key={official.id} className="border-b border-edge-soft last:border-0">
                 <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-edge-soft">
@@ -135,7 +150,7 @@ export function ByPersonGrid({
 
                   // Double-booking is a warning and keeps its orange styling —
                   // the work-area palette is decorative and must not mask it.
-                  const color = ws ? workAreaColor(ws.id) : undefined
+                  const color = ws ? (wsColors.get(ws.id) ?? WORK_AREA_COLORS[0]) : undefined
                   const cellStyle = assignment
                     ? isDoubleBooked
                       ? 'bg-orange-50 border border-orange-200'
