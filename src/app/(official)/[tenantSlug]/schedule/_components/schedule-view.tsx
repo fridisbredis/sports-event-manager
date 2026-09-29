@@ -114,8 +114,19 @@ function DaySelector({
   tenantSlug: string
   label: string
 }) {
-  // One day needs no chooser, and zero days renders the empty state instead.
-  if (days.length < 2) return null
+  // Zero days renders the empty state instead, so there is nothing to label.
+  if (days.length === 0) return null
+
+  // A single day needs no chooser, but it still needs to say which day is on
+  // screen. Returning null here used to drop the only date on the work-area
+  // tab, which formats times without dates on purpose and relied on this row
+  // to carry the day — an official working one day saw three bare time spans
+  // and no date anywhere. A static label rather than a lone tab: one clickable
+  // chip that only ever leads back to the page it is on reads as a control
+  // that does nothing.
+  if (days.length === 1) {
+    return <p className="section-label mb-6">{formatDayHeader(`${days[0]}T00:00:00.000Z`)}</p>
+  }
 
   return (
     <nav aria-label={label} className="-mx-5 px-5 mb-6 overflow-x-auto">
@@ -143,7 +154,18 @@ function DaySelector({
   )
 }
 
-function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
+function TimeView({
+  assignments,
+  showDayHeaders,
+}: {
+  assignments: AssignmentRow[]
+  /**
+   * False when the day selector above already names the day — a single-day
+   * schedule. The group header and that label render the same date in the same
+   * `section-label` style, so showing both stutters the date twice in a row.
+   */
+  showDayHeaders: boolean
+}) {
   // Still grouped even though the window is one day: the header is what
   // confirms which date is on screen, and it stays correct if a window ever
   // spans a boundary.
@@ -160,7 +182,7 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
     <div className="flex flex-col gap-6">
       {groups.map((group) => (
         <div key={group.key}>
-          <p className="section-label mb-3">{group.label}</p>
+          {showDayHeaders ? <p className="section-label mb-3">{group.label}</p> : null}
           <div className="flex flex-col gap-3">
             {/* One card per run rather than per slot: a three-hour shift is
                 three `assignments` rows, and a card each read as three
@@ -434,7 +456,7 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
           description={strings.noAssignmentsOnDayDescription}
         />
       ) : view === 'time' ? (
-        <TimeView assignments={assignments} />
+        <TimeView assignments={assignments} showDayHeaders={days.length > 1} />
       ) : (
         <WorkAreaView assignments={assignments} todoLabel={strings.todoLabel} />
       )}
