@@ -271,7 +271,7 @@ max_frequency = "1s"
 "+46700000009" = "000000"
 "+46700000010" = "000000"
 
-# The six numbers scripts/seed-dev.ts creates. Without these, `npm run
+# The seven numbers scripts/seed-dev.ts creates. Without these, `npm run
 # seed:dev:local` produces a tenant admin and officials nobody can sign in
 # as, which is the whole point of seeding locally. Disjoint from the pool
 # above (integration tests) and from +4672000xxxx (scripts/perf-env.ts).
@@ -282,11 +282,11 @@ max_frequency = "1s"
 "+46709900005" = "000000"
 "+46709900006" = "000000"
 
-# Reserved for a local system_admin. scripts/seed-dev.ts deliberately seeds no
-# system_admin — that role is global (user_roles.tenant_id must be NULL per
-# 0021) and is not part of a tenant's seed data — which leaves SYS-01 and SYS-02
-# unreachable on a fresh local stack. Create the user against this number to
-# exercise them.
+# The local system_admin. The role is global rather than a tenant membership,
+# so its user_roles row carries tenant_id NULL (the shape 0021 made legal for
+# it). The seed used to skip this user on the grounds that a global role is not
+# part of a tenant's seed data, which left SYS-01 and SYS-02 unreachable on a
+# fresh local stack — the seed now creates it.
 "+46709900007" = "000000"
 
 # Configure logged in session timeouts.
