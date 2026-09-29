@@ -22,6 +22,8 @@ The file in this bundle (`Admin Color Update.dc.html`) is a **design reference b
 
 All theme colors were tuned in lightness (same hue) to pass WCAG 2.2 AA against white: 4.5:1 for text, 3:1 for UI borders/large text. See the "Färgtokens (WCAG)" screen in the file for the before/after contrast table.
 
+> **The palette list above is historical; `src/lib/theme/tenant-colors.ts` is the live source.** Green and Orange were replaced by teal and purple (both failed AA), and the three `primary-tint` values were re-solved so all three themes share teal's perceived brightness — HSL lightness is not perceptual, so they carry different L% numbers on purpose. Check the code before treating a hex above as current.
+
 ### Work-area color coding (8-color rotating palette, assigned per work-area name)
 
 Pastel background + saturated foreground pairs, e.g. blue `bg #DCEAFE / fg #1D4ED8`, violet `bg #E5DFFC / fg #7C3AED`, teal `bg #D3F5E7 / fg #0F766E`, rose `bg #FCE1E4 / fg #BE123C`, amber `bg #FCEFD1 / fg #B45309`, fuchsia `bg #F7E1FA / fg #A21CAF`, green `bg #DCF5E1 / fg #15803D`, indigo `bg #DEE3FC / fg #4338CA`.

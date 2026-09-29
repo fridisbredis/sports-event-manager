@@ -8,6 +8,13 @@
 // generated CSS renders them as `hsl(var(--heroui-primary))` etc. The hex value
 // each triplet was converted from is kept in a trailing comment so the palette
 // can be diffed against the handoff without re-running a converter.
+//
+// The three `primaryTint` values deliberately carry DIFFERENT L% numbers
+// (96.88 / 95.1 / 97.63). HSL lightness is not perceptual: at an identical
+// 95.1% these hues rendered at 0.872, 0.917 and 0.833 relative luminance, so
+// the purple surface read visibly darker and heavier than the teal one. The
+// L% values above were solved so all three land on teal's 0.9168 — do not
+// "correct" them back to one shared number.
 
 export type TenantColorKey =
   | 'primary'
@@ -25,7 +32,7 @@ export const TENANT_PALETTES = {
   blue: {
     primary: '211.9 100% 41%', //     #0062D1
     primaryHover: '212 100% 34.5%', // #0052B0
-    primaryTint: '214.3 84% 95.1%', // #E8F1FD
+    primaryTint: '214.3 84% 96.88%', // #F0F6FE
     primaryTintText: '212 100% 34.5%', // #0052B0
     secondary: '225.9 70.7% 40.2%', // #1E40AF
     accent: '201.1 100% 34.5%', //    #0072B0
@@ -54,7 +61,7 @@ export const TENANT_PALETTES = {
   purple: {
     primary: '262.1 83.3% 57.8%', //  #7C3AED
     primaryHover: '262.1 83.3% 50.8%', // #6619EA
-    primaryTint: '262.1 84% 95.1%', // #F0E8FD
+    primaryTint: '262.1 84% 97.63%', // #F8F4FE
     primaryTintText: '262.1 83.3% 50.8%', // #6619EA
     secondary: '244.5 57.9% 50.6%', // #4338CA
     accent: '294.7 72.4% 39.8%', //   #A21CAF

@@ -189,7 +189,10 @@ export default function StageList({ stages, onChange }: Props) {
                   </Button>
 
                   {/* Name */}
-                  <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink">
+                  <span
+                    className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink"
+                    title={stage.name || undefined}
+                  >
                     {stage.name || '—'}
                   </span>
 
@@ -241,10 +244,10 @@ export default function StageList({ stages, onChange }: Props) {
                 {/* Expanded details */}
                 {isExpanded && (
                   <div
-                    className={`ml-7 grid gap-x-6 gap-y-3 px-4 pb-3 ${stage.stage_type === 'race' ? 'grid-cols-[repeat(auto-fit,minmax(140px,1fr))]' : 'grid-cols-1'}`}
+                    className={`ml-7 mb-3 grid gap-x-6 gap-y-3 rounded-card-sm bg-tenant-primary-tint px-4 py-3 mr-4 ${stage.stage_type === 'race' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'}`}
                   >
                     <div>
-                      <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
+                      <p className="mb-1 whitespace-nowrap text-[12px] font-semibold text-ink-muted">
                         {t('eventConfig.stageVenueLabel')}
                       </p>
                       <p className="text-[14px] text-ink-soft">{stage.venue || '–'}</p>
@@ -252,7 +255,7 @@ export default function StageList({ stages, onChange }: Props) {
                     {stage.stage_type === 'race' && (
                       <>
                         <div>
-                          <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
+                          <p className="mb-1 whitespace-nowrap text-[12px] font-semibold text-ink-muted">
                             {stage.race_type === 'time'
                               ? t('eventConfig.categoryTimes')
                               : t('eventConfig.categoryDistances')}
@@ -264,7 +267,7 @@ export default function StageList({ stages, onChange }: Props) {
                           </p>
                         </div>
                         <div>
-                          <p className="mb-1 text-[12px] font-semibold uppercase tracking-label text-ink-faint">
+                          <p className="mb-1 whitespace-nowrap text-[12px] font-semibold text-ink-muted">
                             {t('eventConfig.stageFormalStartEnd')}
                           </p>
                           <p className="text-[14px] text-ink-soft">
