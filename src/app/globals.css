@@ -74,4 +74,17 @@
       theme('boxShadow.card'),
       inset 3px 0 0 color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white);
   }
+
+  /* Same leading edge, but coloured per item rather than by the tenant theme.
+     For lists where the edge identifies WHICH item it is — MYSCH-01's work
+     area cards — instead of just marking it as one. The colour comes from
+     `workAreaColorMap`, passed as `--card-accent` on the element; it falls
+     back to the tenant primary so the class is never edgeless if a caller
+     forgets. Mixed to the same 28% as the others so one card in a stack does
+     not shout louder than the rest. */
+  .card-accent-left-themed.card-accent-left-themed {
+    box-shadow:
+      theme('boxShadow.card'),
+      inset 3px 0 0 color-mix(in srgb, var(--card-accent, hsl(var(--tenant-primary))) 28%, white);
+  }
 }

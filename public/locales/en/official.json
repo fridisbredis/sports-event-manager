@@ -46,7 +46,8 @@
     "dayTabsLabel": "Choose a day",
     "workstation": "Work area",
     "time": "Time",
-    "checklist": "Checklist"
+    "checklist": "Checklist",
+    "todoLabel": "To do"
   },
   "announcements": {
     "title": "Announcements",
