@@ -49,6 +49,7 @@ interface EventInfoCached {
     id: string
     name: string
     stage_type: string
+    stage_date: string | null
     start_time: string | null
     end_time: string | null
     venue: string | null
@@ -75,6 +76,7 @@ async function seedTenantEvent(
     name: `${eventName} Stage 1`,
     stage_type: 'race',
     position: 0,
+    stage_date: '2026-09-01',
     start_time: '2026-09-01T08:00:00Z',
     end_time: '2026-09-01T12:00:00Z',
     venue: 'Main venue',
@@ -121,6 +123,7 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
         id: expect.any(String),
         name: 'Shape Test Event Stage 1',
         stage_type: 'race',
+        stage_date: '2026-09-01',
         start_time: '2026-09-01T08:00:00+00:00',
         end_time: '2026-09-01T12:00:00+00:00',
         venue: 'Main venue',

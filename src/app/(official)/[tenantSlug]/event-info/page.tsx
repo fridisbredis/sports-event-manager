@@ -7,6 +7,8 @@ import { getServerTranslation } from '@/lib/i18n/server'
 import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
+import { StageDateList } from './_components/stage-date-list'
+import { StageVenueCard } from './_components/stage-venue-card'
 import { FacilityChips } from './_components/facility-chips'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
@@ -23,6 +25,7 @@ interface EventInfoCached {
     id: string
     name: string
     stage_type: string
+    stage_date: string | null
     start_time: string | null
     end_time: string | null
     venue: string | null
@@ -35,6 +38,9 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
+// Dates and times render in UTC on purpose. Stage timestamps are stored as
+// wall-clock UTC, so reading them back in the viewer's zone would shift an
+// 08:00 briefing for anyone travelling to the event from another country.
 function formatDate(ts: string | null): string {
   if (!ts) return ''
   return new Date(ts).toLocaleDateString('en-GB', {
@@ -43,6 +49,18 @@ function formatDate(ts: string | null): string {
     month: 'short',
     timeZone: 'UTC',
   })
+}
+
+// A stage carries either a full start timestamp or just a date (stage_date,
+// set when the admin has pinned the day but not yet the hour). The dates
+// section should show the day in both cases, so fall back rather than
+// leaving the row blank.
+function stageDate(stage: { start_time: string | null; stage_date: string | null }): string {
+  if (stage.start_time) return formatDate(stage.start_time)
+  // stage_date is a bare 'YYYY-MM-DD'; append UTC midnight so it is not
+  // parsed as local time and pulled back a day west of Greenwich.
+  if (stage.stage_date) return formatDate(stage.stage_date + 'T00:00:00Z')
+  return ''
 }
 
 function formatTime(ts: string | null): string {
@@ -96,6 +114,13 @@ export default async function EventInfoPage({ params }: Props) {
   const stageList = stages
   const facilityList = facilities
 
+  // Non-race stages (setup, teardown) are internal admin scaffolding. Per
+  // INFO-01 officials do see all stages, so they stay — but a stage with
+  // neither a day nor a venue has nothing to contribute to those two
+  // sections, and an empty row there is noise rather than information.
+  const datedStages = stageList.filter((stage) => stageDate(stage) !== '')
+  const venuedStages = stageList.filter((stage) => stage.venue)
+
   return (
     <div className="px-5 pt-10 pb-6">
       <h1 className="page-title mb-6">{t('eventInfo.title')}</h1>
@@ -107,6 +132,41 @@ export default async function EventInfoPage({ params }: Props) {
         description={event?.description ?? null}
       />
 
+      {/* Dates and venues are the two facts an official checks before the
+          event ("which day am I needed, and where do I go"), so they sit
+          above the hour-by-hour programme, which matters on the day itself.
+
+          Unlike the two sections below, these drop out entirely when empty.
+          They are derived views of the same stage list, so an unpublished
+          event would otherwise repeat the identical "nothing yet" card three
+          times down the screen; the programme's empty state already says it
+          once. */}
+      {datedStages.length > 0 ? (
+        <div className="mb-8">
+          <SectionLabel>{t('eventInfo.datesByStage')}</SectionLabel>
+          <StageDateList
+            stages={datedStages.map((stage) => ({
+              id: stage.id,
+              name: stage.name,
+              date: stageDate(stage),
+            }))}
+          />
+        </div>
+      ) : null}
+
+      {venuedStages.length > 0 ? (
+        <div className="mb-8">
+          <SectionLabel>{t('eventInfo.locationAndVenue')}</SectionLabel>
+          <StageVenueCard
+            stages={venuedStages.map((stage) => ({
+              id: stage.id,
+              name: stage.name,
+              venue: stage.venue as string,
+            }))}
+          />
+        </div>
+      ) : null}
+
       {/* Both sections keep their label when empty rather than vanishing.
           A stage list that is simply not published yet is a normal state for
           an official opening the app early, and a screen that silently drops
@@ -116,6 +176,12 @@ export default async function EventInfoPage({ params }: Props) {
         {stageList.length > 0 ? (
           <div className="flex flex-col gap-3">
             {stageList.map((stage) => {
+              // The reference design shows three labelled schedule points per
+              // stage (briefing / start / podium). event_stages holds only
+              // start_time and end_time, so those three cannot be rendered
+              // without new columns and matching EVT-02 fields — tracked
+              // separately. Until then the card shows the day and the range
+              // that do exist, rather than inventing labels for them.
               const timeRange = [formatTime(stage.start_time), formatTime(stage.end_time)]
                 .filter(Boolean)
                 .join(' – ')
@@ -124,9 +190,7 @@ export default async function EventInfoPage({ params }: Props) {
                   key={stage.id}
                   stageNumber={stage.position + 1}
                   name={stage.name}
-                  date={formatDate(stage.start_time)}
-                  timeRange={timeRange}
-                  venue={stage.venue}
+                  details={[stageDate(stage), timeRange].filter(Boolean)}
                 />
               )
             })}
