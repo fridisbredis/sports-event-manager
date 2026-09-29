@@ -112,6 +112,66 @@ describe('EventInfoPage', () => {
     expect(result).toBeTruthy()
   })
 
+  // The dates-by-stage section derives a stage's day from start_time when it
+  // is set and from stage_date otherwise, so a stage whose hour has not been
+  // pinned yet still appears. Both branches render through the same page, so
+  // these assert the page builds rather than re-testing the formatter.
+  it('renders stages that carry only stage_date, with no start_time', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Stage 1',
+            stage_type: 'race',
+            stage_date: '2026-06-12',
+            start_time: null,
+            end_time: null,
+            venue: 'Town Square',
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    const result = await EventInfoPage({ params: PARAMS })
+
+    expect(result).toBeTruthy()
+  })
+
+  it('renders stages that carry neither a date nor a venue', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Setup',
+            stage_type: 'non_race',
+            stage_date: null,
+            start_time: null,
+            end_time: null,
+            venue: null,
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    const result = await EventInfoPage({ params: PARAMS })
+
+    expect(result).toBeTruthy()
+  })
+
   it('throws when the RPC returns an error', async () => {
     mockResolvedTenant()
     mockUser('user-1')
