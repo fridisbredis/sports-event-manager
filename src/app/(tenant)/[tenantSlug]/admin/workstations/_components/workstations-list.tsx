@@ -278,8 +278,10 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
         defaultExpandedKeys={stages.map((s) => s.id)}
         // HeroUI's splitted variant ships its own card look; point it at the
         // shared surface so these panels match every other card in the app.
+        // `card-accent-primary` adds the same faint top accent the officials
+        // roster and the dashboard cards carry.
         itemClasses={{
-          base: `${CARD_SURFACE} px-6 py-1`,
+          base: `${CARD_SURFACE} card-accent-primary px-6 py-1`,
           trigger: 'py-4',
           content: 'pb-4 pt-0',
         }}
@@ -288,6 +290,9 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
         {stages.map((stage) => (
           <AccordionItem
             key={stage.id}
+            // The title is a component, not a string, so HeroUI can't derive a
+            // label for screen readers or keyboard typeahead on its own.
+            textValue={stage.name}
             title={
               <StageTitle
                 stage={stage}
