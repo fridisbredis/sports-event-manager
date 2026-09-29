@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import { SelectItem } from '@heroui/react'
-import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
+import { SignInButton } from './_components/sign-in-button'
+import { LinkAction } from './_components/link-action'
 import { toastError, parseRetryAfterMinutes } from '@/lib/toast'
 import { logger } from '@/lib/logger'
 import {
@@ -145,21 +146,25 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="max-w-sm mx-auto mt-20 p-6">
-      <h1 className="text-2xl font-semibold mb-6">{t('signIn.title')}</h1>
+    <main className="mx-auto mt-16 w-full max-w-sm px-6 pb-16">
+      <h1 className="page-title mb-8">{t('signIn.title')}</h1>
 
       {step === 'phone' ? (
         <form
-          className="space-y-4"
+          className="space-y-6"
           onSubmit={(e) => {
             e.preventDefault()
             if (!loading && phoneIsValid) sendOtp()
           }}
         >
-          <div className="flex gap-2">
+          {/* The country picker is deliberately the narrower of the two: it
+              holds a fixed four-option code, while the number itself is what
+              the user types and needs the room. Its label truncates to
+              "SE (+..." at this width, which the design accepts. */}
+          <div className="flex items-start gap-3">
             <Select
               label={t('signIn.phoneCountry')}
-              className="w-56"
+              className="w-[42%] shrink-0"
               selectedKeys={[phoneCountry]}
               onSelectionChange={(keys) => {
                 const next = Array.from(keys)[0] as string
@@ -184,64 +189,56 @@ export default function LoginPage() {
               }
             />
           </div>
-          <Button
+          <SignInButton
             type="submit"
-            color="primary"
             className="w-full"
             isLoading={loading}
             isDisabled={loading || !phoneIsValid}
           >
             {loading ? t('signIn.requestingCode') : t('signIn.requestCodeButton')}
-          </Button>
+          </SignInButton>
         </form>
       ) : (
         <form
-          className="space-y-4"
+          className="space-y-6"
           onSubmit={(e) => {
             e.preventDefault()
             if (!loading && otp.length === 6) verifyOtp()
           }}
         >
-          <p className="text-sm text-default-500">
+          <p className="text-base text-ink-soft">
             {t('signIn.codeSentTo', { phone: normalizedPhone })}
           </p>
+          {/* Placeholder rather than a floating label: the paragraph above
+              already says what this field is for, so a label would repeat it. */}
           <Input
             type="text"
             inputMode="numeric"
             maxLength={6}
-            label={t('signIn.codeLabel')}
+            aria-label={t('signIn.codeLabel')}
+            placeholder={t('signIn.codeLabel')}
             value={otp}
             onValueChange={setOtp}
           />
-          <Button
+          <SignInButton
             type="submit"
-            color="primary"
             className="w-full"
             isLoading={loading}
             isDisabled={loading || otp.length !== 6}
           >
             {loading ? t('signIn.verifying') : t('signIn.verifyButton')}
-          </Button>
-          <Button
-            type="button"
-            variant="light"
-            onPress={resendOtp}
-            isLoading={resending}
-            isDisabled={resending || resendCooldown > 0}
-            className="w-full text-sm"
-          >
-            {resendCooldown > 0
-              ? t('signIn.resendCodeCooldown', { seconds: resendCooldown })
-              : t('signIn.resendCodeButton')}
-          </Button>
-          <Button
-            type="button"
-            variant="light"
-            onPress={() => setStep('phone')}
-            className="w-full text-sm"
-          >
-            {t('signIn.changeNumber')}
-          </Button>
+          </SignInButton>
+          {/* The two secondary actions are text links in the design, and are
+              spaced apart from the button and from each other so the pill
+              stays the only thing reading as pressable. */}
+          <div className="space-y-4 pt-2">
+            <LinkAction onPress={resendOtp} isDisabled={resending || resendCooldown > 0}>
+              {resendCooldown > 0
+                ? t('signIn.resendCodeCooldown', { seconds: resendCooldown })
+                : t('signIn.resendCodeButton')}
+            </LinkAction>
+            <LinkAction onPress={() => setStep('phone')}>{t('signIn.changeNumber')}</LinkAction>
+          </div>
         </form>
       )}
     </main>
