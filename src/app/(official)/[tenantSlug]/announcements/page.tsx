@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ImageOff } from 'lucide-react'
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
@@ -30,16 +31,7 @@ function formatAnnouncementTime(ts: string): string {
 function EmptyIcon() {
   return (
     <div className="flex h-20 w-20 items-center justify-center rounded-card-sm border border-edge bg-surface">
-      <svg
-        viewBox="0 0 24 24"
-        className="h-10 w-10 text-ink-faint/50"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M3 21L21 3" />
-        <rect x="3" y="3" width="18" height="18" rx="1" />
-      </svg>
+      <ImageOff aria-hidden="true" strokeWidth={1.5} className="size-10 text-ink-faint/50" />
     </div>
   )
 }

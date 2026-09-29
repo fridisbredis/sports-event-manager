@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { LogOut } from 'lucide-react'
+import { CalendarDays, ChevronRight, LogOut } from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form-fields'
@@ -194,32 +194,22 @@ export default function AccountForm({
             >
               {/* A calendar, since the row leads to the schedule — the
                   empty square it replaced read as an unchecked checkbox. */}
-              <svg
+              <CalendarDays
                 aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
                 strokeWidth={1.7}
-                className="h-8 w-8 shrink-0 text-tenant-primary"
-              >
-                <rect x="3" y="5" width="18" height="16" rx="2.5" />
-                <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
-              </svg>
+                className="size-8 shrink-0 text-tenant-primary"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold text-ink">
                   {t('account.assignmentCount', { count: assignmentCount })}
                 </p>
                 <p className="mt-0.5 text-sm text-ink-muted">{t('account.viewSchedule')}</p>
               </div>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
+              <ChevronRight
+                aria-hidden="true"
                 strokeWidth={1.5}
-                className="h-5 w-5 shrink-0 text-ink-label"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
+                className="size-5 shrink-0 text-ink-label"
+              />
             </Link>
           </>
         )}

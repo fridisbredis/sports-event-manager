@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ImageOff } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
 import { useEffect, useState } from 'react'
 import { dayKey } from '@/lib/scheduling/day-window'
@@ -142,16 +143,7 @@ function DaySelector({
 function EmptyIcon() {
   return (
     <div className="w-20 h-20 rounded-large border-2 border-gray-200 bg-gray-100 flex items-center justify-center mb-4">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        className="w-10 h-10 text-gray-300"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
-      </svg>
+      <ImageOff aria-hidden="true" strokeWidth={1.5} className="size-10 text-ink-faint/50" />
     </div>
   )
 }
