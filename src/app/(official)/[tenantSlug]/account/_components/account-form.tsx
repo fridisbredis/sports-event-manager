@@ -103,11 +103,12 @@ export default function AccountForm({
           </div>
         </div>
       )}
-      {/* Mobile bottom padding clears both the tab bar (64px) and the fixed
-          Save bar that sits on top of it (~60px with its padding) — pb-24
-          was sized before the log-out button existed and left it partly
-          underneath. */}
-      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-40'}>
+      {/* Mobile bottom padding clears the fixed Save bar so the log-out
+          button never sits underneath it. The bar occupies ~128px: the tab
+          bar it floats above (64px) plus its own mt-3, button and pb-2.
+          pb-36 (144px) clears that with a modest gap; pb-40 left an
+          obviously empty band below the last control. */}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-36'}>
         {/* Avatar */}
         <div className="flex justify-center mb-6">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-status-neutral-bg">
@@ -157,7 +158,11 @@ export default function AccountForm({
 
         {/* Notifications section */}
         <p className="section-label mb-3">{t('account.notificationsHeading')}</p>
-        <AppCard className="mb-8" bodyClassName="px-4 py-4">
+        {/* On desktop this card is followed by the Schedule section, and the
+            wider gap separates two sections. On mobile it is the last card
+            and the only thing after it is the log-out button, which needs
+            less air than a section break. */}
+        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.smsUpdatesLabel')}</p>
