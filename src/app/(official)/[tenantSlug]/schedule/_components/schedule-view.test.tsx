@@ -332,3 +332,59 @@ describe('ScheduleView view toggle', () => {
     expect(screen.getByText(STRINGS.noAssignmentsOnDay)).toBeTruthy()
   })
 })
+
+// The day row is the only place the work-area view can learn its date: that
+// view formats times without dates on purpose. A single-day schedule used to
+// render no day row at all, which left those spans dateless.
+describe('ScheduleView day label', () => {
+  beforeEach(() => localStorage.clear())
+
+  const ONE_DAY = () => [
+    slot('a', '2026-08-12T10:00:00.000Z', '2026-08-12T11:00:00.000Z', SOCIAL_MEDIA),
+  ]
+
+  function renderDays(view: 'time' | 'work-area', days: string[], selectedDay: string) {
+    localStorage.setItem('official-schedule-view', view)
+    return render(
+      <ScheduleView
+        assignments={ONE_DAY()}
+        days={days}
+        selectedDay={selectedDay}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+      />
+    )
+  }
+
+  it('names the day on the work-area view when there is only one day', () => {
+    renderDays('work-area', ['2026-08-12'], '2026-08-12')
+
+    expect(screen.getByText('Wednesday 12 August')).toBeTruthy()
+  })
+
+  it('renders the single day as a static label, not a link that goes nowhere', () => {
+    renderDays('work-area', ['2026-08-12'], '2026-08-12')
+
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('navigation', { name: STRINGS.dayTabsLabel })).toBeNull()
+  })
+
+  it('shows the date once, not twice, on the time view for a single day', () => {
+    renderDays('time', ['2026-08-12'], '2026-08-12')
+
+    expect(screen.getAllByText('Wednesday 12 August')).toHaveLength(1)
+  })
+
+  it('still renders clickable day tabs when there is more than one day', () => {
+    renderDays('work-area', ['2026-08-12', '2026-08-13'], '2026-08-12')
+
+    expect(screen.getByRole('navigation', { name: STRINGS.dayTabsLabel })).toBeTruthy()
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+  })
+
+  it('keeps the per-group day headers on the time view across several days', () => {
+    renderDays('time', ['2026-08-12', '2026-08-13'], '2026-08-12')
+
+    expect(screen.getByText('Wednesday 12 August')).toBeTruthy()
+  })
+})
