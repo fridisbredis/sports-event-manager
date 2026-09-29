@@ -67,50 +67,33 @@ async function ensureSeedData(admin: SupabaseClient<Database>) {
   }
 }
 
-// scripts/seed-dev.ts seeds no system_admin (the role is global — user_roles
-// .tenant_id must be NULL per migration 0021 — so it does not belong to a
-// tenant's seed data). SYS-01/SYS-02 are unreachable without one, so the E2E
-// suite owns this user. Idempotent: safe across repeated runs.
-async function ensureSystemAdmin(admin: SupabaseClient<Database>) {
-  const storedPhone = SYSTEM_ADMIN_PHONE.replace(/^\+/, '')
-
-  // GoTrue stores phones without the leading '+', and listUsers() paginates at
-  // 50 by default — the local stack holds the seed users plus whatever earlier
-  // runs left behind, so page through fully rather than trusting page 1.
-  let userId: string | undefined
-  for (let page = 1; ; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) throw error
-    const found = data.users.find((u) => u.phone === storedPhone)
-    if (found) {
-      userId = found.id
-      break
-    }
-    if (data.users.length < 1000) break
-  }
-
-  if (!userId) {
-    const { data, error } = await admin.auth.admin.createUser({
-      phone: SYSTEM_ADMIN_PHONE,
-      phone_confirm: true,
-    })
-    if (error) throw error
-    userId = data.user.id
-  }
-
-  const { data: existingRole, error: roleReadError } = await admin
+// scripts/seed-dev.ts creates the system_admin (global role, user_roles
+// .tenant_id NULL per migration 0021). This setup used to create it too, which
+// meant two places owned one user and their comments drifted apart. It only
+// verifies now.
+//
+// Not merged into ensureSeedData's check: that one returns early when the
+// tenant exists, and a stack seeded before the seed script grew this user has
+// the tenant but no system_admin. Checking the role itself is what catches
+// that, and the fix is a reseed rather than creating the row here.
+async function assertSystemAdminSeeded(admin: SupabaseClient<Database>) {
+  const { data, error } = await admin
     .from('user_roles')
     .select('user_id')
-    .eq('user_id', userId)
     .eq('role', 'system_admin')
     .maybeSingle()
-  if (roleReadError) throw roleReadError
+  if (error) throw error
 
-  if (!existingRole) {
-    const { error } = await admin
-      .from('user_roles')
-      .insert({ user_id: userId, tenant_id: null, role: 'system_admin' })
-    if (error) throw error
+  if (!data) {
+    throw new Error(
+      `No system_admin in the local stack, so SYS-01/SYS-02 cannot be signed into as ` +
+        `${SYSTEM_ADMIN_PHONE}. scripts/seed-dev.ts creates this user, but only on a fresh ` +
+        'tenant — this stack was most likely seeded before it did.\n\n' +
+        'Reseed:\n' +
+        '  psql "$(supabase status -o json | jq -r .DB_URL)" ' +
+        '-c "delete from tenants where slug = \'seed-klubben\';"\n' +
+        '  npm run seed:dev:local'
+    )
   }
 }
 
@@ -188,7 +171,7 @@ export default async function globalSetup() {
   await assertAppTargetsLocalSupabase(process.env.E2E_LOCAL_URL ?? 'http://localhost:3000', apiUrl)
 
   await ensureSeedData(admin)
-  await ensureSystemAdmin(admin)
+  await assertSystemAdminSeeded(admin)
 
   // Handed to the auth fixture so it can reach the database without re-reading
   // `supabase status` per worker.
