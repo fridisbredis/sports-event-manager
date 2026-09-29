@@ -65,8 +65,14 @@ function formatTime(iso: string): string {
 
 function weekdayFromDateString(dateStr: string): string {
   // Append T00:00Z so the Date is parsed as UTC midnight, giving the correct weekday.
+  // The weekday alone cannot be ordered by eye — two stages weeks apart can both
+  // read 'Thu', making a correctly sorted list look shuffled. Day and month
+  // disambiguate them; the year is omitted because it is already shown once in
+  // the event's date range, and repeating it per row crowds the name out.
   return new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', {
     weekday: 'short',
+    day: 'numeric',
+    month: 'short',
     timeZone: 'UTC',
   })
 }
@@ -174,7 +180,7 @@ export default function StageList({ stages, onChange }: Props) {
             return (
               <div key={i} className="bg-white">
                 {/* Collapsed row */}
-                <div className="flex flex-nowrap items-center gap-2 px-4 py-3 transition-colors">
+                <div className="flex items-start gap-2 px-4 py-3 transition-colors">
                   {/* Expand toggle */}
                   <Button
                     isIconOnly
@@ -188,31 +194,37 @@ export default function StageList({ stages, onChange }: Props) {
                     {isExpanded ? <ChevronDown /> : <ChevronRight />}
                   </Button>
 
-                  {/* Name */}
-                  <span
-                    className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink"
-                    title={stage.name || undefined}
-                  >
-                    {stage.name || '—'}
-                  </span>
+                  {/* Name, badge and time range. The range is long enough that
+                      keeping it on the same line as the name squeezes the name
+                      to nothing, so it wraps onto its own line beneath. */}
+                  <div className="min-w-0 flex-1 py-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span
+                        className="min-w-0 truncate text-[15px] font-medium text-ink"
+                        title={stage.name || undefined}
+                      >
+                        {stage.name || '—'}
+                      </span>
 
-                  {/* Type badge */}
-                  <span
-                    className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
-                      stage.stage_type === 'race'
-                        ? 'bg-tenant-accent-tint text-tenant-accent-tint-text'
-                        : 'bg-status-neutral-bg text-status-neutral-text'
-                    }`}
-                  >
-                    {stage.stage_type === 'race'
-                      ? t('eventConfig.stageTypeRace')
-                      : t('eventConfig.stageTypeNonRace')}
-                  </span>
+                      {/* Type badge */}
+                      <span
+                        className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
+                          stage.stage_type === 'race'
+                            ? 'bg-tenant-accent-tint text-tenant-accent-tint-text'
+                            : 'bg-status-neutral-bg text-status-neutral-text'
+                        }`}
+                      >
+                        {stage.stage_type === 'race'
+                          ? t('eventConfig.stageTypeRace')
+                          : t('eventConfig.stageTypeNonRace')}
+                      </span>
+                    </div>
 
-                  {/* Time range */}
-                  <span className="shrink-0 whitespace-nowrap text-right text-[13px] text-ink-muted tabular-nums">
-                    {formatTimeRange(stage.start_time, stage.end_time)}
-                  </span>
+                    {/* Time range */}
+                    <p className="mt-0.5 text-[13px] text-ink-muted tabular-nums">
+                      {formatTimeRange(stage.start_time, stage.end_time)}
+                    </p>
+                  </div>
 
                   {/* Actions */}
                   <div className="shrink-0 flex items-center gap-1">
