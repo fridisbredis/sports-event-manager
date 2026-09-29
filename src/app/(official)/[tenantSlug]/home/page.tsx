@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
+import { Bell, Calendar, ChevronRight, Info, User, type LucideIcon } from 'lucide-react'
 import { unstable_cache } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
@@ -11,68 +12,6 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
-function ChevronRight() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      className="w-5 h-5 shrink-0 text-gray-400"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
-  )
-}
-
-function InfoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <path
-        fillRule="evenodd"
-        d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 01.67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 11-.671-1.34l.041-.022zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5z"
-        clipRule="evenodd"
-      />
-    </svg>
-  )
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <path
-        fillRule="evenodd"
-        d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 3v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3H6V3a.75.75 0 01.75-.75zm13.5 9a1.5 1.5 0 00-1.5-1.5H5.25a1.5 1.5 0 00-1.5 1.5v7.5a1.5 1.5 0 001.5 1.5h13.5a1.5 1.5 0 001.5-1.5v-7.5z"
-        clipRule="evenodd"
-      />
-    </svg>
-  )
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <path
-        fillRule="evenodd"
-        d="M5.25 9a6.75 6.75 0 0113.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 01-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 11-7.48 0 24.585 24.585 0 01-4.831-1.244.75.75 0 01-.298-1.205A8.217 8.217 0 005.25 9.75V9zm4.502 8.9a2.25 2.25 0 104.496 0 25.057 25.057 0 01-4.496 0z"
-        clipRule="evenodd"
-      />
-    </svg>
-  )
-}
-
-function PersonIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <path
-        fillRule="evenodd"
-        d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z"
-        clipRule="evenodd"
-      />
-    </svg>
-  )
-}
-
 function NavCard({
   href,
   title,
@@ -82,21 +21,24 @@ function NavCard({
   href: string
   title: string
   subtitle: string
-  Icon: () => React.ReactElement
+  Icon: LucideIcon
 }) {
   return (
     <Link
       href={href}
-      className={`flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 hover:bg-gray-50 transition-colors`}
+      className={`flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:bg-surface`}
     >
-      <div className="w-12 h-12 rounded-large bg-primary/10 text-primary flex items-center justify-center shrink-0">
-        <Icon />
+      {/* The bubble takes the tenant's tint rather than HeroUI's own primary,
+          so these follow the palette like every other tinted surface in the
+          app. */}
+      <div className="flex size-12 shrink-0 items-center justify-center rounded-large bg-tenant-primary-tint text-tenant-primary-tint-text">
+        <Icon className="size-6" strokeWidth={1.8} aria-hidden="true" />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-[17px] font-bold leading-snug text-ink">{title}</p>
+        <p className="mt-0.5 text-[15px] leading-snug text-ink-muted">{subtitle}</p>
       </div>
-      <ChevronRight />
+      <ChevronRight className="size-5 shrink-0 text-ink-faint" aria-hidden="true" />
     </Link>
   )
 }
@@ -165,51 +107,53 @@ export default async function OfficialHomePage({ params }: Props) {
       href: `/${tenantSlug}/event-info`,
       title: t('home.eventInfo'),
       subtitle: t('home.eventInfoSub'),
-      Icon: InfoIcon,
+      Icon: Info,
     },
     {
       href: `/${tenantSlug}/schedule`,
       title: t('home.mySchedule'),
       subtitle: t('home.myScheduleSub'),
-      Icon: CalendarIcon,
+      Icon: Calendar,
     },
     {
       href: `/${tenantSlug}/announcements`,
       title: t('home.announcements'),
       subtitle: t('home.announcementsSub'),
-      Icon: BellIcon,
+      Icon: Bell,
     },
     {
       href: `/${tenantSlug}/account`,
       title: t('home.accountTitle'),
       subtitle: t('home.accountSub'),
-      Icon: PersonIcon,
+      Icon: User,
     },
   ]
 
   return (
     <div className="px-5 pt-10 pb-6">
-      {/* Greeting */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+      {/* Greeting. The avatar shares its tokens with the one on ACCT-01 —
+          same circle, same initials, so the two screens do not render one
+          person's mark two different greys. */}
+      <div className="mb-8 flex items-center gap-4">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-status-neutral-bg">
           {initials ? (
-            <span className="text-sm font-semibold text-gray-600">{initials}</span>
+            <span className="text-base font-semibold text-ink-soft">{initials}</span>
           ) : null}
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-bold leading-snug text-ink">
             {name ? t('home.greeting', { name }) : t('home.greetingAnon')}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="mt-0.5 text-[15px] text-ink-muted">
             {eventName} · {t('home.eventRole')}
           </p>
         </div>
       </div>
 
-      {/* Nav cards */}
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-        {t('home.goTo')}
-      </p>
+      {/* Nav cards. The heading uses the app-wide .section-label rather than
+          restating the rule — it was a semibold gray-400, a shade and a weight
+          off from every other section label in the app. */}
+      <p className="section-label mb-3">{t('home.goTo')}</p>
       <div className="flex flex-col gap-3">
         {cards.map((card) => (
           <NavCard key={card.href} {...card} />
