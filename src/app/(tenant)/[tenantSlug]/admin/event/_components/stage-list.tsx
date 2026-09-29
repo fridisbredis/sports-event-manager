@@ -77,17 +77,25 @@ function weekdayFromDateString(dateStr: string): string {
   })
 }
 
-function formatTimeRange(start: string | null, end: string | null): string {
-  if (!start) return ''
+/**
+ * Splits the range into its two endpoints so each can be kept unbreakable.
+ * Returned as parts rather than one string because a plain string wraps
+ * wherever it runs out of room — typically mid-date ('Thu 3 / Sept 10:00'),
+ * which reads as a different date. Returns null when there is nothing to show.
+ */
+function stageTimeRangeParts(
+  start: string | null,
+  end: string | null
+): { from: string; to: string | null } | null {
+  if (!start) return null
   const startDate = start.slice(0, 10)
   const startTime = start.slice(11, 16)
-  const day = weekdayFromDateString(startDate)
-  if (!end) return `${day} ${startTime}`
+  const from = `${weekdayFromDateString(startDate)} ${startTime}`
+  if (!end) return { from, to: null }
   const endDate = end.slice(0, 10)
   const endTime = end.slice(11, 16)
-  if (startDate === endDate) return `${day} ${startTime}–${endTime}`
-  const endDay = weekdayFromDateString(endDate)
-  return `${day} ${startTime}–${endDay} ${endTime}`
+  if (startDate === endDate) return { from, to: endTime }
+  return { from, to: `${weekdayFromDateString(endDate)} ${endTime}` }
 }
 
 export default function StageList({ stages, onChange }: Props) {
@@ -177,80 +185,94 @@ export default function StageList({ stages, onChange }: Props) {
           {effectiveStages.map((stage, i) => {
             const isLastRace = stage.stage_type === 'race' && raceStageCount <= 1
             const isExpanded = expanded.has(i)
+            const timeRange = stageTimeRangeParts(stage.start_time, stage.end_time)
             return (
               <div key={i} className="bg-white">
                 {/* Collapsed row */}
-                <div className="flex items-start gap-2 px-4 py-3 transition-colors">
-                  {/* Expand toggle */}
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="light"
-                    onPress={() => toggleExpand(i)}
-                    aria-label={
-                      isExpanded ? t('eventConfig.collapseStage') : t('eventConfig.expandStage')
-                    }
-                  >
-                    {isExpanded ? <ChevronDown /> : <ChevronRight />}
-                  </Button>
-
-                  {/* Name, badge and time range. The range is long enough that
-                      keeping it on the same line as the name squeezes the name
-                      to nothing, so it wraps onto its own line beneath. */}
-                  <div className="min-w-0 flex-1 py-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span
-                        className="min-w-0 truncate text-[15px] font-medium text-ink"
-                        title={stage.name || undefined}
-                      >
-                        {stage.name || '—'}
-                      </span>
-
-                      {/* Type badge */}
-                      <span
-                        className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
-                          stage.stage_type === 'race'
-                            ? 'bg-tenant-accent-tint text-tenant-accent-tint-text'
-                            : 'bg-status-neutral-bg text-status-neutral-text'
-                        }`}
-                      >
-                        {stage.stage_type === 'race'
-                          ? t('eventConfig.stageTypeRace')
-                          : t('eventConfig.stageTypeNonRace')}
-                      </span>
-                    </div>
-
-                    {/* Time range */}
-                    <p className="mt-0.5 text-[13px] text-ink-muted tabular-nums">
-                      {formatTimeRange(stage.start_time, stage.end_time)}
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="shrink-0 flex items-center gap-1">
+                <div className="px-4 py-3 transition-colors">
+                  <div className="flex items-start gap-2">
+                    {/* Expand toggle */}
                     <Button
+                      isIconOnly
                       size="sm"
                       variant="light"
-                      onPress={() => openEdit(i)}
-                      className="font-medium text-tenant-primary-tint-text"
-                    >
-                      {t('actions.edit')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="light"
-                      color="danger"
-                      onPress={() => handleDelete(i)}
-                      className="font-medium text-destructive"
-                      isDisabled={isLastRace}
-                      title={
-                        isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')
+                      onPress={() => toggleExpand(i)}
+                      aria-label={
+                        isExpanded ? t('eventConfig.collapseStage') : t('eventConfig.expandStage')
                       }
                     >
-                      {t('actions.delete')}
+                      {isExpanded ? <ChevronDown /> : <ChevronRight />}
                     </Button>
+
+                    {/* Name and type badge. Only this line shares its width with
+                        the actions, so the badge can sit beside the name. */}
+                    <div className="min-w-0 flex-1 py-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span
+                          className="min-w-0 truncate text-[15px] font-medium text-ink"
+                          title={stage.name || undefined}
+                        >
+                          {stage.name || '—'}
+                        </span>
+
+                        {/* Type badge */}
+                        <span
+                          className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
+                            stage.stage_type === 'race'
+                              ? 'bg-tenant-accent-tint text-tenant-accent-tint-text'
+                              : 'bg-status-neutral-bg text-status-neutral-text'
+                          }`}
+                        >
+                          {stage.stage_type === 'race'
+                            ? t('eventConfig.stageTypeRace')
+                            : t('eventConfig.stageTypeNonRace')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="shrink-0 flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onPress={() => openEdit(i)}
+                        className="font-medium text-tenant-primary-tint-text"
+                      >
+                        {t('actions.edit')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        onPress={() => handleDelete(i)}
+                        className="font-medium text-destructive"
+                        isDisabled={isLastRace}
+                        title={
+                          isLastRace ? t('eventConfig.cannotDeleteLastRace') : t('actions.delete')
+                        }
+                      >
+                        {t('actions.delete')}
+                      </Button>
+                    </div>
                   </div>
+
+                  {/* Time range. Sits outside the row above so it spans the full
+                      card width instead of the narrow column left over beside
+                      the Edit/Delete buttons, which broke it after two or three
+                      words. Each endpoint is kept unbreakable so a wrap at a
+                      narrow width falls between them, never inside a date. */}
+                  {timeRange && (
+                    <p className="ml-9 mt-0.5 text-[13px] text-ink-muted tabular-nums">
+                      <span className="whitespace-nowrap">{timeRange.from}</span>
+                      {timeRange.to && (
+                        <>
+                          {'–'}
+                          <span className="whitespace-nowrap">{timeRange.to}</span>
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 {/* Expanded details */}
