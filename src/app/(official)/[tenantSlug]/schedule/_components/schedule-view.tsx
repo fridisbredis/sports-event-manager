@@ -154,21 +154,10 @@ function DaySelector({
   )
 }
 
-function TimeView({
-  assignments,
-  showDayHeaders,
-}: {
-  assignments: AssignmentRow[]
-  /**
-   * False when the day selector above already names the day — a single-day
-   * schedule. The group header and that label render the same date in the same
-   * `section-label` style, so showing both stutters the date twice in a row.
-   */
-  showDayHeaders: boolean
-}) {
-  // Still grouped even though the window is one day: the header is what
-  // confirms which date is on screen, and it stays correct if a window ever
-  // spans a boundary.
+function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
+  // Still grouped even though the window is usually one day: grouping stays
+  // correct if a window ever spans a midnight boundary, which is the one case
+  // where these headers still earn their place.
   const groups = groupByDay(assignments)
 
   // Coloured across the whole day, not per day-group, so a work area keeps
@@ -182,7 +171,14 @@ function TimeView({
     <div className="flex flex-col gap-6">
       {groups.map((group) => (
         <div key={group.key}>
-          {showDayHeaders ? <p className="section-label mb-3">{group.label}</p> : null}
+          {/* Only when this view holds more than one date. DaySelector above
+              always names the selected day now — as a static label for a
+              single-day schedule, as the highlighted tab otherwise — so a
+              header repeating it stutters the same date twice in the same
+              `section-label` style. More than one group means the window
+              crossed midnight, and then the row above can only name one of
+              the dates, so each group has to label itself. */}
+          {groups.length > 1 ? <p className="section-label mb-3">{group.label}</p> : null}
           <div className="flex flex-col gap-3">
             {/* One card per run rather than per slot: a three-hour shift is
                 three `assignments` rows, and a card each read as three
@@ -456,7 +452,7 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
           description={strings.noAssignmentsOnDayDescription}
         />
       ) : view === 'time' ? (
-        <TimeView assignments={assignments} showDayHeaders={days.length > 1} />
+        <TimeView assignments={assignments} />
       ) : (
         <WorkAreaView assignments={assignments} todoLabel={strings.todoLabel} />
       )}
