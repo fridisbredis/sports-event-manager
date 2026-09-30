@@ -300,6 +300,22 @@ export default function EventConfigForm({
           </Chip>
         </div>
         <div className="flex items-center gap-3">
+          {!isPublished && (
+            // Secondary, and placed before Save: two solid primary buttons
+            // side by side give the row no clear primary action, and the
+            // primary one belongs last in the row.
+            <Button
+              variant="bordered"
+              onPress={handlePublish}
+              isDisabled={isSaving || isPublishing}
+              isLoading={isPublishing}
+              // HeroUI's `bordered` is transparent, so on the grey page ground
+              // the button has no fill of its own — `bg-white` gives it one.
+              className="rounded-control border-edge-field bg-white"
+            >
+              {isPublishing ? t('eventConfig.publishing') : t('eventConfig.publish')}
+            </Button>
+          )}
           <Button
             onPress={handleSave}
             isDisabled={isSaving || isPublishing || isUploading}
@@ -314,16 +330,6 @@ export default function EventConfigForm({
                 ? t('eventConfig.saved')
                 : t('eventConfig.save')}
           </Button>
-          {!isPublished && (
-            <Button
-              color="primary"
-              onPress={handlePublish}
-              isDisabled={isSaving || isPublishing}
-              isLoading={isPublishing}
-            >
-              {isPublishing ? t('eventConfig.publishing') : t('eventConfig.publish')}
-            </Button>
-          )}
         </div>
       </div>
 

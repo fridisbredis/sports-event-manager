@@ -138,7 +138,9 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
 
   return (
     <div className="flex w-full items-center gap-3">
-      <span className="text-[17px] font-bold tracking-tight text-ink">{stage.name}</span>
+      <span className="font-display text-[17px] font-bold tracking-tight text-ink">
+        {stage.name}
+      </span>
       <Chip
         size="sm"
         variant="flat"
@@ -150,8 +152,11 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
       >
         {typeLabel}
       </Chip>
-      {dateStr && <span className="text-[14px] text-ink-muted">{dateStr}</span>}
-      <span className="ml-auto text-[14px] text-ink-muted">
+      {/* HeroUI renders an AccordionItem's title inside an <h2>, and the
+          base layer puts Manrope on every h1-h3. These two are body text, so
+          they have to ask for the system stack back explicitly. */}
+      {dateStr && <span className="font-sans text-[13px] text-ink-muted">{dateStr}</span>}
+      <span className="ml-auto font-sans text-[13px] text-ink-muted">
         {t('workstations.workAreaCount', { count })}
       </span>
     </div>

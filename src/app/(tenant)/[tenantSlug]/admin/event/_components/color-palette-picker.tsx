@@ -25,6 +25,9 @@ export function ColorPalettePicker({
         {(Object.keys(TENANT_PALETTES) as TenantPaletteKey[]).map((key) => {
           const palette = TENANT_PALETTES[key]
           const isSelected = colorPalette === key
+          const ringStyle = {
+            '--tw-ring-color': isSelected ? `hsl(${palette.primaryTint})` : '#fff',
+          } as React.CSSProperties
           return (
             <button
               key={key}
@@ -33,22 +36,39 @@ export function ColorPalettePicker({
               disabled={isSavingPalette}
               aria-pressed={isSelected}
               aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
-              className={`group flex flex-col items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors ${
-                isSelected ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'
+              className={`group flex flex-col items-center gap-1.5 rounded-lg border-2 px-3 py-2.5 transition-colors ${
+                isSelected ? '' : 'border-gray-200 hover:border-gray-300'
               } ${isSavingPalette ? 'opacity-60' : ''}`}
+              // The selected swatch is outlined and filled in its OWN palette,
+              // so the option previews the theme rather than reading as a
+              // neutral "selected" box. primaryTint is the palette's own
+              // surface shade, and the three tints are already balanced for
+              // equal perceived lightness. Inline because the values come from
+              // the palette map, not fixed Tailwind colours.
+              style={
+                isSelected
+                  ? {
+                      borderColor: `hsl(${palette.primary})`,
+                      backgroundColor: `hsl(${palette.primaryTint})`,
+                    }
+                  : undefined
+              }
             >
               <div className="flex -space-x-1.5">
+                {/* The ring separates the overlapping dots, so it has to match
+                    whatever surface sits behind them — white normally, the
+                    palette tint once this option is selected. */}
                 <span
-                  className="h-5 w-5 rounded-full ring-2 ring-white"
-                  style={{ backgroundColor: `hsl(${palette.primary})` }}
+                  className="h-5 w-5 rounded-full ring-2"
+                  style={{ backgroundColor: `hsl(${palette.primary})`, ...ringStyle }}
                 />
                 <span
-                  className="h-5 w-5 rounded-full ring-2 ring-white"
-                  style={{ backgroundColor: `hsl(${palette.secondary})` }}
+                  className="h-5 w-5 rounded-full ring-2"
+                  style={{ backgroundColor: `hsl(${palette.secondary})`, ...ringStyle }}
                 />
                 <span
-                  className="h-5 w-5 rounded-full ring-2 ring-white"
-                  style={{ backgroundColor: `hsl(${palette.accent})` }}
+                  className="h-5 w-5 rounded-full ring-2"
+                  style={{ backgroundColor: `hsl(${palette.accent})`, ...ringStyle }}
                 />
               </div>
               <span className="text-xs text-gray-500 group-hover:text-gray-700">

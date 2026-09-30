@@ -64,7 +64,7 @@ function TodoList({
           this column rather than a sub-heading of a combined one. */}
       {groupLabel ? <h2 className="section-label mb-2">{groupLabel}</h2> : null}
       <h3 className="mb-0.5 text-[15px] font-semibold text-ink">{heading}</h3>
-      <p className="mb-3 text-sm text-ink-soft">{hint}</p>
+      <p className="mb-3 text-[13px] text-gray-400">{hint}</p>
       {rows.length > 0 ? (
         <div className="mb-3 overflow-hidden rounded-lg border border-edge bg-white">
           <div className="divide-y divide-edge-soft">

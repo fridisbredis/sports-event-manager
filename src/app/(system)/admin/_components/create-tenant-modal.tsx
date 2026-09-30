@@ -48,7 +48,7 @@ export function CreateTenantModal({ open, onClose }: Props) {
       classNames={{
         base: 'bg-white rounded-card shadow-modal',
         backdrop: 'bg-ink/45',
-        header: 'px-6 pb-2 pt-6 text-xl font-extrabold tracking-tight text-ink',
+        header: 'px-6 pb-2 pt-6 font-display text-xl font-extrabold tracking-tight text-ink',
         body: 'px-6',
         footer: 'gap-3 px-6 pb-6 pt-4',
         closeButton: 'right-4 top-4 text-ink-label hover:bg-status-neutral-bg',
