@@ -26,19 +26,31 @@ export type ChecklistTodo = {
   item_type: string
 }
 
+/**
+ * Plain strings only — no functions. This object crosses the server/client
+ * boundary, and React can only serialise data across it, so the two strings
+ * that need interpolation carry their `{{name}}` / `{{time}}` placeholders
+ * and are filled in here by `fill()` rather than by a callback from the
+ * server.
+ */
 export interface ChecklistStrings {
   /** Tooltip/label on the checkbox itself. */
   toggleLabel: string
-  /** e.g. "Checked by {{name}} at {{time}}" */
-  checkedBy: (name: string, time: string) => string
+  /** Carries `{{name}}` and `{{time}}`. */
+  checkedBy: string
   /** Fallback when the actor's name is unknown (deleted account). */
   someone: string
   confirmTitle: string
-  /** e.g. "{{name}} checked this off. Uncheck it anyway?" */
-  confirmBody: (name: string) => string
+  /** Carries `{{name}}`. */
+  confirmBody: string
   confirmCancel: string
   confirmConfirm: string
   saveFailed: string
+}
+
+/** Fills `{{key}}` placeholders, matching i18next's interpolation syntax. */
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => values[key] ?? match)
 }
 
 interface Props {
@@ -156,7 +168,10 @@ export function ChecklistItemRow({
             this line is just the latest fact. */}
         {check ? (
           <span className="mt-0.5 block text-xs text-gray-400">
-            {strings.checkedBy(actorName, formatCheckedAt(check.checked_at))}
+            {fill(strings.checkedBy, {
+              name: actorName,
+              time: formatCheckedAt(check.checked_at),
+            })}
           </span>
         ) : null}
         {error ? (
@@ -170,7 +185,9 @@ export function ChecklistItemRow({
         <ModalContent>
           <ModalHeader className="text-base">{strings.confirmTitle}</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-gray-600">{strings.confirmBody(actorName)}</p>
+            <p className="text-sm text-gray-600">
+              {fill(strings.confirmBody, { name: actorName })}
+            </p>
           </ModalBody>
           <ModalFooter>
             {/* "No" closes and changes nothing — no write, no audit row. */}

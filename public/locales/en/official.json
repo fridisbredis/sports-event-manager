@@ -51,7 +51,8 @@
     "workstation": "Work area",
     "time": "Time",
     "checklist": "Checklist",
-    "todoLabel": "To do"
+    "todoLabel": "To do",
+    "infoLabel": "Good to know"
   },
   "announcements": {
     "title": "Announcements",

@@ -13,6 +13,7 @@ const STRINGS = {
   noAssignmentsOnDayDescription: '',
   dayTabsLabel: 'Days',
   todoLabel: 'To do',
+  infoLabel: 'Good to know',
 }
 
 function slot(id: string, start: string, end: string, ws: AssignmentRow['workstations']) {
@@ -35,6 +36,20 @@ const WITH_TODOS = {
   ],
 }
 
+// Deliberately interleaved in `position` order, so a test that only checked
+// admin's ordering would pass while the groups were still mixed.
+const MIXED_TODOS = {
+  id: '44444444-4444-4444-8444-444444444444',
+  name: 'Finish line',
+  description: null,
+  workstation_todos: [
+    { id: 'm1', instruction_text: 'Radio channel 3', position: 0, item_type: 'info' },
+    { id: 'm2', instruction_text: 'Collect timing chips', position: 1, item_type: 'checkbox' },
+    { id: 'm3', instruction_text: 'Cups are by the table', position: 2, item_type: 'info' },
+    { id: 'm4', instruction_text: 'Hand out medals', position: 3, item_type: 'checkbox' },
+  ],
+}
+
 const DEPOT = {
   id: '22222222-2222-4222-8222-222222222222',
   name: 'Depån',
@@ -47,10 +62,10 @@ const DEPOT = {
 // before checkboxes existed, so these only have to satisfy the types.
 const CHECKLIST_STRINGS = {
   toggleLabel: 'Check off',
-  checkedBy: (name: string, time: string) => `Checked by ${name} at ${time}`,
+  checkedBy: 'Checked by {{name}} at {{time}}',
   someone: 'someone',
   confirmTitle: 'Are you sure?',
-  confirmBody: (name: string) => `${name} checked this off. Uncheck it anyway?`,
+  confirmBody: '{{name}} checked this off. Uncheck it anyway?',
   confirmCancel: 'No, keep it',
   confirmConfirm: 'Yes, uncheck',
   saveFailed: 'Could not save. Try again.',
@@ -136,12 +151,15 @@ describe('ScheduleView work-area view', () => {
     expect(new Set(accents).size).toBe(2)
   })
 
-  it('heads the checklist with the to-do label, in position order', async () => {
+  // WITH_TODOS is all informational, so it heads the 'Good to know' group —
+  // the point of the assertion is unchanged: a heading, then admin's own
+  // ordering beneath it.
+  it('heads the checklist with its group label, in position order', async () => {
     renderWorkAreaView([
       slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', WITH_TODOS),
     ])
 
-    expect(await screen.findByText('To do')).toBeInTheDocument()
+    expect(await screen.findByText('Good to know')).toBeInTheDocument()
     const todos = screen
       .getAllByText(/race-day reminder|finish-line photos/)
       .map((el) => el.textContent)
@@ -161,12 +179,14 @@ describe('ScheduleView work-area view', () => {
   // The ring is decorative. If it ever became a real <input type="checkbox">
   // it would be an affordance that ignores every tap — v1 stores no
   // completion state (DECISION Peter 2026-06-24).
-  it('exposes the to-dos as a list, with no checkbox control', async () => {
+  // Informational items still carry no checkbox — only an item the admin
+  // marked as checkable gets one.
+  it('exposes informational to-dos as a list, with no checkbox control', async () => {
     renderWorkAreaView([
       slot('a', '2026-08-12T11:00:00.000Z', '2026-08-12T12:00:00.000Z', WITH_TODOS),
     ])
 
-    await screen.findByText('To do')
+    await screen.findByText('Good to know')
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
@@ -436,5 +456,28 @@ describe('ScheduleView day label', () => {
 
     expect(screen.getByText('Wednesday 12 August')).toBeTruthy()
     expect(screen.getByText('Thursday 13 August')).toBeTruthy()
+  })
+})
+
+describe('ScheduleView checklist grouping', () => {
+  it('puts checkable items above informational ones, under their own headings', () => {
+    renderWorkAreaView([slot('a1', '2026-08-12T08:00:00Z', '2026-08-12T09:00:00Z', MIXED_TODOS)])
+
+    const checkables = screen.getAllByRole('checkbox').map((el) => el.getAttribute('aria-label'))
+    expect(checkables).toEqual(['Check off: Collect timing chips', 'Check off: Hand out medals'])
+
+    // Both headings present, and the actionable group comes first in the DOM.
+    const todoHeading = screen.getByText('To do')
+    const infoHeading = screen.getByText('Good to know')
+    expect(
+      todoHeading.compareDocumentPosition(infoHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it('shows no empty heading for a station with only notes', () => {
+    renderWorkAreaView([slot('a1', '2026-08-12T08:00:00Z', '2026-08-12T09:00:00Z', WITH_TODOS)])
+
+    expect(screen.queryByText('To do')).not.toBeInTheDocument()
+    expect(screen.getByText('Good to know')).toBeInTheDocument()
   })
 })

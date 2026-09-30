@@ -44,6 +44,7 @@ interface Strings {
   noAssignmentsOnDayDescription: string
   dayTabsLabel: string
   todoLabel: string
+  infoLabel: string
 }
 // Order matters: it is both the visual order of the two halves and the order
 // the arrow keys step through. `label` keys into Strings so the labels stay
@@ -233,6 +234,7 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
 function WorkAreaView({
   assignments,
   todoLabel,
+  infoLabel,
   checks,
   tenantSlug,
   currentUserId,
@@ -240,6 +242,7 @@ function WorkAreaView({
 }: {
   assignments: AssignmentRow[]
   todoLabel: string
+  infoLabel: string
   checks: CheckMap
   tenantSlug: string
   currentUserId: string | null
@@ -278,6 +281,10 @@ function WorkAreaView({
         // both have to agree on what counts as a shift, since the checklist
         // keys its state on these exact boundaries.
         const spans = mergeContiguousSlots(rows)
+        // Split, not re-sorted: each group keeps the relative order the admin
+        // gave it.
+        const checkableTodos = sortedTodos.filter((t) => t.item_type === 'checkbox')
+        const infoTodos = sortedTodos.filter((t) => t.item_type !== 'checkbox')
         const color = colors.get(ws.id) ?? WORK_AREA_COLORS[0]
         return (
           <AppCard
@@ -314,17 +321,52 @@ function WorkAreaView({
                 for items an admin explicitly marks as checkable. */}
             {sortedTodos.length > 0 ? (
               <div className="mt-3 border-t border-gray-100 pt-3">
-                <p className="section-label mb-2">{todoLabel}</p>
-                <ul className="flex flex-col gap-2">
-                  {sortedTodos.map((todo) => {
-                    // An info item says the same thing regardless of when it
-                    // is read, so it renders once. A checkbox item is ticked
-                    // per shift, so it renders once per contiguous run: a
-                    // station worked morning and afternoon gets an
-                    // independent tick for each, matching how the state is
-                    // keyed in the database.
-                    if (todo.item_type !== 'checkbox') {
-                      return (
+                {/* Grouped by kind rather than left in admin's single
+                    ordering: the two sorts read differently — one is work to
+                    perform, the other is context to know — and interleaving
+                    them made the actionable rows hard to pick out at a
+                    glance. Checkable items come first, since that is what an
+                    official opens this screen to do; admin's ordering is
+                    preserved within each group. A group with nothing in it
+                    renders no heading at all, so a station with only notes
+                    looks exactly as it did before. */}
+                {checkableTodos.length > 0 ? (
+                  <>
+                    <p className="section-label mb-2">{todoLabel}</p>
+                    <ul className="flex flex-col gap-2">
+                      {checkableTodos.map((todo) =>
+                        // One row per contiguous run, not per item: a station
+                        // worked morning and afternoon gets an independent
+                        // tick for each, matching how the state is keyed in
+                        // the database.
+                        spans.map((span) => (
+                          <ChecklistItemRow
+                            key={`${todo.id}-${span.start}`}
+                            todo={todo}
+                            check={checks.get(`${todo.id}|${span.start}`) ?? null}
+                            color={color}
+                            tenantSlug={tenantSlug}
+                            workstationId={ws.id}
+                            timeslotStart={span.start}
+                            timeslotEnd={span.end}
+                            currentUserId={currentUserId}
+                            strings={checklistStrings}
+                          />
+                        ))
+                      )}
+                    </ul>
+                  </>
+                ) : null}
+                {infoTodos.length > 0 ? (
+                  <>
+                    <p className={`section-label mb-2 ${checkableTodos.length > 0 ? 'mt-4' : ''}`}>
+                      {infoLabel}
+                    </p>
+                    <ul className="flex flex-col gap-2">
+                      {/* An info item says the same thing whenever it is
+                          read, so it renders once regardless of how many
+                          shifts the station is worked. */}
+                      {infoTodos.map((todo) => (
                         <ChecklistItemRow
                           key={todo.id}
                           todo={todo}
@@ -337,24 +379,10 @@ function WorkAreaView({
                           currentUserId={currentUserId}
                           strings={checklistStrings}
                         />
-                      )
-                    }
-                    return spans.map((span) => (
-                      <ChecklistItemRow
-                        key={`${todo.id}-${span.start}`}
-                        todo={todo}
-                        check={checks.get(`${todo.id}|${span.start}`) ?? null}
-                        color={color}
-                        tenantSlug={tenantSlug}
-                        workstationId={ws.id}
-                        timeslotStart={span.start}
-                        timeslotEnd={span.end}
-                        currentUserId={currentUserId}
-                        strings={checklistStrings}
-                      />
-                    ))
-                  })}
-                </ul>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </AppCard>
@@ -505,6 +533,7 @@ export function ScheduleView({
         <WorkAreaView
           assignments={assignments}
           todoLabel={strings.todoLabel}
+          infoLabel={strings.infoLabel}
           checks={checks}
           tenantSlug={tenantSlug}
           currentUserId={currentUserId}

@@ -10,10 +10,10 @@ vi.mock('../actions', () => ({
 
 const STRINGS = {
   toggleLabel: 'Check off',
-  checkedBy: (name: string, time: string) => `Checked by ${name} at ${time}`,
+  checkedBy: 'Checked by {{name}} at {{time}}',
   someone: 'someone',
   confirmTitle: 'Are you sure?',
-  confirmBody: (name: string) => `${name} checked this off. Uncheck it anyway?`,
+  confirmBody: '{{name}} checked this off. Uncheck it anyway?',
   confirmCancel: 'No, keep it',
   confirmConfirm: 'Yes, uncheck',
   saveFailed: 'Could not save. Try again.',
@@ -61,6 +61,26 @@ const OWN_CHECK: ChecklistCheck = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+describe('ChecklistItemRow string contract', () => {
+  it('takes only serialisable strings, so it can cross the server boundary', () => {
+    // The regression this guards: these strings are built in a Server
+    // Component and handed to this Client Component. A callback among them
+    // ("(name) => t(...)") type-checks fine but throws at runtime with
+    // "Functions cannot be passed directly to Client Components" — which is
+    // exactly what shipped and broke MYSCH-01 once.
+    for (const [key, value] of Object.entries(STRINGS)) {
+      expect(typeof value, `strings.${key} must be a string, not a function`).toBe('string')
+    }
+  })
+
+  it('interpolates placeholders rather than printing them raw', () => {
+    renderRow({ check: COLLEAGUE_CHECK })
+
+    expect(screen.queryByText(/\{\{name\}\}/)).not.toBeInTheDocument()
+    expect(screen.getByText('Checked by Bob at 09:30')).toBeInTheDocument()
+  })
 })
 
 describe('ChecklistItemRow item types', () => {

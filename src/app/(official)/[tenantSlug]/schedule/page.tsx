@@ -231,17 +231,23 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     noAssignmentsOnDayDescription: t('mySchedule.noAssignmentsOnDayDescription'),
     dayTabsLabel: t('mySchedule.dayTabsLabel'),
     todoLabel: t('mySchedule.todoLabel'),
+    infoLabel: t('mySchedule.infoLabel'),
   }
 
-  // Interpolation happens here, on the server, where the translator lives —
-  // the client component takes plain functions so it needs no i18n instance
-  // of its own.
+  // Passed as raw templates, not interpolated here: this object crosses into
+  // a Client Component, and only serialisable data survives that boundary —
+  // a `(name) => t(...)` callback throws "Functions cannot be passed directly
+  // to Client Components". `checkedBy`/`confirmBody` keep their {{name}} and
+  // {{time}} placeholders and the row fills them in.
+  //
+  // `returnObjects: false` is implicit; these keys are plain strings, so
+  // i18next returns them verbatim when no interpolation values are given.
   const checklistStrings = {
     toggleLabel: t('checklist.toggleLabel'),
-    checkedBy: (name: string, time: string) => t('checklist.checkedBy', { name, time }),
+    checkedBy: t('checklist.checkedBy'),
     someone: t('checklist.someone'),
     confirmTitle: t('checklist.confirmTitle'),
-    confirmBody: (name: string) => t('checklist.confirmBody', { name }),
+    confirmBody: t('checklist.confirmBody'),
     confirmCancel: t('checklist.confirmCancel'),
     confirmConfirm: t('checklist.confirmConfirm'),
     saveFailed: t('checklist.saveFailed'),
