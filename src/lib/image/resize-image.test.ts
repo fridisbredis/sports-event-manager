@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { resizeAvatar } from './resize-avatar'
+import { resizeImage } from './resize-image'
 
 // jsdom implements neither createImageBitmap nor canvas encoding, so both are
 // stubbed. What's under test is the decision logic — when to re-encode, what
@@ -34,12 +34,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('resizeAvatar', () => {
+describe('resizeImage', () => {
   it('downscales the longest edge to 512px and preserves aspect ratio', async () => {
     stubBitmap(2048, 1024)
     const canvas = stubCanvas(new Blob(['x'], { type: 'image/webp' }))
 
-    const { resized } = await resizeAvatar(bigFile())
+    const { resized } = await resizeImage(bigFile())
 
     expect(resized).toBe(true)
     expect(canvas.width).toBe(512)
@@ -50,7 +50,7 @@ describe('resizeAvatar', () => {
     stubBitmap(1000, 1000)
     stubCanvas(new Blob(['x'], { type: 'image/webp' }))
 
-    const { file } = await resizeAvatar(bigFile())
+    const { file } = await resizeImage(bigFile())
 
     expect(file.type).toBe('image/webp')
     expect(file.name).toBe('photo.webp')
@@ -60,7 +60,7 @@ describe('resizeAvatar', () => {
     stubBitmap(64, 64)
     const canvas = stubCanvas(new Blob(['x'], { type: 'image/webp' }))
 
-    await resizeAvatar(bigFile())
+    await resizeImage(bigFile())
 
     // Redrawn at its own size, never enlarged to 512.
     expect(canvas.width).toBe(64)
@@ -71,7 +71,7 @@ describe('resizeAvatar', () => {
     stubBitmap(64, 64)
     const original = new File([new Uint8Array(10)], 'already.webp', { type: 'image/webp' })
 
-    const { file, resized } = await resizeAvatar(original)
+    const { file, resized } = await resizeImage(original)
 
     expect(resized).toBe(false)
     expect(file).toBe(original)
@@ -81,7 +81,7 @@ describe('resizeAvatar', () => {
     vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('not an image')))
     const original = bigFile()
 
-    const { file, resized } = await resizeAvatar(original)
+    const { file, resized } = await resizeImage(original)
 
     // The server still validates type and size, so a bad file fails there
     // with a real message rather than throwing in the picker.
@@ -94,7 +94,7 @@ describe('resizeAvatar', () => {
     stubCanvas(null)
     const original = bigFile()
 
-    const { file, resized } = await resizeAvatar(original)
+    const { file, resized } = await resizeImage(original)
 
     expect(resized).toBe(false)
     expect(file).toBe(original)
@@ -104,7 +104,7 @@ describe('resizeAvatar', () => {
     const { close } = stubBitmap(2048, 2048)
     stubCanvas(null)
 
-    await resizeAvatar(bigFile())
+    await resizeImage(bigFile())
 
     expect(close).toHaveBeenCalled()
   })

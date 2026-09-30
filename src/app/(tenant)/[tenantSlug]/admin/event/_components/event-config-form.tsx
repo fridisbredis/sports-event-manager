@@ -15,6 +15,7 @@ import {
 } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
+import { resizeImage } from '@/lib/image/resize-image'
 import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
@@ -127,16 +128,20 @@ export default function EventConfigForm({
       setUploadError(t('eventConfig.logoInvalidType'))
       return
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError(t('eventConfig.logoTooLarge'))
-      return
-    }
 
     setUploadError(undefined)
     setIsUploading(true)
 
+    // Downscale before upload, the same way the profile picture does. The
+    // logo renders at 72px, so a full-resolution file is bytes nobody sees —
+    // and a Server Action body is capped at 1 MB, which a photo-sized logo
+    // blows past before the action's own size check can report anything
+    // useful. Shrinking first means a large source file just works instead of
+    // being rejected for its size.
+    const { file: upload } = await resizeImage(file, 'logo')
+
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', upload)
     formData.append('tenantId', tenantId)
     formData.append('eventId', eventId)
     formData.append('oldLogoUrl', logoUrl)

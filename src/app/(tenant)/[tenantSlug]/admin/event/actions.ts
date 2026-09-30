@@ -197,6 +197,15 @@ function extractStoragePath(url: string, bucket: string): string | null {
   return decodeURIComponent(url.slice(idx + marker.length))
 }
 
+// Must stay UNDER Next.js's default 1 MB Server Action body cap. Above that
+// the request is rejected by the framework with a 413 before this action
+// runs, so a larger value here would be advertised in the error copy but
+// never actually enforced — the user would just see a generic failure.
+// The client downscales to a 512px WebP first (see resizeImage), which lands
+// well under 100 kB in practice; this is the backstop for anything that
+// bypasses it, not the expected path.
+const MAX_LOGO_BYTES = 900 * 1024
+
 export async function uploadEventLogo(formData: FormData): Promise<UploadLogoResult> {
   const supabase = await createSupabaseServerClient()
   const {
@@ -212,7 +221,7 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
 
   if (!(file instanceof File)) return { error: 'No file provided' }
   if (!file.type.startsWith('image/')) return { error: 'Please choose an image file' }
-  if (file.size > 2 * 1024 * 1024) return { error: 'Image must be smaller than 2 MB' }
+  if (file.size > MAX_LOGO_BYTES) return { error: 'Image must be smaller than 900 kB' }
   if (!tenantId || !eventId) return { error: 'Missing tenant or event ID' }
 
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
