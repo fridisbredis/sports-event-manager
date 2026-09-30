@@ -295,7 +295,7 @@ export default function WorkstationEditForm({
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
         {/* Left column */}
-        <AppCard bodyClassName="divide-y divide-edge p-0 [&>*]:px-6 [&>*]:py-5">
+        <AppCard bodyClassName="divide-y divide-edge p-0 [&>*]:px-6 [&>*]:py-4">
           {/* Stage */}
           <section>
             <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>

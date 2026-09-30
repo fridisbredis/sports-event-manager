@@ -54,7 +54,7 @@ export function OperatingWindowsEditor({
           </Button>
         )}
       </div>
-      <p className="mb-3 text-sm text-ink-soft">{t('workstations.operatingWindowMidnightHint')}</p>
+      <p className="mb-3 text-xs text-gray-400">{t('workstations.operatingWindowMidnightHint')}</p>
       <div className="space-y-3">
         {windows.map((w, i) => (
           <div
@@ -125,7 +125,7 @@ export function OperatingWindowsEditor({
             failed to load. Dashed, matching the other "nothing here yet"
             placeholders in the admin UI. */}
         {windows.length === 0 && (
-          <p className="rounded-lg border border-dashed border-edge-field px-4 py-5 text-center text-sm text-ink-soft">
+          <p className="rounded-lg border border-dashed border-edge-field px-4 py-3 text-center text-sm text-ink-soft">
             {t('workstations.noOperatingWindows')}
           </p>
         )}

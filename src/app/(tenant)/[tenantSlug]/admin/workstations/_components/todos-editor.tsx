@@ -69,7 +69,7 @@ function TodoList({
         <div className="mb-3 overflow-hidden rounded-lg border border-edge bg-white">
           <div className="divide-y divide-edge-soft">
             {rows.map(({ draft, index }) => (
-              <div key={index} className="flex items-center gap-3 px-3 py-2.5">
+              <div key={index} className="flex items-center gap-3 px-3 py-1.5">
                 {marker}
                 <Input
                   ref={(el) => {
@@ -98,9 +98,15 @@ function TodoList({
                   placeholder={placeholder}
                   classNames={{
                     base: 'flex-1',
+                    // HeroUI gives the wrapper its own min-height, which is
+                    // what made these rows taller than the design's. Cleared
+                    // here so the row's own padding sets the height.
                     inputWrapper:
-                      '!bg-transparent data-[hover=true]:!bg-transparent group-data-[focus=true]:!bg-transparent shadow-none px-2 py-0',
-                    input: 'text-sm text-gray-900 placeholder:text-gray-400',
+                      '!bg-transparent data-[hover=true]:!bg-transparent group-data-[focus=true]:!bg-transparent shadow-none px-2 py-0 h-auto !min-h-0',
+                    // `truncate` so a long instruction ends in an ellipsis
+                    // rather than being cut mid-glyph at the field edge. The
+                    // full text is still there to scroll through once focused.
+                    input: 'text-sm text-gray-900 placeholder:text-gray-400 truncate',
                   }}
                 />
                 <LinkButton size="sm" tone="danger" onPress={() => onRemove(index)}>
