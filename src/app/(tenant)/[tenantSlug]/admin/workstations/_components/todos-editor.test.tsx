@@ -27,9 +27,9 @@ const MIXED: TodoDraft[] = [
   { text: 'Hand out medals', itemType: 'checkbox' },
 ]
 
-/** The list section under a given heading. */
+/** The <section> a given heading belongs to. */
 function listFor(heading: string) {
-  return screen.getByRole('heading', { name: heading }).closest('div')!.parentElement!
+  return screen.getByRole('heading', { name: heading }).closest('section')!
 }
 
 function valuesIn(heading: string): string[] {
@@ -56,6 +56,26 @@ describe('TodosEditor list separation', () => {
     expect(screen.getByText('+ Add check-off item')).toBeInTheDocument()
     expect(screen.getByText('+ Add note')).toBeInTheDocument()
     expect(screen.queryAllByRole('textbox')).toHaveLength(0)
+  })
+})
+
+describe('TodosEditor layout', () => {
+  it('renders the two lists as sibling sections, not one nested panel', () => {
+    // The column this sits in gives each top-level section its own card, so
+    // nesting both lists under one wrapper put them in a single card — which
+    // is the layout regression this guards.
+    const { container } = render(<TodosEditor todos={MIXED} onChange={vi.fn()} />)
+
+    const sections = container.querySelectorAll('section')
+    expect(sections).toHaveLength(2)
+    expect(sections[0].contains(sections[1])).toBe(false)
+  })
+
+  it('labels the pair above the first list only', () => {
+    render(<TodosEditor todos={MIXED} onChange={vi.fn()} />)
+
+    expect(screen.getAllByText('Checklists / to-dos')).toHaveLength(1)
+    expect(listFor('Check-off items')).toHaveTextContent('Checklists / to-dos')
   })
 })
 

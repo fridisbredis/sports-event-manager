@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Input } from '@heroui/react'
 import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
@@ -23,6 +23,8 @@ interface ListProps {
   addLabel: string
   placeholder: string
   removeLabel: string
+  /** Small grey label above the heading. Only the first list carries one. */
+  groupLabel?: string
   rows: { draft: TodoDraft; index: number }[]
   /** Renders the leading glyph for this list — a checkbox outline or a dot. */
   marker: React.ReactNode
@@ -39,6 +41,7 @@ interface ListProps {
  * rather than being written out twice.
  */
 function TodoList({
+  groupLabel,
   heading,
   hint,
   addLabel,
@@ -53,13 +56,16 @@ function TodoList({
   focusIndex,
 }: ListProps) {
   return (
-    <div>
-      <div className="mb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">{heading}</h3>
-        <p className="mt-1 text-xs text-gray-400">{hint}</p>
-      </div>
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {rows.length > 0 ? (
+    <section>
+      {/* The group label sits above the first list only, naming the pair the
+          way the other column headings name their panels. `section-label`
+          matches Capacity beside it, so each list reads as a peer panel in
+          this column rather than a sub-heading of a combined one. */}
+      {groupLabel ? <h2 className="section-label mb-4">{groupLabel}</h2> : null}
+      <h3 className="mb-1 text-[15px] font-semibold text-ink">{heading}</h3>
+      <p className="mb-4 text-sm text-ink-soft">{hint}</p>
+      {rows.length > 0 ? (
+        <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-white">
           <div className="divide-y divide-gray-100">
             {rows.map(({ draft, index }) => (
               <div key={index} className="flex items-center gap-3 px-3 py-2.5">
@@ -102,12 +108,10 @@ function TodoList({
               </div>
             ))}
           </div>
-        ) : null}
-        <div className={`px-4 py-3 ${rows.length > 0 ? 'border-t border-edge' : ''}`}>
-          <LinkButton onPress={onAdd}>{addLabel}</LinkButton>
         </div>
-      </div>
-    </div>
+      ) : null}
+      <LinkButton onPress={onAdd}>{addLabel}</LinkButton>
+    </section>
   )
 }
 
@@ -126,9 +130,14 @@ export function TodosEditor({ todos, onChange }: Props) {
   // survive the re-render the add causes without triggering another.
   const focusIndex = useRef<number | null>(null)
   // Mirrors `todos` for the deferred blur handler below, which runs after the
-  // render that follows blur and must not act on a stale array.
+  // render that follows blur and must not act on a stale array. Written in an
+  // effect rather than during render — a ref write during render is what the
+  // "Cannot access refs during render" rule forbids, and the effect still
+  // lands well before the deferred handler reads it.
   const latestTodos = useRef(todos)
-  latestTodos.current = todos
+  useEffect(() => {
+    latestTodos.current = todos
+  }, [todos])
 
   const rowsOfType = (itemType: ChecklistItemType) =>
     todos
@@ -177,49 +186,46 @@ export function TodosEditor({ todos, onChange }: Props) {
     }, 0)
   }
 
+  // A fragment, not a wrapping element: the two lists are siblings of the
+  // other panels in this column (Capacity and so on), so the column's own
+  // spacing and card treatment apply to each of them separately. Nesting them
+  // inside one wrapper made both share a single card.
   return (
-    <section>
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-        {t('workstations.todosLabel')}
-      </h2>
-      <div className="flex flex-col gap-5">
-        <TodoList
-          heading={t('workstations.checklistHeading')}
-          hint={t('workstations.checklistHint')}
-          addLabel={t('workstations.addChecklistItem')}
-          placeholder={t('workstations.checklistPlaceholder')}
-          removeLabel={t('workstations.removeTodo')}
-          rows={rowsOfType('checkbox')}
-          // An outline, not an interactive control: it previews the checkbox
-          // an official will see. Making it clickable here would suggest an
-          // admin can tick the work off on their behalf.
-          marker={
-            <span
-              aria-hidden="true"
-              className="h-4 w-4 shrink-0 rounded border-2 border-gray-300"
-            />
-          }
-          onAdd={() => add('checkbox')}
-          onRemove={remove}
-          onUpdate={update}
-          onBlurRow={blurRow}
-          focusIndex={focusIndex}
-        />
-        <TodoList
-          heading={t('workstations.notesHeading')}
-          hint={t('workstations.notesHint')}
-          addLabel={t('workstations.addNote')}
-          placeholder={t('workstations.notePlaceholder')}
-          removeLabel={t('workstations.removeTodo')}
-          rows={rowsOfType('info')}
-          marker={<span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-gray-300" />}
-          onAdd={() => add('info')}
-          onRemove={remove}
-          onUpdate={update}
-          onBlurRow={blurRow}
-          focusIndex={focusIndex}
-        />
-      </div>
-    </section>
+    <>
+      <TodoList
+        groupLabel={t('workstations.todosLabel')}
+        heading={t('workstations.checklistHeading')}
+        hint={t('workstations.checklistHint')}
+        addLabel={t('workstations.addChecklistItem')}
+        placeholder={t('workstations.checklistPlaceholder')}
+        removeLabel={t('workstations.removeTodo')}
+        rows={rowsOfType('checkbox')}
+        // An outline, not an interactive control: it previews the checkbox
+        // an official will see. Making it clickable here would suggest an
+        // admin can tick the work off on their behalf.
+        marker={
+          <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded border-2 border-gray-300" />
+        }
+        onAdd={() => add('checkbox')}
+        onRemove={remove}
+        onUpdate={update}
+        onBlurRow={blurRow}
+        focusIndex={focusIndex}
+      />
+      <TodoList
+        heading={t('workstations.notesHeading')}
+        hint={t('workstations.notesHint')}
+        addLabel={t('workstations.addNote')}
+        placeholder={t('workstations.notePlaceholder')}
+        removeLabel={t('workstations.removeTodo')}
+        rows={rowsOfType('info')}
+        marker={<span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-gray-300" />}
+        onAdd={() => add('info')}
+        onRemove={remove}
+        onUpdate={update}
+        onBlurRow={blurRow}
+        focusIndex={focusIndex}
+      />
+    </>
   )
 }
