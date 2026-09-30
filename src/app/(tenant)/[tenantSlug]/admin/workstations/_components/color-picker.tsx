@@ -69,14 +69,19 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
                       total: WORK_AREA_COLORS.length,
                     })
               }
-              // Every swatch keeps a ring standing clear of the circle; the
-              // selection only changes its weight and colour. The two branches
-              // are mutually exclusive rather than one layered over a shared
-              // default — the ring utilities are the same specificity, so
-              // which won would otherwise come down to their order in the
-              // stylesheet.
-              className={`relative size-[22px] rounded-full ring-offset-2 transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-ink ${
-                isSelected ? 'ring-[3px] ring-ink' : 'ring-1 ring-edge'
+              // Every swatch carries a ring, but the two sit differently: an
+              // unselected one is a hairline standing clear of the circle,
+              // while the selected one is a heavy band hugging it with no gap.
+              // Both therefore end at the same outer radius (1px ring + 2px
+              // offset == 3px ring + 0px), so selecting a colour fills the
+              // ring in rather than growing the swatch.
+              //
+              // The branches are mutually exclusive rather than one layered
+              // over a shared default, because the ring utilities are the same
+              // specificity: which won would otherwise come down to their
+              // order in the stylesheet.
+              className={`relative size-[22px] rounded-full transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-ink ${
+                isSelected ? 'ring-[3px] ring-offset-0 ring-ink' : 'ring-1 ring-offset-2 ring-edge'
               }`}
               style={{ backgroundColor: color.bg }}
             >
@@ -84,15 +89,16 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
                   or an opacity change: it survives being drawn over 30
                   different pastels, and it does not read as "disabled" —
                   these stay selectable on purpose. Drawn inside the circle
-                  (not overhanging it) and leaning up to the right, with
-                  square ends, per the design. */}
+                  edge to edge (a chord through the centre is the diameter, so
+                  100% lands exactly on the rim) and leaning up to the right,
+                  with square ends, per the design. */}
               {isTaken && (
                 <span
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 flex items-center justify-center"
                 >
                   <span
-                    className="h-[2.5px] w-[85%] -rotate-45"
+                    className="h-[2.5px] w-full -rotate-45"
                     style={{ backgroundColor: color.fg }}
                   />
                 </span>
