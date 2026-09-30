@@ -131,7 +131,7 @@
     "stageLabel": "Stage",
     "colorLabel": "Color",
     "colorHint": "Used to tell this area apart on the schedule.",
-    "colorTakenHint": "A dark dot marks colors already used by another work area (hover to see which).",
+    "colorTakenHint": "A line through a color means it's already used by another work area (hover to see which).",
     "colorTakenBy": "Already used by {{name}}",
     "colorSwatchLabel": "Color {{index}} of {{total}}",
     "colorSelected": "Selected",

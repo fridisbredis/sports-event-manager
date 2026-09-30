@@ -10,7 +10,7 @@ vi.mock('@/lib/i18n/client', () => ({
         'workstations.colorLabel': 'Color',
         'workstations.colorHint': 'Used to tell this area apart on the schedule.',
         'workstations.colorTakenHint':
-          'A dark dot marks colors already used by another work area (hover to see which).',
+          "A line through a color means it's already used by another work area (hover to see which).",
         'workstations.colorTakenBy': `Already used by ${vars?.name}`,
         'workstations.colorSwatchLabel': `Color ${vars?.index} of ${vars?.total}`,
       })[key] ?? key,
@@ -115,7 +115,7 @@ describe('ColorPicker', () => {
 
   it('explains the markers only when something is actually marked', () => {
     const { rerender } = render(<ColorPicker value={null} takenBy={[]} onChange={vi.fn()} />)
-    expect(screen.queryByText(/A dark dot marks colors/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/A line through a color/)).not.toBeInTheDocument()
 
     rerender(
       <ColorPicker
@@ -124,7 +124,7 @@ describe('ColorPicker', () => {
         onChange={vi.fn()}
       />
     )
-    expect(screen.getByText(/A dark dot marks colors/)).toBeInTheDocument()
+    expect(screen.getByText(/A line through a color/)).toBeInTheDocument()
   })
 
   it('ignores a taken colour that is not in the palette', () => {
