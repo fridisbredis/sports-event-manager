@@ -280,7 +280,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
             minRows={4}
           />
           <div className="flex items-center justify-between mt-3">
-            <span className="text-sm text-ink-soft">{t('communication.smsNote')}</span>
+            <span className="text-[13px] text-ink-muted">{t('communication.smsNote')}</span>
             <Button
               type="button"
               color="primary"
