@@ -34,8 +34,13 @@ export function ColorPalettePicker({
               aria-pressed={isSelected}
               aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
               className={`group flex flex-col items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors ${
-                isSelected ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'
+                isSelected ? 'bg-gray-50' : 'border-gray-200 hover:border-gray-300'
               } ${isSavingPalette ? 'opacity-60' : ''}`}
+              // The selected swatch is outlined in its OWN primary colour, so
+              // the border previews the palette rather than reading as a
+              // neutral "selected" box. Inline because the value comes from
+              // the palette map, not a fixed Tailwind colour.
+              style={isSelected ? { borderColor: `hsl(${palette.primary})` } : undefined}
             >
               <div className="flex -space-x-1.5">
                 <span
