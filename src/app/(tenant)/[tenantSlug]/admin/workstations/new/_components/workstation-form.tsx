@@ -77,7 +77,12 @@ export default function WorkstationForm({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [capacity, setCapacity] = useState(1)
-  const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', limitToDay: null }])
+  // Starts empty: the editor's own empty state explains that a work area
+  // without a window never reaches the schedule, which is more use than a
+  // blank pair of time fields the admin has to either fill in or remove.
+  // Saving with none is allowed — validate() only checks the windows that
+  // exist — so this is a real starting point, not a half-filled form.
+  const [windows, setWindows] = useState<TimeWindow[]>([])
   const [todos, setTodos] = useState<TodoDraft[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -284,7 +289,7 @@ export default function WorkstationForm({
         </AppCard>
 
         {/* Right column */}
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Capacity */}
           <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>

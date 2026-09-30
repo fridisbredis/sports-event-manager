@@ -357,7 +357,7 @@ export default function WorkstationEditForm({
         </AppCard>
 
         {/* Right column */}
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Capacity */}
           <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
