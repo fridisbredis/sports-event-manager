@@ -69,15 +69,14 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
                       total: WORK_AREA_COLORS.length,
                     })
               }
-              // The selected/unselected ring classes are mutually exclusive
-              // rather than a `ring-2` added on top of a `ring-0` default:
-              // both are the same specificity, so which one won would come
-              // down to their order in the stylesheet. The explicit `ring-0`
-              // is load-bearing — HeroUI's theme ships ring utilities into
-              // this build, and without a reset every swatch picked up a
-              // faint grey ring, not just the selected one.
-              className={`relative size-[22px] rounded-full transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-offset-2 focus-visible:ring-ink ${
-                isSelected ? 'ring-2 ring-offset-2 ring-ink' : 'ring-0 focus-visible:ring-2'
+              // Every swatch keeps a ring standing clear of the circle; the
+              // selection only changes its weight and colour. The two branches
+              // are mutually exclusive rather than one layered over a shared
+              // default — the ring utilities are the same specificity, so
+              // which won would otherwise come down to their order in the
+              // stylesheet.
+              className={`relative size-[22px] rounded-full ring-offset-2 transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-ink ${
+                isSelected ? 'ring-[3px] ring-ink' : 'ring-1 ring-edge'
               }`}
               style={{ backgroundColor: color.bg }}
             >
@@ -85,15 +84,15 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
                   or an opacity change: it survives being drawn over 30
                   different pastels, and it does not read as "disabled" —
                   these stay selectable on purpose. Drawn inside the circle
-                  (not overhanging it) and leaning up to the right, per the
-                  design. */}
+                  (not overhanging it) and leaning up to the right, with
+                  square ends, per the design. */}
               {isTaken && (
                 <span
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 flex items-center justify-center"
                 >
                   <span
-                    className="h-[2.5px] w-[85%] -rotate-45 rounded-full"
+                    className="h-[2.5px] w-[85%] -rotate-45"
                     style={{ backgroundColor: color.fg }}
                   />
                 </span>
