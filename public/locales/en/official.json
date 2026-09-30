@@ -35,8 +35,7 @@
     "raceResults": "Race Results",
     "noProgramme": "No programme yet",
     "noProgrammeDescription": "Event details will appear here once published.",
-    "noFacilities": "No facilities listed yet",
-    "noFacilitiesDescription": "You'll see facilities here once the organizer adds them."
+    "noFacilities": "No facilities listed yet."
   },
   "mySchedule": {
     "title": "My schedule",
