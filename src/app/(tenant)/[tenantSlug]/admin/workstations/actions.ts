@@ -11,6 +11,7 @@ import { workstationsCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
 import type { ChecklistItemType } from '@/types/app'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
+import { translateActionError as tError } from '@/lib/actions/action-error'
 
 // The payload shape both workstation RPCs now take (migration
 // 20260930085253). Previously create_ took {instruction_text, position}
@@ -91,15 +92,15 @@ export async function createWorkstation(
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
     logger.warn('createWorkstation: invalid tenantId', { tenantId: input.tenantId })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
 
   const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
   if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
-    return { error: 'Operating window is shorter than the scheduling granularity' }
+    return { error: await tError('actionErrors.windowShorterThanGranularity') }
   }
 
   const validTodos = normaliseTodos(input.todos)
@@ -171,15 +172,15 @@ export async function updateWorkstation(
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
     logger.warn('updateWorkstation: invalid tenantId', { tenantId: input.tenantId })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
 
   const validWindows = input.windows.filter((w) => w.window_start && w.window_end)
   if (findWindowShorterThanGranularity(validWindows, input.schedulingGranularityMin)) {
-    return { error: 'Operating window is shorter than the scheduling granularity' }
+    return { error: await tError('actionErrors.windowShorterThanGranularity') }
   }
 
   const validTodos = normaliseTodos(input.todos)
@@ -253,11 +254,11 @@ export async function deleteWorkstation(
   const parsedTenantId = tenantIdSchema.safeParse(input.tenantId)
   if (!parsedTenantId.success) {
     logger.warn('deleteWorkstation: invalid tenantId', { tenantId: input.tenantId })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
 
   const { error } = await supabase
     .from('workstations')

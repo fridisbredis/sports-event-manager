@@ -71,7 +71,7 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(rpcMock).not.toHaveBeenCalled()
   })

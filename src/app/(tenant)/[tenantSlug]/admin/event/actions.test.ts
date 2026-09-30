@@ -120,7 +120,7 @@ describe('saveEvent', () => {
 
     const result = await saveEvent(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(fromMock).not.toHaveBeenCalled()
   })
@@ -132,7 +132,7 @@ describe('saveEvent', () => {
 
     const result = await saveEvent({ ...BASE_INPUT, scheduling_granularity_min: 90 })
 
-    expect(result).toEqual({ error: 'Scheduling granularity is fixed at 60 minutes.' })
+    expect(result).toEqual({ error: 'Schemaintervallet är låst till 60 minuter.' })
     // The guard runs before the current-event lookup, so nothing is read or written.
     expect(fromMock).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()

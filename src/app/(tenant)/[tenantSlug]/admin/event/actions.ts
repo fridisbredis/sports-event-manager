@@ -16,6 +16,7 @@ import {
   workstationsCacheTag,
   adminDashboardCacheTag,
 } from '@/lib/cache/tags'
+import { translateActionError as tError } from '@/lib/actions/action-error'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -63,14 +64,15 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   if (!user) redirect('/login')
 
-  if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
+  if (!(await hasAdminAccessToTenant(user.id, input.tenantId)))
+    return { error: await tError('actionErrors.notAuthorized') }
 
   // Scheduling granularity is fixed at 60 min in v1 (PO decision, 2026-09-30).
   // The UI no longer offers a choice; this guard is the server-side half, so a
   // direct call to this action can't write a value the scheduling grid mishandles
   // across midnight. See DatesAndGranularitySection for the underlying defect.
   if (input.scheduling_granularity_min !== 60) {
-    return { error: 'Scheduling granularity is fixed at 60 minutes.' }
+    return { error: await tError('actionErrors.granularityFixed') }
   }
 
   // Stage model v0.7: a published event must keep at least one Race stage
@@ -226,19 +228,20 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
   const eventId = formData.get('eventId') as string
   const oldLogoUrl = (formData.get('oldLogoUrl') as string) || ''
 
-  if (!(file instanceof File)) return { error: 'No file provided' }
-  if (!file.type.startsWith('image/')) return { error: 'Please choose an image file' }
-  if (file.size > MAX_LOGO_BYTES) return { error: 'Image must be smaller than 900 kB' }
-  if (!tenantId || !eventId) return { error: 'Missing tenant or event ID' }
+  if (!(file instanceof File)) return { error: await tError('actionErrors.noFileProvided') }
+  if (!file.type.startsWith('image/'))
+    return { error: await tError('actionErrors.chooseImageFile') }
+  if (file.size > MAX_LOGO_BYTES) return { error: await tError('actionErrors.imageTooLarge') }
+  if (!tenantId || !eventId) return { error: await tError('actionErrors.missingTenantOrEvent') }
 
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
     logger.warn('uploadEventLogo: invalid tenantId', { tenantId })
-    return { error: 'Missing tenant or event ID' }
+    return { error: await tError('actionErrors.missingTenantOrEvent') }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
 
   const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
   const path = `${parsedTenantId.data}/${eventId}/${Date.now()}.${ext}`
@@ -281,13 +284,14 @@ export async function updateTenantColorPalette(
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
     logger.warn('updateTenantColorPalette: invalid tenantId', { tenantId })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
 
-  if (!(colorPalette in TENANT_PALETTES)) return { error: 'Unknown color palette' }
+  if (!(colorPalette in TENANT_PALETTES))
+    return { error: await tError('actionErrors.unknownColorPalette') }
 
   // `select()` so the row count comes back: an UPDATE whose rows are all
   // filtered out by RLS is not an error in Postgres — it reports success
@@ -307,7 +311,7 @@ export async function updateTenantColorPalette(
     logger.error('updateTenantColorPalette: update matched no rows', {
       tenantId: parsedTenantId.data,
     })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   revalidatePath(`/${tenantSlug}`, 'layout')

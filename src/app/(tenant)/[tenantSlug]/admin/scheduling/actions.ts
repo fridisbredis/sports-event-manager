@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger'
 import type { Json } from '@/types/database'
 import { ASSIGNMENT_STATUSES, type AssignmentStatus } from '@/types/app'
 import { adminDashboardCacheTag } from '@/lib/cache/tags'
+import { translateActionError as tError } from '@/lib/actions/action-error'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -92,15 +93,13 @@ export interface SaveAssignmentsResult {
 
 // User-facing strings — kept as named constants so the RPC error-code
 // mapping below and the (rare) direct early-return above stay in sync.
-const NOT_AUTHORIZED_ERROR = 'Not authorized'
-const SLOT_TAKEN_ERROR =
-  'Someone else just took that slot. Please reload the schedule and try again.'
-const INVALID_REQUEST_ERROR = 'Invalid request'
-// Deliberately distinct from INVALID_REQUEST_ERROR: this save is well-formed,
+const NOT_AUTHORIZED_KEY = 'actionErrors.notAuthorized'
+const SLOT_TAKEN_KEY = 'actionErrors.slotTaken'
+const INVALID_REQUEST_KEY = 'actionErrors.invalidRequest'
+// Deliberately distinct from INVALID_REQUEST_KEY: this save is well-formed,
 // just too big, and the fix is "split it up" rather than "the caller is
 // broken". Collapsing the two costs whoever debugs it real time.
-const BATCH_TOO_LARGE_ERROR =
-  'Too many assignments in one save. Split the change into smaller saves.'
+const BATCH_TOO_LARGE_KEY = 'actionErrors.batchTooLarge'
 
 // Custom errcodes raised by save_assignments_batch
 // (supabase/migrations/0033_save_assignments_batch_rpc.sql). Mapping on the
@@ -128,11 +127,11 @@ export async function saveAssignments(
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
     logger.warn('saveAssignments: invalid tenantId', { tenantId })
-    return { error: NOT_AUTHORIZED_ERROR }
+    return { error: await tError(NOT_AUTHORIZED_KEY) }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: NOT_AUTHORIZED_ERROR }
+    return { error: await tError(NOT_AUTHORIZED_KEY) }
 
   // Checked before the zod parse, not left to the schemas' own .max(). Both
   // layers reject the same payloads, but a bare safeParse failure cannot say
@@ -143,7 +142,7 @@ export async function saveAssignments(
   // Array.isArray rather than a bare .length: these are declared as arrays but
   // this is a Server Action, so a caller can hand us null or a scalar. Reading
   // .length off that would throw here, where the safeParse below handles it
-  // and returns a clean INVALID_REQUEST_ERROR.
+  // and returns a clean INVALID_REQUEST_KEY.
   if (
     (Array.isArray(additions) && additions.length > MAX_ADDITIONS) ||
     (Array.isArray(deletions) && deletions.length > MAX_DELETIONS) ||
@@ -155,7 +154,7 @@ export async function saveAssignments(
       deletions: Array.isArray(deletions) ? deletions.length : null,
       statusUpdates: Array.isArray(statusUpdates) ? statusUpdates.length : null,
     })
-    return { error: BATCH_TOO_LARGE_ERROR }
+    return { error: await tError(BATCH_TOO_LARGE_KEY) }
   }
 
   const parsedAdditions = additionsSchema.safeParse(additions)
@@ -171,7 +170,7 @@ export async function saveAssignments(
       deletions: !parsedDeletions.success,
       statusUpdates: !parsedStatusUpdates.success,
     })
-    return { error: INVALID_REQUEST_ERROR }
+    return { error: await tError(INVALID_REQUEST_KEY) }
   }
 
   // Runs the delete/status-update/occupancy-check/insert batch as one DB
@@ -191,25 +190,25 @@ export async function saveAssignments(
     .select('id, official_id, workstation_id, timeslot_start, slot_index')
 
   if (error) {
-    if (error.code === SLOT_TAKEN_ERRCODE) return { error: SLOT_TAKEN_ERROR }
-    if (error.code === NOT_AUTHORIZED_ERRCODE) return { error: NOT_AUTHORIZED_ERROR }
+    if (error.code === SLOT_TAKEN_ERRCODE) return { error: await tError(SLOT_TAKEN_KEY) }
+    if (error.code === NOT_AUTHORIZED_ERRCODE) return { error: await tError(NOT_AUTHORIZED_KEY) }
     // The RPC rejected an addition missing official_id/workstation_id/either
     // timeslot bound. The zod parse above should already have caught this, so
     // reaching here means a non-app caller — log it, return nothing specific.
     if (error.code === INVALID_PAYLOAD_ERRCODE) {
       logger.warn('saveAssignments: RPC rejected an invalid assignment payload', { tenantId })
-      return { error: INVALID_REQUEST_ERROR }
+      return { error: await tError(INVALID_REQUEST_KEY) }
     }
     // Unreachable via this action — the cap check above already returned. Kept
     // because 0033 is granted to `authenticated` and enforces its own caps, so
     // this code is part of the RPC's contract regardless of who calls it.
     if (error.code === BATCH_TOO_LARGE_ERRCODE) {
       logger.warn('saveAssignments: RPC rejected an over-cap batch', { tenantId })
-      return { error: BATCH_TOO_LARGE_ERROR }
+      return { error: await tError(BATCH_TOO_LARGE_KEY) }
     }
 
     logger.error('saveAssignments: save_assignments_batch RPC failed', error, { tenantId })
-    return { error: 'Failed to save assignments. Please try again.' }
+    return { error: await tError('actionErrors.saveAssignmentsFailed') }
   }
 
   revalidatePath(`/${tenantSlug}/admin/scheduling`)

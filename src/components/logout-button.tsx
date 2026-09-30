@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import { toastError } from '@/lib/toast'
+import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   className?: string
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function LogoutButton({ className, title, children }: Props) {
+  const { t } = useTranslation()
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   // Posting to the server route rather than calling supabase.auth.signOut()
@@ -20,7 +22,7 @@ export function LogoutButton({ className, title, children }: Props) {
     try {
       const response = await fetch('/api/auth/signout', { method: 'POST' })
       if (!response.ok) {
-        toastError('Could not sign out. Please try again.')
+        toastError(t('actionErrors.signOutFailed'))
         setIsSigningOut(false)
         return
       }
@@ -28,7 +30,7 @@ export function LogoutButton({ className, title, children }: Props) {
       // and replaces the current history entry.
       window.location.replace('/login')
     } catch {
-      toastError('Could not sign out. Please try again.')
+      toastError(t('actionErrors.signOutFailed'))
       setIsSigningOut(false)
     }
   }
