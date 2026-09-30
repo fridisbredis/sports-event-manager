@@ -22,6 +22,7 @@ import {
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
 import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
   tenantSlug: string
@@ -296,17 +297,17 @@ export default function WorkstationEditForm({
         {/* Left column */}
         <div className="space-y-8">
           {/* Stage */}
-          <section>
+          <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
             <div className="rounded-lg bg-status-neutral-bg px-4 py-3 text-[15px] text-ink-soft">
               {selectedStage
                 ? `${selectedStage.name} — ${selectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
                 : t('workstations.allStages')}
             </div>
-          </section>
+          </AppCard>
 
           {/* Identity */}
-          <section>
+          <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.identity')}</h2>
             <div className="space-y-4">
               <Input
@@ -331,7 +332,7 @@ export default function WorkstationEditForm({
                 minRows={3}
               />
             </div>
-          </section>
+          </AppCard>
 
           <OperatingWindowsEditor
             windows={windows}
@@ -358,7 +359,7 @@ export default function WorkstationEditForm({
         {/* Right column */}
         <div className="space-y-8">
           {/* Capacity */}
-          <section>
+          <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
             <Input
               type="number"
@@ -370,7 +371,7 @@ export default function WorkstationEditForm({
               }}
               min={1}
             />
-          </section>
+          </AppCard>
 
           <TodosEditor todos={todos} onChange={handleTodosChange} />
         </div>

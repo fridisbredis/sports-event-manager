@@ -5,6 +5,7 @@ import { Time } from '@internationalized/date'
 import { useTranslation } from '@/lib/i18n/client'
 import { Select, TimeInput } from '@/components/ui/form-fields'
 import { hhmmToTime, timeToHHMM, type TimeWindow } from '../_utils'
+import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
   windows: TimeWindow[]
@@ -40,7 +41,7 @@ export function OperatingWindowsEditor({
   const { t } = useTranslation('admin')
 
   return (
-    <section>
+    <AppCard as="section">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           {t('workstations.operatingWindowsLabel')}
@@ -124,6 +125,6 @@ export function OperatingWindowsEditor({
         ))}
         <LinkButton onPress={onAddWindow}>{t('workstations.addWindow')}</LinkButton>
       </div>
-    </section>
+    </AppCard>
   )
 }

@@ -5,6 +5,7 @@ import { Input } from '@heroui/react'
 import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
 import type { ChecklistItemType } from '@/types/app'
+import { AppCard } from '@/components/ui/app-card'
 
 /** One row in the editor. `text` is the instruction, `itemType` its kind. */
 export interface TodoDraft {
@@ -56,7 +57,7 @@ function TodoList({
   focusIndex,
 }: ListProps) {
   return (
-    <section>
+    <AppCard as="section">
       {/* The group label sits above the first list only, naming the pair the
           way the other column headings name their panels. `section-label`
           matches Capacity beside it, so each list reads as a peer panel in
@@ -111,7 +112,7 @@ function TodoList({
         </div>
       ) : null}
       <LinkButton onPress={onAdd}>{addLabel}</LinkButton>
-    </section>
+    </AppCard>
   )
 }
 
