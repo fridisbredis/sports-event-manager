@@ -11,10 +11,28 @@ export interface UnsavedChangesDialogProps {
   onStay: () => void
 }
 
-export function useUnsavedChanges() {
+export interface UseUnsavedChangesOptions {
+  /**
+   * Undo anything the form changed outside its own React state — DOM the form
+   * mutated directly, for instance — when the user chooses to leave. State held
+   * in the component goes away with the unmount and needs nothing here; a
+   * mutation written straight to the document survives the navigation and would
+   * otherwise look like it had been saved.
+   */
+  onDiscard?: () => void
+}
+
+export function useUnsavedChanges({ onDiscard }: UseUnsavedChangesOptions = {}) {
   const router = useRouter()
   const [isDirty, setIsDirty] = useState(false)
   const isDirtyRef = useRef(false)
+
+  // Held in a ref so callers can pass an inline closure without giving
+  // handleLeave a new identity on every render.
+  const onDiscardRef = useRef(onDiscard)
+  useEffect(() => {
+    onDiscardRef.current = onDiscard
+  })
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const pendingNav = useRef<PendingNavigation>(null)
@@ -39,6 +57,7 @@ export function useUnsavedChanges() {
     pendingNav.current = null
     setDialogOpen(false)
     markClean()
+    onDiscardRef.current?.()
     if (pending?.type === 'push') router.push(pending.url)
     else if (pending?.type === 'back') window.history.back()
   }, [markClean, router])
