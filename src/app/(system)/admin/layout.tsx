@@ -1,5 +1,6 @@
 import { ShieldCheck } from 'lucide-react'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import { SidebarNav } from './_components/sidebar-nav'
 
 interface Props {
@@ -7,7 +8,7 @@ interface Props {
 }
 
 export default async function SystemAdminLayout({ children }: Props) {
-  const t = await getServerTranslation('en', 'admin')
+  const t = await getServerTranslation(defaultLocale, 'admin')
 
   return (
     <div className="app-surface flex min-h-screen">

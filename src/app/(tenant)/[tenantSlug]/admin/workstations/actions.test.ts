@@ -164,7 +164,7 @@ describe('createWorkstation', () => {
     const result = await createWorkstation(BASE_INPUT)
 
     // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
+    expect(result).toEqual({ error: 'Något gick fel när ändringarna skulle sparas. Försök igen.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -282,7 +282,7 @@ describe('updateWorkstation', () => {
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
 
     // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
+    expect(result).toEqual({ error: 'Något gick fel när ändringarna skulle sparas. Försök igen.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -356,7 +356,7 @@ describe('deleteWorkstation', () => {
     const result = await deleteWorkstation(DELETE_BASE_INPUT)
 
     // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Something went wrong while deleting. Please try again.' })
+    expect(result).toEqual({ error: 'Något gick fel vid borttagningen. Försök igen.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })

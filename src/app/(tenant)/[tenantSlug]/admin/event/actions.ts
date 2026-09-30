@@ -8,6 +8,8 @@ import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
 import { logger } from '@/lib/logger'
 import { translateDbError, translateStorageError } from '@/lib/actions/db-error-message'
+import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import {
   eventInfoCacheTag,
   adminEventCacheTag,
@@ -89,7 +91,12 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   const stageRowsHaveRaceStage = input.stages.some((s) => s.name.trim() && s.stage_type === 'race')
   if (currentEvent.status === 'published' && !stageRowsHaveRaceStage) {
-    return { error: 'Cannot remove the last Race stage from a published event.' }
+    // Same message the DB raises as P0003 for this invariant (DB_ERROR_KEYS in
+    // db-error-message.ts). Read from the same key rather than repeating the
+    // literal, so this UI-level guard and the DB-level one can't drift apart
+    // or land in different languages.
+    const t = await getServerTranslation(defaultLocale, 'admin')
+    return { error: t('eventConfig.cannotRemoveLastRaceStage') }
   }
 
   // Derive start_date / end_date from Race stage times so the events row stays

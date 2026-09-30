@@ -4,6 +4,7 @@ import { Info } from 'lucide-react'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
@@ -74,7 +75,7 @@ function formatTime(ts: string | null): string {
 
 export default async function EventInfoPage({ params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation('en', 'official')
+  const t = await getServerTranslation(defaultLocale, 'official')
 
   const user = await getCurrentUser()
 

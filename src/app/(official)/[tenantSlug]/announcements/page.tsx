@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
 import { EmptyState } from '@/components/ui/empty-state'
 import { AnnouncementCard } from './_components/announcement-card'
@@ -33,7 +34,7 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
   const { tenantSlug } = await params
   const { page: pageParam } = await searchParams
   const page = parsePageParam(pageParam)
-  const t = await getServerTranslation('en', 'official')
+  const t = await getServerTranslation(defaultLocale, 'official')
 
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()

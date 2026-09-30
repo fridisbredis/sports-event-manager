@@ -13,22 +13,22 @@ vi.mock('@/lib/logger', () => ({
 describe('translateDbError', () => {
   it('maps P0002 to the not-found message', async () => {
     const result = await translateDbError('test', { code: 'P0002', message: 'raw pg message' })
-    expect(result).toBe('This event could not be found. Refresh the page and try again.')
+    expect(result).toBe('Evenemanget kunde inte hittas. Uppdatera sidan och försök igen.')
   })
 
   it('maps P0003 to the Race-stage-specific message', async () => {
     const result = await translateDbError('test', { code: 'P0003', message: 'raw pg message' })
-    expect(result).toBe('Cannot remove the last Race stage from a published event.')
+    expect(result).toBe('Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.')
   })
 
   it('maps 23514 to the stage-times message', async () => {
     const result = await translateDbError('test', { code: '23514', message: 'raw pg message' })
-    expect(result).toBe("A stage's end time must be after its start time.")
+    expect(result).toBe('En etapps sluttid måste vara efter dess starttid.')
   })
 
   it('falls back to the generic save error for an unmapped code', async () => {
     const result = await translateDbError('test', { code: 'XXXXX', message: 'db is down' })
-    expect(result).toBe('Something went wrong while saving. Please try again.')
+    expect(result).toBe('Något gick fel när ändringarna skulle sparas. Försök igen.')
   })
 
   it('falls back to a caller-supplied key when given one', async () => {
@@ -37,7 +37,7 @@ describe('translateDbError', () => {
       { code: 'XXXXX', message: 'db is down' },
       'workstations.genericDeleteError'
     )
-    expect(result).toBe('Something went wrong while deleting. Please try again.')
+    expect(result).toBe('Något gick fel vid borttagningen. Försök igen.')
   })
 
   it('never returns the raw error message for any code', async () => {
@@ -59,7 +59,7 @@ describe('translateDbError', () => {
       { '23514': 'eventConfig.publishPreconditionFailed' }
     )
     expect(result).toBe(
-      "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again."
+      'Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.'
     )
   })
 
@@ -70,13 +70,13 @@ describe('translateDbError', () => {
       'eventConfig.genericSaveError',
       { '23514': 'eventConfig.publishPreconditionFailed' }
     )
-    expect(result).toBe('This event could not be found. Refresh the page and try again.')
+    expect(result).toBe('Evenemanget kunde inte hittas. Uppdatera sidan och försök igen.')
   })
 })
 
 describe('translateStorageError', () => {
   it('always returns the generic upload error message, never the raw message', async () => {
     const result = await translateStorageError('test', { message: 'S3 bucket unreachable' })
-    expect(result).toBe('Something went wrong while uploading the logo. Please try again.')
+    expect(result).toBe('Något gick fel när logotypen skulle laddas upp. Försök igen.')
   })
 })

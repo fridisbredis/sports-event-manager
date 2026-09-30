@@ -7,6 +7,9 @@ import enAuth from '../../../public/locales/en/auth.json'
 import enAdmin from '../../../public/locales/en/admin.json'
 import enOfficial from '../../../public/locales/en/official.json'
 import svCommon from '../../../public/locales/sv/common.json'
+import svAuth from '../../../public/locales/sv/auth.json'
+import svAdmin from '../../../public/locales/sv/admin.json'
+import svOfficial from '../../../public/locales/sv/official.json'
 
 const translations = {
   en: {
@@ -17,9 +20,9 @@ const translations = {
   },
   sv: {
     common: svCommon,
-    auth: svCommon, // Fallback to common for now
-    admin: svCommon,
-    official: svCommon,
+    auth: svAuth,
+    admin: svAdmin,
+    official: svOfficial,
   },
 } as const
 

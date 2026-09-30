@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
@@ -49,7 +50,7 @@ function formatDateRange(start: string | null, end: string | null) {
 
 export default async function DashboardPage({ params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation('en', 'admin')
+  const t = await getServerTranslation(defaultLocale, 'admin')
 
   const user = await getCurrentUser()
   if (!user) redirect('/login')
