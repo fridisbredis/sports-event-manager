@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
-import { Info, MapPin } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
@@ -204,16 +204,19 @@ export default async function EventInfoPage({ params }: Props) {
         )}
       </div>
 
+      {/* Facilities are a plain dot-separated line, not a map or a panel, so
+          the boxed empty state used elsewhere on this screen oversold them:
+          a framed card with a map pin led officials to expect a location view
+          once facilities existed. A single muted line in the same slot the
+          list occupies says the same thing without promising more. */}
       <div className="mb-8">
         <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
         {facilityList.length > 0 ? (
           <FacilityChips facilities={facilityList} />
         ) : (
-          <EmptyStateCard
-            Icon={MapPin}
-            title={t('eventInfo.noFacilities')}
-            description={t('eventInfo.noFacilitiesDescription')}
-          />
+          <p className="text-[15px] leading-relaxed text-ink-label">
+            {t('eventInfo.noFacilities')}
+          </p>
         )}
       </div>
     </div>
