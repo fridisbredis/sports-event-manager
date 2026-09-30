@@ -43,9 +43,11 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
       <p className="mb-4 text-[13px] text-ink-soft">{t('workstations.colorHint')}</p>
 
       {/* Ten per row at every width: the palette reads as three hue runs, and
-          reflowing it into uneven rows loses that structure. The swatches
-          shrink instead, which they can afford — they carry no text. */}
-      <div className="grid grid-cols-10 gap-2">
+          reflowing it into uneven rows would lose that structure.
+          Fixed-size swatches in a `w-fit` grid rather than `w-full` in a
+          10-column one — the latter grows each swatch with the card, which on
+          a wide screen turned them into ~50px slabs. */}
+      <div className="grid w-fit grid-cols-10 gap-2.5">
         {WORK_AREA_COLORS.map((color, index) => {
           const isSelected = value === color.name
           // A colour the selected area itself holds is not "taken" from its
@@ -67,7 +69,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
                       total: WORK_AREA_COLORS.length,
                     })
               }
-              className={`relative aspect-square w-full rounded-full transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink ${
+              className={`relative size-[22px] rounded-full transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink ${
                 isSelected ? 'ring-2 ring-offset-2 ring-ink' : ''
               }`}
               style={{ backgroundColor: color.bg }}
@@ -75,14 +77,16 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
               {/* The "already used" mark. A diagonal bar rather than a border
                   or an opacity change: it survives being drawn over 30
                   different pastels, and it does not read as "disabled" —
-                  these stay selectable on purpose. */}
+                  these stay selectable on purpose. Drawn inside the circle
+                  (not overhanging it) and leaning up to the right, per the
+                  design. */}
               {isTaken && (
                 <span
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 flex items-center justify-center"
                 >
                   <span
-                    className="h-[2px] w-[130%] rotate-45 rounded-full"
+                    className="h-[2.5px] w-[85%] -rotate-45 rounded-full"
                     style={{ backgroundColor: color.fg }}
                   />
                 </span>

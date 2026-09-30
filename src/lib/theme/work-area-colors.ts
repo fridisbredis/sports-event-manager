@@ -198,11 +198,21 @@ export function firstFreeWorkAreaColor(taken: readonly string[]): WorkAreaColor 
 }
 
 /**
- * Pastel version of a foreground color, for decorative dots and bullets.
- * Per the handoff these are never drawn at full saturation.
+ * The colour for a decorative dot or bullet: the background, as-is.
+ *
+ * This used to lighten the FOREGROUND (`color-mix(fg 65%, white)`), which
+ * worked when fg was a saturated hue — the mix landed on a pastel version of
+ * the same colour. The delivered palette's foregrounds are deliberately muted
+ * near-neutrals chosen for text contrast, so that mix turned every dot grey or
+ * brown: blush became #9B8A8A and sky #839096, neither recognisable as the
+ * colour the admin picked.
+ *
+ * `bg` is the identifying colour in this palette and is already pastel, so the
+ * dot simply uses it. Kept as a function rather than inlining `color.bg` at
+ * the three call sites, so "what a dot looks like" stays one decision.
  */
 export function workAreaDotColor(color: WorkAreaColor): string {
-  return `color-mix(in srgb, ${color.fg} 65%, white)`
+  return color.bg
 }
 
 /**

@@ -174,10 +174,22 @@ describe('workAreaColor', () => {
 })
 
 describe('decorative derivations', () => {
-  it('mixes dots to 65% and borders to 35% of the foreground', () => {
+  it('draws dots in the background colour and mixes borders to 35% of the foreground', () => {
     const color = WORK_AREA_COLORS[0]
-    expect(workAreaDotColor(color)).toBe(`color-mix(in srgb, ${color.fg} 65%, white)`)
+    expect(workAreaDotColor(color)).toBe(color.bg)
     expect(workAreaBorderColor(color)).toBe(`color-mix(in srgb, ${color.fg} 35%, white)`)
+  })
+
+  // The regression this guards: dots used to lighten the FOREGROUND, which on
+  // this palette's muted near-neutral foregrounds rendered every dot grey or
+  // brown regardless of which colour was chosen. blush and sky came out
+  // #9B8A8A and #839096 — two colours nobody would call pink or blue.
+  it('gives every colour a visibly distinct dot', () => {
+    const dots = WORK_AREA_COLORS.map((c) => workAreaDotColor(c))
+    expect(new Set(dots).size).toBe(WORK_AREA_COLORS.length)
+    for (const [i, dot] of dots.entries()) {
+      expect(dot, WORK_AREA_COLORS[i].name).toBe(WORK_AREA_COLORS[i].bg)
+    }
   })
 })
 
