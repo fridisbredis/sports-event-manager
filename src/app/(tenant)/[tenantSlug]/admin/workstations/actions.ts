@@ -9,6 +9,23 @@ import { logger } from '@/lib/logger'
 import { translateDbError } from '@/lib/actions/db-error-message'
 import { workstationsCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
+import type { ChecklistItemType } from '@/types/app'
+
+// The payload shape both workstation RPCs now take (migration
+// 20260930085253). Previously create_ took {instruction_text, position}
+// objects while update_ took bare strings; both take this now.
+export interface TodoInput {
+  instruction_text: string
+  item_type: ChecklistItemType
+}
+
+// Trim, drop blanks, and keep array order — position is derived from
+// ordinality inside the RPC, so it is deliberately not sent.
+function normaliseTodos(todos: TodoInput[]): TodoInput[] {
+  return todos
+    .map((t) => ({ instruction_text: t.instruction_text.trim(), item_type: t.item_type }))
+    .filter((t) => t.instruction_text.length > 0)
+}
 
 const tenantIdSchema = z.string().uuid()
 
@@ -27,7 +44,7 @@ export interface CreateWorkstationInput {
   capacity: number
   recurring: boolean
   windows: WindowInput[]
-  todos: string[]
+  todos: TodoInput[]
   schedulingGranularityMin: number
 }
 
@@ -70,7 +87,7 @@ export async function createWorkstation(
     return { error: 'Operating window is shorter than the scheduling granularity' }
   }
 
-  const validTodos = input.todos.map((t) => t.trim()).filter(Boolean)
+  const validTodos = normaliseTodos(input.todos)
 
   const { error: rpcError } = await supabase.rpc('create_workstation', {
     p_tenant_id: parsedTenantId.data,
@@ -81,10 +98,7 @@ export async function createWorkstation(
     p_capacity_ceiling: input.capacity,
     p_recurring: input.recurring,
     p_windows: validWindows as unknown as Json,
-    p_todos: validTodos.map((text, i) => ({
-      instruction_text: text,
-      position: i,
-    })) as unknown as Json,
+    p_todos: validTodos as unknown as Json,
   })
 
   if (rpcError)
@@ -118,7 +132,7 @@ export interface UpdateWorkstationInput {
   capacity: number
   recurring: boolean
   windows: WindowInput[]
-  todos: string[]
+  todos: TodoInput[]
   schedulingGranularityMin: number
 }
 
@@ -150,7 +164,7 @@ export async function updateWorkstation(
     return { error: 'Operating window is shorter than the scheduling granularity' }
   }
 
-  const validTodos = input.todos.map((t) => t.trim()).filter(Boolean)
+  const validTodos = normaliseTodos(input.todos)
 
   // REL-01: workstation + operating windows + todos are updated atomically
   // by this RPC — see migration 20260908130927 and

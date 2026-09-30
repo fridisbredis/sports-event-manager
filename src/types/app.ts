@@ -25,7 +25,21 @@ export type EventDistance = DbTables['event_distances']['Row']
 export type EventFacility = DbTables['event_facilities']['Row']
 export type Workstation = DbTables['workstations']['Row']
 export type WorkstationOperatingWindow = DbTables['workstation_operating_windows']['Row']
-export type WorkstationTodo = DbTables['workstation_todos']['Row']
+// item_type is a CHECK constraint, not a Postgres enum, so the generated Row
+// type has it as `string` — narrow it here (same pattern as SmsQueueItem).
+export type ChecklistItemType = 'info' | 'checkbox'
+export type WorkstationTodo = Omit<DbTables['workstation_todos']['Row'], 'item_type'> & {
+  item_type: ChecklistItemType
+}
+export type ChecklistItemCheck = DbTables['checklist_item_checks']['Row']
+// Match migration 20260930084957's CHECK constraint. Deliberately NOT part of
+// AuditAction: checklist_item_events is a separate table from audit_events
+// because the actor is an official (audit_events.actor_role admits only
+// admins) and fellow officials must be able to read it.
+export type ChecklistItemEventAction = 'checked' | 'unchecked'
+export type ChecklistItemEvent = Omit<DbTables['checklist_item_events']['Row'], 'action'> & {
+  action: ChecklistItemEventAction
+}
 export type Official = DbTables['officials']['Row']
 // Client-safe projection: excludes invite_token and invite_token_expires_at,
 // which are single-use bearer credentials that must never reach the browser (F-SEC-06).

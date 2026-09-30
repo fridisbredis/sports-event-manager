@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { LinkButton } from '@/components/ui/link-button'
 import { Input, Textarea } from '@/components/ui/form-fields'
@@ -21,7 +21,8 @@ import {
 } from '../../_utils'
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
-import { TodosEditor } from '../../_components/todos-editor'
+import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
   tenantSlug: string
@@ -33,7 +34,7 @@ interface Props {
   initialDescription: string
   initialCapacity: number
   initialWindows: { window_start: string; window_end: string }[]
-  initialTodos: string[]
+  initialTodos: TodoDraft[]
   schedulingGranularityMin: number
 }
 
@@ -95,8 +96,7 @@ export default function WorkstationEditForm({
   const [windows, setWindows] = useState<TimeWindow[]>(() =>
     initWindowsFromStored(initialWindows, stageDays)
   )
-  const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
-  const todoRefs = useRef<(HTMLInputElement | null)[]>([])
+  const [todos, setTodos] = useState<TodoDraft[]>(initialTodos)
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -155,22 +155,10 @@ export default function WorkstationEditForm({
     markDirty()
   }
 
-  function addTodo() {
-    setTodos((prev) => {
-      const next = [...prev, '']
-      setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
-      return next
-    })
-    markDirty()
-  }
-
-  function removeTodo(index: number) {
-    setTodos((prev) => prev.filter((_, i) => i !== index))
-    markDirty()
-  }
-
-  function updateTodo(index: number, value: string) {
-    setTodos((prev) => prev.map((item, i) => (i === index ? value : item)))
+  // Wraps setTodos so any edit in either list marks the form dirty — the
+  // unsaved-changes guard has to fire for a checklist change too.
+  function handleTodosChange(next: TodoDraft[]) {
+    setTodos(next)
     markDirty()
   }
 
@@ -223,7 +211,10 @@ export default function WorkstationEditForm({
         capacity,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
-        todos: todos.filter((item) => item.trim()),
+        todos: todos
+          .map((item) => ({ ...item, text: item.text.trim() }))
+          .filter((item) => item.text)
+          .map((item) => ({ instruction_text: item.text, item_type: item.itemType })),
         schedulingGranularityMin,
       })
 
@@ -302,9 +293,9 @@ export default function WorkstationEditForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[3fr_2fr]">
         {/* Left column */}
-        <div className="space-y-8">
+        <AppCard bodyClassName="divide-y divide-edge p-0 [&>*]:px-6 [&>*]:py-5">
           {/* Stage */}
           <section>
             <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
@@ -363,12 +354,12 @@ export default function WorkstationEditForm({
             minStartFor={minStartFor}
             maxEndFor={maxEndFor}
           />
-        </div>
+        </AppCard>
 
         {/* Right column */}
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Capacity */}
-          <section>
+          <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
             <Input
               type="number"
@@ -380,15 +371,9 @@ export default function WorkstationEditForm({
               }}
               min={1}
             />
-          </section>
+          </AppCard>
 
-          <TodosEditor
-            todos={todos}
-            todoRefs={todoRefs}
-            onAddTodo={addTodo}
-            onRemoveTodo={removeTodo}
-            onUpdateTodo={updateTodo}
-          />
+          <TodosEditor todos={todos} onChange={handleTodosChange} />
         </div>
       </div>
     </div>

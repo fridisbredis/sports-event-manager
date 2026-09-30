@@ -1,5 +1,4 @@
 import { SelectItem, Checkbox } from '@heroui/react'
-import { Button } from '@/components/ui/button'
 import { LinkButton } from '@/components/ui/link-button'
 import { Time } from '@internationalized/date'
 import { useTranslation } from '@/lib/i18n/client'
@@ -41,19 +40,12 @@ export function OperatingWindowsEditor({
 
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-          {t('workstations.operatingWindowsLabel')}
-        </h2>
+      <div className="mb-1 flex items-center justify-between">
+        <h2 className="section-label">{t('workstations.operatingWindowsLabel')}</h2>
         {canMatchStageHours && (
-          <Button
-            variant="light"
-            size="sm"
-            onPress={onMatchStageHours}
-            className="text-default-500"
-          >
+          <LinkButton size="sm" onPress={onMatchStageHours}>
             {t('workstations.matchStageHours')}
-          </Button>
+          </LinkButton>
         )}
       </div>
       <p className="mb-3 text-xs text-gray-400">{t('workstations.operatingWindowMidnightHint')}</p>
@@ -61,7 +53,7 @@ export function OperatingWindowsEditor({
         {windows.map((w, i) => (
           <div
             key={i}
-            className={`rounded-lg border p-3 ${errors?.[i] ? 'border-red-300' : 'border-gray-200'}`}
+            className={`rounded-lg border p-3 ${errors?.[i] ? 'border-red-300' : 'border-edge'}`}
           >
             <div className="flex items-center gap-2">
               <TimeInput
@@ -122,6 +114,17 @@ export function OperatingWindowsEditor({
             )}
           </div>
         ))}
+        {/* A work area with no window never reaches the schedule at all, so
+            an empty list has to say that rather than look like a section that
+            failed to load. Dashed, matching the other "nothing here yet"
+            placeholders in the admin UI. */}
+        {windows.length === 0 && (
+          <p className="rounded-lg border border-dashed border-edge-field px-4 py-3 text-center text-sm text-gray-500">
+            {t('workstations.noOperatingWindows')}
+          </p>
+        )}
+      </div>
+      <div className="mt-3">
         <LinkButton onPress={onAddWindow}>{t('workstations.addWindow')}</LinkButton>
       </div>
     </section>

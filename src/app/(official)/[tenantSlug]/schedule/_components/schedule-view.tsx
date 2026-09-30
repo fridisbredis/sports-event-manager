@@ -6,9 +6,17 @@ import { AppCard } from '@/components/ui/app-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
-import { workAreaColorMap, workAreaDotColor, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
+import { workAreaColorMap, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
+import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './checklist-item-row'
 
-type Todo = { id: string; instruction_text: string; position: number }
+type Todo = { id: string; instruction_text: string; position: number; item_type: string }
+
+/**
+ * Current check state for one shift, keyed by `${todoId}|${timeslotStart}`.
+ * Built once on the server and looked up per row, so rendering a station with
+ * many items over many slots stays a map lookup rather than a scan.
+ */
+export type CheckMap = Map<string, ChecklistCheck>
 type WorkstationRef = {
   id: string
   name: string
@@ -36,6 +44,7 @@ interface Strings {
   noAssignmentsOnDayDescription: string
   dayTabsLabel: string
   todoLabel: string
+  infoLabel: string
 }
 // Order matters: it is both the visual order of the two halves and the order
 // the arrow keys step through. `label` keys into Strings so the labels stay
@@ -53,6 +62,11 @@ interface Props {
   selectedDay: string | null
   tenantSlug: string
   strings: Strings
+  /** Current check state for the selected day, keyed `${todoId}|${slotStart}`. */
+  checks: CheckMap
+  /** The viewer, to tell their own tick from a colleague's. */
+  currentUserId: string | null
+  checklistStrings: ChecklistStrings
 }
 
 function formatTime(ts: string): string {
@@ -220,9 +234,19 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
 function WorkAreaView({
   assignments,
   todoLabel,
+  infoLabel,
+  checks,
+  tenantSlug,
+  currentUserId,
+  checklistStrings,
 }: {
   assignments: AssignmentRow[]
   todoLabel: string
+  infoLabel: string
+  checks: CheckMap
+  tenantSlug: string
+  currentUserId: string | null
+  checklistStrings: ChecklistStrings
 }) {
   // Group by workstation id, preserving first-seen order. Keyed by a Map
   // rather than re-scanning `groups` per row, so an official with many slots
@@ -253,6 +277,14 @@ function WorkAreaView({
     <div className="flex flex-col gap-3">
       {groups.map(({ ws, rows }) => {
         const sortedTodos = [...ws.workstation_todos].sort((a, b) => a.position - b.position)
+        // One computation shared by the time list below and the checklist:
+        // both have to agree on what counts as a shift, since the checklist
+        // keys its state on these exact boundaries.
+        const spans = mergeContiguousSlots(rows)
+        // Split, not re-sorted: each group keeps the relative order the admin
+        // gave it.
+        const checkableTodos = sortedTodos.filter((t) => t.item_type === 'checkbox')
+        const infoTodos = sortedTodos.filter((t) => t.item_type !== 'checkbox')
         const color = colors.get(ws.id) ?? WORK_AREA_COLORS[0]
         return (
           <AppCard
@@ -274,48 +306,83 @@ function WorkAreaView({
                 seven separate jobs instead of one stretch. Gaps still break
                 into separate lines, so a break stays visible. */}
             <div className="text-sm text-gray-500 mt-1">
-              {mergeContiguousSlots(rows).map((span) => (
+              {spans.map((span) => (
                 <p key={span.start}>
                   {formatTime(span.start)}&ndash;{formatTime(span.end)}
                 </p>
               ))}
             </div>
-            {/* Text only, deliberately no checkbox. v1 stores no completion state
-                (DECISION Peter 2026-06-24, docs/flows/workstation-checklist-config.md:46),
-                so a checkbox would be an affordance that ignores every tap. The
-                wireframes do show checkboxes — they predate this decision. Add them
-                back when completion tracking lands, not before. */}
+            {/* Two kinds of row. An 'info' item is still text with a
+                decorative bullet — the original v1 treatment, and still the
+                default. A 'checkbox' item is a real control that writes
+                shared per-shift state (migration 20260930084957), which
+                supersedes the earlier "no completion state in v1" decision
+                (Peter 2026-06-24, docs/flows/workstation-checklist-config.md:46)
+                for items an admin explicitly marks as checkable. */}
             {sortedTodos.length > 0 ? (
               <div className="mt-3 border-t border-gray-100 pt-3">
-                <p className="section-label mb-2">{todoLabel}</p>
-                <ul className="flex flex-col gap-2">
-                  {sortedTodos.map((todo) => (
-                    <li key={todo.id} className="flex items-start gap-2.5">
-                      {/* A filled bullet, deliberately not a checkbox. It
-                          marks these as things to do without promising a tap
-                          does anything: v1 stores no completion state, so a
-                          real checkbox would ignore every tap and leave an
-                          official unsure whether their work had registered.
-                          Decorative — the text beside it carries the meaning,
-                          and <ul>/<li> already tell assistive tech this is a
-                          list — so it is hidden rather than announced as an
-                          unchecked control. Swap it for a real checkbox when
-                          completion tracking lands, not before.
-
-                          Tinted to the card's own work-area colour via
-                          `workAreaDotColor`, the same pastel the admin
-                          surfaces use for dots and bullets — at full
-                          saturation a column of these would read as a row of
-                          alerts. */}
-                      <span
-                        aria-hidden="true"
-                        className="mt-[5px] h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: workAreaDotColor(color) }}
-                      />
-                      <span className="text-sm text-gray-700">{todo.instruction_text}</span>
-                    </li>
-                  ))}
-                </ul>
+                {/* Grouped by kind rather than left in admin's single
+                    ordering: the two sorts read differently — one is work to
+                    perform, the other is context to know — and interleaving
+                    them made the actionable rows hard to pick out at a
+                    glance. Checkable items come first, since that is what an
+                    official opens this screen to do; admin's ordering is
+                    preserved within each group. A group with nothing in it
+                    renders no heading at all, so a station with only notes
+                    looks exactly as it did before. */}
+                {checkableTodos.length > 0 ? (
+                  <>
+                    <p className="section-label mb-2">{todoLabel}</p>
+                    <ul className="flex flex-col gap-2">
+                      {checkableTodos.map((todo) =>
+                        // One row per contiguous run, not per item: a station
+                        // worked morning and afternoon gets an independent
+                        // tick for each, matching how the state is keyed in
+                        // the database.
+                        spans.map((span) => (
+                          <ChecklistItemRow
+                            key={`${todo.id}-${span.start}`}
+                            todo={todo}
+                            check={checks.get(`${todo.id}|${span.start}`) ?? null}
+                            color={color}
+                            tenantSlug={tenantSlug}
+                            workstationId={ws.id}
+                            timeslotStart={span.start}
+                            timeslotEnd={span.end}
+                            currentUserId={currentUserId}
+                            strings={checklistStrings}
+                          />
+                        ))
+                      )}
+                    </ul>
+                  </>
+                ) : null}
+                {infoTodos.length > 0 ? (
+                  <>
+                    <p className={`section-label mb-2 ${checkableTodos.length > 0 ? 'mt-4' : ''}`}>
+                      {infoLabel}
+                    </p>
+                    <ul className="flex flex-col gap-2">
+                      {/* An info item says the same thing whenever it is
+                          read, so it renders once regardless of how many
+                          shifts the station is worked. */}
+                      {infoTodos.map((todo) => (
+                        <ChecklistItemRow
+                          key={todo.id}
+                          todo={todo}
+                          check={null}
+                          color={color}
+                          tenantSlug={tenantSlug}
+                          workstationId={ws.id}
+                          timeslotStart={spans[0]?.start ?? ''}
+                          timeslotEnd={spans[0]?.end ?? ''}
+                          currentUserId={currentUserId}
+                          strings={checklistStrings}
+                        />
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </AppCard>
@@ -325,7 +392,16 @@ function WorkAreaView({
   )
 }
 
-export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strings }: Props) {
+export function ScheduleView({
+  assignments,
+  days,
+  selectedDay,
+  tenantSlug,
+  strings,
+  checks,
+  currentUserId,
+  checklistStrings,
+}: Props) {
   const [view, setView] = useState<View>('time')
 
   useEffect(() => {
@@ -454,7 +530,15 @@ export function ScheduleView({ assignments, days, selectedDay, tenantSlug, strin
       ) : view === 'time' ? (
         <TimeView assignments={assignments} />
       ) : (
-        <WorkAreaView assignments={assignments} todoLabel={strings.todoLabel} />
+        <WorkAreaView
+          assignments={assignments}
+          todoLabel={strings.todoLabel}
+          infoLabel={strings.infoLabel}
+          checks={checks}
+          tenantSlug={tenantSlug}
+          currentUserId={currentUserId}
+          checklistStrings={checklistStrings}
+        />
       )}
     </div>
   )

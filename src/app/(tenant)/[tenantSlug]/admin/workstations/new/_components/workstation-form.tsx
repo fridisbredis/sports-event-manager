@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,8 @@ import {
 } from '../../_utils'
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
-import { TodosEditor } from '../../_components/todos-editor'
+import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
   tenantSlug: string
@@ -76,9 +77,13 @@ export default function WorkstationForm({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [capacity, setCapacity] = useState(1)
-  const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', limitToDay: null }])
-  const [todos, setTodos] = useState<string[]>([''])
-  const todoRefs = useRef<(HTMLInputElement | null)[]>([])
+  // Starts empty: the editor's own empty state explains that a work area
+  // without a window never reaches the schedule, which is more use than a
+  // blank pair of time fields the admin has to either fill in or remove.
+  // Saving with none is allowed — validate() only checks the windows that
+  // exist — so this is a real starting point, not a half-filled form.
+  const [windows, setWindows] = useState<TimeWindow[]>([])
+  const [todos, setTodos] = useState<TodoDraft[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, startSave] = useTransition()
@@ -127,22 +132,6 @@ export default function WorkstationForm({
   function setLimitDay(index: number, day: string) {
     setWindows((prev) => prev.map((win, j) => (j === index ? clampToDay(win, day) : win)))
     clearWindowError(index)
-  }
-
-  function addTodo() {
-    setTodos((prev) => {
-      const next = [...prev, '']
-      setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
-      return next
-    })
-  }
-
-  function removeTodo(index: number) {
-    setTodos((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  function updateTodo(index: number, value: string) {
-    setTodos((prev) => prev.map((t, i) => (i === index ? value : t)))
   }
 
   function validate(): boolean {
@@ -194,7 +183,10 @@ export default function WorkstationForm({
         capacity,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
-        todos: todos.filter((t) => t.trim()),
+        todos: todos
+          .map((t) => ({ ...t, text: t.text.trim() }))
+          .filter((t) => t.text)
+          .map((t) => ({ instruction_text: t.text, item_type: t.itemType })),
         schedulingGranularityMin,
       })
 
@@ -237,9 +229,9 @@ export default function WorkstationForm({
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[3fr_2fr]">
         {/* Left column */}
-        <div className="space-y-8">
+        <AppCard bodyClassName="divide-y divide-edge p-0 [&>*]:px-6 [&>*]:py-5">
           {/* Stage */}
           <section>
             <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
@@ -294,12 +286,12 @@ export default function WorkstationForm({
             minStartFor={minStartFor}
             maxEndFor={maxEndFor}
           />
-        </div>
+        </AppCard>
 
         {/* Right column */}
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Capacity */}
-          <section>
+          <AppCard as="section">
             <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
             <Input
               type="number"
@@ -308,15 +300,9 @@ export default function WorkstationForm({
               onValueChange={(val) => setCapacity(Math.max(1, parseInt(val) || 1))}
               min={1}
             />
-          </section>
+          </AppCard>
 
-          <TodosEditor
-            todos={todos}
-            todoRefs={todoRefs}
-            onAddTodo={addTodo}
-            onRemoveTodo={removeTodo}
-            onUpdateTodo={updateTodo}
-          />
+          <TodosEditor todos={todos} onChange={setTodos} />
         </div>
       </div>
     </div>

@@ -136,9 +136,7 @@
     "removeWindow": "Remove",
     "capacityLabel": "Maximum officials at once",
     "todosLabel": "Checklists / To-dos",
-    "addTodo": "+ Add to-do",
     "removeTodo": "Remove",
-    "todoPlaceholder": "e.g. Verify rider numbers against start list",
     "windowStartLabel": "Start",
     "windowEndLabel": "End",
     "windowEndError": "End must be after start.",
@@ -165,7 +163,16 @@
     "genericDeleteError": "Something went wrong while deleting. Please try again.",
     "workAreaCount_zero": "0 work areas",
     "workAreaCount_one": "{{count}} work area",
-    "workAreaCount_other": "{{count}} work areas"
+    "workAreaCount_other": "{{count}} work areas",
+    "checklistHeading": "Check-off items",
+    "checklistHint": "Officials tick these off during their shift. Everyone on the shift sees who did it.",
+    "addChecklistItem": "+ Add check-off item",
+    "checklistPlaceholder": "e.g. Collect timing chips",
+    "notesHeading": "Notes",
+    "notesHint": "Shown to officials for reference only — nothing to tick off.",
+    "addNote": "+ Add note",
+    "notePlaceholder": "e.g. Radio channel 3 for incidents",
+    "noOperatingWindows": "No operating windows set — this area won't appear on the schedule until you add one."
   },
   "officials": {
     "title": "Officials Roster",

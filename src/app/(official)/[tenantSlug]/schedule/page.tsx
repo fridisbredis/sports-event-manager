@@ -2,8 +2,9 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { ScheduleView, type AssignmentRow } from './_components/schedule-view'
+import { ScheduleView, type AssignmentRow, type CheckMap } from './_components/schedule-view'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
+import { logger } from '@/lib/logger'
 import { distinctDays, dayWindow, resolveSelectedDay } from '@/lib/scheduling/day-window'
 
 interface Props {
@@ -115,7 +116,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
           id,
           name,
           description,
-          workstation_todos ( id, instruction_text, position )
+          workstation_todos ( id, instruction_text, position, item_type )
         )
       `
       )
@@ -138,6 +139,87 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     })
   }
 
+  // Check state for the day on screen. One query for every station the
+  // official works today rather than one per station: the shift screen is
+  // opened on a phone on event day, and N+1 round trips over a field
+  // connection is exactly the shape F-PERF-06 flagged on this path.
+  //
+  // Read with the RLS client, so what comes back is what this official is
+  // allowed to see — the read policy admits any member of the tenant, which
+  // is what makes a colleague's tick visible.
+  const checks: CheckMap = new Map()
+
+  if (assignments.length > 0) {
+    const workstationIds = [
+      ...new Set(
+        assignments
+          .map((a) => a.workstations?.id)
+          .filter((id): id is string => typeof id === 'string')
+      ),
+    ]
+
+    if (workstationIds.length > 0) {
+      const { start, end } = dayWindow(selectedDay as string)
+
+      const { data: checkRows, error: checksError } = await supabase
+        .from('checklist_item_checks')
+        .select('todo_id, timeslot_start, checked_by, checked_at')
+        .eq('tenant_id', tenant.id)
+        .in('workstation_id', workstationIds)
+        .gte('timeslot_start', start)
+        .lt('timeslot_start', end)
+
+      // Fail loud rather than rendering every box unticked: silently showing
+      // an empty checklist would tell an official the work is outstanding
+      // when a colleague has already done it (the F-REL-10 failure mode).
+      if (checksError) throw checksError
+
+      // Actor names in one follow-up query rather than a join: PostgREST
+      // cannot embed auth.users, and checklist_item_checks has no FK to
+      // officials. The names come from the audit trail's denormalised
+      // actor_name, which is written at check time for exactly this reason.
+      const actorIds = [
+        ...new Set(
+          (checkRows ?? [])
+            .map((r) => r.checked_by)
+            .filter((id): id is string => typeof id === 'string')
+        ),
+      ]
+
+      const namesByUserId = new Map<string, string>()
+      if (actorIds.length > 0) {
+        const { data: officialRows, error: namesError } = await supabase
+          .from('officials')
+          .select('user_id, name')
+          .eq('tenant_id', tenant.id)
+          .in('user_id', actorIds)
+
+        // Deliberately not fatal, unlike the check read above: a missing name
+        // degrades one line to the UI's "someone" fallback, whereas a missing
+        // CHECK would misreport the work as outstanding. Logged rather than
+        // swallowed, so the degradation is visible in monitoring (F-REL-10).
+        if (namesError) {
+          logger.error('Official schedule: checklist actor names failed to load', namesError, {
+            tenantId: tenant.id,
+            day: selectedDay,
+          })
+        }
+
+        for (const row of officialRows ?? []) {
+          if (row.user_id) namesByUserId.set(row.user_id, row.name)
+        }
+      }
+
+      for (const row of checkRows ?? []) {
+        checks.set(`${row.todo_id}|${row.timeslot_start}`, {
+          checked_by: row.checked_by,
+          checked_at: row.checked_at,
+          actorName: row.checked_by ? (namesByUserId.get(row.checked_by) ?? null) : null,
+        })
+      }
+    }
+  }
+
   const strings = {
     title: t('mySchedule.title'),
     readOnly: t('mySchedule.readOnly'),
@@ -149,6 +231,26 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     noAssignmentsOnDayDescription: t('mySchedule.noAssignmentsOnDayDescription'),
     dayTabsLabel: t('mySchedule.dayTabsLabel'),
     todoLabel: t('mySchedule.todoLabel'),
+    infoLabel: t('mySchedule.infoLabel'),
+  }
+
+  // Passed as raw templates, not interpolated here: this object crosses into
+  // a Client Component, and only serialisable data survives that boundary —
+  // a `(name) => t(...)` callback throws "Functions cannot be passed directly
+  // to Client Components". `checkedBy`/`confirmBody` keep their {{name}} and
+  // {{time}} placeholders and the row fills them in.
+  //
+  // `returnObjects: false` is implicit; these keys are plain strings, so
+  // i18next returns them verbatim when no interpolation values are given.
+  const checklistStrings = {
+    toggleLabel: t('checklist.toggleLabel'),
+    checkedBy: t('checklist.checkedBy'),
+    someone: t('checklist.someone'),
+    confirmTitle: t('checklist.confirmTitle'),
+    confirmBody: t('checklist.confirmBody'),
+    confirmCancel: t('checklist.confirmCancel'),
+    confirmConfirm: t('checklist.confirmConfirm'),
+    saveFailed: t('checklist.saveFailed'),
   }
 
   return (
@@ -158,6 +260,9 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       selectedDay={selectedDay}
       tenantSlug={tenantSlug}
       strings={strings}
+      checks={checks}
+      currentUserId={user.id}
+      checklistStrings={checklistStrings}
     />
   )
 }

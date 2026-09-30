@@ -199,6 +199,125 @@ export type Database = {
           },
         ]
       }
+      checklist_item_checks: {
+        Row: {
+          checked_at: string
+          checked_by: string | null
+          created_at: string
+          id: string
+          tenant_id: string
+          timeslot_end: string
+          timeslot_start: string
+          todo_id: string
+          workstation_id: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_by?: string | null
+          created_at?: string
+          id?: string
+          tenant_id: string
+          timeslot_end: string
+          timeslot_start: string
+          todo_id: string
+          workstation_id: string
+        }
+        Update: {
+          checked_at?: string
+          checked_by?: string | null
+          created_at?: string
+          id?: string
+          tenant_id?: string
+          timeslot_end?: string
+          timeslot_start?: string
+          todo_id?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'checklist_item_checks_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'checklist_item_checks_todo_id_fkey'
+            columns: ['todo_id']
+            isOneToOne: false
+            referencedRelation: 'workstation_todos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'checklist_item_checks_workstation_id_fkey'
+            columns: ['workstation_id']
+            isOneToOne: false
+            referencedRelation: 'workstations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      checklist_item_events: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          tenant_id: string
+          timeslot_end: string
+          timeslot_start: string
+          todo_id: string
+          workstation_id: string
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          tenant_id: string
+          timeslot_end: string
+          timeslot_start: string
+          todo_id: string
+          workstation_id: string
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          tenant_id?: string
+          timeslot_end?: string
+          timeslot_start?: string
+          todo_id?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'checklist_item_events_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'checklist_item_events_todo_id_fkey'
+            columns: ['todo_id']
+            isOneToOne: false
+            referencedRelation: 'workstation_todos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'checklist_item_events_workstation_id_fkey'
+            columns: ['workstation_id']
+            isOneToOne: false
+            referencedRelation: 'workstations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       event_distances: {
         Row: {
           created_at: string
@@ -683,6 +802,7 @@ export type Database = {
           created_at: string
           id: string
           instruction_text: string
+          item_type: string
           position: number
           workstation_id: string
         }
@@ -690,6 +810,7 @@ export type Database = {
           created_at?: string
           id?: string
           instruction_text: string
+          item_type?: string
           position?: number
           workstation_id: string
         }
@@ -697,6 +818,7 @@ export type Database = {
           created_at?: string
           id?: string
           instruction_text?: string
+          item_type?: string
           position?: number
           workstation_id?: string
         }
@@ -863,6 +985,14 @@ export type Database = {
       }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
+      is_on_workstation_shift: {
+        Args: {
+          p_timeslot_end: string
+          p_timeslot_start: string
+          p_workstation_id: string
+        }
+        Returns: boolean
+      }
       is_system_admin: { Args: never; Returns: boolean }
       publish_event: {
         Args: { p_event_id: string; p_tenant_id: string }

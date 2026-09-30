@@ -51,7 +51,8 @@
     "workstation": "Work area",
     "time": "Time",
     "checklist": "Checklist",
-    "todoLabel": "To do"
+    "todoLabel": "To do",
+    "infoLabel": "Good to know"
   },
   "announcements": {
     "title": "Announcements",
@@ -87,5 +88,15 @@
     "avatarUploadError": "Couldn't upload that picture. Please try again.",
     "avatarTypeError": "Choose a JPEG, PNG or WebP image.",
     "avatarSizeError": "That image is too large. Please choose a smaller one."
+  },
+  "checklist": {
+    "toggleLabel": "Check off",
+    "checkedBy": "Checked by {{name}} at {{time}}",
+    "someone": "someone",
+    "confirmTitle": "Are you sure?",
+    "confirmBody": "{{name}} checked this off. Uncheck it anyway?",
+    "confirmCancel": "No, keep it",
+    "confirmConfirm": "Yes, uncheck",
+    "saveFailed": "Could not save. Try again."
   }
 }

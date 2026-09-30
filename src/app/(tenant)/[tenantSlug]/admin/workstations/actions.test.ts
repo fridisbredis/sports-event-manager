@@ -66,7 +66,10 @@ const BASE_INPUT = {
   capacity: 4,
   recurring: false,
   windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
-  todos: ['Fill cups', ''],
+  todos: [
+    { instruction_text: 'Fill cups', item_type: 'checkbox' as const },
+    { instruction_text: '', item_type: 'info' as const },
+  ],
   schedulingGranularityMin: 30,
 }
 
@@ -140,7 +143,7 @@ describe('createWorkstation', () => {
       p_capacity_ceiling: 4,
       p_recurring: false,
       p_windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
-      p_todos: [{ instruction_text: 'Fill cups', position: 0 }],
+      p_todos: [{ instruction_text: 'Fill cups', item_type: 'checkbox' }],
     })
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
@@ -175,7 +178,10 @@ const UPDATE_BASE_INPUT = {
   capacity: 4,
   recurring: false,
   windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
-  todos: ['Fill cups', ''],
+  todos: [
+    { instruction_text: 'Fill cups', item_type: 'checkbox' as const },
+    { instruction_text: '', item_type: 'info' as const },
+  ],
   schedulingGranularityMin: 30,
 }
 
@@ -252,7 +258,7 @@ describe('updateWorkstation', () => {
       p_capacity_ceiling: 4,
       p_recurring: false,
       p_windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
-      p_todos: ['Fill cups'],
+      p_todos: [{ instruction_text: 'Fill cups', item_type: 'checkbox' }],
     })
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/workstations')
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
