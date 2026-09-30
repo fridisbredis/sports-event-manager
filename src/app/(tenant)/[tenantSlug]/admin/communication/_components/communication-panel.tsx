@@ -11,6 +11,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 type ByChannel<T> = Record<AnnouncementChannel, T>
 
@@ -34,7 +35,7 @@ const NO_PUBLISHED: ByChannel<Announcement[]> = { participants: [], officials: [
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleString('en-GB', {
+  return d.toLocaleString(DATE_LOCALE, {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

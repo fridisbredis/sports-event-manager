@@ -34,23 +34,23 @@ describe('derivedDateRange', () => {
   })
 
   it('formats a single-day race as a same-day range', () => {
-    expect(derivedDateRange([raceStage('2026-08-10T08:00')])).toBe('10–10 Aug 2026')
+    expect(derivedDateRange([raceStage('2026-08-10T08:00')])).toBe('10–10 aug. 2026')
   })
 
   it('formats a multi-day race within the same month as a day range', () => {
     expect(derivedDateRange([raceStage('2026-08-10T08:00', '2026-08-12T08:00')])).toBe(
-      '10–12 Aug 2026'
+      '10–12 aug. 2026'
     )
   })
 
   it('formats a race spanning two months with both month names', () => {
     expect(derivedDateRange([raceStage('2026-08-30T08:00', '2026-09-02T08:00')])).toBe(
-      '30 Aug – 2 Sept 2026'
+      '30 aug. – 2 sep. 2026'
     )
   })
 
   it('ignores non-race stages when computing the range', () => {
     const stages = [nonRaceStage('2026-01-01T08:00'), raceStage('2026-08-10T08:00')]
-    expect(derivedDateRange(stages)).toBe('10–10 Aug 2026')
+    expect(derivedDateRange(stages)).toBe('10–10 aug. 2026')
   })
 })

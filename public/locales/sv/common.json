@@ -1,7 +1,71 @@
 {
-  "_comment": "Swedish translations skeleton. Add translations here when Swedish language support is needed.",
   "app": {
-    "name": "TODO: Swedish translation",
-    "description": "TODO: Swedish translation"
+    "name": "Sports Event Manager",
+    "description": "Planera och genomför ditt sportevenemang"
+  },
+  "errors": {
+    "notAuthorized": "Du har inte behörighet till detta",
+    "noAccess": "Ditt konto är inte kopplat till någon organisation. Kontakta din administratör.",
+    "notFound": "Hittades inte",
+    "numberUsed": "Använt nummer: {{phone}}",
+    "tryDifferentNumber": "Prova ett annat nummer"
+  },
+  "actionErrors": {
+    "notAuthorized": "Behörighet saknas",
+    "invalidRequest": "Ogiltig förfrågan",
+    "invalidName": "Ogiltigt namn",
+    "tenantNameTaken": "Det finns redan en kund med det namnet",
+    "createTenantFailed": "Kunden kunde inte skapas",
+    "updateTenantFailed": "Kunden kunde inte uppdateras",
+    "updateTierFailed": "Nivån kunde inte uppdateras",
+    "saveAssignmentsFailed": "Inplaneringarna kunde inte sparas. Försök igen.",
+    "windowShorterThanGranularity": "Tidsfönstret är kortare än schemaintervallet",
+    "granularityFixed": "Schemaintervallet är låst till 60 minuter.",
+    "noFileProvided": "Ingen fil vald",
+    "chooseImageFile": "Välj en bildfil",
+    "imageTooLarge": "Bilden får vara högst 900 kB",
+    "missingTenantOrEvent": "Kund-ID eller evenemangs-ID saknas",
+    "unknownColorPalette": "Okänd färgpalett",
+    "signOutFailed": "Kunde inte logga ut. Försök igen.",
+    "slotTaken": "Någon annan hann före på den tidsluckan. Ladda om schemat och försök igen.",
+    "batchTooLarge": "För många inplaneringar i en sparning. Dela upp ändringen i mindre delar."
+  },
+  "notFoundPage": {
+    "eyebrow": "Inget resultat",
+    "heading": "Inget resultat för den här kontrollen.",
+    "body": "Banan går inte förbi här. Det du letade efter är inte en del av det här evenemanget.",
+    "cta": "Tillbaka till startlinjen"
+  },
+  "errorPage": {
+    "eyebrow": "Ur kurs",
+    "heading": "Något gick sönder mitt i loppet.",
+    "body": "Den här kontrollen stötte på ett problem. Försök igen — säg till din arrangör om det fortsätter.",
+    "cta": "Försök igen",
+    "toast": "Något gick fel. Försök igen.",
+    "navHint": "De andra flikarna fungerar fortfarande."
+  },
+  "actions": {
+    "save": "Spara",
+    "cancel": "Avbryt",
+    "edit": "Redigera",
+    "delete": "Ta bort",
+    "add": "Lägg till",
+    "back": "Tillbaka",
+    "close": "Stäng",
+    "confirm": "Bekräfta",
+    "remove": "Ta bort",
+    "signOut": "Logga ut",
+    "unsavedChanges": "Du har osparade ändringar. Vill du lämna ändå?",
+    "leaveAnyway": "Lämna ändå",
+    "stayOnPage": "Stanna"
+  },
+  "unsavedChanges": {
+    "title": "Osparade ändringar",
+    "body": "Du har osparade ändringar. Om du lämnar sidan förloras de."
+  },
+  "common": {
+    "loading": "Laddar…",
+    "error": "Fel",
+    "success": "Klart"
   }
 }

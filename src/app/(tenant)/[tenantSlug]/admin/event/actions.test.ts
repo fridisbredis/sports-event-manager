@@ -120,7 +120,7 @@ describe('saveEvent', () => {
 
     const result = await saveEvent(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(fromMock).not.toHaveBeenCalled()
   })
@@ -132,7 +132,7 @@ describe('saveEvent', () => {
 
     const result = await saveEvent({ ...BASE_INPUT, scheduling_granularity_min: 90 })
 
-    expect(result).toEqual({ error: 'Scheduling granularity is fixed at 60 minutes.' })
+    expect(result).toEqual({ error: 'Schemaintervallet är låst till 60 minuter.' })
     // The guard runs before the current-event lookup, so nothing is read or written.
     expect(fromMock).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
@@ -151,7 +151,9 @@ describe('saveEvent', () => {
 
     const result = await saveEvent({ ...BASE_INPUT, stages: [NON_RACE_STAGE] })
 
-    expect(result).toEqual({ error: 'Cannot remove the last Race stage from a published event.' })
+    expect(result).toEqual({
+      error: 'Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.',
+    })
     expect(statusBuilder.eq).toHaveBeenCalledWith('id', EVENT_ID)
     expect(statusBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
     // The events row update must never run once the guard rejects the save.
@@ -169,12 +171,14 @@ describe('saveEvent', () => {
 
     const result = await saveEvent({ ...BASE_INPUT, stages: [] })
 
-    expect(result).toEqual({ error: 'Cannot remove the last Race stage from a published event.' })
+    expect(result).toEqual({
+      error: 'Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.',
+    })
   })
 
   // F-REL-22: never forward a raw DB error.message to the client — assert
   // the translated fallback string, not the raw message the mock returns.
-  const GENERIC_SAVE_ERROR = 'Something went wrong while saving. Please try again.'
+  const GENERIC_SAVE_ERROR = 'Något gick fel när ändringarna skulle sparas. Försök igen.'
 
   it('fails closed when the event status cannot be read', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
@@ -242,7 +246,7 @@ describe('saveEvent', () => {
     const result = await saveEvent({ ...BASE_INPUT, stages: [RACE_STAGE] })
 
     expect(result).toEqual({
-      error: 'Cannot remove the last Race stage from a published event.',
+      error: 'Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.',
     })
   })
 

@@ -45,7 +45,7 @@ beforeEach(() => {
 })
 
 const PUBLISH_PRECONDITION_ERROR =
-  "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again."
+  'Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.'
 
 // EVT-02: publishEvent now delegates the name/status/Race-stage-count check
 // and the publish write to a single publish_event RPC (migration
@@ -71,7 +71,7 @@ describe('publishEvent', () => {
 
     const result = await publishEvent(INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(rpcMock).not.toHaveBeenCalled()
   })
@@ -87,7 +87,7 @@ describe('publishEvent', () => {
 
     // F-REL-22: never forward the raw DB error message to the client.
     expect(result).toEqual({
-      error: 'This event could not be found. Refresh the page and try again.',
+      error: 'Evenemanget kunde inte hittas. Uppdatera sidan och försök igen.',
     })
     expect(rpcMock).toHaveBeenCalledWith('publish_event', {
       p_event_id: EVENT_ID,
@@ -151,7 +151,7 @@ describe('publishEvent', () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const rpcMock = vi.fn().mockResolvedValue({
       data: null,
-      error: { code: '23514', message: 'Event name is required before publishing.' },
+      error: { code: '23514', message: 'Evenemangsnamn krävs före publicering.' },
     })
     mockClient(rpcMock)
 
@@ -218,7 +218,7 @@ describe('publishEvent', () => {
     // message, not a precondition message that would be confidently wrong
     // about why publishing failed.
     expect(result).toEqual({
-      error: 'Something went wrong while saving. Please try again.',
+      error: 'Något gick fel när ändringarna skulle sparas. Försök igen.',
     })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()

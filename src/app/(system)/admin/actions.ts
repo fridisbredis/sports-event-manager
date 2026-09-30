@@ -6,6 +6,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/s
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { toSlug } from './_utils'
 import { z } from 'zod'
+import { translateActionError as tError } from '@/lib/actions/action-error'
 
 const createTenantSchema = z.object({
   name: z.string().trim().min(1),
@@ -47,7 +48,7 @@ async function assertSystemAdmin(): Promise<SystemAdminCheck> {
     .limit(1)
     .maybeSingle()
 
-  if (!data) return { ok: false, error: 'Forbidden' }
+  if (!data) return { ok: false, error: await tError('actionErrors.notAuthorized') }
   return { ok: true, supabase, userId: user.id }
 }
 
@@ -57,10 +58,10 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   const { supabase, userId } = check
 
   const parsed = createTenantSchema.safeParse({ name })
-  if (!parsed.success) return { error: 'Invalid name' }
+  if (!parsed.success) return { error: await tError('actionErrors.invalidName') }
 
   const slug = toSlug(parsed.data.name)
-  if (!slug) return { error: 'Invalid name' }
+  if (!slug) return { error: await tError('actionErrors.invalidName') }
 
   // REL-01: tenant + default event + default stages are created atomically
   // by this RPC — see migration 20260908130253 and
@@ -73,8 +74,8 @@ export async function createTenant(name: string): Promise<{ error?: string }> {
   })
 
   if (rpcError) {
-    if (rpcError.code === '23505') return { error: 'A tenant with that name already exists' }
-    return { error: 'Failed to create tenant' }
+    if (rpcError.code === '23505') return { error: await tError('actionErrors.tenantNameTaken') }
+    return { error: await tError('actionErrors.createTenantFailed') }
   }
 
   const { tenant_id: tenantId } = rpcData as unknown as { tenant_id: string; event_id: string }
@@ -102,14 +103,14 @@ export async function setTenantActive(
   const { supabase, userId } = check
 
   const parsed = setTenantActiveSchema.safeParse({ tenantId, isActive })
-  if (!parsed.success) return { error: 'Invalid request' }
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
 
   const { error } = await supabase
     .from('tenants')
     .update({ is_active: parsed.data.isActive })
     .eq('id', parsed.data.tenantId)
 
-  if (error) return { error: 'Failed to update tenant' }
+  if (error) return { error: await tError('actionErrors.updateTenantFailed') }
 
   await logAuditEvent({
     tenantId: parsed.data.tenantId,
@@ -135,14 +136,14 @@ export async function setTenantTier(
   const { supabase, userId } = check
 
   const parsed = setTenantTierSchema.safeParse({ tenantId, tier })
-  if (!parsed.success) return { error: 'Invalid request' }
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
 
   const { error } = await supabase
     .from('tenants')
     .update({ tier: parsed.data.tier })
     .eq('id', parsed.data.tenantId)
 
-  if (error) return { error: 'Failed to update tier' }
+  if (error) return { error: await tError('actionErrors.updateTierFailed') }
 
   await logAuditEvent({
     tenantId: parsed.data.tenantId,
