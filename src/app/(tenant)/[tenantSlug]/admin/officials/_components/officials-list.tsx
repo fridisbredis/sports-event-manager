@@ -235,6 +235,10 @@ export default function OfficialsList({
             // `shadow-small` HeroUI's wrapper sets on this same element.
             wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
             th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+            // A rule between officials, dropped on the last row so the list
+            // doesn't end on a line just above the card's own edge. Same
+            // treatment as the system-admin tenant list.
+            tr: 'border-b border-edge-soft last:border-b-0',
             td: 'py-4',
           }}
         >
