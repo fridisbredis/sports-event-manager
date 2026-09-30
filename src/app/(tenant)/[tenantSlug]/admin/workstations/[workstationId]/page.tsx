@@ -35,7 +35,7 @@ export default async function EditWorkstationPage({ params }: Props) {
     supabase
       .from('workstations')
       .select(
-        'id, name, description, capacity_ceiling, stage_id, recurring, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position, item_type)'
+        'id, name, description, color, capacity_ceiling, stage_id, recurring, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position, item_type)'
       )
       .eq('id', workstationId)
       .eq('tenant_id', tenant.id)
@@ -55,6 +55,30 @@ export default async function EditWorkstationPage({ params }: Props) {
 
   if (!ws) notFound()
 
+  // The colours other work areas on this stage already hold, for the picker's
+  // "already used" markers. Scoped to the stage because that is what shares a
+  // schedule grid; a stage-less ("all stages") area is compared against the
+  // other stage-less ones, since those are the areas it appears alongside.
+  // Read after the work area itself because it depends on its stage_id — one
+  // extra round trip on a screen that is already two, and only on the edit
+  // path.
+  const siblingsQuery = supabase
+    .from('workstations')
+    .select('id, name, color')
+    .eq('event_id', event.id)
+    .eq('tenant_id', tenant.id)
+    .neq('id', ws.id)
+    .not('color', 'is', null)
+
+  // `.eq('stage_id', null)` matches nothing in SQL — null is never equal to
+  // anything — so the stage-less case needs `is`, not `eq`.
+  const { data: siblings, error: siblingsError } =
+    ws.stage_id === null
+      ? await siblingsQuery.is('stage_id', null)
+      : await siblingsQuery.eq('stage_id', ws.stage_id)
+
+  if (siblingsError) throw siblingsError
+
   const sortedTodos = [...(ws.workstation_todos ?? [])].sort((a, b) => a.position - b.position)
 
   return (
@@ -68,6 +92,11 @@ export default async function EditWorkstationPage({ params }: Props) {
         initialName={ws.name}
         initialDescription={ws.description ?? ''}
         initialCapacity={ws.capacity_ceiling}
+        initialColor={ws.color}
+        takenBy={(siblings ?? []).map((sibling) => ({
+          color: sibling.color as string,
+          name: sibling.name,
+        }))}
         initialWindows={(ws.workstation_operating_windows ?? []).map((w) => ({
           window_start: w.window_start,
           window_end: w.window_end,

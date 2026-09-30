@@ -23,12 +23,14 @@ function slot(id: string, start: string, end: string, ws: AssignmentRow['worksta
 const SOCIAL_MEDIA = {
   id: '11111111-1111-4111-8111-111111111111',
   name: 'Social Media',
+  color: null,
   description: null,
   workstation_todos: [],
 }
 const WITH_TODOS = {
   id: '33333333-3333-4333-8333-333333333333',
   name: 'Depån',
+  color: null,
   description: 'Cups, jugs and refill point at 5 km',
   workstation_todos: [
     { id: 't2', instruction_text: 'Share finish-line photos', position: 2, item_type: 'info' },
@@ -41,6 +43,7 @@ const WITH_TODOS = {
 const MIXED_TODOS = {
   id: '44444444-4444-4444-8444-444444444444',
   name: 'Finish line',
+  color: null,
   description: null,
   workstation_todos: [
     { id: 'm1', instruction_text: 'Radio channel 3', position: 0, item_type: 'info' },
@@ -53,6 +56,7 @@ const MIXED_TODOS = {
 const DEPOT = {
   id: '22222222-2222-4222-8222-222222222222',
   name: 'Depån',
+  color: null,
   description: null,
   workstation_todos: [],
 }

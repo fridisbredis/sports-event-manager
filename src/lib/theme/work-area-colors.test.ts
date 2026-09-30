@@ -3,6 +3,8 @@ import {
   WORK_AREA_COLORS,
   workAreaBorderColor,
   workAreaColor,
+  firstFreeWorkAreaColor,
+  workAreaColorByName,
   workAreaColorMap,
   workAreaDotColor,
 } from './work-area-colors'
@@ -67,7 +69,9 @@ describe('WORK_AREA_COLORS', () => {
   // officials sitting next to each other are actually distinguishable. An
   // earlier revision spaced hues evenly around the circle, which clustered
   // eight of the thirty into green/teal with pairs 0.005 apart — visually
-  // identical at avatar size. Anything under ~0.01 is too close to call.
+  // identical at avatar size. The delivered palette's tightest pair is
+  // periwinkle/iris at 0.0113; the threshold sits just under that, so a future
+  // edit cannot quietly push any pair closer than today's worst.
   it('keeps every pair of backgrounds perceptually distinguishable', () => {
     let closest = { distance: Infinity, pair: '' }
     for (let i = 0; i < WORK_AREA_COLORS.length; i++) {
@@ -81,7 +85,7 @@ describe('WORK_AREA_COLORS', () => {
         }
       }
     }
-    expect(closest.distance, `closest pair was ${closest.pair}`).toBeGreaterThan(0.01)
+    expect(closest.distance, `closest pair was ${closest.pair}`).toBeGreaterThanOrEqual(0.0112)
   })
 
   // Separation has to hold for every colour, not just on average: one colour
@@ -92,33 +96,54 @@ describe('WORK_AREA_COLORS', () => {
       const distances = WORK_AREA_COLORS.filter((other) => other !== color)
         .map((other) => perceptualDistance(color.bg, other.bg))
         .sort((a, b) => a - b)
-      expect(distances[1], `${color.name} has two near-identical neighbours`).toBeGreaterThan(0.012)
+      expect(distances[1], `${color.name} has two near-identical neighbours`).toBeGreaterThan(0.02)
     }
   })
 
-  it('opens with the eight pairs from the design handoff, in order', () => {
-    expect(WORK_AREA_COLORS.slice(0, 8)).toEqual([
-      { name: 'blue', bg: '#DCEAFE', fg: '#1D4ED8' },
-      { name: 'violet', bg: '#E5DFFC', fg: '#7C3AED' },
-      { name: 'teal', bg: '#D3F5E7', fg: '#0F766E' },
-      { name: 'rose', bg: '#FCE1E4', fg: '#BE123C' },
-      { name: 'amber', bg: '#FCEFD1', fg: '#B45309' },
-      { name: 'fuchsia', bg: '#F7E1FA', fg: '#A21CAF' },
-      { name: 'green', bg: '#DCF5E1', fg: '#15803D' },
-      { name: 'indigo', bg: '#DEE3FC', fg: '#4338CA' },
+  // The picker renders the palette in array order as three rows of ten, so
+  // the order is part of the delivered design, not an implementation detail.
+  it('keeps the delivered palette order', () => {
+    expect(WORK_AREA_COLORS.map((c) => c.bg)).toEqual([
+      '#F7B8B8',
+      '#F7C9A8',
+      '#F6DDA0',
+      '#EFE7A8',
+      '#DCEBA0',
+      '#C3E6A8',
+      '#AEE0B4',
+      '#A6E0C4',
+      '#A0DED3',
+      '#9DDAE0',
+      '#9CCDE6',
+      '#A3C1EC',
+      '#B3BDEF',
+      '#C4B4EC',
+      '#D3B0E6',
+      '#E0AEDD',
+      '#E8AECB',
+      '#EDACB8',
+      '#E9B3A3',
+      '#E0BE9B',
+      '#D9C08C',
+      '#D6CC8C',
+      '#CBD394',
+      '#BAD79C',
+      '#A9D9AE',
+      '#9CD6C0',
+      '#9BD1D2',
+      '#A0C6E3',
+      '#B4BEE8',
+      '#C9B8E3',
     ])
   })
 
-  // The three sub-4.5:1 pairs are the handoff's own and are kept deliberately;
-  // this test pins that decision so a future edit has to be explicit about it.
-  it('holds every generated pair to 4.5:1, and the handoff pairs to 4.3:1', () => {
-    const belowAA: string[] = []
+  // The fg draws labels inside a filled schedule cell, so AA is not optional
+  // here. The previous palette carried three exceptions; this one has none,
+  // and this test is what stops one creeping back in.
+  it('clears WCAG AA 4.5:1 for every pair', () => {
     for (const color of WORK_AREA_COLORS) {
-      const ratio = contrastRatio(color.bg, color.fg)
-      expect(ratio).toBeGreaterThanOrEqual(4.3)
-      if (ratio < 4.5) belowAA.push(color.name)
+      expect(contrastRatio(color.bg, color.fg), color.name).toBeGreaterThanOrEqual(4.5)
     }
-    expect(belowAA).toEqual(['violet', 'amber', 'green'])
   })
 })
 
@@ -149,10 +174,22 @@ describe('workAreaColor', () => {
 })
 
 describe('decorative derivations', () => {
-  it('mixes dots to 65% and borders to 35% of the foreground', () => {
+  it('draws dots in the background colour and mixes borders to 35% of the foreground', () => {
     const color = WORK_AREA_COLORS[0]
-    expect(workAreaDotColor(color)).toBe(`color-mix(in srgb, ${color.fg} 65%, white)`)
+    expect(workAreaDotColor(color)).toBe(color.bg)
     expect(workAreaBorderColor(color)).toBe(`color-mix(in srgb, ${color.fg} 35%, white)`)
+  })
+
+  // The regression this guards: dots used to lighten the FOREGROUND, which on
+  // this palette's muted near-neutral foregrounds rendered every dot grey or
+  // brown regardless of which colour was chosen. blush and sky came out
+  // #9B8A8A and #839096 — two colours nobody would call pink or blue.
+  it('gives every colour a visibly distinct dot', () => {
+    const dots = WORK_AREA_COLORS.map((c) => workAreaDotColor(c))
+    expect(new Set(dots).size).toBe(WORK_AREA_COLORS.length)
+    for (const [i, dot] of dots.entries()) {
+      expect(dot, WORK_AREA_COLORS[i].name).toBe(WORK_AREA_COLORS[i].bg)
+    }
   })
 })
 
@@ -235,5 +272,128 @@ describe('workAreaColorMap', () => {
 
   it('returns an empty map for an empty list', () => {
     expect(workAreaColorMap([]).size).toBe(0)
+  })
+})
+
+describe('firstFreeWorkAreaColor', () => {
+  it('returns the first colour when nothing is taken', () => {
+    expect(firstFreeWorkAreaColor([])).toEqual(WORK_AREA_COLORS[0])
+  })
+
+  it('skips taken colours in palette order', () => {
+    const taken = WORK_AREA_COLORS.slice(0, 3).map((c) => c.name)
+    expect(firstFreeWorkAreaColor(taken)).toEqual(WORK_AREA_COLORS[3])
+  })
+
+  it('fills a gap rather than continuing past it', () => {
+    // Deleting a work area frees its colour; the next one added should reuse
+    // it instead of pushing further down a palette that is filling up.
+    const taken = WORK_AREA_COLORS.filter((_, i) => i !== 2)
+      .slice(0, 5)
+      .map((c) => c.name)
+    expect(firstFreeWorkAreaColor(taken)).toEqual(WORK_AREA_COLORS[2])
+  })
+
+  it('falls back to the first colour once all thirty are taken', () => {
+    const taken = WORK_AREA_COLORS.map((c) => c.name)
+    expect(firstFreeWorkAreaColor(taken)).toEqual(WORK_AREA_COLORS[0])
+  })
+
+  it('ignores names that are not in the palette', () => {
+    // A colour retired from the palette can still sit in a row; it must not
+    // consume a slot that no longer corresponds to it.
+    expect(firstFreeWorkAreaColor(['teal2', 'magenta'])).toEqual(WORK_AREA_COLORS[0])
+  })
+})
+
+describe('workAreaColorByName', () => {
+  it('resolves every palette name', () => {
+    for (const color of WORK_AREA_COLORS) {
+      expect(workAreaColorByName(color.name)).toEqual(color)
+    }
+  })
+
+  it('returns undefined for an unknown, empty or absent name', () => {
+    // A name retired from the palette leaves rows behind holding it, so the
+    // lookup has to fail softly rather than throw — callers fall back to the
+    // hash. The `teal2`/`magenta` names came from the previous palette.
+    expect(workAreaColorByName('teal2')).toBeUndefined()
+    expect(workAreaColorByName('')).toBeUndefined()
+    expect(workAreaColorByName(null)).toBeUndefined()
+    expect(workAreaColorByName(undefined)).toBeUndefined()
+  })
+})
+
+describe('workAreaColorMap with stored colors', () => {
+  it('gives an id the color stored for it', () => {
+    const map = workAreaColorMap([{ id: 'ws-1', color: 'orchid' }])
+    expect(map.get('ws-1')!.name).toBe('orchid')
+  })
+
+  it('never displaces a stored color to resolve a hash collision', () => {
+    // The admin chose it; a hashed id must move instead. Every unstored id in
+    // the palette is thrown at one stored slot to prove nothing dislodges it.
+    const ids = [
+      { id: 'chosen', color: 'blush' },
+      ...Array.from({ length: 29 }, (_, i) => ({ id: `hashed-${i}` })),
+    ]
+    const map = workAreaColorMap(ids)
+    expect(map.get('chosen')!.name).toBe('blush')
+    const others = ids.slice(1).map((entry) => map.get(entry.id)!.name)
+    expect(others).not.toContain('blush')
+  })
+
+  it('lets two work areas share a stored color rather than reassigning one', () => {
+    // The picker marks a taken color but does not forbid it, so two rows
+    // holding the same one must both render it — silently repainting one
+    // would contradict what the admin sees in the picker.
+    const map = workAreaColorMap([
+      { id: 'ws-1', color: 'sage' },
+      { id: 'ws-2', color: 'sage' },
+    ])
+    expect(map.get('ws-1')!.name).toBe('sage')
+    expect(map.get('ws-2')!.name).toBe('sage')
+  })
+
+  it('falls back to the hash for a null, absent or retired color', () => {
+    for (const color of [null, undefined, 'teal2']) {
+      const map = workAreaColorMap([{ id: 'ws-1', color }])
+      expect(map.get('ws-1')).toEqual(workAreaColor('ws-1'))
+    }
+  })
+
+  it('mixes stored and unstored ids without either losing its color', () => {
+    const map = workAreaColorMap([
+      { id: 'ws-1', color: 'iris' },
+      { id: 'ws-2' },
+      'ws-3',
+      { id: 'ws-4', color: 'mint' },
+    ])
+    expect(map.size).toBe(4)
+    expect(map.get('ws-1')!.name).toBe('iris')
+    expect(map.get('ws-4')!.name).toBe('mint')
+    expect(new Set([...map.values()].map((c) => c.name)).size).toBe(4)
+  })
+
+  it('keeps a stored color when the same id also appears bare', () => {
+    // Callers build these lists from whatever they render, which can repeat an
+    // id — the stored color must win regardless of which form came first.
+    expect(workAreaColorMap([{ id: 'ws-1', color: 'clay' }, 'ws-1']).get('ws-1')!.name).toBe('clay')
+    expect(workAreaColorMap(['ws-1', { id: 'ws-1', color: 'clay' }]).get('ws-1')!.name).toBe('clay')
+  })
+
+  it('stays independent of the order ids are passed in', () => {
+    const entries = [
+      { id: 'ws-1', color: 'blush' },
+      { id: 'ws-2' },
+      { id: 'ws-3', color: 'teal' },
+      { id: 'ws-4' },
+      { id: 'ws-5' },
+    ]
+    const forward = workAreaColorMap(entries)
+    const reversed = workAreaColorMap([...entries].reverse())
+    for (const entry of entries) {
+      expect(reversed.get(entry.id)).toEqual(forward.get(entry.id))
+    }
   })
 })

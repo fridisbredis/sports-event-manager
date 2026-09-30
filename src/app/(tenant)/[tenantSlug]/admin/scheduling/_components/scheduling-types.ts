@@ -16,6 +16,8 @@ export interface OperatingWindow {
 export interface WorkstationData {
   id: string
   name: string
+  /** Palette name chosen by an admin; null falls back to hashing the id. */
+  color: string | null
   capacity_ceiling: number
   stage_id: string | null
   workstation_operating_windows: OperatingWindow[]

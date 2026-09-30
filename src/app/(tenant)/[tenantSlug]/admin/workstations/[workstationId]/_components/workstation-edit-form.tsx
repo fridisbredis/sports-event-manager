@@ -22,6 +22,7 @@ import {
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
 import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import { ColorPicker, type ColorTakenBy } from '../../_components/color-picker'
 import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
@@ -33,6 +34,8 @@ interface Props {
   initialName: string
   initialDescription: string
   initialCapacity: number
+  initialColor: string | null
+  takenBy: ColorTakenBy[]
   initialWindows: { window_start: string; window_end: string }[]
   initialTodos: TodoDraft[]
   schedulingGranularityMin: number
@@ -52,6 +55,8 @@ export default function WorkstationEditForm({
   initialName,
   initialDescription,
   initialCapacity,
+  initialColor,
+  takenBy,
   initialWindows,
   initialTodos,
   schedulingGranularityMin,
@@ -93,6 +98,7 @@ export default function WorkstationEditForm({
   const [name, setName] = useState(initialName)
   const [description, setDescription] = useState(initialDescription)
   const [capacity, setCapacity] = useState(initialCapacity)
+  const [color, setColor] = useState<string | null>(initialColor)
   const [windows, setWindows] = useState<TimeWindow[]>(() =>
     initWindowsFromStored(initialWindows, stageDays)
   )
@@ -209,6 +215,7 @@ export default function WorkstationEditForm({
         name,
         description,
         capacity,
+        color,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
         todos: todos
@@ -333,6 +340,15 @@ export default function WorkstationEditForm({
               />
             </div>
           </section>
+
+          <ColorPicker
+            value={color}
+            takenBy={takenBy}
+            onChange={(next) => {
+              setColor(next)
+              markDirty()
+            }}
+          />
 
           <OperatingWindowsEditor
             windows={windows}

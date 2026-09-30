@@ -21,6 +21,7 @@ interface AdminWorkstationsCached {
   workstations: Array<{
     id: string
     name: string
+    color: string | null
     capacity_ceiling: number
     stage_id: string | null
     workstation_operating_windows: Array<{ window_start: string; window_end: string }>

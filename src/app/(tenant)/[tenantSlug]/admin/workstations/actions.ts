@@ -10,6 +10,7 @@ import { translateDbError } from '@/lib/actions/db-error-message'
 import { workstationsCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
 import type { ChecklistItemType } from '@/types/app'
+import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 
 // The payload shape both workstation RPCs now take (migration
 // 20260930085253). Previously create_ took {instruction_text, position}
@@ -29,6 +30,18 @@ function normaliseTodos(todos: TodoInput[]): TodoInput[] {
 
 const tenantIdSchema = z.string().uuid()
 
+// The column has a CHECK constraint on the same list, so an invalid name would
+// be rejected by the database anyway — but as a 23514 the admin sees as a
+// generic save failure. Validating here turns it into a no-op instead: a name
+// the palette does not know is treated as "no colour chosen", which is what an
+// unrecognised stored value already means everywhere on the read side.
+const paletteNameSchema = z.enum(WORK_AREA_COLORS.map((c) => c.name) as [string, ...string[]])
+
+function normaliseColor(color: string | null | undefined): string | null {
+  const parsed = paletteNameSchema.safeParse(color)
+  return parsed.success ? parsed.data : null
+}
+
 export interface WindowInput {
   window_start: string
   window_end: string
@@ -43,6 +56,8 @@ export interface CreateWorkstationInput {
   description: string
   capacity: number
   recurring: boolean
+  /** Palette name from WORK_AREA_COLORS; null leaves the work area uncoloured. */
+  color: string | null
   windows: WindowInput[]
   todos: TodoInput[]
   schedulingGranularityMin: number
@@ -97,6 +112,7 @@ export async function createWorkstation(
     p_description: input.description.trim() || undefined,
     p_capacity_ceiling: input.capacity,
     p_recurring: input.recurring,
+    p_color: normaliseColor(input.color) ?? undefined,
     p_windows: validWindows as unknown as Json,
     p_todos: validTodos as unknown as Json,
   })
@@ -131,6 +147,8 @@ export interface UpdateWorkstationInput {
   description: string
   capacity: number
   recurring: boolean
+  /** Palette name from WORK_AREA_COLORS; null clears the work area's colour. */
+  color: string | null
   windows: WindowInput[]
   todos: TodoInput[]
   schedulingGranularityMin: number
@@ -180,6 +198,14 @@ export async function updateWorkstation(
     p_description: input.description.trim() || undefined,
     p_capacity_ceiling: input.capacity,
     p_recurring: input.recurring,
+    // p_set_color is what makes "clear the colour" expressible at all: the
+    // generated Args type has p_color as optional-string (never null), so a
+    // cleared colour is sent by OMITTING p_color, which the function defaults
+    // to null — indistinguishable, on its own, from "don't touch it". The
+    // flag separates the two, and this form always has an opinion (it carries
+    // the current colour), so it always sets.
+    p_color: normaliseColor(input.color) ?? undefined,
+    p_set_color: true,
     p_windows: validWindows as unknown as Json,
     p_todos: validTodos as unknown as Json,
   })

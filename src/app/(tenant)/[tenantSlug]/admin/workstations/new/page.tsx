@@ -44,6 +44,28 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
 
   const preselectedStage = stages?.find((s) => s.id === preselectedStageId) ?? null
 
+  // Colours already held on the stage this work area is being added to, both
+  // for the picker's "already used" markers and to pick its default. Scoped
+  // the same way the edit page scopes it — see the comment there.
+  const siblingsQuery = supabase
+    .from('workstations')
+    .select('id, name, color')
+    .eq('event_id', event.id)
+    .eq('tenant_id', tenant.id)
+    .not('color', 'is', null)
+
+  const { data: siblings, error: siblingsError } =
+    preselectedStage === null
+      ? await siblingsQuery.is('stage_id', null)
+      : await siblingsQuery.eq('stage_id', preselectedStage.id)
+
+  if (siblingsError) throw siblingsError
+
+  const takenBy = (siblings ?? []).map((sibling) => ({
+    color: sibling.color as string,
+    name: sibling.name,
+  }))
+
   return (
     <div className="px-8 py-8">
       <WorkstationForm
@@ -51,6 +73,7 @@ export default async function NewWorkstationPage({ params, searchParams }: Props
         tenantId={tenant.id}
         eventId={event.id}
         preselectedStage={preselectedStage}
+        takenBy={takenBy}
         schedulingGranularityMin={event.scheduling_granularity_min}
       />
     </div>

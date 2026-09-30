@@ -1,32 +1,26 @@
 // Color coding for work areas.
 //
-// Source of truth for the first eight pairs:
-// docs/design_handoff_admin_dashboard/README.md ("Work-area color coding").
-// The remaining 22 were generated to be as distinguishable as possible from
-// the handoff's eight and from each other, measured as OKLab distance rather
-// than hue angle. That distinction matters: an earlier version of this file
-// spaced them evenly around the hue circle, which put eight of the thirty in
-// the green/teal band and produced pairs only 0.005 apart perceptually —
-// indistinguishable as small avatar dots. Candidates vary in lightness and
-// chroma as well as hue, which is what gives thirty pastels room to separate;
-// the closest pair is now 0.0127 apart, and the tightest of those are the
-// handoff's own colours, kept verbatim.
+// Source of truth: the 30 bg/fg pairs below, delivered as the work-area
+// palette for the colour picker (WS-02). They replace the earlier eight from
+// docs/design_handoff_admin_dashboard/README.md plus 22 generated to extend
+// them; that set was paler and three of its pairs fell short of WCAG AA.
 //
-// The above is about telling colours apart. Collisions — two ids hashing to
-// the SAME colour — are a separate problem, and one that per-id hashing
-// cannot solve: with 30 colours, seven ids have a ~50% chance of at least one
-// repeat (the birthday problem). Render a list through `workAreaColorMap`
-// rather than calling `workAreaColor` per row; it resolves the repeats within
-// the set. `workAreaColor` remains correct for a single id shown on its own.
+// The palette is laid out as the picker renders it: three rows of ten, walking
+// the hue circle from warm red through green, teal and blue to violet, then
+// back around at a lower chroma. Adjacent swatches are therefore deliberately
+// similar — position in this array is the picker's reading order, not a
+// distinctness ranking.
 //
-// A note on the handoff's own eight: violet (4.42:1), amber (4.40:1) and green
-// (4.34:1) fall just short of WCAG AA 4.5:1 for normal-size text. They are
-// kept exactly as delivered rather than silently re-tuned — they are the
-// designed palette, and the labels that use them are 500-weight 13-14px. The
-// 22 generated pairs are all held to 4.6:1 to leave margin.
+// `name` is what gets persisted in `workstations.color`, never the hex. That
+// keeps a future re-tune of a shade a pure code change with no data migration,
+// so treat the names as a stable contract: rename one and you orphan the rows
+// holding it.
+//
+// Every pair clears WCAG AA 4.5:1 (the tightest is 4.51:1), which matters
+// because the fg is what draws labels inside a filled schedule cell.
 
 export interface WorkAreaColor {
-  /** Stable identifier. Never renders; safe to reference from tests. */
+  /** Stable identifier. Persisted in `workstations.color`; never renders. */
   name: string
   /** Pastel background for chips, dots and filled schedule cells. */
   bg: string
@@ -35,49 +29,59 @@ export interface WorkAreaColor {
 }
 
 export const WORK_AREA_COLORS: readonly WorkAreaColor[] = [
-  // --- the eight from the handoff, verbatim ---
-  { name: 'blue', bg: '#DCEAFE', fg: '#1D4ED8' }, // 5.50:1
-  { name: 'violet', bg: '#E5DFFC', fg: '#7C3AED' }, // 4.42:1
-  { name: 'teal', bg: '#D3F5E7', fg: '#0F766E' }, // 4.69:1
-  { name: 'rose', bg: '#FCE1E4', fg: '#BE123C' }, // 5.10:1
-  { name: 'amber', bg: '#FCEFD1', fg: '#B45309' }, // 4.40:1
-  { name: 'fuchsia', bg: '#F7E1FA', fg: '#A21CAF' }, // 5.15:1
-  { name: 'green', bg: '#DCF5E1', fg: '#15803D' }, // 4.34:1
-  { name: 'indigo', bg: '#DEE3FC', fg: '#4338CA' }, // 6.21:1
-  // --- 22 generated to extend the set to 30 ---
-  { name: 'amber2', bg: '#FFD7B2', fg: '#9F4600' }, // 4.66:1
-  { name: 'sky', bg: '#A7F1FF', fg: '#006E89' }, // 4.64:1
-  { name: 'grass', bg: '#E0EAB1', fg: '#5F6A00' }, // 4.67:1
-  { name: 'grass2', bg: '#EAFFC7', fg: '#577600' }, // 4.91:1
-  { name: 'green2', bg: '#BEF2CB', fg: '#00752F' }, // 4.67:1
-  { name: 'rose2', bg: '#FFCFE4', fg: '#A33767' }, // 4.64:1
-  { name: 'lime', bg: '#E7E4CA', fg: '#746200' }, // 4.68:1
-  { name: 'cyan', bg: '#B8FFFF', fg: '#007883' }, // 4.68:1
-  { name: 'violet2', bg: '#F8F1FF', fg: '#7551B3' }, // 5.31:1
-  { name: 'orange', bg: '#FFD0C9', fg: '#A83632' }, // 4.67:1
-  { name: 'teal2', bg: '#AAF4E7', fg: '#007361' }, // 4.64:1
-  { name: 'azure', bg: '#DFFAFF', fg: '#0074AF' }, // 4.68:1
-  { name: 'lime2', bg: '#FAEEB4', fg: '#816700' }, // 4.63:1
-  { name: 'magenta', bg: '#F7D4FF', fg: '#87459F' }, // 4.68:1
-  { name: 'emerald', bg: '#BCFEE3', fg: '#007C52' }, // 4.60:1
-  { name: 'blue2', bg: '#C1E6FF', fg: '#1163B6' }, // 4.60:1
-  { name: 'cyan2', bg: '#C9EBEC', fg: '#006F7A' }, // 4.66:1
-  { name: 'green3', bg: '#D3FACA', fg: '#2E7B19' }, // 4.62:1
-  { name: 'lime3', bg: '#F8E1AA', fg: '#865A00' }, // 4.70:1
-  { name: 'orange2', bg: '#FFEDE6', fg: '#AE3F27' }, // 5.23:1
-  { name: 'grass3', bg: '#E8F3CA', fg: '#5E7200' }, // 4.66:1
-  { name: 'azure2', bg: '#C8F5FF', fg: '#006FA7' }, // 4.69:1
+  // --- row 1: red -> aqua ---
+  { name: 'blush', bg: '#F7B8B8', fg: '#654B4B' }, // 4.79:1
+  { name: 'peach', bg: '#F7C9A8', fg: '#655245' }, // 4.72:1
+  { name: 'sand', bg: '#F6DDA0', fg: '#6C6146' }, // 4.51:1
+  { name: 'straw', bg: '#EFE7A8', fg: '#69664A' }, // 4.83:1
+  { name: 'chartreuse', bg: '#DCEBA0', fg: '#616746' }, // 4.99:1
+  { name: 'leaf', bg: '#C3E6A8', fg: '#56654A' }, // 4.95:1
+  { name: 'meadow', bg: '#AEE0B4', fg: '#475C4A' }, // 5.12:1
+  { name: 'jade', bg: '#A6E0C4', fg: '#445C50' }, // 5.19:1
+  { name: 'seafoam', bg: '#A0DED3', fg: '#425B57' }, // 5.19:1
+  { name: 'aqua', bg: '#9DDAE0', fg: '#40595C' }, // 5.16:1
+  // --- row 2: blue -> tan ---
+  { name: 'sky', bg: '#9CCDE6', fg: '#40545E' }, // 4.88:1
+  { name: 'cornflower', bg: '#A3C1EC', fg: '#434F61' }, // 4.72:1
+  { name: 'periwinkle', bg: '#B3BDEF', fg: '#494D62' }, // 4.60:1
+  { name: 'lavender', bg: '#C4B4EC', fg: '#4A445A' }, // 4.66:1
+  { name: 'lilac', bg: '#D3B0E6', fg: '#504357' }, // 4.57:1
+  { name: 'orchid', bg: '#E0AEDD', fg: '#554254' }, // 4.60:1
+  { name: 'mauve', bg: '#E8AECB', fg: '#5F4753' }, // 4.51:1
+  { name: 'rose', bg: '#EDACB8', fg: '#5A4146' }, // 4.79:1
+  { name: 'clay', bg: '#E9B3A3', fg: '#604943' }, // 4.51:1
+  { name: 'tan', bg: '#E0BE9B', fg: '#5C4E40' }, // 4.60:1
+  // --- row 3: ochre -> violet, lower chroma ---
+  { name: 'wheat', bg: '#D9C08C', fg: '#594F39' }, // 4.65:1
+  { name: 'olive', bg: '#D6CC8C', fg: '#585439' }, // 4.87:1
+  { name: 'moss', bg: '#CBD394', fg: '#53573D' }, // 4.87:1
+  { name: 'fern', bg: '#BAD79C', fg: '#4C5840' }, // 4.92:1
+  { name: 'sage', bg: '#A9D9AE', fg: '#455947' }, // 5.02:1
+  { name: 'mint', bg: '#9CD6C0', fg: '#40584F' }, // 5.00:1
+  { name: 'teal', bg: '#9BD1D2', fg: '#405656' }, // 4.87:1
+  { name: 'slate', bg: '#A0C6E3', fg: '#42515D' }, // 4.77:1
+  { name: 'iris', bg: '#B4BEE8', fg: '#4A4E5F' }, // 4.60:1
+  { name: 'heather', bg: '#C9B8E3', fg: '#524B5D' }, // 4.56:1
 ] as const
+
+/** Lookup by persisted name. Returns undefined for a name not in the palette. */
+export function workAreaColorByName(name: string | null | undefined): WorkAreaColor | undefined {
+  if (!name) return undefined
+  return WORK_AREA_COLORS.find((color) => color.name === name)
+}
 
 /**
  * FNV-1a over the work area's id.
  *
- * The brief asked for a color "randomised at creation". Deriving it from the
- * immutable id gets that — the assignment is arbitrary with respect to
- * anything a user controls — while staying a pure function, so it needs no
- * column, no backfill for the rows that already exist, and renders the same on
- * server and client. Renaming a work area keeps its color; only deleting and
- * recreating it draws a new one.
+ * Used for entities that have no stored colour of their own — officials'
+ * avatars, and work areas created before `workstations.color` existed. Work
+ * areas that DO have a stored colour take it from there; see
+ * `workAreaColorMap`, which prefers the stored value and only falls back to
+ * this hash.
+ *
+ * Deriving from the immutable id keeps the assignment arbitrary with respect
+ * to anything a user controls while staying a pure function, so it renders the
+ * same on server and client.
  */
 export function workAreaColor(workAreaId: string): WorkAreaColor {
   return WORK_AREA_COLORS[paletteIndex(workAreaId)]
@@ -93,21 +97,29 @@ function paletteIndex(id: string): number {
   return (hash >>> 0) % WORK_AREA_COLORS.length
 }
 
+/** An id paired with the colour stored for it, if it has one. */
+export interface ColorableId {
+  id: string
+  color?: string | null
+}
+
 /**
  * Colors a whole set of ids at once, resolving collisions within the set.
  *
- * `workAreaColor` hashes each id independently, so two ids in the same list
- * can land on the same color — with 30 colors, seven work areas have a ~50%
- * chance of at least one such pair (the birthday problem). Seen side by side
- * in one table that reads as a bug, whatever the maths says: Testklubben had
- * Social Media and Ringa both on `teal2`, and Depån and "Toalett och dusch"
- * both on `magenta`.
+ * Accepts either bare ids (for entities with no stored colour, such as
+ * officials) or `{ id, color }` pairs. A recognised stored colour always wins
+ * and is never displaced — the admin picked it deliberately, and the picker
+ * already marks the colours another work area on the stage is using. Ids with
+ * no stored colour hash as before, then probe forward past anything taken.
  *
- * Each id keeps its hashed color when that color is still free. Contended
- * ones fall through to the next free slot, probing forward from the hash so
- * the choice stays derived from the id rather than from list position.
+ * `workAreaColor` hashes each id independently, so two unstored ids in the same
+ * list can land on the same color — with 30 colors, seven work areas have a
+ * ~50% chance of at least one such pair (the birthday problem). Seen side by
+ * side in one table that reads as a bug, whatever the maths says: Testklubben
+ * had Social Media and Ringa both on the same colour, and Depån and "Toalett
+ * och dusch" both on another.
  *
- * Two properties this deliberately preserves:
+ * Two properties this deliberately preserves for the unstored ids:
  *
  * - **Order independence.** Ids are resolved in a canonical (sorted) order,
  *   not in list order, so re-sorting a table by name or capacity does not
@@ -119,15 +131,36 @@ function paletteIndex(id: string): number {
  * Beyond 30 ids collisions are unavoidable and the extras wrap around, which
  * is the same cosmetic repeat as before. Returns a Map keyed by id.
  */
-export function workAreaColorMap(ids: readonly string[]): Map<string, WorkAreaColor> {
+export function workAreaColorMap(
+  ids: readonly (string | ColorableId)[]
+): Map<string, WorkAreaColor> {
   const result = new Map<string, WorkAreaColor>()
   const taken = new Set<number>()
 
+  // Collapse duplicates, keeping any stored colour seen for an id. Callers
+  // pass whatever they render, which can repeat an id across rows.
+  const stored = new Map<string, string | null | undefined>()
+  for (const entry of ids) {
+    const id = typeof entry === 'string' ? entry : entry.id
+    const color = typeof entry === 'string' ? null : entry.color
+    if (color || !stored.has(id)) stored.set(id, color)
+  }
   // Sorting decouples the assignment from render order: the same set of ids
   // gets the same colors whichever way the caller happens to have sorted it.
-  const unique = [...new Set(ids)].sort()
+  const unique = [...stored.keys()].sort()
+
+  // Stored colours are claimed first so a hashed id can never take a slot an
+  // admin explicitly chose. Two work areas deliberately sharing a stored
+  // colour both keep it — the picker marks it, but does not forbid it.
+  for (const id of unique) {
+    const chosen = workAreaColorByName(stored.get(id))
+    if (!chosen) continue
+    result.set(id, chosen)
+    taken.add(WORK_AREA_COLORS.indexOf(chosen))
+  }
 
   for (const id of unique) {
+    if (result.has(id)) continue
     const first = paletteIndex(id)
     let index = first
     // Probe forward for a free slot. Bounded by the palette length, so a set
@@ -147,11 +180,39 @@ export function workAreaColorMap(ids: readonly string[]): Map<string, WorkAreaCo
 }
 
 /**
- * Pastel version of a foreground color, for decorative dots and bullets.
- * Per the handoff these are never drawn at full saturation.
+ * The first palette colour not already in `taken`, for defaulting a new work
+ * area's colour.
+ *
+ * Walks the palette in its delivered order rather than hashing, because this
+ * runs in a form where the admin can see the grid: "the first free swatch"
+ * matches what they are looking at, whereas a hashed pick would look arbitrary
+ * and would need an id that does not exist yet anyway.
+ *
+ * Falls back to the first colour once all thirty are taken — at that point
+ * every choice collides, and the picker marks the clash rather than blocking
+ * the save.
+ */
+export function firstFreeWorkAreaColor(taken: readonly string[]): WorkAreaColor {
+  const used = new Set(taken)
+  return WORK_AREA_COLORS.find((color) => !used.has(color.name)) ?? WORK_AREA_COLORS[0]
+}
+
+/**
+ * The colour for a decorative dot or bullet: the background, as-is.
+ *
+ * This used to lighten the FOREGROUND (`color-mix(fg 65%, white)`), which
+ * worked when fg was a saturated hue — the mix landed on a pastel version of
+ * the same colour. The delivered palette's foregrounds are deliberately muted
+ * near-neutrals chosen for text contrast, so that mix turned every dot grey or
+ * brown: blush became #9B8A8A and sky #839096, neither recognisable as the
+ * colour the admin picked.
+ *
+ * `bg` is the identifying colour in this palette and is already pastel, so the
+ * dot simply uses it. Kept as a function rather than inlining `color.bg` at
+ * the three call sites, so "what a dot looks like" stays one decision.
  */
 export function workAreaDotColor(color: WorkAreaColor): string {
-  return `color-mix(in srgb, ${color.fg} 65%, white)`
+  return color.bg
 }
 
 /**

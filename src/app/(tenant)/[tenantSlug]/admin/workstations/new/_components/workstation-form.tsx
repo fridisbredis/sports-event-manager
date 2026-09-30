@@ -19,6 +19,8 @@ import {
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
 import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import { ColorPicker, type ColorTakenBy } from '../../_components/color-picker'
+import { firstFreeWorkAreaColor } from '@/lib/theme/work-area-colors'
 import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
@@ -26,6 +28,7 @@ interface Props {
   tenantId: string
   eventId: string
   preselectedStage: Stage | null
+  takenBy: ColorTakenBy[]
   schedulingGranularityMin: number
 }
 
@@ -39,6 +42,7 @@ export default function WorkstationForm({
   tenantId,
   eventId,
   preselectedStage,
+  takenBy,
   schedulingGranularityMin,
 }: Props) {
   const { t } = useTranslation('admin')
@@ -77,6 +81,13 @@ export default function WorkstationForm({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [capacity, setCapacity] = useState(1)
+  // Defaults to the first free swatch rather than to nothing, so a work area
+  // saved without visiting the picker still gets a distinct colour — the
+  // schedule is unreadable when several areas share one, and "no opinion" is
+  // the common case when adding one quickly.
+  const [color, setColor] = useState<string>(
+    () => firstFreeWorkAreaColor(takenBy.map((entry) => entry.color)).name
+  )
   // Starts empty: the editor's own empty state explains that a work area
   // without a window never reaches the schedule, which is more use than a
   // blank pair of time fields the admin has to either fill in or remove.
@@ -181,6 +192,7 @@ export default function WorkstationForm({
         name,
         description,
         capacity,
+        color,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
         todos: todos
@@ -265,6 +277,8 @@ export default function WorkstationForm({
               />
             </div>
           </section>
+
+          <ColorPicker value={color} takenBy={takenBy} onChange={setColor} />
 
           <OperatingWindowsEditor
             windows={windows}

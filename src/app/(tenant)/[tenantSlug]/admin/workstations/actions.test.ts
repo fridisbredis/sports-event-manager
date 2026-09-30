@@ -64,6 +64,7 @@ const BASE_INPUT = {
   name: 'Water station',
   description: '',
   capacity: 4,
+  color: 'orchid',
   recurring: false,
   windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
   todos: [
@@ -141,6 +142,7 @@ describe('createWorkstation', () => {
       p_name: 'Water station',
       p_description: undefined,
       p_capacity_ceiling: 4,
+      p_color: 'orchid',
       p_recurring: false,
       p_windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
       p_todos: [{ instruction_text: 'Fill cups', item_type: 'checkbox' }],
@@ -176,6 +178,7 @@ const UPDATE_BASE_INPUT = {
   name: 'Water station',
   description: '',
   capacity: 4,
+  color: 'orchid',
   recurring: false,
   windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
   todos: [
@@ -256,6 +259,8 @@ describe('updateWorkstation', () => {
       p_name: 'Water station',
       p_description: undefined,
       p_capacity_ceiling: 4,
+      p_color: 'orchid',
+      p_set_color: true,
       p_recurring: false,
       p_windows: [{ window_start: '2026-09-01T08:00:00Z', window_end: '2026-09-01T16:00:00Z' }],
       p_todos: [{ instruction_text: 'Fill cups', item_type: 'checkbox' }],

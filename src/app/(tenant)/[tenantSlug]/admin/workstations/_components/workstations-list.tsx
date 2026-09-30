@@ -46,6 +46,8 @@ interface Stage {
 interface Workstation {
   id: string
   name: string
+  /** Palette name chosen by an admin; null falls back to hashing the id. */
+  color: string | null
   capacity_ceiling: number
   stage_id: string | null
   workstation_operating_windows: OperatingWindow[]
@@ -243,7 +245,10 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
   // colour appearing in two stage panels reads as a repeat just as much as
   // two in one table would. Must sit above the early return below — hooks
   // cannot be called conditionally.
-  const colors = useMemo(() => workAreaColorMap(workstations.map((ws) => ws.id)), [workstations])
+  const colors = useMemo(
+    () => workAreaColorMap(workstations.map((ws) => ({ id: ws.id, color: ws.color }))),
+    [workstations]
+  )
 
   if (stages.length === 0) {
     return (
