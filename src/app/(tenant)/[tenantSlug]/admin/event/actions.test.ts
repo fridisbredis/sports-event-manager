@@ -84,7 +84,7 @@ const BASE_INPUT = {
   description: '',
   location: '',
   logo_url: '',
-  scheduling_granularity_min: 30,
+  scheduling_granularity_min: 60,
   stages: [RACE_STAGE],
   facilities: [],
 }
@@ -123,6 +123,20 @@ describe('saveEvent', () => {
     expect(result).toEqual({ error: 'Not authorized' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a scheduling granularity other than 60 min and never touches events', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const fromMock = vi.fn()
+    mockClient(fromMock)
+
+    const result = await saveEvent({ ...BASE_INPUT, scheduling_granularity_min: 90 })
+
+    expect(result).toEqual({ error: 'Scheduling granularity is fixed at 60 minutes.' })
+    // The guard runs before the current-event lookup, so nothing is read or written.
+    expect(fromMock).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
   })
 
   it('blocks removing the last Race stage from a published event, before writing anything', async () => {

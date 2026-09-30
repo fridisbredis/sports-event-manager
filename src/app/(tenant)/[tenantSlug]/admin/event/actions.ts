@@ -63,6 +63,14 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
 
   if (!(await hasAdminAccessToTenant(user.id, input.tenantId))) return { error: 'Not authorized' }
 
+  // Scheduling granularity is fixed at 60 min in v1 (PO decision, 2026-09-30).
+  // The UI no longer offers a choice; this guard is the server-side half, so a
+  // direct call to this action can't write a value the scheduling grid mishandles
+  // across midnight. See DatesAndGranularitySection for the underlying defect.
+  if (input.scheduling_granularity_min !== 60) {
+    return { error: 'Scheduling granularity is fixed at 60 minutes.' }
+  }
+
   // Stage model v0.7: a published event must keep at least one Race stage
   // (mirrors the same check in publishEvent). Checked before any write so a
   // rejected save never leaves the events row partially updated. Fails
