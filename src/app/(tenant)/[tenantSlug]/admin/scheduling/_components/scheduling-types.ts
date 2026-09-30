@@ -47,3 +47,5 @@ export interface LocalAssignment {
   status: string
   slot_index: number | null
 }
+
+export type SchedulingView = 'by-person' | 'by-work-area'
