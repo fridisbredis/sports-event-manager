@@ -69,8 +69,15 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
                       total: WORK_AREA_COLORS.length,
                     })
               }
-              className={`relative size-[22px] rounded-full transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink ${
-                isSelected ? 'ring-2 ring-offset-2 ring-ink' : ''
+              // The selected/unselected ring classes are mutually exclusive
+              // rather than a `ring-2` added on top of a `ring-0` default:
+              // both are the same specificity, so which one won would come
+              // down to their order in the stylesheet. The explicit `ring-0`
+              // is load-bearing — HeroUI's theme ships ring utilities into
+              // this build, and without a reset every swatch picked up a
+              // faint grey ring, not just the selected one.
+              className={`relative size-[22px] rounded-full transition-[box-shadow,transform] hover:scale-110 focus:outline-none focus-visible:ring-offset-2 focus-visible:ring-ink ${
+                isSelected ? 'ring-2 ring-offset-2 ring-ink' : 'ring-0 focus-visible:ring-2'
               }`}
               style={{ backgroundColor: color.bg }}
             >
