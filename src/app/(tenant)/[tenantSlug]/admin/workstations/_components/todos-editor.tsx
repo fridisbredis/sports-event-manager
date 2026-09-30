@@ -1,4 +1,6 @@
-import type { MutableRefObject } from 'react'
+'use client'
+
+import { useRef } from 'react'
 import { Input } from '@heroui/react'
 import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
@@ -12,77 +14,172 @@ export interface TodoDraft {
 
 interface Props {
   todos: TodoDraft[]
-  todoRefs: MutableRefObject<(HTMLInputElement | null)[]>
-  onAddTodo: () => void
-  onRemoveTodo: (index: number) => void
-  onUpdateTodo: (index: number, value: string) => void
-  onUpdateTodoType: (index: number, itemType: ChecklistItemType) => void
+  onChange: (next: TodoDraft[]) => void
 }
 
-export function TodosEditor({
-  todos,
-  todoRefs,
-  onAddTodo,
-  onRemoveTodo,
-  onUpdateTodo,
-  onUpdateTodoType,
-}: Props) {
+interface ListProps {
+  heading: string
+  hint: string
+  addLabel: string
+  placeholder: string
+  removeLabel: string
+  rows: { draft: TodoDraft; index: number }[]
+  /** Renders the leading glyph for this list — a checkbox outline or a dot. */
+  marker: React.ReactNode
+  onAdd: () => void
+  onRemove: (index: number) => void
+  onUpdate: (index: number, value: string) => void
+  focusIndex: React.MutableRefObject<number | null>
+}
+
+/**
+ * One of the two lists. Both are the same shape — heading, rows, add link —
+ * and differ only in their marker and wording, so they share this component
+ * rather than being written out twice.
+ */
+function TodoList({
+  heading,
+  hint,
+  addLabel,
+  placeholder,
+  removeLabel,
+  rows,
+  marker,
+  onAdd,
+  onRemove,
+  onUpdate,
+  focusIndex,
+}: ListProps) {
+  return (
+    <div>
+      <div className="mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">{heading}</h3>
+        <p className="mt-1 text-xs text-gray-400">{hint}</p>
+      </div>
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        {rows.length > 0 ? (
+          <div className="divide-y divide-gray-100">
+            {rows.map(({ draft, index }) => (
+              <div key={index} className="flex items-center gap-3 px-3 py-2.5">
+                {marker}
+                <Input
+                  ref={(el) => {
+                    // Focus the row this list just added, without a ref array
+                    // that would have to stay aligned with a filtered view of
+                    // a shared list.
+                    if (el && focusIndex.current === index) {
+                      focusIndex.current = null
+                      setTimeout(() => el.focus(), 0)
+                    }
+                  }}
+                  type="text"
+                  value={draft.text}
+                  onChange={(e) => onUpdate(index, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      onAdd()
+                    }
+                  }}
+                  placeholder={placeholder}
+                  classNames={{
+                    base: 'flex-1',
+                    inputWrapper:
+                      '!bg-transparent data-[hover=true]:!bg-transparent group-data-[focus=true]:!bg-transparent shadow-none px-2 py-0',
+                    input: 'text-sm text-gray-900 placeholder:text-gray-400',
+                  }}
+                />
+                <LinkButton size="sm" tone="danger" onPress={() => onRemove(index)}>
+                  {removeLabel}
+                </LinkButton>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className={`px-4 py-3 ${rows.length > 0 ? 'border-t border-edge' : ''}`}>
+          <LinkButton onPress={onAdd}>{addLabel}</LinkButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The two checklist lists an admin edits: things officials tick off during
+ * their shift, and notes they only read.
+ *
+ * They are two views over one `todos` array rather than two arrays, because
+ * that array is what both RPCs take and what `position` is derived from. Each
+ * row carries its index into that array, so editing one list never disturbs
+ * the other's ordering.
+ */
+export function TodosEditor({ todos, onChange }: Props) {
   const { t } = useTranslation('admin')
+  // Which absolute index to focus once it renders. A ref, not state: it must
+  // survive the re-render the add causes without triggering another.
+  const focusIndex = useRef<number | null>(null)
+
+  const rowsOfType = (itemType: ChecklistItemType) =>
+    todos
+      .map((draft, index) => ({ draft, index }))
+      .filter(({ draft }) => draft.itemType === itemType)
+
+  function add(itemType: ChecklistItemType) {
+    // Appended at the end of the whole array: `position` follows array order,
+    // and the official-facing screen groups by kind anyway, so the two lists
+    // stay independently ordered without interleaving logic here.
+    focusIndex.current = todos.length
+    onChange([...todos, { text: '', itemType }])
+  }
+
+  function remove(index: number) {
+    onChange(todos.filter((_, i) => i !== index))
+  }
+
+  function update(index: number, value: string) {
+    onChange(todos.map((todo, i) => (i === index ? { ...todo, text: value } : todo)))
+  }
 
   return (
     <section>
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
         {t('workstations.todosLabel')}
       </h2>
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <div className="divide-y divide-gray-100">
-          {todos.map((todo, i) => (
-            <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-              {/*
-                The checkbox is the type toggle, not a completion control —
-                ticking it here marks the item as one an official will be able
-                to tick on their shift. It was previously rendered permanently
-                disabled, purely as a visual hint that v1 tracked no completion.
-              */}
-              <input
-                type="checkbox"
-                checked={todo.itemType === 'checkbox'}
-                onChange={(e) => onUpdateTodoType(i, e.target.checked ? 'checkbox' : 'info')}
-                aria-label={t('workstations.todoIsCheckbox')}
-                title={t('workstations.todoIsCheckbox')}
-                className="h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <Input
-                ref={(el) => {
-                  todoRefs.current[i] = el
-                }}
-                type="text"
-                value={todo.text}
-                onChange={(e) => onUpdateTodo(i, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    onAddTodo()
-                  }
-                }}
-                placeholder={t('workstations.todoPlaceholder')}
-                classNames={{
-                  base: 'flex-1',
-                  inputWrapper:
-                    '!bg-transparent data-[hover=true]:!bg-transparent group-data-[focus=true]:!bg-transparent shadow-none px-2 py-0',
-                  input: 'text-sm text-gray-900 placeholder:text-gray-400',
-                }}
-              />
-              <LinkButton size="sm" tone="danger" onPress={() => onRemoveTodo(i)}>
-                {t('workstations.removeTodo')}
-              </LinkButton>
-            </div>
-          ))}
-        </div>
-        <div className="border-t border-edge px-4 py-3 flex items-center justify-between gap-4">
-          <LinkButton onPress={onAddTodo}>{t('workstations.addTodo')}</LinkButton>
-          <p className="text-xs text-gray-400">{t('workstations.todoTypeHint')}</p>
-        </div>
+      <div className="flex flex-col gap-5">
+        <TodoList
+          heading={t('workstations.checklistHeading')}
+          hint={t('workstations.checklistHint')}
+          addLabel={t('workstations.addChecklistItem')}
+          placeholder={t('workstations.checklistPlaceholder')}
+          removeLabel={t('workstations.removeTodo')}
+          rows={rowsOfType('checkbox')}
+          // An outline, not an interactive control: it previews the checkbox
+          // an official will see. Making it clickable here would suggest an
+          // admin can tick the work off on their behalf.
+          marker={
+            <span
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0 rounded border-2 border-gray-300"
+            />
+          }
+          onAdd={() => add('checkbox')}
+          onRemove={remove}
+          onUpdate={update}
+          focusIndex={focusIndex}
+        />
+        <TodoList
+          heading={t('workstations.notesHeading')}
+          hint={t('workstations.notesHint')}
+          addLabel={t('workstations.addNote')}
+          placeholder={t('workstations.notePlaceholder')}
+          removeLabel={t('workstations.removeTodo')}
+          rows={rowsOfType('info')}
+          marker={<span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-gray-300" />}
+          onAdd={() => add('info')}
+          onRemove={remove}
+          onUpdate={update}
+          focusIndex={focusIndex}
+        />
       </div>
     </section>
   )

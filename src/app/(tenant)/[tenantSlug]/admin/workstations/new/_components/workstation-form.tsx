@@ -19,7 +19,6 @@ import {
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
 import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
-import type { ChecklistItemType } from '@/types/app'
 
 interface Props {
   tenantSlug: string
@@ -78,8 +77,7 @@ export default function WorkstationForm({
   const [description, setDescription] = useState('')
   const [capacity, setCapacity] = useState(1)
   const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', limitToDay: null }])
-  const [todos, setTodos] = useState<TodoDraft[]>([{ text: '', itemType: 'info' }])
-  const todoRefs = useRef<(HTMLInputElement | null)[]>([])
+  const [todos, setTodos] = useState<TodoDraft[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSaving, startSave] = useTransition()
@@ -128,26 +126,6 @@ export default function WorkstationForm({
   function setLimitDay(index: number, day: string) {
     setWindows((prev) => prev.map((win, j) => (j === index ? clampToDay(win, day) : win)))
     clearWindowError(index)
-  }
-
-  function addTodo() {
-    setTodos((prev) => {
-      const next = [...prev, { text: '', itemType: 'info' as const }]
-      setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
-      return next
-    })
-  }
-
-  function removeTodo(index: number) {
-    setTodos((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  function updateTodo(index: number, value: string) {
-    setTodos((prev) => prev.map((t, i) => (i === index ? { ...t, text: value } : t)))
-  }
-
-  function updateTodoType(index: number, itemType: ChecklistItemType) {
-    setTodos((prev) => prev.map((t, i) => (i === index ? { ...t, itemType } : t)))
   }
 
   function validate(): boolean {
@@ -318,14 +296,7 @@ export default function WorkstationForm({
             />
           </section>
 
-          <TodosEditor
-            todos={todos}
-            todoRefs={todoRefs}
-            onAddTodo={addTodo}
-            onRemoveTodo={removeTodo}
-            onUpdateTodo={updateTodo}
-            onUpdateTodoType={updateTodoType}
-          />
+          <TodosEditor todos={todos} onChange={setTodos} />
         </div>
       </div>
     </div>
