@@ -3,15 +3,11 @@
 import { Clock, Layers } from 'lucide-react'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react'
-import { Button } from '@/components/ui/button'
-import { LISTBOX_ITEM } from '@/components/ui/form-fields'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import {
   generateSlotsForDay,
   slotEndTime,
   isWithinWindow,
-  formatDayLabel,
   computeOverCapacityCells,
   computeOverCapacityDetails,
   computeDoubleBookedOfficials,
@@ -23,6 +19,10 @@ import { getAssignmentsForCell } from './grid-helpers'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
+import { SchedulingPrintStyles, SchedulingPrintHeader } from './scheduling-print-chrome'
+import { SchedulingToolbar } from './scheduling-toolbar'
+import { ConflictBanners } from './conflict-banners'
+import { SchedulingViewToggle } from './scheduling-view-toggle'
 import { ByPersonGrid } from './by-person-grid'
 import { ByWorkAreaGrid } from './by-work-area-grid'
 import { useSchedulingGridInteraction } from './use-scheduling-grid-interaction'
@@ -36,6 +36,7 @@ import type {
   OfficialData,
   AssignmentData,
   LocalAssignment,
+  SchedulingView,
 } from './scheduling-types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -52,8 +53,6 @@ interface Props {
   initialSelectedDay: string
   initialSelectedStageId: string
 }
-
-type View = 'by-person' | 'by-work-area'
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -75,7 +74,7 @@ export function SchedulingGrid({
   // getCurrentStage/first otherwise) — trust that instead of re-deriving it
   // here, so a "review this warning" link actually lands on the flagged stage.
   const [selectedStageId, setSelectedStageId] = useState<string>(initialSelectedStageId)
-  const [view, setView] = useState<View>('by-person')
+  const [view, setView] = useState<SchedulingView>('by-person')
   const [selectedDay, setSelectedDay] = useState<string>(initialSelectedDay)
 
   // The assignments the server sent are scoped to `initialSelectedDay` — when the
@@ -89,6 +88,15 @@ export function SchedulingGrid({
   function changeDay(day: string, stageId: string = selectedStageId) {
     setSelectedDay(day)
     router.push(`?stage=${stageId}&day=${day}`, { scroll: false })
+  }
+
+  function handleSelectStage(id: string) {
+    const stage = stages.find((s) => s.id === id)
+    if (!stage) return
+    setSelectedStageId(id)
+    closePickerCell()
+    closeCellActionCell()
+    changeDay(getAllocableDays(stage)[0] ?? '', id)
   }
 
   const {
@@ -137,8 +145,6 @@ export function SchedulingGrid({
     () => (selectedStage ? getAllocableDays(selectedStage) : []),
     [selectedStage]
   )
-
-  const dayIndex = availableDays.indexOf(selectedDay)
 
   const slots = useMemo(
     () =>
@@ -388,222 +394,29 @@ export function SchedulingGrid({
 
   return (
     <div>
-      <style>{`
-        .print-only { display: none; }
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          .scheduling-scroll-container {
-            overflow: visible !important;
-            max-height: none !important;
-          }
-          [data-picker-cell], [data-cell-action], [data-ws-picker], [role='dialog'] {
-            display: none !important;
-          }
-          @page { size: landscape; }
-        }
-      `}</style>
+      <SchedulingPrintStyles />
 
-      {/* Print-only header — replaces the interactive chrome when printing */}
-      <div className="print-only mb-4">
-        <h1 className="page-title">{t('scheduling.title')}</h1>
-        <p className="text-sm text-gray-600">
-          {selectedStage?.name}
-          {selectedDay ? ` — ${formatDayLabel(selectedDay)}` : ''}
-        </p>
-      </div>
+      <SchedulingPrintHeader stageName={selectedStage?.name} selectedDay={selectedDay} />
 
-      {/* Header */}
-      <div className="no-print flex items-center gap-4 mb-6">
-        <h1 className="page-title">{t('scheduling.title')}</h1>
+      <SchedulingToolbar
+        stages={stages}
+        selectedStage={selectedStage}
+        selectedStageId={selectedStageId}
+        onSelectStage={handleSelectStage}
+        availableDays={availableDays}
+        selectedDay={selectedDay}
+        onSelectDay={(day) => changeDay(day)}
+        dragSaving={dragSaving}
+      />
 
-        <div className="flex-1" />
+      <ConflictBanners
+        overCapacityCount={overCapacityCount}
+        overCapacityDetails={overCapacityDetails}
+        doubleBookedCount={doubleBookedCount}
+        doubleBookedDetails={doubleBookedDetails}
+      />
 
-        {/* Stage + day selector — grouped together since they're one connected control */}
-        <Dropdown>
-          <DropdownTrigger>
-            <Button
-              variant="bordered"
-              size="sm"
-              endContent={
-                <svg
-                  className="w-4 h-4 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              }
-            >
-              {selectedStage?.name ?? t('scheduling.selectStage')}
-            </Button>
-          </DropdownTrigger>
-          <DropdownMenu
-            selectionMode="single"
-            // Shared with the Select fields so hover and the selected row
-            // pick up the tenant palette instead of HeroUI's grey.
-            itemClasses={{ base: LISTBOX_ITEM }}
-            selectedKeys={new Set([selectedStageId])}
-            onAction={(key) => {
-              const id = String(key)
-              const stage = stages.find((s) => s.id === id)
-              if (stage) {
-                setSelectedStageId(id)
-                closePickerCell()
-                closeCellActionCell()
-                changeDay(getAllocableDays(stage)[0] ?? '', id)
-              }
-            }}
-          >
-            {stages.map((stage) => (
-              <DropdownItem key={stage.id}>{stage.name}</DropdownItem>
-            ))}
-          </DropdownMenu>
-        </Dropdown>
-
-        {availableDays.length > 0 && (
-          <div className="flex items-center gap-1">
-            <Button
-              isIconOnly
-              variant="bordered"
-              size="sm"
-              onPress={() => changeDay(availableDays[dayIndex - 1])}
-              isDisabled={dayIndex <= 0}
-              aria-label={t('scheduling.prevDay')}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </Button>
-            <span className="text-sm text-gray-600 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center capitalize">
-              {selectedDay ? formatDayLabel(selectedDay) : ''}
-            </span>
-            <Button
-              isIconOnly
-              variant="bordered"
-              size="sm"
-              onPress={() => changeDay(availableDays[dayIndex + 1])}
-              isDisabled={dayIndex >= availableDays.length - 1}
-              aria-label={t('scheduling.nextDay')}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </Button>
-          </div>
-        )}
-
-        {dragSaving && (
-          <span className="text-xs text-gray-400">{t('scheduling.dragPaintSaving')}</span>
-        )}
-
-        <Button variant="bordered" size="sm" onPress={() => window.print()}>
-          {t('scheduling.print')}
-        </Button>
-      </div>
-
-      {/* Conflict banners */}
-      {overCapacityCount > 0 && (
-        <div className="no-print mb-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-md text-sm text-orange-700">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-4 h-4 text-orange-500 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z"
-              />
-            </svg>
-            {t('scheduling.overCapacity', { count: overCapacityCount })}
-          </div>
-          <ul className="mt-1.5 ml-6 space-y-0.5 text-xs text-orange-600">
-            {overCapacityDetails.map((d, i) => (
-              <li key={i}>
-                {d.workAreaName} — {d.time} ({d.count}/{d.ceiling}): {d.officialNames.join(', ')}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {doubleBookedCount > 0 && (
-        <div className="no-print mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-4 h-4 text-red-500 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-            >
-              <circle cx="12" cy="12" r="10" strokeWidth={2} />
-              <path strokeLinecap="round" strokeWidth={2} d="M8 8l8 8M16 8l-8 8" />
-            </svg>
-            {t('scheduling.doubleBooked', { count: doubleBookedCount })}
-          </div>
-          <ul className="mt-1.5 ml-6 space-y-0.5 text-xs text-red-600">
-            {doubleBookedDetails.map((d, i) => (
-              <li key={i}>
-                {d.officialName} — {d.time} ({d.workAreaNames.join(', ')})
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* View toggle — a segmented control rather than two separate buttons:
-          the two views are one either/or choice, and the shared track makes
-          that read at a glance. Plain <button>s, not our Button, because
-          HeroUI's own padding and min-width fight the flush segments. */}
-      <div
-        role="tablist"
-        aria-label={t('scheduling.viewToggleLabel')}
-        className="no-print mb-5 inline-flex gap-1 rounded-control bg-status-neutral-bg p-1"
-      >
-        {(
-          [
-            ['by-person', t('scheduling.viewByPerson')],
-            ['by-work-area', t('scheduling.viewByWorkArea')],
-          ] as const
-        ).map(([key, label]) => {
-          const isActive = view === key
-          return (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => setView(key)}
-              className={`rounded-[7px] px-4 py-1.5 text-sm font-semibold transition-colors ${
-                isActive
-                  ? 'bg-tenant-primary text-white shadow-card'
-                  : 'text-ink-soft hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          )
-        })}
-      </div>
+      <SchedulingViewToggle view={view} onChange={setView} />
 
       {/* Grid */}
       {officials.length === 0 && stageWorkstations.length === 0 ? (
