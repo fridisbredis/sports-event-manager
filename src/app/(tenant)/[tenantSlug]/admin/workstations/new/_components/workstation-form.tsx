@@ -226,19 +226,19 @@ export default function WorkstationForm({
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[3fr_2fr]">
         {/* Left column */}
-        <div className="space-y-8">
+        <AppCard bodyClassName="divide-y divide-edge p-0 [&>*]:px-6 [&>*]:py-5">
           {/* Stage */}
-          <AppCard as="section">
+          <section>
             <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
             <div className="rounded-lg bg-status-neutral-bg px-4 py-3 text-[15px] text-ink-soft">
               {preselectedStage
                 ? `${preselectedStage.name} — ${preselectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
                 : t('workstations.allStages')}
             </div>
-          </AppCard>
+          </section>
 
           {/* Identity */}
-          <AppCard as="section">
+          <section>
             <h2 className="section-label mb-4">{t('workstations.identity')}</h2>
             <div className="space-y-4">
               <Input
@@ -259,7 +259,7 @@ export default function WorkstationForm({
                 minRows={3}
               />
             </div>
-          </AppCard>
+          </section>
 
           <OperatingWindowsEditor
             windows={windows}
@@ -281,7 +281,7 @@ export default function WorkstationForm({
             minStartFor={minStartFor}
             maxEndFor={maxEndFor}
           />
-        </div>
+        </AppCard>
 
         {/* Right column */}
         <div className="space-y-8">
