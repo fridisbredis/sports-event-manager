@@ -71,6 +71,47 @@ describe('useUnsavedChanges', () => {
     expect(result.current.dialogProps.open).toBe(false)
   })
 
+  it('onLeave runs onDiscard so the form can undo changes it made outside React state', () => {
+    const { push } = mockRouter()
+    const onDiscard = vi.fn()
+    const { result } = renderHook(() => useUnsavedChanges({ onDiscard }))
+
+    act(() => result.current.markDirty())
+    act(() => result.current.guardedNavigate('/next'))
+    act(() => result.current.dialogProps.onLeave())
+
+    expect(onDiscard).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith('/next')
+  })
+
+  it('onStay leaves the previewed changes in place', () => {
+    mockRouter()
+    const onDiscard = vi.fn()
+    const { result } = renderHook(() => useUnsavedChanges({ onDiscard }))
+
+    act(() => result.current.markDirty())
+    act(() => result.current.guardedNavigate('/next'))
+    act(() => result.current.dialogProps.onStay())
+
+    expect(onDiscard).not.toHaveBeenCalled()
+  })
+
+  it('onLeave runs onDiscard for a back-navigation too', () => {
+    mockRouter()
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    const onDiscard = vi.fn()
+    const { result } = renderHook(() => useUnsavedChanges({ onDiscard }))
+
+    act(() => result.current.markDirty())
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    act(() => result.current.dialogProps.onLeave())
+
+    expect(onDiscard).toHaveBeenCalledTimes(1)
+    backSpy.mockRestore()
+  })
+
   it('onStay closes the dialog without navigating or clearing the dirty flag', () => {
     const { push } = mockRouter()
     const { result } = renderHook(() => useUnsavedChanges())

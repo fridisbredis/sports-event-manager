@@ -64,7 +64,14 @@ export default function EventConfigForm({
   isPublished,
 }: Props) {
   const { t } = useTranslation('admin')
-  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
+  // Leaving with an unsaved palette has to put the theme back. Picking a colour
+  // writes the CSS variables straight onto :root for an immediate preview, and
+  // unlike every other field here that lives in component state, those survive
+  // the navigation — the abandoned colour would follow the user to the next
+  // page and read as saved.
+  const { markDirty, markClean, dialogProps } = useUnsavedChanges({
+    onDiscard: () => paintTheme(savedPalette),
+  })
 
   const [name, setName] = useState(initialName)
   const [eventType, setEventType] = useState(initialEventType)
