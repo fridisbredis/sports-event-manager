@@ -25,6 +25,7 @@ import {
   workAreaDotColor,
   type WorkAreaColor,
 } from '@/lib/theme/work-area-colors'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 // Every rendered id is in the map by construction; this only satisfies the
 // type at the lookup site.
@@ -64,7 +65,7 @@ function utcDateStr(iso: string): string {
 }
 
 function utcTimeStr(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-GB', {
+  return new Date(iso).toLocaleTimeString(DATE_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
@@ -73,7 +74,7 @@ function utcTimeStr(iso: string): string {
 
 function formatWindow(w: OperatingWindow): string {
   const dateLabel = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', {
+    new Date(iso).toLocaleDateString(DATE_LOCALE, {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -116,7 +117,7 @@ function formatStageDate(stage: Stage): string {
     month: 'short',
     timeZone: 'UTC',
   }
-  const start = new Date(stage.start_time).toLocaleDateString('en-GB', opts)
+  const start = new Date(stage.start_time).toLocaleDateString(DATE_LOCALE, opts)
   if (!stage.end_time) return start
   const startDay = utcDateStr(stage.start_time)
   const endDay = utcDateStr(stage.end_time)
@@ -125,7 +126,7 @@ function formatStageDate(stage: Stage): string {
     const endTime = utcTimeStr(stage.end_time)
     return `${start} · ${startTime}–${endTime}`
   }
-  const end = new Date(stage.end_time).toLocaleDateString('en-GB', opts)
+  const end = new Date(stage.end_time).toLocaleDateString(DATE_LOCALE, opts)
   return `${start} – ${end}`
 }
 

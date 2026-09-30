@@ -8,6 +8,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
 import { workAreaColorMap, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './checklist-item-row'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 type Todo = { id: string; instruction_text: string; position: number; item_type: string }
 
@@ -72,7 +73,7 @@ interface Props {
 }
 
 function formatTime(ts: string): string {
-  return new Date(ts).toLocaleTimeString('en-GB', {
+  return new Date(ts).toLocaleTimeString(DATE_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
@@ -80,7 +81,7 @@ function formatTime(ts: string): string {
 }
 
 function formatDayHeader(ts: string): string {
-  return new Date(ts).toLocaleDateString('en-GB', {
+  return new Date(ts).toLocaleDateString(DATE_LOCALE, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -93,7 +94,7 @@ function formatDayHeader(ts: string): string {
 // is anchored to midnight UTC to match the `timeZone: 'UTC'` the rest of this
 // component formats in.
 function formatDayTab(day: string): string {
-  return new Date(`${day}T00:00:00.000Z`).toLocaleDateString('en-GB', {
+  return new Date(`${day}T00:00:00.000Z`).toLocaleDateString(DATE_LOCALE, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

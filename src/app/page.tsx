@@ -33,7 +33,7 @@ export default async function RootPage() {
     redirect('/confirm-invite')
   }
 
-  const t = await getServerTranslation('en')
+  const t = await getServerTranslation()
   return (
     <main className="max-w-md mx-auto mt-20 p-6">
       <h1 className="text-xl font-semibold">{t('errors.notAuthorized')}</h1>

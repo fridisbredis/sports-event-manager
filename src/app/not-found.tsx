@@ -3,7 +3,7 @@ import { getServerTranslation } from '@/lib/i18n/server'
 import { display } from '@/fonts/space-grotesk'
 
 export default async function NotFound() {
-  const t = await getServerTranslation('en')
+  const t = await getServerTranslation()
 
   return (
     <main

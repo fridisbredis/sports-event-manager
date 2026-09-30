@@ -96,7 +96,7 @@ describe('createWorkstation', () => {
 
     const result = await createWorkstation({ ...BASE_INPUT, tenantId: 'not-a-uuid' })
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
@@ -107,7 +107,7 @@ describe('createWorkstation', () => {
 
     const result = await createWorkstation(BASE_INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(rpcMock).not.toHaveBeenCalled()
   })
@@ -123,7 +123,7 @@ describe('createWorkstation', () => {
       schedulingGranularityMin: 30,
     })
 
-    expect(result).toEqual({ error: 'Operating window is shorter than the scheduling granularity' })
+    expect(result).toEqual({ error: 'Tidsfönstret är kortare än schemaintervallet' })
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
@@ -164,7 +164,7 @@ describe('createWorkstation', () => {
     const result = await createWorkstation(BASE_INPUT)
 
     // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
+    expect(result).toEqual({ error: 'Något gick fel när ändringarna skulle sparas. Försök igen.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -213,7 +213,7 @@ describe('updateWorkstation', () => {
 
     const result = await updateWorkstation({ ...UPDATE_BASE_INPUT, tenantId: 'not-a-uuid' })
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
@@ -224,7 +224,7 @@ describe('updateWorkstation', () => {
 
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(rpcMock).not.toHaveBeenCalled()
   })
@@ -240,7 +240,7 @@ describe('updateWorkstation', () => {
       schedulingGranularityMin: 30,
     })
 
-    expect(result).toEqual({ error: 'Operating window is shorter than the scheduling granularity' })
+    expect(result).toEqual({ error: 'Tidsfönstret är kortare än schemaintervallet' })
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
@@ -282,7 +282,7 @@ describe('updateWorkstation', () => {
     const result = await updateWorkstation(UPDATE_BASE_INPUT)
 
     // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
+    expect(result).toEqual({ error: 'Något gick fel när ändringarna skulle sparas. Försök igen.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -330,7 +330,7 @@ describe('deleteWorkstation', () => {
 
     const result = await deleteWorkstation({ ...DELETE_BASE_INPUT, tenantId: 'not-a-uuid' })
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(fromMock).not.toHaveBeenCalled()
   })
 
@@ -341,7 +341,7 @@ describe('deleteWorkstation', () => {
 
     const result = await deleteWorkstation(DELETE_BASE_INPUT)
 
-    expect(result).toEqual({ error: 'Not authorized' })
+    expect(result).toEqual({ error: 'Behörighet saknas' })
     expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
     expect(fromMock).not.toHaveBeenCalled()
   })
@@ -356,7 +356,7 @@ describe('deleteWorkstation', () => {
     const result = await deleteWorkstation(DELETE_BASE_INPUT)
 
     // F-REL-22: never forward the raw DB error message to the client.
-    expect(result).toEqual({ error: 'Something went wrong while deleting. Please try again.' })
+    expect(result).toEqual({ error: 'Något gick fel vid borttagningen. Försök igen.' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })

@@ -11,12 +11,24 @@ import enCommon from '../../public/locales/en/common.json'
 import enAuth from '../../public/locales/en/auth.json'
 import enAdmin from '../../public/locales/en/admin.json'
 import enOfficial from '../../public/locales/en/official.json'
+import svCommon from '../../public/locales/sv/common.json'
+import svAuth from '../../public/locales/sv/auth.json'
+import svAdmin from '../../public/locales/sv/admin.json'
+import svOfficial from '../../public/locales/sv/official.json'
 
-const enResources: Record<string, unknown> = {
-  common: enCommon,
-  auth: enAuth,
-  admin: enAdmin,
-  official: enOfficial,
+const resources: Record<string, Record<string, unknown>> = {
+  en: {
+    common: enCommon,
+    auth: enAuth,
+    admin: enAdmin,
+    official: enOfficial,
+  },
+  sv: {
+    common: svCommon,
+    auth: svAuth,
+    admin: svAdmin,
+    official: svOfficial,
+  },
 }
 
 if (!i18next.isInitialized) {
@@ -24,8 +36,7 @@ if (!i18next.isInitialized) {
     .use(initReactI18next)
     .use(
       resourcesToBackend((language: string, namespace: string) => {
-        if (language === 'en') return enResources[namespace] ?? {}
-        return {}
+        return resources[language]?.[namespace] ?? {}
       })
     )
     .init({
