@@ -30,8 +30,8 @@ const WITH_TODOS = {
   name: 'Depån',
   description: 'Cups, jugs and refill point at 5 km',
   workstation_todos: [
-    { id: 't2', instruction_text: 'Share finish-line photos', position: 2 },
-    { id: 't1', instruction_text: 'Post race-day reminder', position: 1 },
+    { id: 't2', instruction_text: 'Share finish-line photos', position: 2, item_type: 'info' },
+    { id: 't1', instruction_text: 'Post race-day reminder', position: 1, item_type: 'info' },
   ],
 }
 
@@ -40,6 +40,26 @@ const DEPOT = {
   name: 'Depån',
   description: null,
   workstation_todos: [],
+}
+
+// The checklist props these tests don't exercise. Kept minimal on purpose:
+// the fixtures above are all `info` items, which render exactly as they did
+// before checkboxes existed, so these only have to satisfy the types.
+const CHECKLIST_STRINGS = {
+  toggleLabel: 'Check off',
+  checkedBy: (name: string, time: string) => `Checked by ${name} at ${time}`,
+  someone: 'someone',
+  confirmTitle: 'Are you sure?',
+  confirmBody: (name: string) => `${name} checked this off. Uncheck it anyway?`,
+  confirmCancel: 'No, keep it',
+  confirmConfirm: 'Yes, uncheck',
+  saveFailed: 'Could not save. Try again.',
+}
+
+const CHECKLIST_PROPS = {
+  checks: new Map(),
+  currentUserId: null,
+  checklistStrings: CHECKLIST_STRINGS,
 }
 
 function renderView(view: 'time' | 'work-area', assignments: AssignmentRow[]) {
@@ -51,6 +71,7 @@ function renderView(view: 'time' | 'work-area', assignments: AssignmentRow[]) {
       selectedDay="2026-08-12"
       tenantSlug="testklubben"
       strings={STRINGS}
+      {...CHECKLIST_PROPS}
     />
   )
 }
@@ -235,6 +256,7 @@ describe('ScheduleView view toggle', () => {
         selectedDay="2026-08-12"
         tenantSlug="testklubben"
         strings={STRINGS}
+        {...CHECKLIST_PROPS}
       />
     )
   }
@@ -352,6 +374,7 @@ describe('ScheduleView day label', () => {
         selectedDay={selectedDay}
         tenantSlug="testklubben"
         strings={STRINGS}
+        {...CHECKLIST_PROPS}
       />
     )
   }
@@ -407,6 +430,7 @@ describe('ScheduleView day label', () => {
         selectedDay="2026-08-12"
         tenantSlug="testklubben"
         strings={STRINGS}
+        {...CHECKLIST_PROPS}
       />
     )
 

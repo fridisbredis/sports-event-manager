@@ -21,7 +21,8 @@ import {
 } from '../../_utils'
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
-import { TodosEditor } from '../../_components/todos-editor'
+import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import type { ChecklistItemType } from '@/types/app'
 
 interface Props {
   tenantSlug: string
@@ -33,7 +34,7 @@ interface Props {
   initialDescription: string
   initialCapacity: number
   initialWindows: { window_start: string; window_end: string }[]
-  initialTodos: string[]
+  initialTodos: TodoDraft[]
   schedulingGranularityMin: number
 }
 
@@ -95,7 +96,9 @@ export default function WorkstationEditForm({
   const [windows, setWindows] = useState<TimeWindow[]>(() =>
     initWindowsFromStored(initialWindows, stageDays)
   )
-  const [todos, setTodos] = useState<string[]>(initialTodos.length > 0 ? initialTodos : [''])
+  const [todos, setTodos] = useState<TodoDraft[]>(
+    initialTodos.length > 0 ? initialTodos : [{ text: '', itemType: 'info' }]
+  )
   const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -157,7 +160,7 @@ export default function WorkstationEditForm({
 
   function addTodo() {
     setTodos((prev) => {
-      const next = [...prev, '']
+      const next = [...prev, { text: '', itemType: 'info' as const }]
       setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
       return next
     })
@@ -170,7 +173,12 @@ export default function WorkstationEditForm({
   }
 
   function updateTodo(index: number, value: string) {
-    setTodos((prev) => prev.map((item, i) => (i === index ? value : item)))
+    setTodos((prev) => prev.map((item, i) => (i === index ? { ...item, text: value } : item)))
+    markDirty()
+  }
+
+  function updateTodoType(index: number, itemType: ChecklistItemType) {
+    setTodos((prev) => prev.map((item, i) => (i === index ? { ...item, itemType } : item)))
     markDirty()
   }
 
@@ -223,7 +231,10 @@ export default function WorkstationEditForm({
         capacity,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
-        todos: todos.filter((item) => item.trim()),
+        todos: todos
+          .map((item) => ({ ...item, text: item.text.trim() }))
+          .filter((item) => item.text)
+          .map((item) => ({ instruction_text: item.text, item_type: item.itemType })),
         schedulingGranularityMin,
       })
 
@@ -388,6 +399,7 @@ export default function WorkstationEditForm({
             onAddTodo={addTodo}
             onRemoveTodo={removeTodo}
             onUpdateTodo={updateTodo}
+            onUpdateTodoType={updateTodoType}
           />
         </div>
       </div>

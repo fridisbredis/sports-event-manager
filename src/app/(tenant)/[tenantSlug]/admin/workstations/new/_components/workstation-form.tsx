@@ -18,7 +18,8 @@ import {
 } from '../../_utils'
 import { getAllocableRange } from '@/lib/scheduling/allocable-range'
 import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
-import { TodosEditor } from '../../_components/todos-editor'
+import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import type { ChecklistItemType } from '@/types/app'
 
 interface Props {
   tenantSlug: string
@@ -77,7 +78,7 @@ export default function WorkstationForm({
   const [description, setDescription] = useState('')
   const [capacity, setCapacity] = useState(1)
   const [windows, setWindows] = useState<TimeWindow[]>([{ start: '', end: '', limitToDay: null }])
-  const [todos, setTodos] = useState<string[]>([''])
+  const [todos, setTodos] = useState<TodoDraft[]>([{ text: '', itemType: 'info' }])
   const todoRefs = useRef<(HTMLInputElement | null)[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -131,7 +132,7 @@ export default function WorkstationForm({
 
   function addTodo() {
     setTodos((prev) => {
-      const next = [...prev, '']
+      const next = [...prev, { text: '', itemType: 'info' as const }]
       setTimeout(() => todoRefs.current[next.length - 1]?.focus(), 0)
       return next
     })
@@ -142,7 +143,11 @@ export default function WorkstationForm({
   }
 
   function updateTodo(index: number, value: string) {
-    setTodos((prev) => prev.map((t, i) => (i === index ? value : t)))
+    setTodos((prev) => prev.map((t, i) => (i === index ? { ...t, text: value } : t)))
+  }
+
+  function updateTodoType(index: number, itemType: ChecklistItemType) {
+    setTodos((prev) => prev.map((t, i) => (i === index ? { ...t, itemType } : t)))
   }
 
   function validate(): boolean {
@@ -194,7 +199,10 @@ export default function WorkstationForm({
         capacity,
         recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
         windows: finalWindows,
-        todos: todos.filter((t) => t.trim()),
+        todos: todos
+          .map((t) => ({ ...t, text: t.text.trim() }))
+          .filter((t) => t.text)
+          .map((t) => ({ instruction_text: t.text, item_type: t.itemType })),
         schedulingGranularityMin,
       })
 
@@ -316,6 +324,7 @@ export default function WorkstationForm({
             onAddTodo={addTodo}
             onRemoveTodo={removeTodo}
             onUpdateTodo={updateTodo}
+            onUpdateTodoType={updateTodoType}
           />
         </div>
       </div>

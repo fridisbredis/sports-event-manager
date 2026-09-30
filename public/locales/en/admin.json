@@ -165,7 +165,9 @@
     "genericDeleteError": "Something went wrong while deleting. Please try again.",
     "workAreaCount_zero": "0 work areas",
     "workAreaCount_one": "{{count}} work area",
-    "workAreaCount_other": "{{count}} work areas"
+    "workAreaCount_other": "{{count}} work areas",
+    "todoIsCheckbox": "Officials can check this off",
+    "todoTypeHint": "Tick a box to let officials check that item off during their shift."
   },
   "officials": {
     "title": "Officials Roster",

@@ -35,7 +35,7 @@ export default async function EditWorkstationPage({ params }: Props) {
     supabase
       .from('workstations')
       .select(
-        'id, name, description, capacity_ceiling, stage_id, recurring, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position)'
+        'id, name, description, capacity_ceiling, stage_id, recurring, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position, item_type)'
       )
       .eq('id', workstationId)
       .eq('tenant_id', tenant.id)
@@ -72,7 +72,13 @@ export default async function EditWorkstationPage({ params }: Props) {
           window_start: w.window_start,
           window_end: w.window_end,
         }))}
-        initialTodos={sortedTodos.map((t) => t.instruction_text)}
+        initialTodos={sortedTodos.map((t) => ({
+          text: t.instruction_text,
+          // item_type is `string` off the generated Row type (a CHECK
+          // constraint, not a Postgres enum); anything unrecognised falls
+          // back to the informational default rather than rendering ticked.
+          itemType: t.item_type === 'checkbox' ? ('checkbox' as const) : ('info' as const),
+        }))}
         schedulingGranularityMin={event.scheduling_granularity_min}
       />
     </div>
