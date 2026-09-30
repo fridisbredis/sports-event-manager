@@ -29,6 +29,7 @@ interface ListProps {
   onAdd: () => void
   onRemove: (index: number) => void
   onUpdate: (index: number, value: string) => void
+  onBlurRow: (index: number) => void
   focusIndex: React.MutableRefObject<number | null>
 }
 
@@ -48,6 +49,7 @@ function TodoList({
   onAdd,
   onRemove,
   onUpdate,
+  onBlurRow,
   focusIndex,
 }: ListProps) {
   return (
@@ -81,6 +83,11 @@ function TodoList({
                       onAdd()
                     }
                   }}
+                  // Enter adds a row and moves focus to it; leaving that row
+                  // without typing anything should not leave a blank behind.
+                  // Only ever drops a row that is empty, so a row with text
+                  // survives losing focus however it was left.
+                  onBlur={() => onBlurRow(index)}
                   placeholder={placeholder}
                   classNames={{
                     base: 'flex-1',
@@ -118,6 +125,10 @@ export function TodosEditor({ todos, onChange }: Props) {
   // Which absolute index to focus once it renders. A ref, not state: it must
   // survive the re-render the add causes without triggering another.
   const focusIndex = useRef<number | null>(null)
+  // Mirrors `todos` for the deferred blur handler below, which runs after the
+  // render that follows blur and must not act on a stale array.
+  const latestTodos = useRef(todos)
+  latestTodos.current = todos
 
   const rowsOfType = (itemType: ChecklistItemType) =>
     todos
@@ -138,6 +149,32 @@ export function TodosEditor({ todos, onChange }: Props) {
 
   function update(index: number, value: string) {
     onChange(todos.map((todo, i) => (i === index ? { ...todo, text: value } : todo)))
+  }
+
+  /**
+   * Drops a row left empty when focus leaves it — the blank Enter adds and
+   * nobody fills in.
+   *
+   * Deferred a tick rather than run inline: blur fires BEFORE the click that
+   * caused it, so removing here and now would reindex the list out from under
+   * a pending click and delete the wrong row (or fire "Remove" on a row that
+   * has shifted up). Waiting lets the click land first, and the empty row is
+   * still gone before anyone can type into it.
+   *
+   * Whitespace counts as empty, matching what the save path already does —
+   * `normaliseTodos` trims and drops blanks, so a row of spaces was never
+   * going to be saved anyway.
+   */
+  function blurRow(index: number) {
+    setTimeout(() => {
+      // Read through the ref, not the closure: by the time this runs the
+      // click it deferred to may already have edited or removed rows, and
+      // acting on the array as it looked at blur time would undo that.
+      const current = latestTodos.current
+      const row = current[index]
+      if (!row || row.text.trim() !== '') return
+      onChange(current.filter((_, i) => i !== index))
+    }, 0)
   }
 
   return (
@@ -165,6 +202,7 @@ export function TodosEditor({ todos, onChange }: Props) {
           onAdd={() => add('checkbox')}
           onRemove={remove}
           onUpdate={update}
+          onBlurRow={blurRow}
           focusIndex={focusIndex}
         />
         <TodoList
@@ -178,6 +216,7 @@ export function TodosEditor({ todos, onChange }: Props) {
           onAdd={() => add('info')}
           onRemove={remove}
           onUpdate={update}
+          onBlurRow={blurRow}
           focusIndex={focusIndex}
         />
       </div>

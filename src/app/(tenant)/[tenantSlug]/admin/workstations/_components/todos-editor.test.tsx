@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { TodosEditor, type TodoDraft } from './todos-editor'
 
 vi.mock('@/lib/i18n/client', () => ({
@@ -120,5 +120,60 @@ describe('TodosEditor editing', () => {
 
     const next = onChange.mock.calls[0][0] as TodoDraft[]
     expect(next.filter((t) => t.itemType === 'checkbox')).toHaveLength(2)
+  })
+})
+
+describe('TodosEditor empty-row cleanup', () => {
+  it('drops a row left empty when focus leaves it', async () => {
+    const onChange = vi.fn()
+    const withBlank: TodoDraft[] = [...MIXED, { text: '', itemType: 'checkbox' }]
+    render(<TodosEditor todos={withBlank} onChange={onChange} />)
+
+    const blank = within(listFor('Check-off items')).getByDisplayValue('')
+    fireEvent.blur(blank)
+
+    // Deferred a tick so a pending click lands first.
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(MIXED))
+  })
+
+  it('treats a row of whitespace as empty, matching the save path', async () => {
+    const onChange = vi.fn()
+    const withSpaces: TodoDraft[] = [...MIXED, { text: '   ', itemType: 'info' }]
+    render(<TodosEditor todos={withSpaces} onChange={onChange} />)
+
+    // Selected by position: getByDisplayValue normalises whitespace, so a
+    // value of only spaces is not findable by it.
+    const noteFields = within(listFor('Notes')).getAllByRole('textbox')
+    fireEvent.blur(noteFields[noteFields.length - 1])
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(MIXED))
+  })
+
+  it('keeps a row that has text when focus leaves it', async () => {
+    const onChange = vi.fn()
+    render(<TodosEditor todos={MIXED} onChange={onChange} />)
+
+    fireEvent.blur(within(listFor('Check-off items')).getByDisplayValue('Hand out medals'))
+
+    // Nothing to clean up — a filled row must survive losing focus however it
+    // was left, including tabbing straight past it.
+    await new Promise((r) => setTimeout(r, 10))
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('does not remove the wrong row when Remove is clicked on another', async () => {
+    // The ordering hazard: blur fires before the click that caused it. If
+    // cleanup ran inline it would reindex the list under the pending click.
+    const onChange = vi.fn()
+    const withBlank: TodoDraft[] = [{ text: '', itemType: 'info' }, ...MIXED]
+    render(<TodosEditor todos={withBlank} onChange={onChange} />)
+
+    const blank = within(listFor('Notes')).getByDisplayValue('')
+    fireEvent.blur(blank)
+    fireEvent.click(within(listFor('Notes')).getAllByText('Remove')[1])
+
+    // The click is what the admin meant, and it is reported against the array
+    // as it stood when they clicked.
+    expect(onChange).toHaveBeenCalledWith(withBlank.filter((_, i) => i !== 1))
   })
 })
