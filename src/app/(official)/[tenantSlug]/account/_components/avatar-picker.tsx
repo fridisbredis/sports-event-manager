@@ -5,7 +5,7 @@ import { Camera } from 'lucide-react'
 import { AvatarImage } from '@/components/ui/avatar-image'
 import { useTranslation } from '@/lib/i18n/client'
 import { uploadAvatar } from '@/lib/actions/avatar'
-import { resizeAvatar } from '@/lib/image/resize-avatar'
+import { resizeImage } from '@/lib/image/resize-image'
 import { toastError } from '@/lib/toast'
 
 interface Props {
@@ -55,7 +55,7 @@ export function AvatarPicker({
       // Action body is capped at 1 MB — without this the request is rejected
       // by Next.js before it ever reaches the action's own size check, so the
       // user gets a generic failure instead of a useful message.
-      const { file: upload } = await resizeAvatar(file)
+      const { file: upload } = await resizeImage(file, 'avatar')
 
       const formData = new FormData()
       formData.append('file', upload)

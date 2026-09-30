@@ -6,13 +6,13 @@
  * camera is several times that. Raising `serverActions.bodySizeLimit` would
  * lift the ceiling for every action in the app to accommodate one screen.
  * Shrinking first keeps the default cap intact and is better on every other
- * axis too — the avatar is rendered at 80px at the largest, so a full-
- * resolution upload is bytes nobody ever sees, paid for on every roster row
- * that later loads the picture.
+ * axis too — an avatar is rendered at 80px and an event logo at 72px, so a
+ * full-resolution upload is bytes nobody ever sees, paid for again on every
+ * roster row and every screen that later loads the picture.
  *
- * WebP at 0.85 keeps a 512px square well under 100 kB in practice. The output
- * is always WebP regardless of what went in, which is why the upload action
- * accepts it alongside JPEG and PNG.
+ * WebP at 0.85 keeps a 512px image well under 100 kB in practice. The output
+ * is always WebP regardless of what went in, which is why the upload actions
+ * accept it alongside JPEG and PNG.
  */
 
 /** Longest edge of the re-encoded image, in pixels. */
@@ -32,8 +32,11 @@ export interface ResizeResult {
  * the browser can't decode it (a corrupt image, or a format it doesn't
  * support). Callers still validate size and type server-side — this only
  * makes the common case fit, it is not a security boundary.
+ *
+ * `fallbackName` names the re-encoded file when the source name has no stem
+ * to reuse; it only affects the storage object's name.
  */
-export async function resizeAvatar(file: File): Promise<ResizeResult> {
+export async function resizeImage(file: File, fallbackName = 'image'): Promise<ResizeResult> {
   // createImageBitmap is the cheap path and is supported everywhere this app
   // runs; if it throws, the file isn't a decodable image and the server-side
   // validation will reject it with a proper message.
@@ -72,7 +75,7 @@ export async function resizeAvatar(file: File): Promise<ResizeResult> {
     // toBlob yields null if the browser can't encode the requested type.
     if (!blob) return { file, resized: false }
 
-    const renamed = file.name.replace(/\.[^.]+$/, '') || 'avatar'
+    const renamed = file.name.replace(/\.[^.]+$/, '') || fallbackName
     return {
       file: new File([blob], `${renamed}.webp`, { type: OUTPUT_TYPE }),
       resized: true,
