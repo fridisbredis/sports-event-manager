@@ -125,7 +125,7 @@ export function OperatingWindowsEditor({
             failed to load. Dashed, matching the other "nothing here yet"
             placeholders in the admin UI. */}
         {windows.length === 0 && (
-          <p className="rounded-lg border border-dashed border-edge-field px-4 py-3 text-center text-sm text-ink-soft">
+          <p className="rounded-lg border border-dashed border-edge-field px-4 py-4 text-center text-sm text-ink">
             {t('workstations.noOperatingWindows')}
           </p>
         )}

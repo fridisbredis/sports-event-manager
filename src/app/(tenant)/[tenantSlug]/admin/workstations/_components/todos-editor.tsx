@@ -69,7 +69,7 @@ function TodoList({
         <div className="mb-3 overflow-hidden rounded-lg border border-edge bg-white">
           <div className="divide-y divide-edge-soft">
             {rows.map(({ draft, index }) => (
-              <div key={index} className="flex items-center gap-3 px-3 py-1.5">
+              <div key={index} className="flex items-center gap-3 px-3 py-2">
                 {marker}
                 <Input
                   ref={(el) => {
