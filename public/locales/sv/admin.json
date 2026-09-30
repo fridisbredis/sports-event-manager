@@ -7,7 +7,8 @@
     "officials": "Funktionärer",
     "scheduling": "Schemaläggning",
     "communication": "Kommunikation",
-    "account": "Konto"
+    "account": "Konto",
+    "logOut": "Logga ut"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",

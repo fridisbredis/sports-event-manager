@@ -10,6 +10,7 @@ import { PublishSection } from './_components/publish-section'
 import { OfficialsCard } from './_components/officials-card'
 import { SchedulingWarningsCard } from './_components/scheduling-warnings-card'
 import { AdminAreasGrid } from './_components/admin-areas-grid'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -41,8 +42,8 @@ function formatDateRange(start: string | null, end: string | null) {
   const e = new Date(end)
   const sDay = s.getUTCDate()
   const eDay = e.getUTCDate()
-  const sMonth = s.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
-  const eMonth = e.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
+  const sMonth = s.toLocaleDateString(DATE_LOCALE, { month: 'short', timeZone: 'UTC' })
+  const eMonth = e.toLocaleDateString(DATE_LOCALE, { month: 'short', timeZone: 'UTC' })
   const year = e.getUTCFullYear()
   if (sMonth === eMonth) return `${sDay}–${eDay} ${sMonth} ${year}`
   return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`

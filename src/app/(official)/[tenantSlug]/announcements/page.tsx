@@ -8,6 +8,7 @@ import { defaultLocale } from '@/lib/i18n/config'
 import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
 import { EmptyState } from '@/components/ui/empty-state'
 import { AnnouncementCard } from './_components/announcement-card'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -19,14 +20,14 @@ function formatAnnouncementTime(ts: string): string {
   const todayUTC = new Date().toISOString().slice(0, 10)
   const tsUTC = date.toISOString().slice(0, 10)
   const yesterdayUTC = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
-  const time = date.toLocaleTimeString('en-GB', {
+  const time = date.toLocaleTimeString(DATE_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
   })
   if (tsUTC === todayUTC) return `Today · ${time}`
   if (tsUTC === yesterdayUTC) return `Yesterday · ${time}`
-  const weekday = date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+  const weekday = date.toLocaleDateString(DATE_LOCALE, { weekday: 'short', timeZone: 'UTC' })
   return `${weekday} · ${time}`
 }
 

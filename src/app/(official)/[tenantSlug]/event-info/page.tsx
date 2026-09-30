@@ -13,6 +13,7 @@ import { StageVenueCard } from './_components/stage-venue-card'
 import { FacilityChips } from './_components/facility-chips'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 interface EventInfoCached {
   event: {
@@ -44,7 +45,7 @@ interface Props {
 // 08:00 briefing for anyone travelling to the event from another country.
 function formatDate(ts: string | null): string {
   if (!ts) return ''
-  return new Date(ts).toLocaleDateString('en-GB', {
+  return new Date(ts).toLocaleDateString(DATE_LOCALE, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -66,7 +67,7 @@ function stageDate(stage: { start_time: string | null; stage_date: string | null
 
 function formatTime(ts: string | null): string {
   if (!ts) return ''
-  return new Date(ts).toLocaleTimeString('en-GB', {
+  return new Date(ts).toLocaleTimeString(DATE_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
