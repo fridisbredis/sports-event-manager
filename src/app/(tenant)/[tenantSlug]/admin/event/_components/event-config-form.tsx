@@ -96,7 +96,9 @@ export default function EventConfigForm({
     setColorPalette(initialColorPalette)
   }
   const [paletteError, setPaletteError] = useState<string | undefined>()
-  const [granularity, setGranularity] = useState(initialGranularity)
+  // Fixed at 60 min in v1 — see DatesAndGranularitySection for why. Read from the
+  // event row rather than hardcoded, so an older row keeps rendering its own value.
+  const [granularity] = useState(initialGranularity)
   const [stages, setStages] = useState<StageInput[]>(initialStages)
   const [facilities, setFacilities] = useState<LabelInput[]>(initialFacilities)
   const [facilityInput, setFacilityInput] = useState('')
@@ -393,14 +395,8 @@ export default function EventConfigForm({
             />
 
             <DatesAndGranularitySection
-              isPublished={isPublished}
               dateRangeLabel={derivedDateRange(stages)}
               granularity={granularity}
-              onGranularityChange={(minutes) => {
-                setGranularity(minutes)
-                setSaveSuccess(false)
-                markDirty()
-              }}
             />
 
             <FacilitiesEditor

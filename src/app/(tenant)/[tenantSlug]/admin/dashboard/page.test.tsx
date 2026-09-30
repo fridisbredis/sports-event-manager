@@ -67,7 +67,7 @@ const EVENT = {
   start_date: '2026-06-01',
   end_date: '2026-06-02',
   status: 'draft',
-  scheduling_granularity_min: 30,
+  scheduling_granularity_min: 60,
   logo_url: null,
 }
 
