@@ -20,6 +20,8 @@ export type CheckMap = Map<string, ChecklistCheck>
 type WorkstationRef = {
   id: string
   name: string
+  /** Palette name chosen by an admin; null falls back to hashing the id. */
+  color: string | null
   description: string | null
   workstation_todos: Todo[]
 } | null
@@ -178,7 +180,10 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
   // one colour down the timeline — and the same colour it has on the
   // work-area tab, since both map over the same day's stations.
   const colors = workAreaColorMap(
-    assignments.map((a) => a.workstations?.id).filter((id): id is string => id !== undefined)
+    assignments
+      .map((a) => a.workstations)
+      .filter((ws): ws is NonNullable<WorkstationRef> => ws != null)
+      .map((ws) => ({ id: ws.id, color: ws.color }))
   )
 
   return (
@@ -271,7 +276,7 @@ function WorkAreaView({
   // is what tells two cards apart at a glance. `workAreaColorMap` over the
   // whole day's stations rather than `workAreaColor` per card, so two
   // stations on one day can't come out the same colour.
-  const colors = workAreaColorMap(groups.map((g) => g.ws.id))
+  const colors = workAreaColorMap(groups.map((g) => ({ id: g.ws.id, color: g.ws.color })))
 
   return (
     <div className="flex flex-col gap-3">

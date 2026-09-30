@@ -85,7 +85,7 @@ export function ByWorkAreaGrid({
   // One colour per work area across the whole grid, so no two rows visible at
   // the same time share one.
   const colorMap = useMemo(
-    () => workAreaColorMap(stageWorkstations.map((ws) => ws.id)),
+    () => workAreaColorMap(stageWorkstations.map((ws) => ({ id: ws.id, color: ws.color }))),
     [stageWorkstations]
   )
 

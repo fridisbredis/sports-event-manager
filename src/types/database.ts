@@ -835,6 +835,7 @@ export type Database = {
       workstations: {
         Row: {
           capacity_ceiling: number
+          color: string | null
           created_at: string
           description: string | null
           event_id: string
@@ -846,6 +847,7 @@ export type Database = {
         }
         Insert: {
           capacity_ceiling: number
+          color?: string | null
           created_at?: string
           description?: string | null
           event_id: string
@@ -857,6 +859,7 @@ export type Database = {
         }
         Update: {
           capacity_ceiling?: number
+          color?: string | null
           created_at?: string
           description?: string | null
           event_id?: string
@@ -953,6 +956,7 @@ export type Database = {
       create_workstation: {
         Args: {
           p_capacity_ceiling?: number
+          p_color?: string
           p_description?: string
           p_event_id: string
           p_name?: string
@@ -1050,9 +1054,11 @@ export type Database = {
       update_workstation: {
         Args: {
           p_capacity_ceiling: number
+          p_color?: string
           p_description?: string
           p_name: string
           p_recurring: boolean
+          p_set_color?: boolean
           p_stage_id?: string
           p_tenant_id: string
           p_todos?: Json

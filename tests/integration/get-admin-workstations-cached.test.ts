@@ -50,6 +50,7 @@ interface AdminWorkstationsCached {
   workstations: Array<{
     id: string
     name: string
+    color: string | null
     capacity_ceiling: number
     stage_id: string | null
     workstation_operating_windows: Array<{ window_start: string; window_end: string }>
@@ -83,6 +84,9 @@ async function seedTenantEventAndWorkstation(
       event_id: event.id,
       stage_id: stage.id,
       name: `${label} Workstation`,
+      // A non-null colour so the shape test proves the RPC carries the stored
+      // value through, rather than only that the key is present.
+      color: 'orchid',
       capacity_ceiling: 4,
     })
     .select()
@@ -135,6 +139,7 @@ describe('get_admin_workstations_cached RPC (PERF-06 Phase 2 fail-closed boundar
     expect(payload.workstations[0]).toEqual({
       id: workstation.id,
       name: 'Shape Test Workstation',
+      color: 'orchid',
       capacity_ceiling: 4,
       stage_id: stage.id,
       workstation_operating_windows: [

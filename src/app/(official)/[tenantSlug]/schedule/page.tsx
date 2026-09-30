@@ -115,6 +115,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
         workstations (
           id,
           name,
+          color,
           description,
           workstation_todos ( id, instruction_text, position, item_type )
         )

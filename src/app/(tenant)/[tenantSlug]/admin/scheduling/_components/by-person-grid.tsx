@@ -60,7 +60,7 @@ export function ByPersonGrid({
   // the same people from the same list.
   const personColors = useMemo(() => workAreaColorMap(officials.map((o) => o.id)), [officials])
   const wsColors = useMemo(
-    () => workAreaColorMap(stageWorkstations.map((ws) => ws.id)),
+    () => workAreaColorMap(stageWorkstations.map((ws) => ({ id: ws.id, color: ws.color }))),
     [stageWorkstations]
   )
 

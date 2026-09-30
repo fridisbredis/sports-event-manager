@@ -179,6 +179,7 @@ describe('resolveCellActionLabel', () => {
     {
       id: 'ws-1',
       name: 'Water Station',
+      color: null,
       capacity_ceiling: 2,
       stage_id: null,
       workstation_operating_windows: [],

@@ -214,12 +214,25 @@ async function main() {
   // on two days" is not expressible in this model — the MYSCH-01 fixture below
   // gets its multi-day case from same-named work areas on different stages
   // instead.
+  // `color` is a WORK_AREA_COLORS palette name (src/lib/theme/work-area-colors.ts).
+  // Set explicitly rather than left NULL so the seed matches what real data
+  // looks like once an admin has saved a work area: NULL is the legacy
+  // fall-back-to-hashing path, and seeding only that would leave the stored
+  // colour path untested by hand. Two clearly different hues, repeated on each
+  // stage — the work areas share names across stages, and sharing a colour too
+  // is what makes "Finish line" recognisable from one day to the next.
   const WORK_AREA_TEMPLATES = [
-    { name: 'Finish line', description: 'Timing and finish chute', capacity_ceiling: 4 },
+    {
+      name: 'Finish line',
+      description: 'Timing and finish chute',
+      capacity_ceiling: 4,
+      color: 'blush',
+    },
     {
       name: 'Water station',
       description: 'Cups, jugs and refill point at 5 km',
       capacity_ceiling: 2,
+      color: 'sky',
     },
   ]
 
