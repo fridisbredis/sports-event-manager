@@ -1,17 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, ChevronRight, LogOut } from 'lucide-react'
 import { Switch } from '@heroui/react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { LogoutButton } from '@/components/logout-button'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
-import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
-import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
+import { useAutosave } from '@/lib/hooks/use-autosave'
 import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
 import { LanguageSwitcher } from '@/components/language-switcher'
@@ -47,78 +45,120 @@ export default function AccountForm({
   // The section heading is shared with every other language control in the
   // app, so it lives in `common` rather than being duplicated per namespace.
   const { t: tCommon } = useTranslation('common')
-  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
 
   const [name, setName] = useState(initialName)
   const [smsOptOut, setSmsOptOut] = useState(initialSmsOptOut)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // The route validates name and smsOptOut as one object, so every write
+  // carries both. Reading them from refs rather than from state keeps a save
+  // triggered by one control from sending a stale value for the other: the
+  // ref is current the moment its setter runs, while the state variable
+  // captured in this render is not.
+  const nameRef = useRef(initialName)
+  const smsOptOutRef = useRef(initialSmsOptOut)
+
+  // The last name the server accepted. Typing a letter and deleting it again
+  // lands back here, and that should produce no write and no "Saved" for a
+  // change that was never made. The switch needs no equivalent: it cannot
+  // return to its stored value except by a second deliberate click, which is
+  // a real change and should be written.
+  const savedName = useRef(initialName)
+
+  async function persist() {
+    const res = await fetch('/api/account', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId,
+        name: nameRef.current,
+        smsOptOut: smsOptOutRef.current,
+      }),
+    })
+
+    if (!res.ok) throw new Error('Save failed')
+
+    savedName.current = nameRef.current
+  }
+
+  // Typing is debounced; the switch writes on the spot. A half-typed name is a
+  // value worth not sending, a half-flipped switch is not a thing.
+  const nameSave = useAutosave<void>({
+    onSave: persist,
+    delay: 800,
+    onError: () => toastError(t('account.saveError')),
+  })
+
+  const toggleSave = useAutosave<void>({
+    onSave: persist,
+    delay: 0,
+    onError: () => toastError(t('account.saveError')),
+  })
 
   function handleNameChange(value: string) {
     setName(value)
-    markDirty()
-    setSaveState('idle')
+    nameRef.current = value
+    // An empty name fails the route's min(1) and would only produce a toast on
+    // a field the user is still in the middle of clearing. Wait for something
+    // to save; blur restores the stored name if they leave it empty.
+    //
+    // cancel() rather than a bare return in both cases: an earlier keystroke
+    // may already have a timer running, and letting it fire would write a
+    // value the user has since backed out of.
+    if (value.trim() === '' || value === savedName.current) {
+      nameSave.cancel()
+      return
+    }
+    nameSave.queue()
+  }
+
+  function handleNameBlur() {
+    // Leaving the field empty is not an edit, it is an unfinished one. Put the
+    // stored name back rather than holding a value the server will refuse.
+    if (name.trim() === '') {
+      setName(savedName.current)
+      nameRef.current = savedName.current
+      return
+    }
+    // Overtake the debounce timer: the user has moved on and expects the edit
+    // to be in by the time they look at something else.
+    nameSave.flush()
   }
 
   function handleToggle(isSelected: boolean) {
-    setSmsOptOut(!isSelected)
-    markDirty()
-    setSaveState('idle')
+    const next = !isSelected
+    setSmsOptOut(next)
+    smsOptOutRef.current = next
+    toggleSave.queue()
   }
 
-  async function handleSave() {
-    setSaveState('saving')
-
-    try {
-      const res = await fetch('/api/account', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, name, smsOptOut }),
-      })
-
-      if (!res.ok) {
-        throw new Error('Save failed')
-      }
-
-      markClean()
-      setSaveState('saved')
-    } catch {
-      setSaveState('idle')
-      toastError(t('account.saveError'))
-    }
-  }
-
-  const saveLabel =
-    saveState === 'saving'
-      ? t('account.saving')
-      : saveState === 'saved'
-        ? t('account.saved')
-        : t('account.save')
+  // One line for the whole form rather than one per control: two independent
+  // "Saved" markers on a screen this short read as two different things having
+  // happened. 'saving' wins over 'saved' so a new edit replaces the previous
+  // confirmation instead of flickering between them.
+  const status =
+    nameSave.status === 'saving' || toggleSave.status === 'saving'
+      ? 'saving'
+      : nameSave.status === 'error' || toggleSave.status === 'error'
+        ? 'error'
+        : nameSave.status === 'saved' || toggleSave.status === 'saved'
+          ? 'saved'
+          : 'idle'
 
   const isDesktop = layout === 'desktop'
 
   return (
     <>
       {isDesktop && (
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-8 flex items-center justify-between">
           <h1 className="page-title">{t('account.title')}</h1>
-          <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              color={saveState === 'saved' ? 'success' : 'primary'}
-              isLoading={saveState === 'saving'}
-              onPress={handleSave}
-            >
-              {saveLabel}
-            </Button>
-          </div>
+          <SaveStatus status={status} t={t} />
         </div>
       )}
-      {/* Mobile bottom padding clears the fixed Save bar so the log-out
-          button never sits underneath it. The bar occupies ~136px: the tab
-          bar it floats above (64px) plus its own py-3 either side of a
-          ~48px button. pb-36 (144px) clears that with a modest gap; pb-40
-          left an obviously empty band below the last control. */}
-      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-36'}>
+      {/* With the fixed Save bar gone, the only thing to clear at the foot of
+          the mobile screen is the tab bar itself. The layout already reserves
+          that with pb-16; pb-8 here is the screen's own breathing room below
+          the log-out button, not a clearance. */}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-8'}>
         {/* Avatar — clickable, opens a file picker and uploads on pick.
             AvatarPicker centres itself. */}
         <div className="mb-6">
@@ -150,7 +190,12 @@ export default function AccountForm({
                 {t('account.editHint')}
               </span>
             }
+            onBlur={handleNameBlur}
           />
+          {/* Mobile has no header to put this in, so it sits under the field
+              it most often describes. Reserved height, so the card below does
+              not jump a line each time a save starts and finishes. */}
+          {!isDesktop && <SaveStatus status={status} t={t} className="mt-1.5 h-5" />}
         </div>
 
         {/* Phone field. Grey rather than white: it is the one field on the
@@ -252,31 +297,41 @@ export default function AccountForm({
           </LogoutButton>
         )}
       </div>
-
-      {/* Mobile: Save button fixed at bottom above tab bar.
-          z-30 keeps it under the tab bar (z-40) so the two can overlap
-          rather than meet exactly: -mb-px pulls the bar down a hair past
-          bottom-16 so a sub-pixel rounding difference cannot reopen the
-          seam that let page content show through between the two bars.
-          py-3 on the bar rather than mt-3 above the button and pb-2 below:
-          the button sits centred in its own strip, matching the padding
-          above it to the padding below. */}
-      {!isDesktop && (
-        <div className="fixed bottom-16 -mb-px inset-x-0 z-30 px-5 py-3 bg-white border-t border-gray-100">
-          <Button
-            type="button"
-            color="primary"
-            isLoading={saveState === 'saving'}
-            onPress={handleSave}
-            fullWidth
-            className="rounded-large py-3 text-sm font-semibold"
-          >
-            {saveLabel}
-          </Button>
-        </div>
-      )}
-
-      <UnsavedChangesDialog {...dialogProps} />
     </>
+  )
+}
+
+/**
+ * The autosave counterpart to the Save button this screen used to carry.
+ *
+ * aria-live is polite and the region is always mounted: a status that appears
+ * and disappears re-announces itself on every keystroke, where an empty live
+ * region that fills and empties announces only what changed. 'idle' renders
+ * nothing visible but keeps the node, which is what makes that true.
+ */
+function SaveStatus({
+  status,
+  t,
+  className = '',
+}: {
+  status: 'idle' | 'saving' | 'saved' | 'error'
+  t: (key: string) => string
+  className?: string
+}) {
+  return (
+    <p
+      aria-live="polite"
+      className={`text-sm transition-colors ${
+        status === 'error' ? 'text-danger' : 'text-ink-muted'
+      } ${className}`}
+    >
+      {status === 'saving'
+        ? t('account.saving')
+        : status === 'saved'
+          ? t('account.saved')
+          : status === 'error'
+            ? t('account.saveError')
+            : ''}
+    </p>
   )
 }
