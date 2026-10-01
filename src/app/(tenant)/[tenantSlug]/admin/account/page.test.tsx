@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminAccountPage from './page'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
-import AdminAccountForm from './_components/admin-account-form'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  createSupabaseServiceClient: vi.fn(),
 }))
 
 // getAdminTenant resolves the tenant only after the admin access check passes,
@@ -26,10 +24,6 @@ vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
   }),
-}))
-
-vi.mock('./_components/admin-account-form', () => ({
-  default: vi.fn(() => null),
 }))
 
 vi.mock('@/app/(official)/[tenantSlug]/account/_components/account-form', () => ({
@@ -72,30 +66,15 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 // caller is an authorized admin of it, or null for "no such tenant OR not
 // authorized" — the two are deliberately indistinguishable to the caller.
 //
-// The no-official-row fallback looks the user up via the service client's
-// auth.admin.getUserById rather than trusting getCurrentUser()'s claims —
-// the JWT doesn't reliably carry phone/user_metadata (PERF-01's getClaims()
-// switch), so this mocks that live lookup as the source of display data.
 function mockUser(
   userId: string | null,
-  userMetadata: Record<string, unknown> = {},
+  _userMetadata: Record<string, unknown> = {},
   fromMock: ReturnType<typeof vi.fn> = vi.fn(),
   tenant: unknown = { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true }
 ) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
   vi.mocked(getAdminTenant).mockResolvedValue(tenant as never)
   vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
-  vi.mocked(createSupabaseServiceClient).mockReturnValue({
-    auth: {
-      admin: {
-        getUserById: vi.fn(() =>
-          Promise.resolve({
-            data: { user: userId ? { user_metadata: userMetadata, phone: '0701234567' } : null },
-          })
-        ),
-      },
-    },
-  } as never)
 }
 
 beforeEach(() => {
@@ -119,50 +98,17 @@ describe('AdminAccountPage', () => {
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('renders AdminAccountForm with metadata name/phone when no official row exists yet', async () => {
+  // ACCT-01 is backed by an `officials` row. A role-only admin (a global
+  // system_admin, who holds no roster row in any tenant) has nothing to edit
+  // here, so the screen is absent rather than rendering a form built from
+  // auth.users that showed an empty name and a '?' avatar and could not save.
+  // The two nav bars omit the link on the same condition (hasAccountScreen).
+  it('calls notFound when the caller has no officials row in this tenant', async () => {
     const fromMock = vi.fn()
     fromMock.mockReturnValueOnce(chain({ data: null })) // officials — none
     mockUser('user-1', { name: 'Peter' }, fromMock)
 
-    const result = await AdminAccountPage({ params: PARAMS })
-
-    const form = findByType(result, AdminAccountForm)
-    expect(form).not.toBeNull()
-    expect(form!.props).toEqual({ name: 'Peter', phone: '0701234567', tenantId: TENANT_ID })
-  })
-
-  // Regression test: getCurrentUser()'s claims-derived user is not the
-  // source of display data here, since the JWT doesn't reliably carry
-  // phone/user_metadata (PERF-01). The fallback must go to the live
-  // auth.admin.getUserById lookup instead, even when getCurrentUser()
-  // resolves a user with no metadata attached at all.
-  it('falls back to the service-client user lookup for name/phone, not the claims-derived user', async () => {
-    const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(chain({ data: null })) // officials — none
-    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
-    vi.mocked(getAdminTenant).mockResolvedValue({
-      id: TENANT_ID,
-      slug: 'viadal',
-      color_palette: 'blue',
-      is_active: true,
-    } as never)
-    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
-    vi.mocked(createSupabaseServiceClient).mockReturnValue({
-      auth: {
-        admin: {
-          getUserById: vi.fn(() =>
-            Promise.resolve({
-              data: { user: { user_metadata: { name: 'Peter' }, phone: '0709998888' } },
-            })
-          ),
-        },
-      },
-    } as never)
-
-    const result = await AdminAccountPage({ params: PARAMS })
-
-    const form = findByType(result, AdminAccountForm)
-    expect(form!.props).toEqual({ name: 'Peter', phone: '0709998888', tenantId: TENANT_ID })
+    await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
   })
 
   it('renders AccountForm with the official row and assignment count when it exists', async () => {
@@ -195,13 +141,14 @@ describe('AdminAccountPage', () => {
   // job is only to delegate — and to act on whatever tenant comes back rather
   // than trusting the slug from the URL.
   it('delegates the access decision to getAdminTenant', async () => {
+    const official = { id: 'off-1', name: 'Sys', phone: '0701234567', sms_opt_out: false }
     const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(chain({ data: null }))
+    fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(chain({ count: 0 }))
     mockUser('user-1', { name: 'Sys' }, fromMock)
 
     const result = await AdminAccountPage({ params: PARAMS })
 
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
-    expect(findByType(result, AdminAccountForm)).not.toBeNull()
+    expect(findByType(result, AccountForm)).not.toBeNull()
   })
 })
