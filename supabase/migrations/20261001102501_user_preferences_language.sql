@@ -52,6 +52,17 @@
 --             point — nothing else references it, and application code
 --             resolves a missing row to the default locale, so dropping it
 --             degrades every user to 'en' rather than breaking a read.
+--   Data:     no data loss. The table is created empty and holds only a
+--             display preference; a dropped row costs the user their language
+--             choice, nothing more.
+--   Blast:    none for the currently deployed code, which does not know this
+--             table exists. If the table were missing or unreadable once the
+--             new image is live, getUserLanguage() logs the failed read and
+--             falls back to the default locale, so pages render in English
+--             rather than erroring.
+--   Window:   compatible — a new table nothing deployed reads or writes yet,
+--             so the already-running image is unaffected while the schema is
+--             live and the new image is not.
 -- ============================================================================
 
 create table if not exists public.user_preferences (
