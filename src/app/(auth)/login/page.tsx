@@ -11,22 +11,13 @@ import { SignInButton } from './_components/sign-in-button'
 import { LinkAction } from './_components/link-action'
 import { toastError, parseRetryAfterMinutes } from '@/lib/toast'
 import { logger } from '@/lib/logger'
+import { authErrorKey } from '@/lib/auth/auth-error-keys'
 import {
   normalizePhoneToE164,
   isValidPhoneForCountry,
   guessPhoneCountryFromLocale,
   PHONE_COUNTRIES,
 } from '@/lib/phone'
-
-// GoTrue error codes → translation keys. `otp_expired` covers both a mistyped
-// and an expired code — GoTrue does not distinguish them, so the message must
-// work for both cases.
-const AUTH_ERROR_KEYS: Record<string, string> = {
-  otp_expired: 'signIn.invalidCode',
-  over_sms_send_rate_limit: 'signIn.tooManyRequests',
-  over_request_rate_limit: 'signIn.tooManyRequests',
-  signup_disabled: 'signIn.notRegistered',
-}
 
 const RESEND_COOLDOWN_SECONDS = 30
 
@@ -111,7 +102,7 @@ export default function LoginPage() {
           })
         )
       } else {
-        toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
+        toastError(t(authErrorKey(error.code)))
       }
     }
     return !error
@@ -145,7 +136,7 @@ export default function LoginPage() {
           })
         )
       } else {
-        toastError(t(AUTH_ERROR_KEYS[error.code ?? ''] ?? 'signIn.error'))
+        toastError(t(authErrorKey(error.code)))
       }
       return
     }
