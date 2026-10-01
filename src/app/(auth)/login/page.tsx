@@ -79,7 +79,14 @@ export default function LoginPage() {
     setLanguageChosen(true)
   }
 
+  // Only show the "invalid number" message once the user has finished with
+  // the field — on blur, or on a submit attempt. Validating on every keystroke
+  // means a half-typed number ("6") renders as an error, which reads as the
+  // form scolding someone who is simply still typing. The submit button is
+  // already gated on `phoneIsValid`, so nothing is lost by staying quiet.
+  const [phoneTouched, setPhoneTouched] = useState(false)
   const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
+  const showPhoneError = phoneTouched && phone.trim() !== '' && !phoneIsValid
 
   useEffect(() => {
     if (resendCooldown === 0) return
@@ -185,6 +192,7 @@ export default function LoginPage() {
           className="space-y-6"
           onSubmit={(e) => {
             e.preventDefault()
+            setPhoneTouched(true)
             if (!loading && phoneIsValid) sendOtp()
           }}
         >
@@ -200,6 +208,7 @@ export default function LoginPage() {
               onSelectionChange={(keys) => {
                 const next = Array.from(keys)[0] as string
                 setPhoneCountry(next as typeof phoneCountry)
+                setPhoneTouched(false)
               }}
             >
               {PHONE_COUNTRIES.map((c) => (
@@ -213,11 +222,15 @@ export default function LoginPage() {
               label={t('signIn.phoneLabel')}
               placeholder={t('signIn.phonePlaceholder')}
               value={phone}
-              onValueChange={setPhone}
-              isInvalid={phone.trim() !== '' && !phoneIsValid}
-              errorMessage={
-                phone.trim() !== '' && !phoneIsValid ? t('signIn.invalidPhone') : undefined
-              }
+              onValueChange={(value) => {
+                setPhone(value)
+                // Clear the error the moment typing resumes, rather than
+                // leaving it up while the user corrects the number.
+                setPhoneTouched(false)
+              }}
+              onBlur={() => setPhoneTouched(true)}
+              isInvalid={showPhoneError}
+              errorMessage={showPhoneError ? t('signIn.invalidPhone') : undefined}
             />
           </div>
           <SignInButton
