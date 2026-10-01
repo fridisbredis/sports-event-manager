@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import AccountForm from './account-form'
 
@@ -11,15 +11,11 @@ const { fakeT } = vi.hoisted(() => ({
 
 vi.mock('@/lib/i18n/client', () => ({ useTranslation: () => ({ t: fakeT }) }))
 
-vi.mock('@/lib/hooks/use-unsaved-changes', () => ({
-  useUnsavedChanges: () => ({ markDirty: vi.fn(), markClean: vi.fn(), dialogProps: {} }),
-}))
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
+vi.mock('@/lib/toast', () => ({ toastError }))
 
-vi.mock('@/components/unsaved-changes-dialog', () => ({ default: () => null }))
-
-// Stubbed for the same reason as the dialog above: this file tests the account
-// form's own behaviour, and the real switcher pulls in useRouter(), which has
-// no mounted app router under jsdom.
+// This file tests the account form's own behaviour, and the real switcher
+// pulls in useRouter(), which has no mounted app router under jsdom.
 vi.mock('@/components/language-switcher', () => ({ LanguageSwitcher: () => null }))
 
 vi.mock('@/components/ui/app-card', () => ({
@@ -27,21 +23,41 @@ vi.mock('@/components/ui/app-card', () => ({
 }))
 
 vi.mock('@/components/ui/form-fields', () => ({
-  Input: ({ label, value }: { label?: string; value?: string }) => (
+  Input: ({
+    label,
+    value,
+    onValueChange,
+    onBlur,
+  }: {
+    label?: string
+    value?: string
+    onValueChange?: (v: string) => void
+    onBlur?: () => void
+  }) => (
     <label>
       {label}
-      <input readOnly value={value ?? ''} />
+      <input
+        value={value ?? ''}
+        onChange={(e) => onValueChange?.(e.target.value)}
+        onBlur={onBlur}
+      />
     </label>
   ),
 }))
 
-// Only Switch and Button are reached from this component, but the mock
-// replaces the whole module — so Button must be stubbed too, or the shared
-// Button wrapper renders `undefined`.
+// Only Switch is reached from this component now that the Save button is
+// gone, but the mock replaces the whole module, so Button is stubbed too for
+// anything that reaches it indirectly.
 vi.mock('@heroui/react', () => ({
-  Switch: ({ 'aria-label': ariaLabel }: { 'aria-label'?: string }) => (
-    <button aria-label={ariaLabel} />
-  ),
+  Switch: ({
+    'aria-label': ariaLabel,
+    isSelected,
+    onValueChange,
+  }: {
+    'aria-label'?: string
+    isSelected?: boolean
+    onValueChange?: (v: boolean) => void
+  }) => <button aria-label={ariaLabel} onClick={() => onValueChange?.(!isSelected)} />,
   Button: ({
     children,
     onPress,
@@ -128,5 +144,139 @@ describe('AccountForm layout split', () => {
 
     render(<AccountForm {...baseProps} />)
     expect(screen.queryByText('account.logOut')).toBeTruthy()
+  })
+})
+
+describe('AccountForm autosave', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('offers no Save control — the form writes on its own', () => {
+    render(<AccountForm {...baseProps} />)
+    expect(screen.queryByText('account.save')).toBeNull()
+  })
+
+  it('writes the name once the typing settles', async () => {
+    render(<AccountForm {...baseProps} />)
+    const input = screen.getByLabelText('account.nameLabel')
+
+    fireEvent.change(input, { target: { value: 'Frida B' } })
+    expect(fetch).not.toHaveBeenCalled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(800)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(url).toBe('/api/account')
+    expect(JSON.parse(init.body)).toEqual({
+      tenantId: 't1',
+      name: 'Frida B',
+      smsOptOut: false,
+    })
+  })
+
+  it('collapses a burst of keystrokes into one request', async () => {
+    render(<AccountForm {...baseProps} />)
+    const input = screen.getByLabelText('account.nameLabel')
+
+    fireEvent.change(input, { target: { value: 'F' } })
+    act(() => vi.advanceTimersByTime(300))
+    fireEvent.change(input, { target: { value: 'Fr' } })
+    act(() => vi.advanceTimersByTime(300))
+    fireEvent.change(input, { target: { value: 'Fri' } })
+
+    await act(async () => {
+      vi.advanceTimersByTime(800)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(JSON.parse(init.body).name).toBe('Fri')
+  })
+
+  it('writes on blur rather than making the user wait out the delay', async () => {
+    render(<AccountForm {...baseProps} />)
+    const input = screen.getByLabelText('account.nameLabel')
+
+    fireEvent.change(input, { target: { value: 'Frida B' } })
+    await act(async () => {
+      fireEvent.blur(input)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('writes the switch immediately — there is no half-flipped state to wait for', async () => {
+    render(<AccountForm {...baseProps} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('account.smsUpdatesLabel'))
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    // The route validates both fields together, so the untouched name rides
+    // along with the toggle rather than being dropped.
+    expect(JSON.parse(init.body)).toEqual({
+      tenantId: 't1',
+      name: 'Frida',
+      smsOptOut: true,
+    })
+  })
+
+  it('does not write an empty name, and restores the stored one on blur', async () => {
+    render(<AccountForm {...baseProps} />)
+    const input = screen.getByLabelText('account.nameLabel')
+
+    fireEvent.change(input, { target: { value: '' } })
+    await act(async () => {
+      vi.advanceTimersByTime(800)
+    })
+    // min(1) on the route would reject it; the user is mid-edit, not done.
+    expect(fetch).not.toHaveBeenCalled()
+
+    await act(async () => {
+      fireEvent.blur(input)
+    })
+    expect((input as HTMLInputElement).value).toBe('Frida')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('does not write a name that is already what is stored', async () => {
+    render(<AccountForm {...baseProps} />)
+    const input = screen.getByLabelText('account.nameLabel')
+
+    fireEvent.change(input, { target: { value: 'Fridaa' } })
+    fireEvent.change(input, { target: { value: 'Frida' } })
+
+    await act(async () => {
+      vi.advanceTimersByTime(800)
+    })
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a failed write instead of silently dropping it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    render(<AccountForm {...baseProps} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('account.smsUpdatesLabel'))
+    })
+
+    // Both halves matter: the toast is what catches the eye, the status line
+    // is what remains readable afterwards.
+    expect(toastError).toHaveBeenCalledWith('account.saveError')
+    expect(screen.getByText('account.saveError')).toBeTruthy()
   })
 })
