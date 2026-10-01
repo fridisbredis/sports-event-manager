@@ -114,10 +114,10 @@ export default function AccountForm({
         </div>
       )}
       {/* Mobile bottom padding clears the fixed Save bar so the log-out
-          button never sits underneath it. The bar occupies ~128px: the tab
-          bar it floats above (64px) plus its own mt-3, button and pb-2.
-          pb-36 (144px) clears that with a modest gap; pb-40 left an
-          obviously empty band below the last control. */}
+          button never sits underneath it. The bar occupies ~136px: the tab
+          bar it floats above (64px) plus its own py-3 either side of a
+          ~48px button. pb-36 (144px) clears that with a modest gap; pb-40
+          left an obviously empty band below the last control. */}
       <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-36'}>
         {/* Avatar — clickable, opens a file picker and uploads on pick.
             AvatarPicker centres itself. */}
@@ -253,16 +253,23 @@ export default function AccountForm({
         )}
       </div>
 
-      {/* Mobile: Save button fixed at bottom above tab bar */}
+      {/* Mobile: Save button fixed at bottom above tab bar.
+          z-30 keeps it under the tab bar (z-40) so the two can overlap
+          rather than meet exactly: -mb-px pulls the bar down a hair past
+          bottom-16 so a sub-pixel rounding difference cannot reopen the
+          seam that let page content show through between the two bars.
+          py-3 on the bar rather than mt-3 above the button and pb-2 below:
+          the button sits centred in its own strip, matching the padding
+          above it to the padding below. */}
       {!isDesktop && (
-        <div className="fixed bottom-16 inset-x-0 px-5 pb-2 bg-white border-t border-gray-100">
+        <div className="fixed bottom-16 -mb-px inset-x-0 z-30 px-5 py-3 bg-white border-t border-gray-100">
           <Button
             type="button"
             color="primary"
             isLoading={saveState === 'saving'}
             onPress={handleSave}
             fullWidth
-            className="mt-3 rounded-large py-3 text-sm font-semibold"
+            className="rounded-large py-3 text-sm font-semibold"
           >
             {saveLabel}
           </Button>

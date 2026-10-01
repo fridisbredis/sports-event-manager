@@ -21,9 +21,15 @@ export function BottomTabBar({ tenantSlug }: Props) {
     { href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User },
   ]
 
+  // The height is fixed, not content-derived. Three places assume this bar is
+  // 4rem tall — the layout's pb-16 reserve and the account screen's Save bar,
+  // which floats at bottom-16 — and when the intrinsic height drifted below
+  // that (shorter labels, tighter line box) a gap opened between the Save bar
+  // and this one that let page content show through. h-16 makes the shared
+  // assumption true.
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-edge bg-white">
-      <div className="flex">
+    <nav className="fixed bottom-0 inset-x-0 z-40 h-16 border-t border-edge bg-white">
+      <div className="flex h-full">
         {tabs.map(({ href, label, Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
