@@ -79,7 +79,7 @@ describe('saveAssignments RPC error mapping', () => {
     const result = await saveAssignments('acme', TENANT_ID, [VALID_ADDITION], [])
 
     expect(result.error).toBe(
-      'Någon annan hann före på den tidsluckan. Ladda om schemat och försök igen.'
+      'Someone else just took that slot. Please reload the schedule and try again.'
     )
   })
 
@@ -88,7 +88,7 @@ describe('saveAssignments RPC error mapping', () => {
 
     const result = await saveAssignments('acme', TENANT_ID, [VALID_ADDITION], [])
 
-    expect(result.error).toBe('Behörighet saknas')
+    expect(result.error).toBe('Not authorized')
   })
 
   it('maps ASG03 to the generic invalid-request message and logs it', async () => {
@@ -96,7 +96,7 @@ describe('saveAssignments RPC error mapping', () => {
 
     const result = await saveAssignments('acme', TENANT_ID, [VALID_ADDITION], [])
 
-    expect(result.error).toBe('Ogiltig förfrågan')
+    expect(result.error).toBe('Invalid request')
     expect(loggerWarn).toHaveBeenCalled()
   })
 
@@ -105,7 +105,7 @@ describe('saveAssignments RPC error mapping', () => {
 
     const result = await saveAssignments('acme', TENANT_ID, [VALID_ADDITION], [])
 
-    expect(result.error).toBe('Inplaneringarna kunde inte sparas. Försök igen.')
+    expect(result.error).toBe('Failed to save assignments. Please try again.')
     expect(loggerError).toHaveBeenCalled()
   })
 
@@ -142,7 +142,7 @@ describe('saveAssignments payload validation', () => {
       []
     )
 
-    expect(result.error).toBe('Ogiltig förfrågan')
+    expect(result.error).toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
     expect(loggerWarn).toHaveBeenCalled()
   })
@@ -150,7 +150,7 @@ describe('saveAssignments payload validation', () => {
   it('rejects a non-uuid deletion id without calling the RPC', async () => {
     const result = await saveAssignments('acme', TENANT_ID, [], ['not-a-uuid'])
 
-    expect(result.error).toBe('Ogiltig förfrågan')
+    expect(result.error).toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
   })
 
@@ -167,7 +167,7 @@ describe('saveAssignments payload validation', () => {
       [{ id: ASSIGNMENT_ID, status: 'deleted' as unknown as AssignmentStatus }]
     )
 
-    expect(result.error).toBe('Ogiltig förfrågan')
+    expect(result.error).toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
   })
 
@@ -179,7 +179,7 @@ describe('saveAssignments payload validation', () => {
       []
     )
 
-    expect(result.error).toBe('Ogiltig förfrågan')
+    expect(result.error).toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
   })
 
@@ -206,7 +206,7 @@ describe('saveAssignments payload validation', () => {
   it('rejects an invalid tenantId before touching the payload', async () => {
     const result = await saveAssignments('acme', 'not-a-uuid', [VALID_ADDITION], [])
 
-    expect(result.error).toBe('Behörighet saknas')
+    expect(result.error).toBe('Not authorized')
     expect(rpc).not.toHaveBeenCalled()
   })
 })
@@ -214,10 +214,10 @@ describe('saveAssignments payload validation', () => {
 // The caps exist mainly in migration 0033 (the RPC is granted to
 // `authenticated`, so it is reachable without this action). These tests cover
 // the client-facing half: the message has to say "too large", never the
-// generic "Ogiltig förfrågan", or nobody can tell an oversized save from a
+// generic "Invalid request", or nobody can tell an oversized save from a
 // broken caller.
 describe('saveAssignments batch caps', () => {
-  const TOO_LARGE = 'För många inplaneringar i en sparning. Dela upp ändringen i mindre delar.'
+  const TOO_LARGE = 'Too many assignments in one save. Split the change into smaller saves.'
 
   function additions(n: number) {
     return Array.from({ length: n }, (_, i) => ({ ...VALID_ADDITION, slot_index: i + 1 }))
@@ -227,7 +227,7 @@ describe('saveAssignments batch caps', () => {
     const result = await saveAssignments('acme', TENANT_ID, additions(501), [])
 
     expect(result.error).toBe(TOO_LARGE)
-    expect(result.error).not.toBe('Ogiltig förfrågan')
+    expect(result.error).not.toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
   })
 
@@ -278,7 +278,7 @@ describe('saveAssignments batch caps', () => {
       []
     )
 
-    expect(result.error).toBe('Ogiltig förfrågan')
+    expect(result.error).toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
   })
 })

@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { SidebarNav } from './_components/sidebar-nav'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
@@ -12,7 +12,8 @@ interface Props {
 
 export default async function TenantLayout({ children, params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation(defaultLocale, 'admin')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'admin')
 
   const user = await getCurrentUser()
 
@@ -30,7 +31,11 @@ export default async function TenantLayout({ children, params }: Props) {
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette ?? 'blue'} />
       <div className="app-surface flex min-h-screen">
-        <SidebarNav tenantSlug={tenantSlug} adminLabel={t('navigation.adminLabel')} />
+        <SidebarNav
+          tenantSlug={tenantSlug}
+          adminLabel={t('navigation.adminLabel')}
+          language={language}
+        />
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </>

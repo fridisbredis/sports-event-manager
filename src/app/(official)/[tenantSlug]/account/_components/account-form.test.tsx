@@ -17,6 +17,11 @@ vi.mock('@/lib/hooks/use-unsaved-changes', () => ({
 
 vi.mock('@/components/unsaved-changes-dialog', () => ({ default: () => null }))
 
+// Stubbed for the same reason as the dialog above: this file tests the account
+// form's own behaviour, and the real switcher pulls in useRouter(), which has
+// no mounted app router under jsdom.
+vi.mock('@/components/language-switcher', () => ({ LanguageSwitcher: () => null }))
+
 vi.mock('@/components/ui/app-card', () => ({
   AppCard: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }))
@@ -61,6 +66,7 @@ const baseProps = {
   tenantSlug: 'seed-klubben',
   assignmentCount: 3,
   i18nNamespace: 'official' as const,
+  language: 'en' as const,
 }
 
 describe('AccountForm log out', () => {

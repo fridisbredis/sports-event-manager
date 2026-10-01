@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
 
@@ -18,7 +18,7 @@ export default async function TenantDetailPage({ params }: Props) {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
 
-  const t = await getServerTranslation(defaultLocale, 'admin')
+  const t = await getServerTranslation(await getUserLanguage(), 'admin')
   const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')

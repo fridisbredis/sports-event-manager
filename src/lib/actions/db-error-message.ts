@@ -1,5 +1,5 @@
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { logger } from '@/lib/logger'
 
 // F-REL-22: never forward a raw Postgres/PostgREST/Storage error.message to
@@ -54,7 +54,7 @@ export async function translateDbError(
   if (options?.log !== false) {
     logger.error(logMessage, undefined, { code: error.code, message: error.message })
   }
-  const t = await getServerTranslation(defaultLocale, 'admin')
+  const t = await getServerTranslation(await getUserLanguage(), 'admin')
   const key = codeOverrides?.[error.code ?? ''] ?? DB_ERROR_KEYS[error.code ?? ''] ?? fallbackKey
   return t(key)
 }
@@ -71,6 +71,6 @@ export async function translateStorageError(
   namespace: 'admin' | 'official' = 'admin'
 ): Promise<string> {
   logger.error(logMessage, undefined, { message: error.message })
-  const t = await getServerTranslation(defaultLocale, namespace)
+  const t = await getServerTranslation(await getUserLanguage(), namespace)
   return t(fallbackKey)
 }

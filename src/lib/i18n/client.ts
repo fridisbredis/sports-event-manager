@@ -1,8 +1,11 @@
 import { useTranslation as useTranslationBase } from 'react-i18next'
-import { defaultNS, locales } from './config'
+import { defaultNS } from './config'
 
 export function useTranslation(ns?: string) {
   return useTranslationBase(ns || defaultNS)
 }
 
-export type Locale = (typeof locales)[number]
+// Re-exported from ./config so client components can keep importing it
+// from here; the canonical declaration sits next to `locales` itself, where
+// server-only modules can reach it without pulling in react-i18next.
+export type { Locale } from './config'

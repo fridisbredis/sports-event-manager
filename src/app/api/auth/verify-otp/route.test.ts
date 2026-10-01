@@ -7,6 +7,12 @@ import { logAuthEvent } from '@/lib/audit/log-auth-event'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  // Only reached when the request carries a `language`, which none of the
+  // cases below do — mocked so that a future case which does send one fails on
+  // its own assertion rather than on an undefined export.
+  createSupabaseServiceClient: vi.fn(() => ({
+    from: vi.fn(() => ({ upsert: vi.fn().mockResolvedValue({ error: null }) })),
+  })),
 }))
 
 vi.mock('@/lib/rate-limit', () => ({

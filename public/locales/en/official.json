@@ -86,7 +86,9 @@
     "avatarUploading": "Uploading…",
     "avatarUploadError": "Couldn't upload that picture. Please try again.",
     "avatarTypeError": "Choose a JPEG, PNG or WebP image.",
-    "avatarSizeError": "That image is too large. Please choose a smaller one."
+    "avatarSizeError": "That image is too large. Please choose a smaller one.",
+    "languageLabel": "App language",
+    "languageHint": "Text messages are always sent in English."
   },
   "checklist": {
     "toggleLabel": "Check off",

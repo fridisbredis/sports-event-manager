@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { translateDbError, translateStorageError } from './db-error-message'
 
 vi.mock('@/lib/logger', () => ({
@@ -13,22 +14,22 @@ vi.mock('@/lib/logger', () => ({
 describe('translateDbError', () => {
   it('maps P0002 to the not-found message', async () => {
     const result = await translateDbError('test', { code: 'P0002', message: 'raw pg message' })
-    expect(result).toBe('Evenemanget kunde inte hittas. Uppdatera sidan och försök igen.')
+    expect(result).toBe('This event could not be found. Refresh the page and try again.')
   })
 
   it('maps P0003 to the Race-stage-specific message', async () => {
     const result = await translateDbError('test', { code: 'P0003', message: 'raw pg message' })
-    expect(result).toBe('Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.')
+    expect(result).toBe('Cannot remove the last Race stage from a published event.')
   })
 
   it('maps 23514 to the stage-times message', async () => {
     const result = await translateDbError('test', { code: '23514', message: 'raw pg message' })
-    expect(result).toBe('En etapps sluttid måste vara efter dess starttid.')
+    expect(result).toBe("A stage's end time must be after its start time.")
   })
 
   it('falls back to the generic save error for an unmapped code', async () => {
     const result = await translateDbError('test', { code: 'XXXXX', message: 'db is down' })
-    expect(result).toBe('Något gick fel när ändringarna skulle sparas. Försök igen.')
+    expect(result).toBe('Something went wrong while saving. Please try again.')
   })
 
   it('falls back to a caller-supplied key when given one', async () => {
@@ -37,7 +38,7 @@ describe('translateDbError', () => {
       { code: 'XXXXX', message: 'db is down' },
       'workstations.genericDeleteError'
     )
-    expect(result).toBe('Något gick fel vid borttagningen. Försök igen.')
+    expect(result).toBe('Something went wrong while deleting. Please try again.')
   })
 
   it('never returns the raw error message for any code', async () => {
@@ -59,7 +60,7 @@ describe('translateDbError', () => {
       { '23514': 'eventConfig.publishPreconditionFailed' }
     )
     expect(result).toBe(
-      'Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.'
+      "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again."
     )
   })
 
@@ -70,6 +71,21 @@ describe('translateDbError', () => {
       'eventConfig.genericSaveError',
       { '23514': 'eventConfig.publishPreconditionFailed' }
     )
+    expect(result).toBe('This event could not be found. Refresh the page and try again.')
+  })
+})
+
+// vitest.setup.ts stubs getUserLanguage() to 'en' for the whole suite, so every
+// assertion above is really asserting the English path. That makes this the one
+// place that proves the helper follows the user's stored language at all — without
+// it, translateDbError could ignore the preference entirely and the suite would
+// stay green.
+describe('translateDbError language resolution', () => {
+  it('returns the message in the language the user chose, not the default', async () => {
+    vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
+
+    const result = await translateDbError('test', { code: 'P0002', message: 'raw pg message' })
+
     expect(result).toBe('Evenemanget kunde inte hittas. Uppdatera sidan och försök igen.')
   })
 })
@@ -77,6 +93,6 @@ describe('translateDbError', () => {
 describe('translateStorageError', () => {
   it('always returns the generic upload error message, never the raw message', async () => {
     const result = await translateStorageError('test', { message: 'S3 bucket unreachable' })
-    expect(result).toBe('Något gick fel när logotypen skulle laddas upp. Försök igen.')
+    expect(result).toBe('Something went wrong while uploading the logo. Please try again.')
   })
 })
