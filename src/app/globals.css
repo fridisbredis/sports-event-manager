@@ -88,3 +88,55 @@
       inset 3px 0 0 color-mix(in srgb, var(--card-accent, hsl(var(--tenant-primary))) 28%, white);
   }
 }
+
+/* iOS zooms the whole page in when a focused field's text is under 16px, and
+   never zooms back out — one tap on the login field leaves every later screen
+   scaled up and clipped, because client-side navigation has no page load to
+   reset the scale. This is WebKit-level, so it is Chrome and every other iOS
+   browser too, not just Safari.
+
+   Fixed by rewriting HeroUI's font-size tokens rather than the fields
+   themselves. HeroUI sizes field text with
+   `.text-small { font-size: var(--heroui-font-size-small) }`, so overriding
+   the token beats every rule that reads it, without touching line-height or
+   any other field styling.
+
+   Placement and selector are both load-bearing, and both were found the hard
+   way by diffing the compiled stylesheet:
+     - It lives in `utilities` (emitted last) because HeroUI defines these
+       tokens ~90KB into the file; the same block in `base` is overwritten.
+     - It repeats HeroUI's own `:root, .light, [data-theme='light']` list
+       because a bare `:root` loses to the `.light` branch on specificity.
+   A plain `input { font-size: 16px }` fails for the same two reasons: the
+   `.text-small` class outranks it and lands later.
+
+   `small` is the token behind the default `md` fields that
+   @/components/ui/form-fields wraps; `tiny` is raised too because the
+   date/time segments use it. 16px is WebKit's threshold, not a design choice,
+   and it applies only to coarse pointers so desktop keeps the 14px from the
+   design handoff.
+
+   Not fixed with `maximum-scale=1, user-scalable=no` on the viewport: that
+   also stops the zoom, but disables pinch-zoom entirely and fails WCAG 2.1 AA
+   1.4.4 (Resize Text). */
+@layer utilities {
+  @media (pointer: coarse) {
+    :root,
+    .light,
+    [data-theme='light'],
+    .dark,
+    [data-theme='dark'] {
+      --heroui-font-size-tiny: 1rem;
+      --heroui-font-size-small: 1rem;
+    }
+
+    /* Raw fields that never read the tokens above. Scoped away from HeroUI's
+       own inputs, which the tokens already cover. */
+    input:not([data-slot]),
+    select:not([data-slot]),
+    textarea:not([data-slot]),
+    [contenteditable]:not([contenteditable='false']) {
+      font-size: max(16px, 1em);
+    }
+  }
+}
