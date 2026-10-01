@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import i18next from 'i18next'
 import { useTranslation } from '@/lib/i18n/client'
 import { locales, type Locale } from '@/lib/i18n/config'
 import { toastError } from '@/lib/toast'
@@ -65,7 +64,12 @@ export function LanguageSwitcher({
   variant = 'outlined',
   className = '',
 }: Props) {
-  const { t } = useTranslation('common')
+  // The instance behind the surrounding I18nextProvider, not the imported
+  // i18next singleton: on the server that singleton is shared by every request
+  // in the process, and this component must never be the thing that mutates it.
+  // useTranslation() hands back the instance its own provider supplied, which
+  // is the client one wherever this component can actually be clicked.
+  const { t, i18n } = useTranslation('common')
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [language, setLanguage] = useState<Locale>(current)
@@ -82,7 +86,7 @@ export function LanguageSwitcher({
     // a moment apart, which is why the control stays disabled until both are
     // done.
     setLanguage(next)
-    i18next.changeLanguage(next)
+    i18n.changeLanguage(next)
     onChange?.(next)
 
     if (!persist) return
@@ -105,7 +109,7 @@ export function LanguageSwitcher({
       // Put the control and the client-side language back where they were, so
       // what the user sees matches what is actually stored.
       setLanguage(previous)
-      i18next.changeLanguage(previous)
+      i18n.changeLanguage(previous)
       onChange?.(previous)
       toastError(t('language.saveFailed'))
     } finally {
