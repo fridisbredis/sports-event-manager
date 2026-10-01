@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, createContext, useContext, useEffect } from 'react'
-import i18next from 'i18next'
+import i18next, { createInstance, type i18n as I18nInstance } from 'i18next'
 import { initReactI18next, I18nextProvider } from 'react-i18next'
 import resourcesToBackend from 'i18next-resources-to-backend'
 import { i18nConfig, defaultLocale, locales, type Locale } from '@/lib/i18n/config'
@@ -33,12 +33,26 @@ const resources: Record<string, Record<string, unknown>> = {
 
 // Seeded with the language the server rendered in, so the very first paint is
 // already correct. init() is synchronous for statically bundled resources like
-// these, and runs once per browser session — subsequent changes go through the
-// effect in the component below rather than re-initialising.
-function ensureInitialized(language: string) {
-  if (i18next.isInitialized) return
-
-  i18next
+// these.
+//
+// On the client this is the shared singleton, created once per browser session:
+// there is exactly one user, the switcher mutates it with changeLanguage(), and
+// every subscribed component re-renders off that.
+//
+// On the SERVER it must be a fresh instance per render. `i18next` is a
+// module-level object shared by the whole Node process, not scoped to a
+// request, so initialising it or changing its language leaks across users:
+// once a signed-in Swedish user had rendered, the same /login served Swedish to
+// everyone after them until the process restarted, while the client — with no
+// stored preference — hydrated in English. That surfaced as a hydration
+// mismatch, but the underlying fault is worse than a mismatch: one user's
+// language decided what the next user's server render said.
+//
+// react-i18next reads the instance from I18nextProvider's context, so handing
+// the server a private instance is enough — the components calling
+// useTranslation() need no change.
+function configure(instance: I18nInstance, language: string) {
+  instance
     .use(initReactI18next)
     .use(
       resourcesToBackend((lng: string, namespace: string) => {
@@ -48,6 +62,12 @@ function ensureInitialized(language: string) {
     .init({
       ...i18nConfig,
       lng: language,
+      // Load the bundled resources during init() rather than on a later tick.
+      // The resources are statically imported objects, so there is nothing to
+      // wait for — but left at its default i18next defers them, and a server
+      // render (which gets no second tick) would emit raw keys like
+      // "language.label" instead of the translated string.
+      initImmediate: false,
       react: {
         useSuspense: false, // Disable suspense in case of missing translations
       },
@@ -55,6 +75,22 @@ function ensureInitialized(language: string) {
         loadPath: '/locales/{{lng}}/{{ns}}.json',
       },
     })
+
+  return instance
+}
+
+// `typeof window` rather than a build-time flag: this one module is shared by
+// both halves, and the branch has to hold at runtime.
+const isServer = typeof window === 'undefined'
+
+function instanceFor(language: string): I18nInstance {
+  // A private instance per render, and never initReactI18next on the shared
+  // singleton — see above. init() is synchronous for statically bundled
+  // resources, so this builds an object graph rather than doing any I/O.
+  if (isServer) return configure(createInstance(), language)
+
+  if (!i18next.isInitialized) configure(i18next, language)
+  return i18next
 }
 
 // The language the server resolved for this render, published so client
@@ -90,8 +126,9 @@ interface I18nProviderProps {
 export function I18nProvider({ children, language = defaultLocale }: I18nProviderProps) {
   // Before the first render rather than in an effect: the strings below are
   // about to be read, and initialising afterwards would paint them in the
-  // fallback language first. This is idempotent after the first call.
-  ensureInitialized(language)
+  // fallback language first. Idempotent on the client after the first call; on
+  // the server it is a fresh instance each time, which is the point.
+  const instance = instanceFor(language)
 
   // changeLanguage() is a side effect on a module-level singleton that other
   // components subscribe to, so calling it during render updates those
@@ -105,11 +142,15 @@ export function I18nProvider({ children, language = defaultLocale }: I18nProvide
   // covers what that cannot: a language
   // that changes afterwards, when the switcher saves and the route re-renders
   // with a new value from the server.
+  //
+  // Effects do not run on the server, so this only ever touches the client
+  // instance — but it reads `instance` rather than the imported singleton so
+  // that stays true by construction rather than by coincidence.
   useEffect(() => {
-    if (language && language !== i18next.language) {
-      i18next.changeLanguage(language)
+    if (language && language !== instance.language) {
+      instance.changeLanguage(language)
     }
-  }, [language])
+  }, [instance, language])
 
   // Narrowed rather than cast: `language` is a plain string on this prop for
   // callers that read it out of the database, and an unrecognised value must
@@ -118,7 +159,7 @@ export function I18nProvider({ children, language = defaultLocale }: I18nProvide
 
   return (
     <LanguageContext.Provider value={resolved}>
-      <I18nextProvider i18n={i18next}>{children}</I18nextProvider>
+      <I18nextProvider i18n={instance}>{children}</I18nextProvider>
     </LanguageContext.Provider>
   )
 }

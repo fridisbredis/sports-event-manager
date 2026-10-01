@@ -9,7 +9,13 @@ const { fakeT } = vi.hoisted(() => ({
     vars ? `${key}:${JSON.stringify(vars)}` : key,
 }))
 
-vi.mock('@/lib/i18n/client', () => ({ useTranslation: () => ({ t: fakeT }) }))
+// `i18n` is part of what useTranslation() really returns, and the switcher
+// calls changeLanguage() on it rather than on the imported singleton — the
+// singleton is shared across requests on the server, so no component may touch
+// it directly.
+vi.mock('@/lib/i18n/client', () => ({
+  useTranslation: () => ({ t: fakeT, i18n: { changeLanguage: vi.fn(), language: 'en' } }),
+}))
 
 vi.mock('i18next', () => ({
   default: { changeLanguage: vi.fn(), language: 'en' },
