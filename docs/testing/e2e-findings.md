@@ -142,8 +142,8 @@ Ticketed as F-MNT-20 in `docs/quality-requirements.md` after Eduardo pointed out
 in review of PR #177 that this lived only in a test document and so had no owner.
 
 **Resolved 2026-09-11** (migrations `20260911130436_ensure_admin_roster_row_rpc.sql`
-and `20260911130546_backfill_admin_roster_rows.sql`; not yet applied to dev or
-prod). The "how" is settled: a real `officials` row, written by an
+and `20260911130546_backfill_admin_roster_rows.sql`; applied to dev and prod on
+2026-09-28). The "how" is settled: a real `officials` row, written by an
 `ensure_admin_roster_row` RPC. Two things in the write-up above turned out to be
 wrong once measured, and are worth recording:
 
@@ -164,6 +164,16 @@ seeded admin to a work area on the local stack.
 
 The three assertions that carried this discrepancy now assert presence instead of
 absence.
+
+**Verified on dev and prod 2026-10-01.** Both migrations are recorded in
+`supabase_migrations.schema_migrations`, `ensure_admin_roster_row` exists, and
+the query that found this defect — tenant_admins in `user_roles` with no
+matching `officials` row — now returns 0 on both. The backfill behaved as
+predicted on prod: viadal-2026's two hand-made rows still carry their 2026-07-07
+timestamps and exactly one row was inserted. Note one case the write-up above
+does not cover: on dev, `testklubben` has both a `removed` row from 2026-07-02
+and a new row from 2026-09-28, because the RPC's reuse-first claim deliberately
+skips removed rows rather than resurrecting them.
 
 ### F5 — Permission matrix holds
 
