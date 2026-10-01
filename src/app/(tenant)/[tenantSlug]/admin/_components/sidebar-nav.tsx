@@ -25,11 +25,14 @@ interface Props {
   tenantSlug: string
   adminLabel: string
   language: Locale
+  // False when the caller has no `officials` row in this tenant, so ACCT-01
+  // has nothing to show them — see hasAccountScreen in lib/auth/tenant.
+  showAccount: boolean
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({ tenantSlug, adminLabel, language }: Props) {
+export function SidebarNav({ tenantSlug, adminLabel, language, showAccount }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation('admin')
   // Shared with every other language control in the app, so it lives in
@@ -141,7 +144,7 @@ export function SidebarNav({ tenantSlug, adminLabel, language }: Props) {
               variant={collapsed ? 'stacked' : 'outlined'}
             />
           </div>
-          {navLink('admin/account', t('navigation.account'), UserCircle)}
+          {showAccount && navLink('admin/account', t('navigation.account'), UserCircle)}
           <LogoutButton
             title={collapsed ? t('navigation.logOut') : undefined}
             className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${

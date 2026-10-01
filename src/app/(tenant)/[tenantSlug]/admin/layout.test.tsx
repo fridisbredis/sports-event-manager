@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TenantLayout from './layout'
-import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from './_components/sidebar-nav'
 
@@ -10,6 +10,7 @@ import { SidebarNav } from './_components/sidebar-nav'
 vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getAdminTenant: vi.fn(),
+  hasAccountScreen: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -80,6 +81,7 @@ describe('TenantLayout', () => {
 
   it('renders children and SidebarNav when the user has admin access', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(hasAccountScreen).mockResolvedValue(true)
     vi.mocked(getAdminTenant).mockResolvedValue({
       id: TENANT_ID,
       slug: 'viadal',
@@ -97,5 +99,26 @@ describe('TenantLayout', () => {
 
     const flat = JSON.stringify(result)
     expect(flat).toContain('CHILD_CONTENT')
+  })
+
+  // ACCT-01 is backed by an `officials` row, so the sidebar hides its link for
+  // a caller without one — a global system_admin holds no roster row in any
+  // tenant, and the page answers notFound() for them.
+  it('passes showAccount through to SidebarNav', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(getAdminTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+    })
+
+    vi.mocked(hasAccountScreen).mockResolvedValue(false)
+    let nav = findByType(await TenantLayout({ children: 'C', params: PARAMS }), SidebarNav)
+    expect(nav!.props.showAccount).toBe(false)
+
+    vi.mocked(hasAccountScreen).mockResolvedValue(true)
+    nav = findByType(await TenantLayout({ children: 'C', params: PARAMS }), SidebarNav)
+    expect(nav!.props.showAccount).toBe(true)
   })
 })

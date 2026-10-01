@@ -88,6 +88,7 @@ describe('OfficialLayout', () => {
       slug: 'viadal',
       color_palette: 'blue',
       is_active: true,
+      officialId: 'off-1',
     })
 
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
@@ -96,9 +97,27 @@ describe('OfficialLayout', () => {
 
     const tabBar = findByType(result, BottomTabBar)
     expect(tabBar).not.toBeNull()
-    expect(tabBar!.props).toEqual({ tenantSlug: 'viadal' })
+    expect(tabBar!.props).toEqual({ tenantSlug: 'viadal', showAccount: true })
 
     const flat = JSON.stringify(result)
     expect(flat).toContain('CHILD_CONTENT')
+  })
+
+  // The access check allows an admin into official surfaces without a roster
+  // row (officialId: null) so their schedule degrades to empty rather than
+  // locking them out. ACCT-01 is the one screen that needs the row itself, so
+  // the tab goes rather than leading to the notFound() the page answers.
+  it('hides the account tab when the caller has no officials row', async () => {
+    mockUser('user-1', {
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+      officialId: null,
+    })
+
+    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
+
+    expect(findByType(result, BottomTabBar)!.props.showAccount).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { SidebarNav } from './_components/sidebar-nav'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -27,6 +27,10 @@ export default async function TenantLayout({ children, params }: Props) {
 
   if (!tenant) notFound()
 
+  // ACCT-01 is backed by an `officials` row, which an admin who reaches this
+  // tenant by role alone does not have — see hasAccountScreen.
+  const showAccount = await hasAccountScreen(tenantSlug)
+
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette ?? 'blue'} />
@@ -35,6 +39,7 @@ export default async function TenantLayout({ children, params }: Props) {
           tenantSlug={tenantSlug}
           adminLabel={t('navigation.adminLabel')}
           language={language}
+          showAccount={showAccount}
         />
         <div className="min-w-0 flex-1">{children}</div>
       </div>
