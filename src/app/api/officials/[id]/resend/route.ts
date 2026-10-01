@@ -12,6 +12,8 @@ import {
   type RateLimitResult,
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
+import { getServerTranslation } from '@/lib/i18n/server'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 const resendSchema = z.object({
   tenantId: z.string().uuid(),
@@ -180,6 +182,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${updated.invite_token}`
 
+  // Same language rule as the create route: the invitee still has no
+  // user_preferences row of their own — a resend only ever targets an
+  // `invited` official, checked above, which is by definition someone who has
+  // not confirmed yet — so this follows the admin pressing resend.
+  const t = await getServerTranslation(await getUserLanguage(), 'auth')
+  const smsBody = t('confirmation.inviteSms.body', {
+    name: official.name,
+    tenant: tenant?.name ?? t('confirmation.inviteSms.fallbackTenant'),
+    url: inviteUrl,
+  })
+
   // The token above has already been regenerated and the old link revoked - that cannot
   // be rolled back here even if the send below fails, because the whole point of the
   // rotation is that the old token is gone. A failed send is therefore destructive rather
@@ -194,7 +207,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // above, so nothing that reaches the catch below is a fault of our own configuration.
   try {
     await client.messages.create({
-      body: `Hi ${official.name}, you have been invited as an official for ${tenant?.name ?? 'an event'}. Confirm your availability here: ${inviteUrl}`,
+      body: smsBody,
       from: fromNumber,
       to: toTwilioE164(official.phone),
     })

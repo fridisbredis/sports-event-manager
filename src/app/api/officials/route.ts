@@ -15,6 +15,8 @@ import {
   type RateLimitResult,
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
+import { getServerTranslation } from '@/lib/i18n/server'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
@@ -253,6 +255,19 @@ export async function POST(request: NextRequest) {
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${official.invite_token}`
 
+  // The invitee has no language of their own yet: user_preferences is written
+  // when they confirm (api/officials/confirm), which is strictly after this
+  // send. The inviting admin's language is the best available proxy — a
+  // Swedish-speaking admin is inviting Swedish-speaking officials — and it is
+  // what makes this SMS Swedish for Viadal without a tenant-level setting.
+  // Once they confirm, the language they picked on the invite page takes over.
+  const t = await getServerTranslation(await getUserLanguage(), 'auth')
+  const smsBody = t('confirmation.inviteSms.body', {
+    name,
+    tenant: tenant?.name ?? t('confirmation.inviteSms.fallbackTenant'),
+    url: inviteUrl,
+  })
+
   // The row is already committed at this point. A failed send must not be reported as a
   // failed create, or the admin retries and we accumulate duplicate invited officials.
   // The row stays `invited`, which is exactly the state the resend endpoint accepts.
@@ -264,7 +279,7 @@ export async function POST(request: NextRequest) {
   try {
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
     await client.messages.create({
-      body: `Hi ${name}, you have been invited as an official for ${tenant?.name ?? 'an event'}. Confirm your availability here: ${inviteUrl}`,
+      body: smsBody,
       from: process.env.TWILIO_PHONE_NUMBER!,
       to: toTwilioE164(phone),
     })

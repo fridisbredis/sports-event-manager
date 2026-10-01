@@ -5,6 +5,7 @@ import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
 import twilio from 'twilio'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -181,6 +182,37 @@ describe('POST /api/officials/[id]/resend', () => {
       from: '+15550001111',
       to: '+46701234567',
     })
+  })
+
+  it("resends the invite SMS in the resending admin's language", async () => {
+    // A resend only ever targets an `invited` official, so the recipient has
+    // by definition not confirmed and has no stored language of their own.
+    // Overrides the global 'en' stub from vitest.setup.ts.
+    vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+        })
+      )
+      .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(res.status).toBe(200)
+    expect(messagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'Hej Anna, du har bjudits in som funktionär för Viadal 2026. Bekräfta din tillgänglighet här: https://app.example.com/invite/tok-new',
+      })
+    )
   })
 
   it('returns 500 and never sends sms when the token refresh fails', async () => {

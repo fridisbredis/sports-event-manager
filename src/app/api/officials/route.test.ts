@@ -10,6 +10,7 @@ import { revalidateTag } from 'next/cache'
 import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Database } from '@/types/database'
 import twilio from 'twilio'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -231,6 +232,46 @@ describe('POST /api/officials', () => {
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         body: 'Hi Bo, you have been invited as an official for an event. Confirm your availability here: https://app.example.com/invite/tok-xyz',
+      })
+    )
+  })
+
+  it("sends the invite SMS in the inviting admin's language", async () => {
+    // The invitee has no stored language at this point - user_preferences is
+    // written when they confirm, which is strictly after this send - so the
+    // admin's own language is what the text follows. Overrides the global
+    // 'en' stub from vitest.setup.ts.
+    vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
+    asAdmin()
+    const official = { id: 'off-1', name: 'Anna', phone: '0701234567', invite_token: 'tok-abc' }
+    mockService(chain({ data: official, error: null }), chain({ data: { name: 'Viadal 2026' } }))
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+    )
+
+    expect(messagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'Hej Anna, du har bjudits in som funktionär för Viadal 2026. Bekräfta din tillgänglighet här: https://app.example.com/invite/tok-abc',
+      })
+    )
+  })
+
+  it('falls back to the Swedish tenant placeholder when the tenant has no name', async () => {
+    // The fallback word is translated too - mixing 'an event' into an
+    // otherwise Swedish sentence is exactly what a hardcoded fallback does.
+    vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
+    asAdmin()
+    const official = { id: 'off-1', name: 'Bo', phone: '0709998877', invite_token: 'tok-xyz' }
+    mockService(chain({ data: official, error: null }), chain({ data: null }))
+
+    await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Bo', phone: '0709998877', phoneCountry: 'SE' })
+    )
+
+    expect(messagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'Hej Bo, du har bjudits in som funktionär för ett evenemang. Bekräfta din tillgänglighet här: https://app.example.com/invite/tok-xyz',
       })
     )
   })
