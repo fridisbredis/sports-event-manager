@@ -68,6 +68,13 @@
 --             ships. If the trigger were to reject a write it should have
 --             allowed, the user sees the upload fail loudly rather than
 --             silently — strictly better than the current behaviour.
+--   Window:   compatible. Nothing the deployed image reads or writes changes
+--             shape — no column is added, renamed or dropped, and no
+--             existing policy is altered. The old image keeps working
+--             unchanged while the new schema is live, and the only
+--             behavioural difference is that the avatar UPDATE it already
+--             issues starts matching its row instead of silently matching
+--             none.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
