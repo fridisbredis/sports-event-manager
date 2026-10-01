@@ -1,10 +1,10 @@
 'use client'
 
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, createContext, useContext, useEffect } from 'react'
 import i18next from 'i18next'
 import { initReactI18next, I18nextProvider } from 'react-i18next'
 import resourcesToBackend from 'i18next-resources-to-backend'
-import { i18nConfig, defaultLocale } from '@/lib/i18n/config'
+import { i18nConfig, defaultLocale, locales, type Locale } from '@/lib/i18n/config'
 
 // Import all translation files statically for better bundling
 import enCommon from '../../public/locales/en/common.json'
@@ -57,6 +57,31 @@ function ensureInitialized(language: string) {
     })
 }
 
+// The language the server resolved for this render, published so client
+// components can start from it rather than guessing.
+//
+// Without this, a client component that needs the current language as *state*
+// (rather than just calling t()) had no way to reach it, and /login hardcoded
+// defaultLocale instead. That disagreed with the strings around it, which come
+// from the i18next instance seeded with the server's language — a signed-in
+// Swedish user signing out got a page rendered in Swedish on the server and
+// hydrated as English, which React reports as a hydration mismatch.
+const LanguageContext = createContext<Locale>(defaultLocale)
+
+function isLocale(value: string): value is Locale {
+  return (locales as readonly string[]).includes(value)
+}
+
+/**
+ * The language the current render is in — the signed-in user's stored
+ * preference, or the default locale when they have not chosen one or are
+ * signed out. Identical on the server and on the first client render, which is
+ * what makes it safe to seed state with.
+ */
+export function useLanguage(): Locale {
+  return useContext(LanguageContext)
+}
+
 interface I18nProviderProps {
   children: ReactNode
   language?: string
@@ -86,5 +111,14 @@ export function I18nProvider({ children, language = defaultLocale }: I18nProvide
     }
   }, [language])
 
-  return <I18nextProvider i18n={i18next}>{children}</I18nextProvider>
+  // Narrowed rather than cast: `language` is a plain string on this prop for
+  // callers that read it out of the database, and an unrecognised value must
+  // land on the same default the server used, not be published as a Locale.
+  const resolved: Locale = isLocale(language) ? language : defaultLocale
+
+  return (
+    <LanguageContext.Provider value={resolved}>
+      <I18nextProvider i18n={i18next}>{children}</I18nextProvider>
+    </LanguageContext.Provider>
+  )
 }

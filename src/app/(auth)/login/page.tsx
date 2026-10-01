@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
 import { LanguageSwitcher } from '@/components/language-switcher'
-import { defaultLocale, type Locale } from '@/lib/i18n/config'
+import { type Locale } from '@/lib/i18n/config'
+import { useLanguage } from '@/components/i18n-provider'
 import { SelectItem } from '@heroui/react'
 import { Input, Select } from '@/components/ui/form-fields'
 import { SignInButton } from './_components/sign-in-button'
@@ -63,7 +64,14 @@ export default function LoginPage() {
   // `language` unconditionally would post the page default on every sign-in
   // and overwrite a returning user's stored choice with it — someone who had
   // picked Swedish would be reset to English each time they signed in.
-  const [language, setLanguage] = useState<Locale>(defaultLocale)
+  // Seeded from the language this render is already in, not from
+  // defaultLocale. The strings on this page come from the i18next instance the
+  // root layout seeded with the signed-in user's stored language, so hardcoding
+  // the default made the switcher disagree with the text beside it: a Swedish
+  // user signing out got a page the server rendered in Swedish and the client
+  // hydrated as English. Reading the same value both sides keeps them equal.
+  const renderLanguage = useLanguage()
+  const [language, setLanguage] = useState<Locale>(renderLanguage)
   const [languageChosen, setLanguageChosen] = useState(false)
 
   function handleLanguageChange(next: Locale) {
