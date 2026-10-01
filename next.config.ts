@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // Next 16 blocks requests for /_next/* dev resources whose Host header is not
+  // localhost, so opening the dev server from another device on the LAN (a real
+  // phone, for testing touch behaviour) serves the HTML and CSS but blocks every
+  // JS chunk — the page renders unstyled-by-JS and nothing interactive works.
+  //
+  // Scoped to the private LAN ranges rather than '*': these addresses are not
+  // routable from the internet, so this cannot expose the dev server beyond the
+  // local network. It has no effect on `next build` / production, where the dev
+  // resource handler does not exist at all.
+  allowedDevOrigins: ['192.168.*.*', '10.*.*.*', '172.16.*.*'],
   images: {
     remotePatterns: [
       {
