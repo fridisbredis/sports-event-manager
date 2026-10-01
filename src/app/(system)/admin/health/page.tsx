@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import { StatusCard } from './_components/status-card'
 import { fetchSupabaseStatus, fetchTwilioStatus, fetchSentryStatus } from './_lib/fetch-status'
 import {
@@ -16,7 +17,7 @@ export default async function SystemHealthPage() {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
 
-  const t = await getServerTranslation('en', 'admin')
+  const t = await getServerTranslation(defaultLocale, 'admin')
   const statusLabels = {
     ok: t('health.status.ok'),
     error: t('health.status.error'),

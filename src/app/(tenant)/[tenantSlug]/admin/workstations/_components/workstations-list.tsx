@@ -25,6 +25,7 @@ import {
   workAreaDotColor,
   type WorkAreaColor,
 } from '@/lib/theme/work-area-colors'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 // Every rendered id is in the map by construction; this only satisfies the
 // type at the lookup site.
@@ -64,7 +65,7 @@ function utcDateStr(iso: string): string {
 }
 
 function utcTimeStr(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-GB', {
+  return new Date(iso).toLocaleTimeString(DATE_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
@@ -73,7 +74,7 @@ function utcTimeStr(iso: string): string {
 
 function formatWindow(w: OperatingWindow): string {
   const dateLabel = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', {
+    new Date(iso).toLocaleDateString(DATE_LOCALE, {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -116,7 +117,7 @@ function formatStageDate(stage: Stage): string {
     month: 'short',
     timeZone: 'UTC',
   }
-  const start = new Date(stage.start_time).toLocaleDateString('en-GB', opts)
+  const start = new Date(stage.start_time).toLocaleDateString(DATE_LOCALE, opts)
   if (!stage.end_time) return start
   const startDay = utcDateStr(stage.start_time)
   const endDay = utcDateStr(stage.end_time)
@@ -125,7 +126,7 @@ function formatStageDate(stage: Stage): string {
     const endTime = utcTimeStr(stage.end_time)
     return `${start} · ${startTime}–${endTime}`
   }
-  const end = new Date(stage.end_time).toLocaleDateString('en-GB', opts)
+  const end = new Date(stage.end_time).toLocaleDateString(DATE_LOCALE, opts)
   return `${start} – ${end}`
 }
 
@@ -137,7 +138,9 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
 
   return (
     <div className="flex w-full items-center gap-3">
-      <span className="text-[17px] font-bold tracking-tight text-ink">{stage.name}</span>
+      <span className="font-display text-[17px] font-bold tracking-tight text-ink">
+        {stage.name}
+      </span>
       <Chip
         size="sm"
         variant="flat"
@@ -149,8 +152,11 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
       >
         {typeLabel}
       </Chip>
-      {dateStr && <span className="text-[14px] text-ink-muted">{dateStr}</span>}
-      <span className="ml-auto text-[14px] text-ink-muted">
+      {/* HeroUI renders an AccordionItem's title inside an <h2>, and the
+          base layer puts Manrope on every h1-h3. These two are body text, so
+          they have to ask for the system stack back explicitly. */}
+      {dateStr && <span className="font-sans text-[13px] text-ink-muted">{dateStr}</span>}
+      <span className="ml-auto font-sans text-[13px] text-ink-muted">
         {t('workstations.workAreaCount', { count })}
       </span>
     </div>

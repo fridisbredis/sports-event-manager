@@ -1,4 +1,5 @@
 import { getAllocableRange, getAllocableDays } from './allocable-range'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 // Structural (not imported from the component) so this module has no dependency
@@ -106,7 +107,7 @@ export function isWithinWindow(slot: Date, granMin: number, windows: OperatingWi
 
 export function formatDayLabel(day: string): string {
   const date = new Date(`${day}T12:00:00.000Z`)
-  return date.toLocaleDateString('sv-SE', {
+  return date.toLocaleDateString(DATE_LOCALE, {
     weekday: 'long',
     day: 'numeric',
     month: 'short',
@@ -115,11 +116,19 @@ export function formatDayLabel(day: string): string {
 }
 
 export function formatSlotLabel(slot: Date): string {
-  return slot.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+  return slot.toLocaleTimeString(DATE_LOCALE, {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  })
 }
 
 export function formatSlotDateTimeLabel(slot: Date): string {
-  const date = slot.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const date = slot.toLocaleDateString(DATE_LOCALE, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
   return `${date} ${formatSlotLabel(slot)}`
 }
 

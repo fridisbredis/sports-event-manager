@@ -235,6 +235,10 @@ export default function OfficialsList({
             // `shadow-small` HeroUI's wrapper sets on this same element.
             wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
             th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+            // A rule between officials, dropped on the last row so the list
+            // doesn't end on a line just above the card's own edge. Same
+            // treatment as the system-admin tenant list.
+            tr: 'border-b border-edge-soft last:border-b-0',
             td: 'py-4',
           }}
         >
@@ -242,7 +246,10 @@ export default function OfficialsList({
             <TableColumn>{t('officials.name')}</TableColumn>
             <TableColumn>{t('officials.phone')}</TableColumn>
             <TableColumn>{t('officials.status')}</TableColumn>
-            <TableColumn>{t('officials.actions')}</TableColumn>
+            {/* A fixed width so the two actions keep the same two columns on
+                every row; without it the cell shrinks to its content and
+                Re-send invite lands wherever Remove happens to end. */}
+            <TableColumn width={260}>{t('officials.actions')}</TableColumn>
           </TableHeader>
           <TableBody>
             {visibleOfficials.map((official) => {
@@ -291,7 +298,17 @@ export default function OfficialsList({
                   </TableCell>
                   <TableCell>
                     {!isCurrentUser && (
-                      <div className="flex items-center gap-5">
+                      // Remove sits on the left, Re-send invite pinned to the
+                      // right, so the second action lines up down the column
+                      // instead of starting wherever the first one ends.
+                      <div className="flex items-center justify-between gap-5">
+                        <LinkButton
+                          size="sm"
+                          tone="danger"
+                          onPress={() => setRemoveTarget(official)}
+                        >
+                          {t('officials.remove')}
+                        </LinkButton>
                         {official.invite_status === 'invited' && (
                           <LinkButton
                             size="sm"
@@ -301,13 +318,6 @@ export default function OfficialsList({
                             {t('officials.resendInvite')}
                           </LinkButton>
                         )}
-                        <LinkButton
-                          size="sm"
-                          tone="danger"
-                          onPress={() => setRemoveTarget(official)}
-                        >
-                          {t('officials.remove')}
-                        </LinkButton>
                       </div>
                     )}
                   </TableCell>

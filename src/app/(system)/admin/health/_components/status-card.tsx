@@ -28,7 +28,7 @@ export function StatusCard({ title, status, statusLabels, facts, links, note }: 
   return (
     <AppCard>
       <div className="flex items-start justify-between gap-4">
-        <h3 className="text-base font-bold tracking-tight text-ink">{title}</h3>
+        <h3 className="font-display text-base font-bold tracking-tight text-ink">{title}</h3>
         {status && statusLabels && (
           <span
             className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[status]}`}

@@ -65,7 +65,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
         href={href}
         title={collapsed ? label : undefined}
         aria-current={isActive ? 'page' : undefined}
-        className={`flex items-center gap-3 px-6 py-2.5 text-sm transition-colors ${
+        className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${
           collapsed ? 'justify-center px-0' : ''
         } ${isActive ? 'font-semibold' : 'text-ink-soft hover:bg-gray-50 hover:text-ink'}`}
         // The active item takes the tenant's primary tint with a 3px inset bar
@@ -81,7 +81,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
             : undefined
         }
       >
-        <Icon className="size-4 shrink-0" strokeWidth={2} />
+        <Icon className="size-[18px] shrink-0" strokeWidth={1.5} />
         {!collapsed && label}
       </Link>
     )
@@ -118,13 +118,13 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
         <div className="border-t border-gray-100 py-2">
           {navLink('admin/account', t('navigation.account'), UserCircle)}
           <LogoutButton
-            title={collapsed ? 'Log out' : undefined}
-            className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
+            title={collapsed ? t('navigation.logOut') : undefined}
+            className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
               collapsed ? 'justify-center px-0' : ''
             }`}
           >
-            <LogOut className="size-4 shrink-0" strokeWidth={2} />
-            {!collapsed && 'Log out'}
+            <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
+            {!collapsed && t('navigation.logOut')}
           </LogoutButton>
         </div>
       </div>

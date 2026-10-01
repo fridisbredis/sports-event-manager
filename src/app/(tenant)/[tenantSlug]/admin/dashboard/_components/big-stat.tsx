@@ -13,7 +13,7 @@ export function BigStat({
   return (
     <div>
       <div
-        className={`text-[32px] font-bold leading-none tracking-tight tabular-nums ${
+        className={`font-display text-[32px] font-bold leading-none tracking-tight tabular-nums ${
           emphasis ? 'text-tenant-primary' : 'text-ink'
         }`}
       >

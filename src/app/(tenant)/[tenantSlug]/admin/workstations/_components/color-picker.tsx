@@ -40,7 +40,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
   return (
     <section>
       <h2 className="section-label mb-1">{t('workstations.colorLabel')}</h2>
-      <p className="mb-4 text-[13px] text-ink-soft">{t('workstations.colorHint')}</p>
+      <p className="mb-4 text-[13px] text-ink-muted">{t('workstations.colorHint')}</p>
 
       {/* Ten per row at every width: the palette reads as three hue runs, and
           reflowing it into uneven rows would lose that structure.
@@ -126,7 +126,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
       </div>
 
       {takenBy.length > 0 && (
-        <p className="mt-3 text-[13px] text-ink-soft">{t('workstations.colorTakenHint')}</p>
+        <p className="mt-3 text-[13px] text-gray-400">{t('workstations.colorTakenHint')}</p>
       )}
     </section>
   )

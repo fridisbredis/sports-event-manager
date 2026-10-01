@@ -62,7 +62,12 @@ export default function WorkstationEditForm({
   schedulingGranularityMin,
 }: Props) {
   const { t } = useTranslation('admin')
-  const { markDirty, markClean, guardedNavigate, dialogProps } = useUnsavedChanges()
+  const {
+    markDirty: markUnsavedChanges,
+    markClean,
+    guardedNavigate,
+    dialogProps,
+  } = useUnsavedChanges()
 
   const stageId = initialStageId ?? '__all__'
   const selectedStage = stages.find((s) => s.id === stageId) ?? null
@@ -108,6 +113,14 @@ export default function WorkstationEditForm({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isSaving, startSave] = useTransition()
   const [isDeleting, startDelete] = useTransition()
+
+  // Every edit marks dirty through here rather than calling the hook directly:
+  // a change made after a save also has to drop the button out of its "Saved"
+  // state, and pairing those two by hand at each call site is what was missed.
+  function markDirty() {
+    markUnsavedChanges()
+    setSaveSuccess(false)
+  }
 
   function addWindow() {
     setWindows((prev) => [...prev, { start: '', end: '', limitToDay: null }])

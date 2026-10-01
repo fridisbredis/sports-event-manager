@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
+import { translateActionError as tError } from '@/lib/actions/action-error'
 
 // The shift a check belongs to. Not an assignment id: a check is shared by
 // every official on the shift, so there is no single assignment row that owns
@@ -38,16 +39,16 @@ export async function toggleChecklistItem(
   const parsed = toggleSchema.safeParse(input)
   if (!parsed.success) {
     logger.warn('toggleChecklistItem: invalid input', { issues: parsed.error.issues })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   const { tenantSlug, todoId, workstationId, timeslotStart, timeslotEnd, checked } = parsed.data
 
   const user = await getCurrentUser()
-  if (!user) return { error: 'Not authorized' }
+  if (!user) return { error: await tError('actionErrors.notAuthorized') }
 
   const tenant = await getOfficialTenant(tenantSlug)
-  if (!tenant) return { error: 'Not authorized' }
+  if (!tenant) return { error: await tError('actionErrors.notAuthorized') }
 
   const supabase = await createSupabaseServerClient()
 

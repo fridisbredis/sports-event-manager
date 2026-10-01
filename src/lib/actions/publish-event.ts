@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger'
 import { translateDbError } from '@/lib/actions/db-error-message'
 import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { logQueryError } from '@/lib/db/query-error'
+import { translateActionError as tError } from '@/lib/actions/action-error'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -44,11 +45,11 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   if (!parsedTenantId.success) {
     const safeTenantIdForLog = String(input.tenantId).replace(/[\r\n]/g, '')
     logger.warn('publishEvent: invalid tenantId', { tenantId: safeTenantIdForLog })
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
   }
 
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
-    return { error: 'Not authorized' }
+    return { error: await tError('actionErrors.notAuthorized') }
 
   // EVT-02: name/status/Race-stage-count check and the publish write happen
   // inside this single RPC, under a row lock (SELECT ... FOR UPDATE) held

@@ -103,7 +103,7 @@ describe('toggleChecklistItem authorization', () => {
 
     const result = await toggleChecklistItem(BASE_INPUT)
 
-    expect(result.error).toBe('Not authorized')
+    expect(result.error).toBe('Behörighet saknas')
     expect(captured.upsert).not.toHaveBeenCalled()
   })
 
@@ -113,7 +113,7 @@ describe('toggleChecklistItem authorization', () => {
 
     const result = await toggleChecklistItem(BASE_INPUT)
 
-    expect(result.error).toBe('Not authorized')
+    expect(result.error).toBe('Behörighet saknas')
     expect(captured.upsert).not.toHaveBeenCalled()
   })
 
@@ -122,7 +122,7 @@ describe('toggleChecklistItem authorization', () => {
 
     const result = await toggleChecklistItem({ ...BASE_INPUT, todoId: 'not-a-uuid' })
 
-    expect(result.error).toBe('Not authorized')
+    expect(result.error).toBe('Behörighet saknas')
     expect(captured.upsert).not.toHaveBeenCalled()
   })
 

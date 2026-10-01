@@ -7,6 +7,7 @@ import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from '@gravity-ui/icons'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 interface Props {
   stages: StageInput[]
@@ -69,7 +70,7 @@ function weekdayFromDateString(dateStr: string): string {
   // read 'Thu', making a correctly sorted list look shuffled. Day and month
   // disambiguate them; the year is omitted because it is already shown once in
   // the event's date range, and repeating it per row crowds the name out.
-  return new Date(dateStr + 'T00:00Z').toLocaleDateString('en-GB', {
+  return new Date(dateStr + 'T00:00Z').toLocaleDateString(DATE_LOCALE, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

@@ -406,7 +406,7 @@ describe('ScheduleView day label', () => {
   it('names the day on the work-area view when there is only one day', () => {
     renderDays('work-area', ['2026-08-12'], '2026-08-12')
 
-    expect(screen.getByText('Wednesday 12 August')).toBeTruthy()
+    expect(screen.getByText('onsdag 12 augusti')).toBeTruthy()
   })
 
   it('renders the single day as a static label, not a link that goes nowhere', () => {
@@ -419,7 +419,7 @@ describe('ScheduleView day label', () => {
   it('shows the date once, not twice, on the time view for a single day', () => {
     renderDays('time', ['2026-08-12'], '2026-08-12')
 
-    expect(screen.getAllByText('Wednesday 12 August')).toHaveLength(1)
+    expect(screen.getAllByText('onsdag 12 augusti')).toHaveLength(1)
   })
 
   it('still renders clickable day tabs when there is more than one day', () => {
@@ -430,13 +430,13 @@ describe('ScheduleView day label', () => {
   })
 
   it('leaves the date to the tabs on the time view across several days', () => {
-    // The selected tab already reads 'Wed 12 Aug'. A per-group header under it
+    // The selected tab already reads 'ons 12 aug.'. A per-group header under it
     // spelled the same date out a second time, which is what this asserts is
     // gone — the long form should appear nowhere on screen.
     renderDays('time', ['2026-08-12', '2026-08-13'], '2026-08-12')
 
-    expect(screen.queryByText('Wednesday 12 August')).toBeNull()
-    expect(screen.getByRole('link', { name: 'Wed 12 Aug' })).toBeTruthy()
+    expect(screen.queryByText('onsdag 12 augusti')).toBeNull()
+    expect(screen.getByRole('link', { name: 'ons 12 aug.' })).toBeTruthy()
   })
 
   it('labels each group when one day window crosses midnight', () => {
@@ -458,8 +458,8 @@ describe('ScheduleView day label', () => {
       />
     )
 
-    expect(screen.getByText('Wednesday 12 August')).toBeTruthy()
-    expect(screen.getByText('Thursday 13 August')).toBeTruthy()
+    expect(screen.getByText('onsdag 12 augusti')).toBeTruthy()
+    expect(screen.getByText('torsdag 13 augusti')).toBeTruthy()
   })
 })
 

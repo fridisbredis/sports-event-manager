@@ -1,15 +1,14 @@
 'use client'
 
 import { HeroUIProvider, ToastProvider } from '@heroui/react'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
-// The UI language is English (see src/lib/i18n/config.ts), but date and
-// calendar conventions are regional, not linguistic: the users are Swedish and
-// expect weeks to start on Monday and dates written the Swedish way
-// (YYYY-MM-DD). React Aria takes both from this locale, so it is pinned to
-// sv-SE independently of the i18next language. Without it React Aria falls
-// back to the browser locale — en-US for most dev machines — which renders
-// 9/10/2026 and Sunday-first calendars.
-const DATE_LOCALE = 'sv-SE'
+// React Aria takes weekday order and date format from this locale. Without it
+// it falls back to the browser locale — en-US for most dev machines — which
+// renders 9/10/2026 and Sunday-first calendars. Shared with every
+// toLocale*String call in the app so the pickers and the rendered dates can't
+// disagree; see the constant's own file for why it is separate from the
+// i18next language.
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

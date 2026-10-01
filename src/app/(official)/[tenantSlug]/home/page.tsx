@@ -5,6 +5,7 @@ import { unstable_cache } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { defaultLocale } from '@/lib/i18n/config'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { AvatarImage } from '@/components/ui/avatar-image'
@@ -46,7 +47,7 @@ function NavCard({
 
 export default async function OfficialHomePage({ params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation('en', 'official')
+  const t = await getServerTranslation(defaultLocale, 'official')
 
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()

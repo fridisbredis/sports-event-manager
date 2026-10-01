@@ -10,6 +10,26 @@
     "numberUsed": "Number used: {{phone}}",
     "tryDifferentNumber": "Try a different number"
   },
+  "actionErrors": {
+    "notAuthorized": "Not authorized",
+    "invalidRequest": "Invalid request",
+    "invalidName": "Invalid name",
+    "tenantNameTaken": "A tenant with that name already exists",
+    "createTenantFailed": "Failed to create tenant",
+    "updateTenantFailed": "Failed to update tenant",
+    "updateTierFailed": "Failed to update tier",
+    "saveAssignmentsFailed": "Failed to save assignments. Please try again.",
+    "windowShorterThanGranularity": "Operating window is shorter than the scheduling granularity",
+    "granularityFixed": "Scheduling granularity is fixed at 60 minutes.",
+    "noFileProvided": "No file provided",
+    "chooseImageFile": "Please choose an image file",
+    "imageTooLarge": "Image must be smaller than 900 kB",
+    "missingTenantOrEvent": "Missing tenant or event ID",
+    "unknownColorPalette": "Unknown color palette",
+    "signOutFailed": "Could not sign out. Please try again.",
+    "slotTaken": "Someone else just took that slot. Please reload the schedule and try again.",
+    "batchTooLarge": "Too many assignments in one save. Split the change into smaller saves."
+  },
   "notFoundPage": {
     "eyebrow": "No result",
     "heading": "No result for this checkpoint.",

@@ -12,6 +12,7 @@ import {
 } from '@heroui/react'
 import { workAreaDotColor, type WorkAreaColor } from '@/lib/theme/work-area-colors'
 import { toggleChecklistItem } from '../actions'
+import { DATE_LOCALE } from '@/lib/i18n/date-locale'
 
 export type ChecklistCheck = {
   checked_by: string | null
@@ -67,7 +68,7 @@ interface Props {
 }
 
 function formatCheckedAt(ts: string): string {
-  return new Date(ts).toLocaleTimeString('en-GB', {
+  return new Date(ts).toLocaleTimeString(DATE_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
