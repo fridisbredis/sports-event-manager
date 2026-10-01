@@ -9,12 +9,19 @@ const eslintConfig = [
     // for the edge runtime — linting it produced 205 problems, all from that
     // one file, which is more than enough noise to hide a real one.
     //
-    // CI never saw them because it lints a clean checkout where .temp/ does not
-    // exist, so this only ever affected people running the local stack.
+    // .claude/worktrees/ is the same story on a much larger scale: each
+    // worktree is a full checkout of another branch, so linting the repo root
+    // lints the whole source tree once more per worktree — 778 files and
+    // roughly 6,900 errors here, which buries this tree's own output.
+    // coverage/ holds a reporter asset that lints to one more.
+    //
+    // CI never saw any of them because it lints a clean checkout where none of
+    // these directories exist, so this only ever affected people running the
+    // local stack, coverage runs or worktrees.
     //
     // Must stay a lone `ignores` key in its own object to apply globally; put
     // beside `rules` it would only scope to that config block.
-    ignores: ['supabase/.temp/**'],
+    ignores: ['supabase/.temp/**', '.claude/**', 'coverage/**'],
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
