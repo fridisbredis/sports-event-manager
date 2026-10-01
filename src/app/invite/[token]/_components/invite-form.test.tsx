@@ -34,7 +34,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }))
 
 const PHONE = '46701234567'
-const RESEND_COOLDOWN_MS = 30_000
+const RESEND_COOLDOWN_SECONDS = 30
 
 /** Fills the form to the point where the confirm button sends the OTP. */
 function fillAndSubmit() {
@@ -49,9 +49,6 @@ function fillAndSubmit() {
 // keys; this form showed the message verbatim.
 describe('InviteForm provider error mapping', () => {
   beforeEach(() => {
-    // Installed before any render: the cooldown interval is created on mount,
-    // and a clock swapped in afterwards would not control it.
-    vi.useFakeTimers({ shouldAdvanceTime: true })
     signInWithOtp.mockReset()
   })
 
@@ -87,26 +84,39 @@ describe('InviteForm provider error mapping', () => {
   })
 
   it('maps the error on the resend path too', async () => {
-    signInWithOtp.mockResolvedValueOnce({ error: null })
-    fillAndSubmit()
+    // The whole case runs on a frozen clock: the cooldown interval is created
+    // when the OTP step opens, so a clock installed afterwards controls
+    // nothing and leaves the countdown stuck at its initial value. React state
+    // is flushed with act() instead of testing-library's async queries, which
+    // poll on timers and cannot settle while those are faked.
+    vi.useFakeTimers()
+    try {
+      signInWithOtp.mockResolvedValueOnce({ error: null })
+      fillAndSubmit()
 
-    // Reaching the OTP step is what exposes the resend button. Queried by
-    // placeholder, not label: this form's OTP field is a raw input whose
-    // <label> has no htmlFor, so getByLabelText does not reach it.
-    await screen.findByPlaceholderText('000000')
+      // Reaching the OTP step is what exposes the resend button.
+      await act(async () => {})
+      expect(screen.getByPlaceholderText('000000')).toBeInTheDocument()
 
-    // Resend opens on a 30s cooldown, so the button stays disabled and
-    // labelled with the countdown until the interval has ticked it down.
-    await act(async () => {
-      vi.advanceTimersByTime(RESEND_COOLDOWN_MS)
-    })
+      // One second at a time, letting React commit in between: the cooldown
+      // effect lists resendCooldown as a dependency, so every tick tears the
+      // interval down and schedules a fresh one, and a single large advance
+      // would only ever fire the first of them.
+      for (let i = 0; i < RESEND_COOLDOWN_SECONDS; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1000)
+        })
+      }
 
-    signInWithOtp.mockResolvedValueOnce({
-      error: { code: 'otp_expired', message: 'Token has expired' },
-    })
-    fireEvent.click(screen.getByText('signIn.resendCodeButton'))
+      signInWithOtp.mockResolvedValueOnce({
+        error: { code: 'otp_expired', message: 'Token has expired' },
+      })
+      fireEvent.click(screen.getByText('signIn.resendCodeButton'))
+      await act(async () => {})
+    } finally {
+      vi.useRealTimers()
+    }
 
-    await waitFor(() => expect(toastError).toHaveBeenCalled())
     expect(toastError).toHaveBeenCalledWith('signIn.invalidCode')
     expect(toastError).not.toHaveBeenCalledWith('Token has expired')
   })
