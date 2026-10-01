@@ -5,11 +5,16 @@ import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
 import { logQueryError } from '@/lib/db/query-error'
+import { locales } from '@/lib/i18n/config'
 
 const confirmSchema = z.object({
   token: z.string().uuid(),
   name: z.string().min(1),
   privacyAccepted: z.literal(true),
+  // The language the invitee read the invite page in. Optional: an older
+  // client that does not send it still confirms, and that user simply has no
+  // stored preference yet.
+  language: z.enum(locales).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -19,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  const { token, name, privacyAccepted } = parsed.data
+  const { token, name, privacyAccepted, language } = parsed.data
 
   // User must be authenticated (OTP verified) before we confirm the invite.
   // Accept Bearer token from the Authorization header (set by the invite form
@@ -151,6 +156,35 @@ export async function POST(request: NextRequest) {
       tenantId,
       detail: { role: 'official' },
     })
+  }
+
+  // Carry the language chosen on the invite page into the user's profile.
+  // Without this the invitee reads the whole invite in their own language,
+  // then lands on a home screen in the default one — the choice would appear
+  // to be forgotten at the exact moment they signed in.
+  //
+  // After the confirm, not before: user_preferences references auth.users,
+  // and this is the first point where the row is certain to exist and the
+  // invite is known to be valid. A failure here must not fail the request —
+  // the confirmation has already committed, and a missing preference
+  // degrades to the default locale rather than breaking the sign-in.
+  if (language) {
+    const { error: languageError } = await service.from('user_preferences').upsert(
+      { user_id: user.id, language, updated_at: new Date().toISOString() },
+      {
+        onConflict: 'user_id',
+      }
+    )
+
+    if (languageError) {
+      logQueryError(languageError, {
+        op: 'POST /api/officials/confirm',
+        table: 'user_preferences',
+        kind: 'update',
+        tenantId,
+        extra: { usage: 'invite_language_carryover' },
+      })
+    }
   }
 
   const { data: tenant, error: tenantError } = await service

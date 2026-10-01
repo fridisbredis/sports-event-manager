@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { checkLoginVerifyRateLimit, type RateLimitResult } from '@/lib/rate-limit'
 import { stripE164Plus } from '@/lib/phone'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
+import { locales } from '@/lib/i18n/config'
+import { logQueryError } from '@/lib/db/query-error'
 
 // Leading '+' optional — see send-otp/route.ts. The phone posted here is the same
 // normalizePhoneToE164 output the send step used, which carries no '+'.
 const verifyOtpSchema = z.object({
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
   token: z.string().length(6),
+  // The language the sign-in page was read in. Optional: an older client
+  // that does not send it still signs in, and that user keeps whatever
+  // preference they already had.
+  language: z.enum(locales).optional(),
 })
 
 // Routed through the server (rather than the browser calling verifyOtp
@@ -23,7 +29,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
-  const { phone, token } = parsed.data
+  const { phone, token, language } = parsed.data
 
   let rateLimit: RateLimitResult
   try {
@@ -79,6 +85,36 @@ export async function POST(request: NextRequest) {
         status: 500,
       }
     )
+  }
+
+  // Carry the language chosen on the sign-in page into the user's profile, now
+  // that a user id exists to attach it to. Written through the service client
+  // rather than the RLS one: the session cookies for this user are set on the
+  // response being built here, so `auth.uid()` is not yet populated for a read
+  // on this request.
+  //
+  // Only when the caller actually sent one, so a returning user who ignored the
+  // switcher keeps the language they chose previously instead of having it
+  // overwritten with the page default on every sign-in.
+  //
+  // A failure here must not fail the sign-in: the session is already valid, and
+  // a missing preference degrades to the default locale.
+  if (language) {
+    const { error: languageError } = await createSupabaseServiceClient()
+      .from('user_preferences')
+      .upsert(
+        { user_id: data.user.id, language, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+
+    if (languageError) {
+      logQueryError(languageError, {
+        op: 'POST /api/auth/verify-otp',
+        table: 'user_preferences',
+        kind: 'update',
+        extra: { usage: 'sign_in_language_carryover' },
+      })
+    }
   }
 
   await logAuthEvent({ phone, event: 'otp_verify_succeeded', actorUserId: data.user.id })

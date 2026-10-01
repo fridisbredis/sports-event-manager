@@ -67,5 +67,9 @@
     "loading": "Loading...",
     "error": "Error",
     "success": "Success"
+  },
+  "language": {
+    "label": "Language",
+    "saveFailed": "Could not save your language. Please try again."
   }
 }

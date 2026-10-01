@@ -4,12 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutPanelLeft, LogOut } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import type { Locale } from '@/lib/i18n/config'
 
 interface Props {
   labels: {
     tenants: string
     logOut: string
+    language: string
   }
+  language: Locale
 }
 
 // The system-admin sidebar deliberately does NOT use the tenant theme tint the
@@ -20,7 +24,7 @@ interface Props {
 const ACTIVE_ITEM = 'bg-status-neutral-bg font-semibold text-ink shadow-[inset_3px_0_0_#111827]'
 const IDLE_ITEM = 'text-ink-soft hover:bg-gray-50 hover:text-ink'
 
-export function SidebarNav({ labels }: Props) {
+export function SidebarNav({ labels, language }: Props) {
   const pathname = usePathname()
   // Excludes /admin/health: it's reached via a link from the tenant list
   // (SYS-03), not a sidebar tab, so this is the first admin route where
@@ -40,13 +44,21 @@ export function SidebarNav({ labels }: Props) {
           }`}
         >
           <LayoutPanelLeft className="size-[18px] shrink-0" strokeWidth={1.5} />
-          {labels.tenants}
+          <span className="truncate" title={labels.tenants}>
+            {labels.tenants}
+          </span>
         </Link>
       </nav>
       <div className="border-t border-edge-soft py-2">
+        <div className="border-b border-edge-soft px-6 pb-3 pt-1">
+          <p className="section-label mb-1.5">{labels.language}</p>
+          <LanguageSwitcher current={language} fill />
+        </div>
         <LogoutButton className="flex w-full items-center gap-3 px-6 py-2.5 text-left text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink">
           <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
-          {labels.logOut}
+          <span className="truncate" title={labels.logOut}>
+            {labels.logOut}
+          </span>
         </LogoutButton>
       </div>
     </div>

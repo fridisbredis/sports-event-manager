@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { defaultLocale, type Locale } from '@/lib/i18n/config'
 import { toastError } from '@/lib/toast'
 
 const RESEND_COOLDOWN_SECONDS = 30
@@ -29,6 +31,20 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+  // Not persisted while the invitee is still signed out — there is no user
+  // row to write to yet. It rides along on the confirm call below, which is
+  // the first moment an auth.users row is guaranteed to exist.
+  const [language, setLanguage] = useState<Locale>(defaultLocale)
+  // Whether the invitee actually picked a language, as opposed to just taking
+  // the page default. Only a real choice is stored, so an absent
+  // user_preferences row keeps meaning "never chose" rather than "was shown
+  // English once" — same rule as the sign-in page.
+  const [languageChosen, setLanguageChosen] = useState(false)
+
+  function handleLanguageChange(next: Locale) {
+    setLanguage(next)
+    setLanguageChosen(true)
+  }
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -89,7 +105,12 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
         'Content-Type': 'application/json',
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: JSON.stringify({ token, name: name.trim(), privacyAccepted }),
+      body: JSON.stringify({
+        token,
+        name: name.trim(),
+        privacyAccepted,
+        ...(languageChosen ? { language } : {}),
+      }),
     })
     setLoading(false)
     if (res.ok) {
@@ -124,9 +145,9 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
     return (
       <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center text-center py-16">
-          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gray-700">
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-tenant-primary">
             <svg
-              className="h-8 w-8 text-gray-700"
+              className="h-8 w-8 text-tenant-primary"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -140,7 +161,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
         <div className="pb-8 shrink-0">
           <button
             onClick={() => router.push('/')}
-            className="w-full rounded-xl bg-gray-900 py-4 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+            className="w-full rounded-xl bg-tenant-primary py-4 text-sm font-semibold text-white transition-colors hover:bg-tenant-primary-hover"
           >
             {t('confirmation.goHome')}
           </button>
@@ -152,7 +173,19 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   if (step === 'verify-otp') {
     return (
       <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
-        <div className="flex-1 overflow-y-auto pt-12">
+        {/* Carried onto this step too: it is the last point before the choice is
+            written to the profile at confirm time, and without it someone who
+            switched on the previous step and wants to switch back has no way
+            to. */}
+        <div className="sticky top-0 z-10 flex shrink-0 justify-end bg-white pb-3 pt-6">
+          <LanguageSwitcher
+            current={language}
+            persist={false}
+            onChange={handleLanguageChange}
+            variant="solid"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto">
           <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
           <hr className="border-dashed border-gray-200 mb-8" />
           <p className="text-sm text-gray-500 mb-6">
@@ -189,7 +222,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
           <button
             onClick={handleVerifyOtp}
             disabled={loading || otp.length !== 6}
-            className="w-full rounded-xl bg-gray-900 py-4 text-sm font-semibold text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="w-full rounded-xl bg-tenant-primary py-4 text-sm font-semibold text-white transition-colors hover:bg-tenant-primary-hover disabled:opacity-50"
           >
             {loading ? t('signIn.verifying') : t('signIn.verifyButton')}
           </button>
@@ -201,7 +234,20 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   // fill-form state
   return (
     <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
-      <div className="flex-1 overflow-y-auto pt-12">
+      {/* Outside the scrolling region, not just first inside it: whoever opens
+          this link may not read the language it defaults to, so the control
+          that fixes that has to stay reachable however far down the form they
+          have scrolled. The background is opaque so the form does not show
+          through as it scrolls underneath. */}
+      <div className="sticky top-0 z-10 flex shrink-0 justify-end bg-white pb-3 pt-6">
+        <LanguageSwitcher
+          current={language}
+          persist={false}
+          onChange={handleLanguageChange}
+          variant="solid"
+        />
+      </div>
+      <div className="flex-1 overflow-y-auto">
         <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
         <hr className="border-dashed border-gray-200 mb-8" />
 
@@ -233,13 +279,13 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
               onClick={() => setAvailable((v) => !v)}
               className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-sm text-left transition-colors ${
                 available
-                  ? 'border-gray-900 bg-gray-50'
+                  ? 'border-tenant-primary bg-tenant-primary-tint'
                   : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
               <div
                 className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                  available ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
+                  available ? 'border-tenant-primary bg-tenant-primary' : 'border-gray-300'
                 }`}
               >
                 {available && (
@@ -290,13 +336,13 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             onClick={() => setPrivacyAccepted((v) => !v)}
             className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-sm text-left transition-colors ${
               privacyAccepted
-                ? 'border-gray-900 bg-gray-50'
+                ? 'border-tenant-primary bg-tenant-primary-tint'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
             <div
               className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                privacyAccepted ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
+                privacyAccepted ? 'border-tenant-primary bg-tenant-primary' : 'border-gray-300'
               }`}
             >
               {privacyAccepted && (
@@ -331,7 +377,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
         <button
           onClick={handleConfirmAvailability}
           disabled={!available || !privacyAccepted || !name.trim() || loading}
-          className="w-full rounded-xl bg-gray-900 py-4 text-sm font-semibold text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
+          className="w-full rounded-xl bg-tenant-primary py-4 text-sm font-semibold text-white transition-colors hover:bg-tenant-primary-hover disabled:opacity-50"
         >
           {loading ? t('confirmation.confirming') : t('confirmation.confirmButton')}
         </button>

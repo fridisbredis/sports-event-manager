@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
@@ -11,7 +11,8 @@ interface Props {
 
 export default async function OfficialAccountPage({ params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation(defaultLocale, 'official')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'official')
 
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
@@ -59,6 +60,7 @@ export default async function OfficialAccountPage({ params }: Props) {
         tenantSlug={tenantSlug}
         assignmentCount={assignmentCount ?? 0}
         i18nNamespace="official"
+        language={language}
       />
     </div>
   )

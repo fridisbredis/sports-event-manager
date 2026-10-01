@@ -9,7 +9,7 @@ import { translateStorageError } from '@/lib/actions/db-error-message'
 import { logQueryError } from '@/lib/db/query-error'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 const uuidSchema = z.string().uuid()
 
@@ -64,7 +64,7 @@ export async function uploadAvatar(formData: FormData): Promise<UploadAvatarResu
 
   if (!user) redirect('/login')
 
-  const t = await getServerTranslation(defaultLocale, 'official')
+  const t = await getServerTranslation(await getUserLanguage(), 'official')
 
   const file = formData.get('file')
   const tenantId = formData.get('tenantId')

@@ -82,7 +82,7 @@ describe('assertSystemAdmin gate (shared by all actions)', () => {
 
     const result = await createTenant('Viadal 2026')
 
-    expect(result).toEqual({ error: 'Behörighet saknas' })
+    expect(result).toEqual({ error: 'Not authorized' })
     expect(serviceFromMock).toHaveBeenCalledTimes(1)
     expect(serverFromMock).not.toHaveBeenCalled()
   })
@@ -95,7 +95,7 @@ describe('createTenant', () => {
 
     const result = await createTenant('   ')
 
-    expect(result).toEqual({ error: 'Ogiltigt namn' })
+    expect(result).toEqual({ error: 'Invalid name' })
     // assertSystemAdmin's role lookup goes through the service client, not this one.
     expect(fromMock).not.toHaveBeenCalled()
   })
@@ -142,7 +142,7 @@ describe('createTenant', () => {
 
     const result = await createTenant('Viadal 2026')
 
-    expect(result).toEqual({ error: 'Det finns redan en kund med det namnet' })
+    expect(result).toEqual({ error: 'A tenant with that name already exists' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(logAuditEvent).not.toHaveBeenCalled()
   })
@@ -155,7 +155,7 @@ describe('setTenantActive', () => {
 
     const result = await setTenantActive('not-a-uuid', true)
 
-    expect(result).toEqual({ error: 'Ogiltig förfrågan' })
+    expect(result).toEqual({ error: 'Invalid request' })
     expect(fromMock).not.toHaveBeenCalled()
   })
 
@@ -191,7 +191,7 @@ describe('setTenantActive', () => {
 
     const result = await setTenantActive(TENANT_ID, true)
 
-    expect(result).toEqual({ error: 'Kunden kunde inte uppdateras' })
+    expect(result).toEqual({ error: 'Failed to update tenant' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(logAuditEvent).not.toHaveBeenCalled()
   })
@@ -204,7 +204,7 @@ describe('setTenantTier', () => {
 
     const result = await setTenantTier(TENANT_ID, 'enterprise' as never)
 
-    expect(result).toEqual({ error: 'Ogiltig förfrågan' })
+    expect(result).toEqual({ error: 'Invalid request' })
     expect(fromMock).not.toHaveBeenCalled()
   })
 
@@ -214,7 +214,7 @@ describe('setTenantTier', () => {
 
     const result = await setTenantTier('not-a-uuid', 'premium')
 
-    expect(result).toEqual({ error: 'Ogiltig förfrågan' })
+    expect(result).toEqual({ error: 'Invalid request' })
     expect(fromMock).not.toHaveBeenCalled()
   })
 
@@ -249,7 +249,7 @@ describe('setTenantTier', () => {
 
     const result = await setTenantTier(TENANT_ID, 'premium')
 
-    expect(result).toEqual({ error: 'Nivån kunde inte uppdateras' })
+    expect(result).toEqual({ error: 'Failed to update tier' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(logAuditEvent).not.toHaveBeenCalled()
   })

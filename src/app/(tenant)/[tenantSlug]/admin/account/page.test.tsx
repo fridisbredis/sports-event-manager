@@ -185,6 +185,7 @@ describe('AdminAccountPage', () => {
       tenantSlug: 'viadal',
       assignmentCount: 3,
       i18nNamespace: 'admin',
+      language: 'en',
       layout: 'desktop',
     })
   })

@@ -14,6 +14,8 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import type { Locale } from '@/lib/i18n/config'
 import { AvatarPicker } from './avatar-picker'
 
 interface AccountFormProps {
@@ -25,6 +27,7 @@ interface AccountFormProps {
   tenantSlug: string
   assignmentCount: number
   i18nNamespace: 'official' | 'admin'
+  language: Locale
   layout?: 'mobile' | 'desktop'
 }
 
@@ -37,9 +40,13 @@ export default function AccountForm({
   tenantSlug,
   assignmentCount,
   i18nNamespace,
+  language,
   layout = 'mobile',
 }: AccountFormProps) {
   const { t } = useTranslation(i18nNamespace)
+  // The section heading is shared with every other language control in the
+  // app, so it lives in `common` rather than being duplicated per namespace.
+  const { t: tCommon } = useTranslation('common')
   const { markDirty, markClean, dialogProps } = useUnsavedChanges()
 
   const [name, setName] = useState(initialName)
@@ -177,6 +184,27 @@ export default function AccountForm({
               color="primary"
               aria-label={t('account.smsUpdatesLabel')}
             />
+          </div>
+        </AppCard>
+
+        {/* Language. Saves on click through its own endpoint rather than
+            joining the Save button above: the name and SMS fields are one
+            tenant-scoped write, while language is per user and applies
+            everywhere. Switching it re-renders the page, which would
+            discard an unsaved name edit — so it is deliberately a separate
+            section, not another row in the card above. */}
+        <p className="section-label mb-3">{tCommon('language.label')}</p>
+        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[15px] font-semibold text-ink">{t('account.languageLabel')}</p>
+              <p className="mt-0.5 text-sm text-ink-muted">{t('account.languageHint')}</p>
+            </div>
+            {/* Solid here, not the sidebars' outlined form: this is a standalone
+                control on a card with no nav beside it to compete with, and both
+                screens that render this form sit under a TenantThemeStyle, so the
+                tenant primary fill resolves. */}
+            <LanguageSwitcher current={language} variant="solid" />
           </div>
         </AppCard>
 

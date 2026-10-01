@@ -1,5 +1,5 @@
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 // Server actions return their error message to the client as a plain string,
 // which the caller hands straight to toastError(). Before this helper those
@@ -15,6 +15,6 @@ import { defaultLocale } from '@/lib/i18n/config'
 // error still goes through translateDbError (F-REL-22) — never forward
 // error.message from the database to the client.
 export async function translateActionError(key: string): Promise<string> {
-  const t = await getServerTranslation(defaultLocale, 'common')
+  const t = await getServerTranslation(await getUserLanguage(), 'common')
   return t(key)
 }

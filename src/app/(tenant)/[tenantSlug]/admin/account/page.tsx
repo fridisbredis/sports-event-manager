@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 import AdminAccountForm from './_components/admin-account-form'
 
@@ -12,6 +13,7 @@ export default async function AdminAccountPage({ params }: Props) {
   const { tenantSlug } = await params
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
+  const language = await getUserLanguage()
 
   if (!user) redirect('/login')
 
@@ -71,6 +73,7 @@ export default async function AdminAccountPage({ params }: Props) {
         tenantSlug={tenantSlug}
         assignmentCount={assignmentCount ?? 0}
         i18nNamespace="admin"
+        language={language}
         layout="desktop"
       />
     </div>

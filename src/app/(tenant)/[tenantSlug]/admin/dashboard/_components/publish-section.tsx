@@ -1,6 +1,6 @@
 import { publishEvent } from '@/lib/actions/publish-event'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { PublishButton } from './publish-button'
 import { SectionCard } from './section-card'
 
@@ -23,7 +23,7 @@ export async function PublishSection({
   tenantId,
   eventId,
 }: PublishSectionProps) {
-  const t = await getServerTranslation(defaultLocale, 'admin')
+  const t = await getServerTranslation(await getUserLanguage(), 'admin')
 
   async function handlePublish() {
     'use server'

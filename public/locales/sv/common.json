@@ -67,5 +67,9 @@
     "loading": "Laddar…",
     "error": "Fel",
     "success": "Klart"
+  },
+  "language": {
+    "label": "Språk",
+    "saveFailed": "Kunde inte spara ditt språk. Försök igen."
   }
 }

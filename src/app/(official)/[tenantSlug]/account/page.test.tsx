@@ -147,6 +147,8 @@ describe('OfficialAccountPage', () => {
       tenantSlug: 'viadal',
       assignmentCount: 5,
       i18nNamespace: 'official',
+      language: 'en',
+      avatarUrl: undefined,
     })
   })
 

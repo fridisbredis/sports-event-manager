@@ -31,7 +31,7 @@ export function BottomTabBar({ tenantSlug }: Props) {
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
+              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
                 active ? 'text-tenant-primary' : 'text-ink-faint hover:text-ink-soft'
               }`}
             >
@@ -42,7 +42,13 @@ export function BottomTabBar({ tenantSlug }: Props) {
                   shared icon set. A heavier stroke keeps the active tab
                   distinguishable without relying on colour alone. */}
               <Icon className="size-6" strokeWidth={active ? 2.4 : 1.6} aria-hidden="true" />
-              <span>{label}</span>
+              {/* Five tabs share the viewport, so each gets ~75px at 375px wide —
+                  less than some labels need ("Evenemangsinfo" against "Event
+                  info"). Without min-w-0 the flex item refuses to shrink below its
+                  content and the row overflows instead of the label clipping. */}
+              <span className="w-full truncate px-0.5 text-center" title={label}>
+                {label}
+              </span>
             </Link>
           )
         })}

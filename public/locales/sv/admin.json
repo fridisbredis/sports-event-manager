@@ -336,7 +336,9 @@
     "avatarUploading": "Laddar upp…",
     "avatarUploadError": "Kunde inte ladda upp bilden. Försök igen.",
     "avatarTypeError": "Välj en bild i formatet JPEG, PNG eller WebP.",
-    "avatarSizeError": "Bilden är för stor. Välj en mindre."
+    "avatarSizeError": "Bilden är för stor. Välj en mindre.",
+    "languageLabel": "Appens språk",
+    "languageHint": "SMS skickas alltid på engelska."
   },
   "adminAccount": {
     "title": "Konto",

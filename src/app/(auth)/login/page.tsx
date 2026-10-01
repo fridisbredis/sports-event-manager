@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/i18n/client'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { defaultLocale, type Locale } from '@/lib/i18n/config'
 import { SelectItem } from '@heroui/react'
 import { Input, Select } from '@/components/ui/form-fields'
 import { SignInButton } from './_components/sign-in-button'
@@ -62,6 +64,21 @@ export default function LoginPage() {
   const [resending, setResending] = useState(false)
   const [normalizedPhone, setNormalizedPhone] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
+  // Nowhere to persist this yet — there is no session until the OTP
+  // verifies. It rides along on the verify call, which is the first point
+  // where a user id exists to attach it to.
+  //
+  // `chosen` tracks whether the user actually touched the switcher. Sending
+  // `language` unconditionally would post the page default on every sign-in
+  // and overwrite a returning user's stored choice with it — someone who had
+  // picked Swedish would be reset to English each time they signed in.
+  const [language, setLanguage] = useState<Locale>(defaultLocale)
+  const [languageChosen, setLanguageChosen] = useState(false)
+
+  function handleLanguageChange(next: Locale) {
+    setLanguage(next)
+    setLanguageChosen(true)
+  }
 
   const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
 
@@ -138,7 +155,14 @@ export default function LoginPage() {
 
   async function verifyOtp() {
     if (
-      await request(() => postJson('/api/auth/verify-otp', { phone: normalizedPhone, token: otp }))
+      await request(() =>
+        postJson('/api/auth/verify-otp', {
+          phone: normalizedPhone,
+          token: otp,
+          // Omitted entirely when untouched, so the stored preference stands.
+          ...(languageChosen ? { language } : {}),
+        })
+      )
     ) {
       router.push('/')
       router.refresh()
@@ -147,6 +171,14 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto mt-16 w-full max-w-sm px-6 pb-16">
+      {/* The one screen with no stored preference to read: a user who has not
+          signed in yet gets the default locale whatever they chose last time,
+          so without this a Swedish user meets an English sign-in page and no
+          way to change it. The choice rides along on the verify call and is
+          saved once there is a user id to attach it to. */}
+      <div className="mb-6 flex justify-end">
+        <LanguageSwitcher current={language} persist={false} onChange={handleLanguageChange} />
+      </div>
       <h1 className="page-title mb-8">{t('signIn.title')}</h1>
 
       {step === 'phone' ? (

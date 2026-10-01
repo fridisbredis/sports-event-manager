@@ -18,17 +18,23 @@ import {
 } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import { LogoutButton } from '@/components/logout-button'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import type { Locale } from '@/lib/i18n/config'
 
 interface Props {
   tenantSlug: string
   adminLabel: string
+  language: Locale
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({ tenantSlug, adminLabel }: Props) {
+export function SidebarNav({ tenantSlug, adminLabel, language }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation('admin')
+  // Shared with every other language control in the app, so it lives in
+  // `common` rather than being duplicated into the admin namespace.
+  const { t: tCommon } = useTranslation('common')
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
@@ -82,7 +88,14 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
         }
       >
         <Icon className="size-[18px] shrink-0" strokeWidth={1.5} />
-        {!collapsed && label}
+        {/* Widened to w-64 for the Swedish labels; `truncate` with a title
+            attribute is the backstop for any locale longer still, so a long
+            label clips with a tooltip instead of wrapping the row. */}
+        {!collapsed && (
+          <span className="truncate" title={label}>
+            {label}
+          </span>
+        )}
       </Link>
     )
   }
@@ -90,7 +103,7 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
   return (
     <aside
       className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-edge bg-white transition-[width] duration-150 ${
-        collapsed ? 'w-16' : 'w-56'
+        collapsed ? 'w-16' : 'w-64'
       }`}
     >
       <div
@@ -116,6 +129,18 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
           {navItems.map((item) => navLink(item.segment, item.label, item.icon))}
         </nav>
         <div className="border-t border-gray-100 py-2">
+          {/* The collapsed rail is 4rem wide, which the two options do not fit
+              side by side — so they stack rather than the control disappearing
+              until the rail is reopened. The caps label goes with them: at this
+              width "EN"/"SV" alone would read as two more nav items. */}
+          <div className={`border-b border-gray-100 pb-3 pt-1 ${collapsed ? 'px-3' : 'px-6'}`}>
+            {!collapsed && <p className="section-label mb-1.5">{tCommon('language.label')}</p>}
+            <LanguageSwitcher
+              current={language}
+              fill={!collapsed}
+              variant={collapsed ? 'stacked' : 'outlined'}
+            />
+          </div>
           {navLink('admin/account', t('navigation.account'), UserCircle)}
           <LogoutButton
             title={collapsed ? t('navigation.logOut') : undefined}
@@ -124,7 +149,11 @@ export function SidebarNav({ tenantSlug, adminLabel }: Props) {
             }`}
           >
             <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
-            {!collapsed && t('navigation.logOut')}
+            {!collapsed && (
+              <span className="truncate" title={t('navigation.logOut')}>
+                {t('navigation.logOut')}
+              </span>
+            )}
           </LogoutButton>
         </div>
       </div>

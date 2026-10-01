@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { defaultLocale } from '@/lib/i18n/config'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { ScheduleView, type AssignmentRow, type CheckMap } from './_components/schedule-view'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
 import { logger } from '@/lib/logger'
@@ -31,7 +31,7 @@ const SCHEDULE_CEILING = 500
 export default async function SchedulePage({ params, searchParams }: Props) {
   const { tenantSlug } = await params
   const { day: requestedDay } = await searchParams
-  const t = await getServerTranslation(defaultLocale, 'official')
+  const t = await getServerTranslation(await getUserLanguage(), 'official')
 
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
