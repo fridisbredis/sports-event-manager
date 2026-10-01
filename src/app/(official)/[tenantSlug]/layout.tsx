@@ -23,12 +23,18 @@ export default async function OfficialLayout({ children, params }: Props) {
 
   if (!tenant) notFound()
 
+  // ACCT-01 is backed by an `officials` row. An admin who reaches this tenant
+  // by role alone has none, and the account page below answers notFound() for
+  // them — so the tab would lead nowhere. Reuses the resolution above rather
+  // than asking again (F-PERF-07).
+  const showAccount = tenant.officialId != null
+
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette} />
       <div className="flex flex-col min-h-screen bg-white">
         <div className="flex-1 pb-16">{children}</div>
-        <BottomTabBar tenantSlug={tenantSlug} />
+        <BottomTabBar tenantSlug={tenantSlug} showAccount={showAccount} />
       </div>
     </>
   )

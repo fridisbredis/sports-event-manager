@@ -127,9 +127,28 @@ test.describe('system admin', () => {
   // policy (CLAUDE.md), and hasAdminAccessToTenant grants the same global
   // access in the app layer — a system admin reaches a tenant's screens
   // without a user_roles row for it.
-  for (const path of ADMIN_PATHS) {
+  //
+  // ACCT-01 is the exception, and deliberately so: it is backed by an
+  // `officials` row rather than by a role, editing that row's name, avatar and
+  // SMS opt-out. The seeded system admin is global (tenant_id null) and holds
+  // no roster row in any tenant — F-MNT-20's backfill covers tenant_admins,
+  // not global admins, who should not appear on any tenant's roster. So the
+  // screen has nothing to show them and both nav bars omit its link.
+  for (const path of ADMIN_PATHS.filter((p) => !p.endsWith('/admin/account'))) {
     test(`can reach ${path}`, async ({ systemAdminPage }) => {
       await expectReachable(systemAdminPage, path)
     })
   }
+
+  test('gets 404 on the account screen, which needs an officials row', async ({
+    systemAdminPage,
+  }) => {
+    await expectNotFound(systemAdminPage, `/${SEED_TENANT_SLUG}/admin/account`)
+  })
+
+  test('gets 404 on the official account screen for the same reason', async ({
+    systemAdminPage,
+  }) => {
+    await expectNotFound(systemAdminPage, `/${SEED_TENANT_SLUG}/account`)
+  })
 })

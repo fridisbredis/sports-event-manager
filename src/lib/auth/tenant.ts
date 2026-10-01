@@ -680,3 +680,24 @@ export const getOfficialTenant = cache(
     return resolveTenantForOfficial(tenantSlug, user.id)
   }
 )
+
+// ACCT-01 is the one screen that is backed by an `officials` row rather than
+// by a role: it edits that row's name, avatar and SMS opt-out. A caller who
+// reaches a tenant by role alone — a global system_admin, who deliberately
+// holds no roster row anywhere — has no such row to edit there, so the screen
+// has nothing to show them and both nav bars should omit the link.
+//
+// Keyed on the row, not on the role. That is the condition the screen actually
+// depends on, and it is already computed by the official-surface access check,
+// so this adds no query. A tenant_admin missing their row (none on dev or prod
+// since the F-MNT-20 backfill) is covered by the same answer rather than
+// falling through to a half-populated form.
+export const hasAccountScreen = cache(async (tenantSlug: string): Promise<boolean> => {
+  // Goes through getOfficialTenant rather than resolveOfficialSurfaceAccess
+  // directly: the latter's own dependencies are not memoised, so calling it
+  // here would re-run the tenant lookup and the access-context queries that
+  // the layout above has already paid for (F-PERF-07). The admin layout calls
+  // this too, so on admin screens it is the one official-surface resolution of
+  // the render; on official screens it reuses the layout's.
+  return (await getOfficialTenant(tenantSlug))?.officialId != null
+})

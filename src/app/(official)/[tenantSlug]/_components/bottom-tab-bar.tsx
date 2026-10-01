@@ -7,9 +7,12 @@ import { useTranslation } from '@/lib/i18n/client'
 
 interface Props {
   tenantSlug: string
+  // False when the caller has no `officials` row in this tenant, so ACCT-01
+  // would answer notFound() — see hasAccountScreen in lib/auth/tenant.
+  showAccount: boolean
 }
 
-export function BottomTabBar({ tenantSlug }: Props) {
+export function BottomTabBar({ tenantSlug, showAccount }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation('official')
 
@@ -18,7 +21,9 @@ export function BottomTabBar({ tenantSlug }: Props) {
     { href: `/${tenantSlug}/schedule`, label: t('nav.mySchedule'), Icon: Calendar },
     { href: `/${tenantSlug}/event-info`, label: t('nav.eventInfo'), Icon: Info },
     { href: `/${tenantSlug}/announcements`, label: t('nav.announcements'), Icon: Bell },
-    { href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User },
+    ...(showAccount
+      ? [{ href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User }]
+      : []),
   ]
 
   // The height is fixed, not content-derived. Three places assume this bar is

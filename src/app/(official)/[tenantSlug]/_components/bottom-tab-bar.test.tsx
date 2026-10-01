@@ -23,9 +23,9 @@ vi.mock('@/lib/i18n/client', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
-function renderBar(pathname: string) {
+function renderBar(pathname: string, showAccount = true) {
   mockPathname.mockReturnValue(pathname)
-  return render(<BottomTabBar tenantSlug="seed-klubben" />)
+  return render(<BottomTabBar tenantSlug="seed-klubben" showAccount={showAccount} />)
 }
 
 function activeHrefs() {
@@ -40,6 +40,17 @@ describe('BottomTabBar', () => {
     renderBar('/seed-klubben/home')
 
     expect(screen.getAllByRole('link')).toHaveLength(5)
+  })
+
+  // ACCT-01 is backed by an `officials` row, and the page answers notFound()
+  // without one — so for a role-only admin (a global system_admin holds no
+  // roster row in any tenant) the tab is omitted rather than leading to a 404.
+  it('omits the account tab when the caller has no officials row', () => {
+    renderBar('/seed-klubben/home', false)
+
+    const hrefs = screen.getAllByRole('link').map((el) => el.getAttribute('href'))
+    expect(hrefs).toHaveLength(4)
+    expect(hrefs).not.toContain('/seed-klubben/account')
   })
 
   it('marks exactly the tab matching the current path', () => {

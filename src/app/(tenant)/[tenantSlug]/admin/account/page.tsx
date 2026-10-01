@@ -1,9 +1,8 @@
 import { redirect, notFound } from 'next/navigation'
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
-import AdminAccountForm from './_components/admin-account-form'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -39,23 +38,13 @@ export default async function AdminAccountPage({ params }: Props) {
     .limit(1)
     .maybeSingle()
 
-  if (!official) {
-    // getCurrentUser() resolves identity from the JWT's own claims (PERF-01) —
-    // fast, but the token only carries what was baked in at login and doesn't
-    // reliably include phone/user_metadata the way GoTrue's live user record
-    // does. This form needs the real values, so it looks the user up by their
-    // own id instead of trusting the claims payload for display data.
-    const {
-      data: { user: authUser },
-    } = await createSupabaseServiceClient().auth.admin.getUserById(user.id)
-    const name = (authUser?.user_metadata?.name as string | undefined) ?? ''
-    const phone = authUser?.phone ?? ''
-    return (
-      <div className="px-8 py-8">
-        <AdminAccountForm name={name} phone={phone} tenantId={tenant.id} />
-      </div>
-    )
-  }
+  // No roster row means there is no account to edit in this tenant: ACCT-01
+  // edits an `officials` row's name, avatar and SMS opt-out, none of which a
+  // role-only admin has here. This used to fall back to a form built from
+  // auth.users, which rendered an empty name and a '?' avatar and could not
+  // save — so it now matches the official-facing page and the two nav bars,
+  // which omit the link entirely (hasAccountScreen).
+  if (!official) notFound()
 
   const { count: assignmentCount } = await supabase
     .from('assignments')
