@@ -106,6 +106,10 @@ export function WsSlotModal({
                     type="text"
                     size="sm"
                     placeholder={t('scheduling.slotModalSearchPlaceholder')}
+                    // Named off the same string as the placeholder: a
+                    // placeholder is not exposed as an accessible name, and
+                    // vanishes once the field has text.
+                    aria-label={t('scheduling.slotModalSearchPlaceholder')}
                     value={wsSlotModalSearch}
                     onValueChange={onSearchChange}
                     className="mb-2"

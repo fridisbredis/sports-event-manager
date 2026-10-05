@@ -425,6 +425,44 @@ throughout.
 
 ---
 
+**[A11Y] Three admin fields were named only by their placeholder**
+Priority: Low — FIXED
+
+Chased down from a `useLabel` warning in the E2E dev-server output ("If you do
+not provide a visible label, you must specify an aria-label…"). A placeholder
+is not an accessible name: it is not exposed as one, and it disappears the
+moment the field has text. Three fields had nothing else:
+
+- the checklist/notes row input (WS-02) — now named off its list's heading
+- the slot-modal official search (SCHED-01)
+- the announcement composer (COMM-01) — named off the card heading above it
+
+All three reuse strings that already exist in both `en` and `sv`, so no new
+keys and no locale-parity risk.
+
+---
+
+**[NOISE] The `useLabel` warning in dev output is HeroUI's, not ours**
+Priority: Low — no action
+
+Worth writing down because it looks actionable and is not. After the three
+fixes above, the warning still appears ~24 times in an `admin-event` run.
+Instrumenting `@react-aria/label` to print a stack trace puts every remaining
+one inside `useDateRangePicker` → HeroUI's `DateRangePicker`, reached from
+`stage-modal.tsx`, which _does_ pass a `label`.
+
+The rendered result is fine — each segment carries a full accessible name:
+
+    spinbutton "år, Startdatum, Start / end time Startdatum Slutdatum Kalender"
+
+It is the wrapping `group` element that has no name of its own, which is what
+React Aria is complaining about. Nothing a screen-reader user hits is
+unlabelled. Don't spend time on it again, and don't "fix" it by bolting an
+`aria-label` onto the picker — that would paper over a library internal and
+change what the segments announce.
+
+---
+
 **[TEST] Run integration + E2E suites in CI**
 Priority: Low — E2E DONE, integration was already there
 

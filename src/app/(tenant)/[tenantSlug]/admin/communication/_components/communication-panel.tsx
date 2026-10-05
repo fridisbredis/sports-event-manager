@@ -278,6 +278,9 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
             value={draft}
             onValueChange={setDraft}
             placeholder={t('communication.announcementPlaceholder')}
+            // The card heading right above is what names this composer; the
+            // placeholder is not an accessible name and goes away on typing.
+            aria-label={t('communication.newAnnouncement')}
             minRows={4}
           />
           <div className="flex items-center justify-between mt-3">

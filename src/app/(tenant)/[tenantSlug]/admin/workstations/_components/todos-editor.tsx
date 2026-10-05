@@ -96,6 +96,11 @@ function TodoList({
                   // survives losing focus however it was left.
                   onBlur={() => onBlurRow(index)}
                   placeholder={placeholder}
+                  // A placeholder is not an accessible name — it is not
+                  // exposed as one, and it disappears as soon as the field
+                  // has text. Each row is one entry in this list, so the
+                  // list's own heading is what names it.
+                  aria-label={heading}
                   classNames={{
                     base: 'flex-1',
                     // HeroUI gives the wrapper its own min-height, which is
