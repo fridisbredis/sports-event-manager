@@ -140,3 +140,19 @@
     }
   }
 }
+
+/* Horizontal chip rows (the day tabs on MYSCH-01) scroll, but the scrollbar
+   track is drawn flush against the chips' bottom edge on any platform set to
+   always show scrollbars — it reads as an underline cutting through the row.
+   Hiding the bar is safe here because the row is a short list of chips whose
+   partial last item already signals there is more, and it stays reachable by
+   touch drag, shift+wheel, and keyboard focus on the links. */
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
