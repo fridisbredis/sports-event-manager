@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../src/types/database'
-import { SEED_TENANT_SLUG, SYSTEM_ADMIN_PHONE } from './fixtures/users'
+import { NON_LOGIN_FIXTURES, SEED_TENANT_SLUG, SYSTEM_ADMIN_PHONE, USERS } from './fixtures/users'
 
 // Reads the local stack's credentials the same way scripts/seed-dev-local.mjs
 // does. Playwright's globalSetup runs before any test file, in its own process,
@@ -175,6 +175,46 @@ async function clearLoginRateLimits(admin: SupabaseClient<Database>) {
   if (error) throw error
 }
 
+// The suite's selectors are English (playwright.config.ts pins locale 'en-GB'),
+// but the UI language is a per-user setting in user_preferences, not a function
+// of the browser locale — so the pinned locale does not control it. The seed
+// script sets no language at all, which leaves these rows to whatever the last
+// person to click through the shared local stack happened to save. A developer
+// switching the UI to Swedish in ACCT-01 therefore breaks every English
+// selector on the next run, on a screen that has nothing to do with the change.
+//
+// Pinning the language here makes the suite independent of that state, the same
+// way clearLoginRateLimits() makes it independent of accumulated counters.
+// Deliberately not a seed-script change: the seed is for realistic data, and a
+// real tenant's officials do choose their own language.
+async function pinTestUserLanguage(admin: SupabaseClient<Database>) {
+  const phones = [
+    ...Object.values(USERS).map((u) => u.phone),
+    ...Object.values(NON_LOGIN_FIXTURES),
+  ].map((phone) => phone.replace(/^\+/, ''))
+
+  const userIds: string[] = []
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) throw error
+    for (const user of data.users) {
+      if (user.phone && phones.includes(user.phone)) userIds.push(user.id)
+    }
+    if (data.users.length < 1000) break
+  }
+
+  if (userIds.length === 0) return
+
+  // Upsert rather than update: a user who never opened ACCT-01 has no row, and
+  // the app then falls back to defaultLocale — which is 'en' today, but writing
+  // the row makes the suite independent of that default too.
+  const { error } = await admin.from('user_preferences').upsert(
+    userIds.map((user_id) => ({ user_id, language: 'en' })),
+    { onConflict: 'user_id' }
+  )
+  if (error) throw error
+}
+
 export default async function globalSetup() {
   const { apiUrl, serviceRoleKey } = readLocalStackCredentials()
 
@@ -189,6 +229,9 @@ export default async function globalSetup() {
 
   await ensureSeedData(admin)
   await ensureSystemAdmin(admin)
+
+  // After ensureSystemAdmin, so the system admin's own row is pinned too.
+  await pinTestUserLanguage(admin)
 
   // Handed to the auth fixture so it can reach the database without re-reading
   // `supabase status` per worker.

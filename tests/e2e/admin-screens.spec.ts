@@ -217,4 +217,16 @@ test.describe('ACCT-01 admin account', () => {
     await expect(page.getByLabel('Name', { exact: true })).toBeEditable()
     await expect(page.getByText('Mobile number')).toBeVisible()
   })
+
+  // Admin-only, and deliberately shown even at zero: an admin's sidebar has no
+  // My schedule entry, so this row is their only way in, and one with no shifts
+  // still needs to be able to look. The count is rendered, not a condition —
+  // which is why this lives here and not in official-screens.spec.ts.
+  test('links to the schedule, and shows the count rather than gating on it', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.goto(`${base}/account`)
+
+    await expect(page.getByRole('link', { name: /assignment/ })).toBeVisible()
+  })
 })
