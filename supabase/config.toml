@@ -289,6 +289,17 @@ max_frequency = "1s"
 # fresh local stack — the seed now creates it.
 "+46709900007" = "000000"
 
+# AUTH-02 invite-confirmation E2E (tests/e2e/invite-confirmation.spec.ts). That
+# suite must sign in as someone who holds no role yet — the whole point is to
+# watch a user *become* an official — so it cannot reuse any number above:
+# +4670990000x are seeded with roles, and +4670000000x belong to the
+# integration suite. These are claimed and reset per run by the spec's own
+# fixture, which deletes the auth user and officials rows it created.
+"+46709910001" = "000000"
+"+46709910002" = "000000"
+"+46709910003" = "000000"
+"+46709910004" = "000000"
+
 # Configure logged in session timeouts.
 # [auth.sessions]
 # Force log out after the specified duration.
