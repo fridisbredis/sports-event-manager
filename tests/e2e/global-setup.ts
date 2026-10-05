@@ -216,6 +216,35 @@ async function pinTestUserLanguage(admin: SupabaseClient<Database>) {
   if (error) throw error
 }
 
+// Assignments written by a previous run that did not get to clean up after
+// itself — a test killed by a timeout, or Ctrl-C partway through.
+//
+// The suite shares one mutable seed tenant at workers: 1 (F7), and SCHED-01's
+// specs are the first that write assignments rather than restoring a field they
+// edited. A leaked row is not inert: it occupies a cell a later run expects to
+// find empty, and a stale over-capacity row changes what the conflict banner
+// says, so the failure surfaces in a spec that did nothing wrong.
+//
+// Seeded rows all carry a todo_id (scripts/seed-dev.ts attaches one to each);
+// rows the UI writes never do, because SCHED-01 has no todo picker. That makes
+// `todo_id IS NULL` an exact line between fixture and debris, with no need to
+// hardcode which slots the specs happen to use.
+async function clearLeakedAssignments(admin: SupabaseClient<Database>) {
+  const { data: tenant } = await admin
+    .from('tenants')
+    .select('id')
+    .eq('slug', SEED_TENANT_SLUG)
+    .maybeSingle()
+  if (!tenant) return
+
+  const { error } = await admin
+    .from('assignments')
+    .delete()
+    .eq('tenant_id', tenant.id)
+    .is('todo_id', null)
+  if (error) throw error
+}
+
 export default async function globalSetup() {
   const { apiUrl, serviceRoleKey } = readLocalStackCredentials()
 
@@ -233,6 +262,9 @@ export default async function globalSetup() {
 
   // After ensureSystemAdmin, so the system admin's own row is pinned too.
   await pinTestUserLanguage(admin)
+
+  // After ensureSeedData, so there is a tenant to clean within.
+  await clearLeakedAssignments(admin)
 
   // Handed to the auth fixture so it can reach the database without re-reading
   // `supabase status` per worker.

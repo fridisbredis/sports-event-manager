@@ -27,28 +27,25 @@ Nothing exercised a browser. That leaves two classes of defect uncovered:
 
 ## Status of the suite
 
-113 tests, all green.
+127 tests, all green. Counts below are from `--list` on 2026-10-05; the table
+drifted from the suite between write-ups, so three of them are corrections
+rather than additions.
 
 | Spec                       | Screens                                     | Tests       |
 | -------------------------- | ------------------------------------------- | ----------- |
 | `auth.spec.ts`             | AUTH-01                                     | 8           |
-| `access-control.spec.ts`   | permission matrix, every screen             | 53          |
+| `access-control.spec.ts`   | permission matrix, every screen             | 54          |
 | `admin-event.spec.ts`      | EVT-01, EVT-02                              | 15          |
 | `admin-screens.spec.ts`    | WS-01, WS-02, OFF-01, COMM-01, ACCT-01      | 14          |
-| `official-screens.spec.ts` | HOME-01, INFO-01, MYSCH-01, ANN-01, ACCT-01 | 17          |
-| `system-admin.spec.ts`     | SYS-01, SYS-02                              | 6           |
-| —                          | SCHED-01                                    | not started |
+| `official-screens.spec.ts` | HOME-01, INFO-01, MYSCH-01, ANN-01, ACCT-01 | 16          |
+| `scheduling.spec.ts`       | SCHED-01                                    | 13          |
+| `system-admin.spec.ts`     | SYS-01, SYS-02                              | 7           |
 | —                          | AUTH-02 (invite confirmation)               | not started |
 
-A full run takes about 2 minutes on one worker.
+A full run takes about 6 minutes on one worker.
 
 Not covered, and worth knowing:
 
-- **SCHED-01**, the most complex screen. Notable for whoever picks it up: no
-  Save button (it autosaves via `use-scheduling-autosave`), stage and day live
-  in the URL while the view toggle is local state, over-capacity is a soft
-  warning while out-of-window is hard-blocked, and the by-work-area view only
-  accepts edits when a row is expanded. Now unblocked — see F8.
 - **AUTH-02**, invite confirmation. Two implementations exist —
   `/invite/[token]` and `/confirm-invite` — and which one is live needs
   resolving first.
@@ -305,6 +302,97 @@ data, and real officials do choose their own language.
 
 ---
 
+### F10 — A saving cell has no button, so `:has(button)` indexing silently shifts
+
+**Severity: medium (test infrastructure).** The subtlest thing SCHED-01 taught.
+
+The by-person grid renders an assignable cell as a bare `<button>` and a cell
+mid-save as a `<Skeleton>` — a `<div>` with no button at all. Addressing cells as
+"the nth `td` containing a button" therefore looks right and reads well, and is
+wrong the moment a save is in flight: every slot after the pending one shifts
+left by one, so the next click lands an hour earlier than the test believes.
+
+What made this expensive to find is that it does not fail where it happens. The
+click succeeds, the assertion on that cell succeeds, and the damage shows up as
+a later test finding an occupied cell it expected to be empty — or as an
+assignment left behind in the database after a green run. It presented as
+flakiness that moved between tests from run to run.
+
+The fix is to index by column position (`td` offset by the sticky name column
+plus the one out-of-window column) rather than by what a cell happens to
+contain. Worth generalising: in a grid that swaps elements for skeletons while
+saving, any locator phrased in terms of what a cell contains is a locator that
+moves.
+
+### F11 — Popups are positioned from the clicked cell, so a right-hand slot is unclickable at 1280px
+
+**Severity: low (test infrastructure), but it looks like a product bug.**
+
+The work-area picker and the cell action popup are `position: fixed`, placed
+from the clicked cell's `getBoundingClientRect()`. At Playwright's default
+1280x720 the right-hand slots of an eleven-column grid sit at the edge, so the
+popup renders outside the viewport and Playwright refuses to click it —
+"element is outside of the viewport", after scrolling into view has already
+succeeded.
+
+Not a defect in the screen: a real admin scrolls the grid horizontally and the
+popup follows. But it is indistinguishable from one at first read, and it made
+the over-capacity test fail only for the later slot it had been moved to in
+order to avoid the seeded assignments. `scheduling.spec.ts` opts into a 1680px
+viewport via `test.use()`, which is also the honest form factor for an
+admin-only, desktop-first screen.
+
+### F12 — The suite's first writing specs needed a cleanup that survives a killed run
+
+**Severity: medium.** F7 predicted this; SCHED-01 is where it bit.
+
+Every spec before this one restored a field it edited — an event name, a tier, a
+toggle. SCHED-01's specs create rows. A test killed by a timeout, or a run
+stopped with Ctrl-C, leaves assignments behind, and the shared seed tenant then
+starts the next run dirty: a cell a later test expects to be empty is occupied,
+and a stale over-capacity row changes what the conflict banner says. The failure
+surfaces in a spec that did nothing wrong.
+
+Three layers, in the order they do the work:
+
+1. Each writing test restores in a `finally`, so an assertion failure mid-test
+   still cleans up.
+2. `clearCell()` loops rather than clicking once. An over-capacity slot holds
+   several assignments in one cell and the popup lists a Remove per row, so one
+   click is never enough — and `handleCellAction()` closes the popup _before_
+   awaiting the delete, so the popup going away is not evidence the row is gone.
+   The cell's own text is the only signal tied to the database.
+3. `globalSetup` deletes leaked rows before the run, for the cases the first two
+   cannot reach (SIGKILL, a crashed browser). Seeded assignments all carry a
+   `todo_id`; rows written through the UI never do, because SCHED-01 has no todo
+   picker. That makes `todo_id IS NULL` an exact line between fixture and debris
+   without hardcoding which slots the specs use.
+
+The third layer is the one worth keeping in mind when adding writing specs: it
+is what makes a run reproducible after the previous one was interrupted.
+
+### F13 — `selectStage()` returned before the URL was written
+
+**Severity: low (test infrastructure).**
+
+Clicking a stage in the dropdown relabels the trigger from local state
+immediately, but `handleSelectStage()` then calls `changeDay()`, whose
+`router.push()` writes `?stage=&day=` a beat later. A helper that waited on the
+trigger's label therefore returned while the URL was still the old one, and a
+test reading `searchParams` straight after got a stale value — intermittently,
+depending on how fast the push landed.
+
+Mentioned because the fix is a general one: when an interaction updates both
+local state and the URL, wait on the URL. It is the slower of the two and the
+one the server actually reads.
+
+A related note for anyone extending these specs: the grid writes `?stage=` only
+when the stage is _changed_, never on first load. A test that needs a stage id
+has to change stage to get one; reading it from the initial URL yields an empty
+string.
+
+---
+
 ## Suggested Trello cards
 
 Copy-paste ready. Priorities are my read, not Peter's.
@@ -337,13 +425,23 @@ so work areas with NULL never render. Now generated per stage.
 ---
 
 **[TEST] E2E coverage for SCHED-01**
-Priority: Medium — unblocked by #180
+Priority: — (done, branch `test/e2e-sched01`)
 
-The most complex screen and the only major one with no E2E coverage. Notable
-for testing: no Save button (autosaves via `use-scheduling-autosave`), stage
-and day live in the URL while the view toggle is local state, over-capacity is
-a soft warning while out-of-window is hard-blocked, and the by-work-area view
-only accepts edits when a row is expanded.
+13 tests in `scheduling.spec.ts`, covering all four of the quirks this card
+named: autosave with no Save button (asserted by reloading, so the check is
+against the database rather than React state), stage and day restored from a
+shared URL while the view toggle deliberately is not, over-capacity accepted
+with a warning against out-of-window rendered unclickable, and the by-work-area
+rows that only expose slot rows once expanded.
+
+Four findings came out of writing it — F10 to F13. F10 is the one worth reading
+before touching these specs: a cell mid-save renders a skeleton with no button,
+so any `:has(button)` index silently shifts and the failure lands in a different
+test than the one that caused it.
+
+The screen itself came out clean. No product defects found — the earlier F6
+concern about the view toggle is already fixed in the app, and the F-MNT-20
+admin roster row is now asserted positively here.
 
 ---
 
