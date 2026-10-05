@@ -70,7 +70,16 @@ fi
 # function body is not a data migration"). A migration whose body DML
 # matters is one that also invokes it, and the invocation is a bare
 # statement this does catch.
-body=$(python3 - "${FILE}" <<'PY'
+#
+# The stripping AND the matching both happen in python, over the whole file
+# as one string. They used to be split — python stripped, `grep -E` matched —
+# but grep is line-oriented, so a statement broken across a newline
+# (`UPDATE\n  officials SET ...`) slipped past a pattern that caught the
+# identical single-line statement. Reformatting is not a reason to skip a
+# snapshot, so the patterns below use `\s+` (which spans newlines) and the
+# exit status comes straight from python.
+set +e
+offenders=$(python3 - "${FILE}" <<'PY'
 import re, sys
 
 sql = open(sys.argv[1], encoding="utf-8").read()
@@ -80,17 +89,35 @@ sql = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)?\$.*?\$\1?\$", " ", sql, flags=re.S)
 sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
 sql = re.sub(r"--[^\n]*", " ", sql)
 
-sys.stdout.write(sql)
-PY
-)
-
 # Word-boundary matches so a column named "updated_at" or a constraint named
 # "..._deleted_fkey" cannot trip this.
-if echo "${body}" | grep -qiE '(^|[^[:alnum:]_])(INSERT[[:space:]]+INTO|UPDATE[[:space:]]+[A-Za-z_"]|DELETE[[:space:]]+FROM|TRUNCATE|DROP[[:space:]]+COLUMN)'; then
+pattern = re.compile(
+    r'(?<![A-Za-z0-9_])('
+    r'INSERT\s+INTO'
+    r'|UPDATE\s+[A-Za-z_"]'
+    r'|DELETE\s+FROM'
+    r'|TRUNCATE'
+    r'|DROP\s+COLUMN'
+    r')',
+    re.I,
+)
+
+# Collapse each hit's internal whitespace so a wrapped statement prints as
+# one readable line.
+hits = [re.sub(r"\s+", " ", m.group(0)) for m in pattern.finditer(sql)]
+for hit in hits[:10]:
+    print(hit)
+
+sys.exit(1 if hits else 0)
+PY
+)
+found=$?
+set -e
+
+if [[ ${found} -ne 0 ]]; then
   echo "FAIL ${FILE} — claims 'no snapshot required (constraint-only)' but its SQL writes rows or drops a column"
   echo "     offending statements:"
-  echo "${body}" | grep -ioE '(INSERT[[:space:]]+INTO|UPDATE[[:space:]]+[A-Za-z_"]+|DELETE[[:space:]]+FROM|TRUNCATE[[:space:]]+[A-Za-z_"]*|DROP[[:space:]]+COLUMN)' \
-    | head -10 | sed 's/^/       /'
+  echo "${offenders}" | sed 's/^/       /'
   exit 1
 fi
 
