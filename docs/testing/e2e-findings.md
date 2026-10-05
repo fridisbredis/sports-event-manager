@@ -101,12 +101,24 @@ admin. That is defensible — the role is global (`user_roles.tenant_id` must be
 NULL per migration 0021) and does not belong to a tenant's seed data — but it
 means the two system screens could not be reached by any test.
 
-The E2E suite now provisions its own on `+46709900007`, added to
+The E2E suite first provisioned its own on `+46709900007`, added to
 `[auth.sms.test_otp]`. Idempotent, so repeated runs are safe.
 
-Worth deciding: should `seed-dev.ts` own this user instead, so manual local
-testing of SYS-01/02 works too? Right now you can only reach those screens by
-running the E2E setup first.
+**Resolved.** `seed-dev.ts` owns this user now, so a plain
+`npm run seed:dev:local` is enough to reach SYS-01/SYS-02 by hand — running the
+E2E setup first is no longer the only way in. The role stays global
+(`tenant_id` NULL, the shape migration 0021 made legal for it) and gets no
+`officials` row: a system_admin is on no tenant's roster and is not schedulable.
+
+It is the one row in that script that survives a reseed. The documented reset is
+`delete from tenants where slug = 'seed-klubben'`, which cascades tenant-scoped
+rows, and this one has no tenant to cascade from — so the seed writes it only
+when absent, rather than colliding with `user_roles`' unique
+`(user_id, tenant_id)`.
+
+`global-setup.ts` keeps its `ensureSystemAdmin` backstop. It is no longer the
+owner, but `ensureSeedData` returns early when the tenant already exists, so a
+stack seeded before this change would otherwise never acquire the user.
 
 ### F4 — The tenant admin is missing from the officials roster, is unschedulable, and 404s on the official account screen
 

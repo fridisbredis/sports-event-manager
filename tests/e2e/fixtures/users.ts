@@ -2,8 +2,10 @@
 //
 // Every number here has a matching entry under [auth.sms.test_otp] in
 // supabase/config.toml with the code '000000' — that is what makes UI sign-in
-// possible without a real SMS. Numbers +46709900001..006 are created by
-// scripts/seed-dev.ts; +46709900007 is created by tests/e2e/global-setup.ts.
+// possible without a real SMS. Numbers +46709900001..007 are all created by
+// scripts/seed-dev.ts — including the system_admin, so SYS-01/SYS-02 can be
+// reached by hand on a freshly seeded stack. tests/e2e/global-setup.ts still
+// re-checks +46709900007, for stacks seeded before the seed owned it.
 //
 // Deliberately disjoint from the integration suite's pool (+46700000001..010,
 // see tests/integration/helpers.ts) so the two suites can run against the same
