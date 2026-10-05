@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { saveEvent } from './actions'
+import { saveEvent, uploadEventLogo } from './actions'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
+import { logger } from '@/lib/logger'
 import { revalidatePath, updateTag } from 'next/cache'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -11,6 +12,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/auth/tenant', () => ({
   hasAdminAccessToTenant: vi.fn(),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
 vi.mock('next/navigation', () => ({
@@ -330,5 +335,264 @@ describe('saveEvent', () => {
       ],
     })
     expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
+  })
+})
+
+// Builds the storage half of the mocked Supabase client. uploadEventLogo is
+// the only action here that touches Storage, so this stays separate from
+// mockClient rather than widening it for the saveEvent cases.
+function mockStorageClient({
+  uploadError = null,
+  removeError = null,
+  publicUrl = 'https://cdn.example.test/storage/v1/object/public/logos/new.webp',
+  user = { id: 'user-1' } as { id: string } | null,
+}: {
+  uploadError?: { message: string } | null
+  removeError?: { message: string } | null
+  publicUrl?: string
+  user?: { id: string } | null
+} = {}) {
+  const upload = vi.fn().mockResolvedValue({ error: uploadError })
+  const remove = vi.fn().mockResolvedValue({ error: removeError })
+  const getPublicUrl = vi.fn(() => ({ data: { publicUrl } }))
+  const from = vi.fn(() => ({ upload, remove, getPublicUrl }))
+
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+    storage: { from },
+  } as never)
+
+  return { from, upload, remove, getPublicUrl }
+}
+
+function logoFormData({
+  file = new File(['x'], 'logo.webp', { type: 'image/webp' }) as unknown,
+  tenantId = TENANT_ID,
+  eventId = EVENT_ID,
+  oldLogoUrl,
+}: {
+  file?: unknown
+  tenantId?: string | null
+  eventId?: string | null
+  oldLogoUrl?: string
+} = {}) {
+  const fd = new FormData()
+  if (file !== undefined && file !== null) fd.append('file', file as string | Blob)
+  if (tenantId !== null) fd.append('tenantId', tenantId)
+  if (eventId !== null) fd.append('eventId', eventId)
+  if (oldLogoUrl !== undefined) fd.append('oldLogoUrl', oldLogoUrl)
+  return fd
+}
+
+// A File whose size clears MAX_LOGO_BYTES (900 kB) without allocating a real
+// megabyte buffer in every run.
+function oversizedFile() {
+  const file = new File(['x'], 'big.webp', { type: 'image/webp' })
+  Object.defineProperty(file, 'size', { value: 900 * 1024 + 1 })
+  return file
+}
+
+describe('uploadEventLogo', () => {
+  it('redirects to /login when there is no authenticated user', async () => {
+    mockStorageClient({ user: null })
+
+    await expect(uploadEventLogo(logoFormData())).rejects.toThrow('NEXT_REDIRECT')
+    expect(redirect).toHaveBeenCalledWith('/login')
+  })
+
+  it('rejects a non-File value in formData', async () => {
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData({ file: 'not-a-file' }))
+
+    expect(result).toEqual({ error: 'No file provided' })
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-image content type', async () => {
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(
+      logoFormData({ file: new File(['%PDF'], 'logo.pdf', { type: 'application/pdf' }) })
+    )
+
+    expect(result).toEqual({ error: 'Please choose an image file' })
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  it('rejects a file over the 900 kB Server Action body cap', async () => {
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData({ file: oversizedFile() }))
+
+    expect(result).toEqual({ error: 'Image must be smaller than 900 kB' })
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  it('rejects a missing tenantId', async () => {
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData({ tenantId: null }))
+
+    expect(result).toEqual({ error: 'Missing tenant or event ID' })
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  it('rejects a missing eventId', async () => {
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData({ eventId: null }))
+
+    expect(result).toEqual({ error: 'Missing tenant or event ID' })
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  // A non-UUID tenantId is a malformed request rather than an ordinary miss,
+  // so it must be logged as well as rejected — the client never sends one
+  // through the normal flow.
+  it('rejects a tenantId that fails tenantIdSchema and logs the attempt', async () => {
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData({ tenantId: 'not-a-uuid' }))
+
+    expect(result).toEqual({ error: 'Missing tenant or event ID' })
+    expect(logger.warn).toHaveBeenCalledWith('uploadEventLogo: invalid tenantId', {
+      tenantId: 'not-a-uuid',
+    })
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  it('returns Not authorized and never uploads when the user has no admin access', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData())
+
+    expect(result).toEqual({ error: 'Not authorized' })
+    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
+    expect(storage.upload).not.toHaveBeenCalled()
+  })
+
+  // F-REL-22: the raw Storage error.message must not reach the client.
+  it('translates a storage upload error instead of forwarding it', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient({ uploadError: { message: 'bucket quota exceeded' } })
+
+    const result = await uploadEventLogo(logoFormData())
+
+    expect(result).toEqual({
+      error: 'Something went wrong while uploading the logo. Please try again.',
+    })
+    expect(storage.remove).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith('uploadEventLogo: storage upload failed', undefined, {
+      message: 'bucket quota exceeded',
+    })
+  })
+
+  it('returns the public URL and uploads under tenant/event with the file content type', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData())
+
+    expect(result).toEqual({
+      publicUrl: 'https://cdn.example.test/storage/v1/object/public/logos/new.webp',
+    })
+    expect(storage.from).toHaveBeenCalledWith('logos')
+    const [path, file, options] = storage.upload.mock.calls[0]
+    expect(path).toMatch(new RegExp(`^${TENANT_ID}/${EVENT_ID}/\\d+\\.webp$`))
+    expect(file).toBeInstanceOf(File)
+    expect(options).toEqual({ contentType: 'image/webp' })
+    // No previous logo was supplied, so there is nothing to clean up.
+    expect(storage.remove).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a jpg extension when the filename has none', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient()
+
+    await uploadEventLogo(logoFormData({ file: new File(['x'], 'logo', { type: 'image/jpeg' }) }))
+
+    expect(storage.upload.mock.calls[0][0]).toMatch(
+      new RegExp(`^${TENANT_ID}/${EVENT_ID}/\\d+\\.jpg$`)
+    )
+  })
+
+  it('removes the old logo path on success', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(
+      logoFormData({
+        oldLogoUrl: `https://cdn.example.test/storage/v1/object/public/logos/${TENANT_ID}/${EVENT_ID}/old.webp`,
+      })
+    )
+
+    expect(result.publicUrl).toBeDefined()
+    expect(storage.remove).toHaveBeenCalledWith([`${TENANT_ID}/${EVENT_ID}/old.webp`])
+  })
+
+  // Cleanup is best-effort: a failed removal leaves an orphaned object but
+  // must never turn a successful upload into an error for the admin.
+  it('still returns the public URL when removing the old logo fails', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient({ removeError: { message: 'object not found' } })
+
+    const result = await uploadEventLogo(
+      logoFormData({
+        oldLogoUrl: `https://cdn.example.test/storage/v1/object/public/logos/${TENANT_ID}/${EVENT_ID}/old.webp`,
+      })
+    )
+
+    expect(result).toEqual({
+      publicUrl: 'https://cdn.example.test/storage/v1/object/public/logos/new.webp',
+    })
+    expect(storage.remove).toHaveBeenCalled()
+  })
+
+  // extractStoragePath is module-private, so it is exercised through the
+  // cleanup branch it feeds: no bucket marker => null => no remove call.
+  describe('extractStoragePath (via old-logo cleanup)', () => {
+    it('skips cleanup for a URL without the bucket marker', async () => {
+      vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+      const storage = mockStorageClient()
+
+      const result = await uploadEventLogo(
+        logoFormData({ oldLogoUrl: 'https://example.test/some/other/logo.webp' })
+      )
+
+      expect(result.publicUrl).toBeDefined()
+      expect(storage.remove).not.toHaveBeenCalled()
+    })
+
+    it('skips cleanup for a URL in a different bucket', async () => {
+      vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+      const storage = mockStorageClient()
+
+      await uploadEventLogo(
+        logoFormData({
+          oldLogoUrl: 'https://cdn.example.test/storage/v1/object/public/avatars/tenant/old.webp',
+        })
+      )
+
+      expect(storage.remove).not.toHaveBeenCalled()
+    })
+
+    it('decodes a percent-encoded path before removing it', async () => {
+      vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+      const storage = mockStorageClient()
+
+      await uploadEventLogo(
+        logoFormData({
+          oldLogoUrl:
+            'https://cdn.example.test/storage/v1/object/public/logos/tenant/event/my%20logo%20%281%29.webp',
+        })
+      )
+
+      expect(storage.remove).toHaveBeenCalledWith(['tenant/event/my logo (1).webp'])
+    })
   })
 })
