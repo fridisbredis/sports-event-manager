@@ -67,10 +67,11 @@ async function ensureSeedData(admin: SupabaseClient<Database>) {
   }
 }
 
-// scripts/seed-dev.ts seeds no system_admin (the role is global — user_roles
-// .tenant_id must be NULL per migration 0021 — so it does not belong to a
-// tenant's seed data). SYS-01/SYS-02 are unreachable without one, so the E2E
-// suite owns this user. Idempotent: safe across repeated runs.
+// scripts/seed-dev.ts now creates this user itself, so SYS-01/SYS-02 are
+// reachable on a freshly seeded stack without running the suite first. This
+// stays as a backstop for the case the seed cannot cover: ensureSeedData above
+// returns early when the tenant already exists, so a stack seeded before the
+// seed owned this user never gets it. Idempotent: safe across repeated runs.
 async function ensureSystemAdmin(admin: SupabaseClient<Database>) {
   const storedPhone = SYSTEM_ADMIN_PHONE.replace(/^\+/, '')
 
