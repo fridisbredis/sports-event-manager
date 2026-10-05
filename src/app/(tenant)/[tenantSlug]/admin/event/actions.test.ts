@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { saveEvent, uploadEventLogo } from './actions'
+import { saveEvent, uploadEventLogo, updateTenantColorPalette } from './actions'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
-import { logger } from '@/lib/logger'
 import { revalidatePath, updateTag } from 'next/cache'
+import { logger } from '@/lib/logger'
+import type { TenantPaletteKey } from '@/lib/theme/tenant-colors'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -12,10 +13,6 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/auth/tenant', () => ({
   hasAdminAccessToTenant: vi.fn(),
-}))
-
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
 vi.mock('next/navigation', () => ({
@@ -27,6 +24,12 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
   updateTag: vi.fn(),
+}))
+
+// The real logger writes JSON to stderr and reports errors to Sentry, neither
+// of which belongs in a unit test run.
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
 function chain(result: unknown) {
@@ -100,6 +103,10 @@ function statusBuilderFor(status: 'draft' | 'published' | null, errorMessage?: s
     error: errorMessage ? { message: errorMessage } : null,
   })
 }
+
+// F-REL-22: never forward a raw DB error.message to the client — assert
+// the translated fallback string, not the raw message the mock returns.
+const GENERIC_SAVE_ERROR = 'Something went wrong while saving. Please try again.'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -180,10 +187,6 @@ describe('saveEvent', () => {
       error: 'Cannot remove the last Race stage from a published event.',
     })
   })
-
-  // F-REL-22: never forward a raw DB error.message to the client — assert
-  // the translated fallback string, not the raw message the mock returns.
-  const GENERIC_SAVE_ERROR = 'Something went wrong while saving. Please try again.'
 
   it('fails closed when the event status cannot be read', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
@@ -594,5 +597,120 @@ describe('uploadEventLogo', () => {
 
       expect(storage.remove).toHaveBeenCalledWith(['tenant/event/my logo (1).webp'])
     })
+  })
+})
+
+describe('updateTenantColorPalette', () => {
+  // Resolved by the real i18n layer, same as the saveEvent cases above.
+  const NOT_AUTHORIZED = 'Not authorized'
+
+  function paletteClient(
+    updateBuilder?: ReturnType<typeof chain>,
+    user: unknown = { id: 'user-1' }
+  ) {
+    const fromMock = vi.fn(() => updateBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
+      from: fromMock,
+      rpc: vi.fn(),
+    } as never)
+    return fromMock
+  }
+
+  it('redirects to /login when there is no authenticated user', async () => {
+    const fromMock = paletteClient(undefined, null)
+
+    await expect(updateTenantColorPalette('viadal', TENANT_ID, 'blue')).rejects.toThrow(
+      'NEXT_REDIRECT'
+    )
+    expect(redirect).toHaveBeenCalledWith('/login')
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a tenantId that is not a uuid without checking access or writing', async () => {
+    const fromMock = paletteClient()
+
+    const result = await updateTenantColorPalette('viadal', 'not-a-uuid', 'blue')
+
+    expect(result).toEqual({ error: NOT_AUTHORIZED })
+    expect(hasAdminAccessToTenant).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('updateTenantColorPalette: invalid tenantId', {
+      tenantId: 'not-a-uuid',
+    })
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('returns an authorization error and never touches tenants when access is denied', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const fromMock = paletteClient()
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'blue')
+
+    expect(result).toEqual({ error: NOT_AUTHORIZED })
+    expect(hasAdminAccessToTenant).toHaveBeenCalledWith('user-1', TENANT_ID)
+    expect(fromMock).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('rejects a palette key that is not in TENANT_PALETTES', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const fromMock = paletteClient()
+
+    const result = await updateTenantColorPalette(
+      'viadal',
+      TENANT_ID,
+      'chartreuse' as TenantPaletteKey
+    )
+
+    expect(result).toEqual({ error: 'Unknown color palette' })
+    expect(fromMock).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('translates the db error from the tenants update and skips revalidation', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const updateBuilder = chain({ data: null, error: { message: 'connection reset' } })
+    paletteClient(updateBuilder)
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'blue')
+
+    // F-REL-22: the raw DB message must never reach the client.
+    expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('treats an update that matched no rows as an authorization failure', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const updateBuilder = chain({ data: [], error: null })
+    paletteClient(updateBuilder)
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'blue')
+
+    // An UPDATE filtered out entirely by RLS succeeds while changing nothing —
+    // the `select('id')` row count is what tells the two cases apart.
+    expect(result).toEqual({ error: NOT_AUTHORIZED })
+    expect(logger.error).toHaveBeenCalledWith('updateTenantColorPalette: update matched no rows', {
+      tenantId: TENANT_ID,
+    })
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('writes the palette and revalidates the tenant subtree as a layout on success', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const updateBuilder = chain({ data: [{ id: TENANT_ID }], error: null })
+    const fromMock = paletteClient(updateBuilder)
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'green')
+
+    expect(result).toEqual({})
+    expect(fromMock).toHaveBeenCalledWith('tenants')
+    expect(updateBuilder.update).toHaveBeenCalledWith({ color_palette: 'green' })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('id', TENANT_ID)
+    expect(updateBuilder.select).toHaveBeenCalledWith('id')
+    // 'layout' so every page under /{tenantSlug} picks up the new theme, not
+    // just the admin page the picker lives on.
+    expect(revalidatePath).toHaveBeenCalledWith('/viadal', 'layout')
   })
 })
