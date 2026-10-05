@@ -62,8 +62,13 @@ test.describe('INFO-01 event info', () => {
     // The seed builds three (Day 1/2/3), so assert all three by name — the
     // previous `getByText(/^[123]$/).first()` matched a single stage-number
     // badge and passed even if only one card rendered.
+    // Each stage name appears in three sections (dates, venue, programme), so
+    // an unscoped getByText is a strict-mode violation rather than a signal.
+    // Scope to the programme list and match the heading paragraph there.
     for (const name of ['Day 1', 'Day 2', 'Day 3']) {
-      await expect(page.getByText(name, { exact: true })).toBeVisible()
+      await expect(
+        page.getByRole('paragraph').filter({ hasText: new RegExp(`^${name}$`) })
+      ).toHaveCount(1)
     }
 
     // The "not just race stages" half of INFO-01 is NOT covered here: the seed
@@ -80,22 +85,29 @@ test.describe('MYSCH-01 my schedule', () => {
     await expect(page.getByRole('heading', { name: 'My schedule' })).toBeVisible()
     await expect(page.getByText('Read-only')).toBeVisible()
 
-    await expect(page.getByRole('button', { name: 'Time' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Work area' })).toBeVisible()
+    // The view switch is a radiogroup, not two buttons — one either/or
+    // choice, which is what lets a screen reader announce "1 of 2".
+    const views = page.getByRole('radiogroup', { name: 'My schedule' })
+    await expect(views.getByRole('radio', { name: 'Time' })).toBeVisible()
+    await expect(views.getByRole('radio', { name: 'Work area' })).toBeVisible()
   })
 
   test('switching to the work area view is remembered', async ({ officialConfirmedPage: page }) => {
     await page.goto(`${base}/schedule`)
 
-    await page.getByRole('button', { name: 'Work area' }).click()
-    // The toggle marks the active view with a class only — there is no
-    // aria-pressed or role=tab to assert on.
-    await expect(page.getByRole('button', { name: 'Work area' })).toHaveClass(/bg-primary/)
+    const workArea = page.getByRole('radio', { name: 'Work area' })
+
+    await workArea.click()
+    // aria-checked, not the CSS class the earlier version asserted on: the
+    // selected state is what a screen reader is told, so it is the thing worth
+    // holding the app to. A restyle may change bg-primary; it must not change
+    // this.
+    await expect(workArea).toBeChecked()
 
     // Persisted in localStorage['official-schedule-view'], so it survives a
     // reload without a round-trip to the server.
     await page.reload()
-    await expect(page.getByRole('button', { name: 'Work area' })).toHaveClass(/bg-primary/)
+    await expect(workArea).toBeChecked()
   })
 
   test('day selector navigates between the seeded days', async ({
@@ -170,9 +182,13 @@ test.describe('ACCT-01 official account', () => {
     const sms = page.getByRole('switch', { name: 'SMS updates' })
     const wasOn = await sms.isChecked()
 
+    // The screen autosaves — the Save button this test used to click was
+    // replaced by a polite aria-live region (SaveStatus in account-form.tsx).
+    // Waiting for 'Saved' is what makes the reload below race-free.
+    const saved = page.getByText('Saved', { exact: true })
+
     await sms.click()
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+    await expect(saved).toBeVisible()
 
     await page.reload()
     await expect(sms).toBeChecked({ checked: !wasOn })
@@ -180,20 +196,22 @@ test.describe('ACCT-01 official account', () => {
     // Restore: this flag decides whether the SMS worker texts this official,
     // and the next run reuses the same seeded user.
     await sms.click()
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+    await expect(saved).toBeVisible()
   })
 
-  test('links to the schedule when the official has assignments', async ({
+  // The schedule section is NOT here. Both halves of this pair used to live in
+  // this file, asserting it appears when assignmentCount > 0 and not when it is
+  // 0 — but account-form.tsx gates the section on `isDesktop` (the layout prop,
+  // which only the admin screen passes) and says so: an official already has
+  // My schedule in the bottom tab bar, so a second door to the same room is
+  // not offered. The count never gated it.
+  //
+  // So the negative test passed for the wrong reason — the link is absent
+  // because this user is an official, not because they have no shifts — and
+  // the positive one could never pass here. Coverage moved to the admin
+  // account screen, which is the one that renders it. See admin-screens.spec.ts.
+  test('offers no second route to the schedule — the tab bar is the one door', async ({
     officialConfirmedPage: page,
-  }) => {
-    await page.goto(`${base}/account`)
-    // Conditional section: shown only when assignmentCount > 0.
-    await expect(page.getByRole('link', { name: /assignment/ })).toBeVisible()
-  })
-
-  test('hides the schedule section for an official without assignments', async ({
-    officialNoShiftsPage: page,
   }) => {
     await page.goto(`${base}/account`)
     await expect(page.getByRole('link', { name: /assignment/ })).toHaveCount(0)

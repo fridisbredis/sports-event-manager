@@ -156,6 +156,107 @@ jobs:
         if: always()
         run: supabase stop
 
+  test-e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    # The suite drives a real browser through sign-in and every screen; it is
+    # the slowest job here by a wide margin, so it gets a ceiling well above
+    # the ~2 min it takes locally without letting a hang burn a full hour.
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only chromium: playwright.config.ts defines a single project, so
+      # installing the other engines would add minutes of download for
+      # browsers no test opens. --with-deps pulls the system libraries the
+      # GitHub runner image does not ship.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          # Same pin as the integration job above — see the note there on why
+          # this is not `latest`.
+          version: 2.116.0
+
+      - name: Start local Supabase stack
+        env:
+          # config.toml reads the Twilio token through env() and `supabase
+          # start` refuses to boot without it. Its value is irrelevant: the
+          # seed numbers are intercepted by [auth.sms.test_otp] before Twilio
+          # is ever called, which is what makes UI sign-in possible here.
+          SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: dummy
+        run: supabase start
+
+      # Same gate as the integration job: `supabase start` returns before
+      # PostgREST will accept service-role queries, and globalSetup's very
+      # first act is a service-role read of `tenants`.
+      - name: Wait for PostgREST to accept service-role queries
+        run: |
+          set -euo pipefail
+
+          # Same extraction as the integration job: -o env with explicit
+          # override names, rather than parsing the JSON shape, which has
+          # changed between CLI versions before.
+          eval "$(supabase status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+            | grep -E '^(SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=')"
+
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              "${SUPABASE_URL}/rest/v1/tenants?select=id&limit=1")
+            if [ "$status" = "200" ]; then
+              echo "PostgREST is ready (attempt $i)"
+              exit 0
+            fi
+            echo "PostgREST not ready yet (attempt $i, status $status), retrying..."
+            sleep 2
+          done
+          echo "PostgREST did not become ready in time"
+          exit 1
+
+      # No seed step: tests/e2e/global-setup.ts runs `npm run seed:dev:local`
+      # itself when the tenant is missing, which it always is on a fresh
+      # runner. Seeding here as well would make the seed script throw — it
+      # refuses to double an existing tenant, by design.
+      #
+      # No env pinning either: playwright.config.ts starts its own dev server
+      # with NEXT_PUBLIC_SUPABASE_URL pointed at the local stack, and with
+      # CI set, reuseExistingServer is false, so it cannot attach to anything
+      # else. There is no .env.local on a runner for it to read.
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      # The HTML report carries the trace and screenshot for every failure
+      # (trace: 'retain-on-failure'), which is the only way to debug a CI-only
+      # failure without reproducing it locally.
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
+
   migration-forward-fix:
     name: Migration forward-fix
     runs-on: ubuntu-latest

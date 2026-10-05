@@ -18,6 +18,11 @@ test.describe('AUTH-01 sign in', () => {
     // isValidPhoneForCountry() fails, so the button never enables and no OTP
     // is ever requested — the client-side gate before the rate limiter.
     await expect(page.getByRole('button', { name: 'Send code' })).toBeDisabled()
+
+    // The message waits for blur (#228): flagging a number as invalid while it
+    // is still being typed calls every half-entered number wrong. The disabled
+    // button above is the gate; this is only how it explains itself.
+    await page.getByLabel('Phone number').blur()
     await expect(
       page.getByText('Enter a valid mobile number for the selected country.')
     ).toBeVisible()

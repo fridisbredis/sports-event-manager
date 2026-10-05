@@ -213,14 +213,25 @@ better practice, but two consequences are worth knowing:
 - Selectors are coupled to the English copy in `public/locales/en/`. Renaming a
   button breaks tests. Since `sv` is intentionally incomplete and the app
   defaults to `en`, this is stable today.
-- A few places have no accessible marker for state at all: the scheduling view
-  toggle and the official schedule view toggle mark the active option with a CSS
-  class only — no `aria-pressed`, no `role="tab"`. Tests assert on `bg-primary`,
-  which is brittle. The day selector on MYSCH-01 is the one place that does it
-  properly, with `aria-current="page"`.
+- A few places had no accessible marker for state at all: the scheduling view
+  toggle and the official schedule view toggle marked the active option with a
+  CSS class only. Tests asserted on `bg-primary`, which is brittle. The day
+  selector on MYSCH-01 was the one place that did it properly, with
+  `aria-current="page"`.
 
-Adding `aria-pressed` to those toggles would be a small accessibility win and
-would let the tests assert something meaningful.
+**Resolved — but not the way this finding proposed, and the lag is the lesson.**
+Both toggles now carry real semantics: the official one is a `role="radiogroup"`
+with `aria-checked`, roving `tabIndex` and arrow keys; the admin one is a
+`role="tablist"` with `aria-selected`. `aria-pressed`, which this finding
+suggested, would have been the wrong fix — it describes an independent on/off
+per button, not one either/or choice, so a screen reader would announce
+"pressed" rather than "1 of 2".
+
+The toggles were fixed in passing (around #215) without this finding or the
+tests being updated, so the suite kept asserting on a `bg-primary` class the
+buttons no longer carry — and kept passing, because by then it was failing for
+an unrelated reason first (see F9). A finding that proposes a fix should be
+re-read against the code before anyone acts on it.
 
 ### F7 — Seed script is not idempotent
 
@@ -259,6 +270,38 @@ is now the same work area _name_ on two stages.
 
 Worth remembering as a pattern: an empty screen is as likely to be a fixture
 that does not satisfy a grouping predicate as it is a fixture that is missing.
+
+### F9 — UI language is per-user state, so a developer's click could break the suite
+
+**Severity: medium. Fixed in this branch.**
+
+The whole suite selects on English copy, and `playwright.config.ts` pins
+`locale: 'en-GB'` believing that settles it. It does not. The UI language is a
+per-user row in `user_preferences`, chosen in ACCT-01 — the browser locale
+never enters into it.
+
+`scripts/seed-dev.ts` sets no language at all, so those rows held whatever the
+last person to click through the shared local stack happened to save. Two of
+the four seeded users had drifted to `sv`. The result: 14 of 17 official specs
+failed, every one of them waiting out a 60s timeout on an English selector
+against a Swedish page, and the run took 9 minutes to tell us so.
+
+Two things worth taking from it:
+
+- **The failure pointed away from its cause.** Fourteen red tests across five
+  screens look like a broken app. Nothing was broken, and nothing in the error
+  text mentioned language — only Playwright's own page snapshot, which renders
+  the accessibility tree and showed `heading "Mitt schema"`, gave it away.
+- **It hid a second, real problem.** Behind the language failure sat four
+  genuinely stale selectors (F6's toggle, an ambiguous `getByText`, a Save
+  button that autosave replaced, and a pair of tests asserting an admin-only
+  section on an official screen). A suite failing for one loud reason stops
+  reporting the quiet ones.
+
+`globalSetup` now pins every fixture user's language, the same way it already
+clears rate-limit counters — the suite should not depend on local state no
+fixture owns. Deliberately not a seed-script change: the seed is for realistic
+data, and real officials do choose their own language.
 
 ---
 
@@ -358,10 +401,55 @@ passing against the dev database before I noticed.
 
 ---
 
-**[TEST] Run integration + E2E suites in CI**
-Priority: Low (needs discussion)
+**[BUG] Two admin specs still assume the tenant admin has no officials row**
+Priority: Medium — RESOLVED
 
-Neither the integration suite nor E2E runs in `quality.yml` today — only lint,
-format, typecheck and unit tests. Both need a local Supabase stack in the
-runner, so this is a real piece of work, not a config tweak. Worth scoping
-before committing to it.
+Found while fixing F9, left alone as out of scope at the time. Both failed on
+`main`; both were confirmed stale tests, not broken screens, and are fixed:
+
+- `ACCT-01 admin account › shows an editable name and a read-only number` —
+  expected the admin-only form (label `Name`). There is no admin-only form any
+  more: `admin/account/page.tsx` renders the same `AccountForm` as the
+  official-facing screen and `notFound()`s when the roster row is missing. Now
+  asserts `Name (editable)` / `Mobile number (read-only)`.
+- `OFF-01 officials roster › lists the admin on the roster as Event admin` —
+  the `/— Event admin$/` filter never matched. `hasText` tests the row's whole
+  concatenated text, which runs on past the name into the number and status
+  cells (`…— Event admin+46 70 990 00 01Confirmed`), so an end anchor cannot
+  match a grid row at all. The assertion was never capable of passing in this
+  markup; dropping the anchor matches exactly one row.
+
+Both were fallout from F-MNT-20 (#187), which gave tenant admins their roster
+row — the behaviour changed, the specs did not. The screens were correct
+throughout.
+
+---
+
+**[TEST] Run integration + E2E suites in CI**
+Priority: Low — E2E DONE, integration was already there
+
+Half of this was a stale premise: `test-integration` has been a job in
+`quality.yml` for some time, and it is what made the E2E job cheap to add —
+the hard parts (pinned Supabase CLI, `supabase start`, waiting for PostgREST
+to accept service-role queries) were already solved and proven there.
+
+The E2E job now runs on every PR. What it needs beyond the integration
+recipe:
+
+- `npx playwright install --with-deps chromium` — one browser, because
+  `playwright.config.ts` defines a single project.
+- `SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: dummy` on `supabase start`. The value
+  is irrelevant: `[auth.sms.test_otp]` intercepts the seed numbers before
+  Twilio is called, which is what makes real UI sign-in possible on a runner.
+- No seed step. `global-setup.ts` runs `npm run seed:dev:local` itself when
+  the tenant is missing, which it always is on a fresh runner; seeding twice
+  would make the seed script throw, by design.
+- No env pinning. With `CI` set, `reuseExistingServer` is false, so Playwright
+  always starts its own dev server with the local stack pinned — and there is
+  no `.env.local` on a runner for it to misread (F8).
+- The HTML report is uploaded on failure, carrying the trace and screenshot
+  for each one. Without it a CI-only failure can only be debugged by
+  reproducing it locally.
+
+Runtime is ~3 minutes locally from cold, including seeding and five real
+sign-ins; `timeout-minutes: 30` is a hang ceiling, not an expectation.
