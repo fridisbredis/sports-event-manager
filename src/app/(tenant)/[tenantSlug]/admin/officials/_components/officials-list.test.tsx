@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { ReactNode, KeyboardEvent } from 'react'
 import OfficialsList from './officials-list'
 import { toastError } from '@/lib/toast'
+import { logger } from '@/lib/logger'
 import type { OfficialListItem } from '@/types/app'
 
 // Shared translate stub: returns the i18n key, or `key:JSON(vars)` when vars are
@@ -26,6 +27,13 @@ vi.mock('@/lib/toast', async (importOriginal) => {
     toastError: vi.fn(),
   }
 })
+
+// The real logger writes a JSON line to stderr and reports to Sentry. Stubbed
+// both to keep the unexpected-status test's output clean and so the test can
+// assert that branch actually logs.
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
 
 // HeroUI's real components rely on react-aria overlays/portals and framer-motion,
 // which aren't set up in this jsdom environment and aren't the point of these
@@ -216,6 +224,42 @@ async function openAddModalAndFillValidForm() {
 }
 
 describe('OfficialsList — handleAdd error branches', () => {
+  it('409: shows duplicate-phone toast and marks the phone field invalid', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse(409))
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+      />
+    )
+
+    const sendButton = await openAddModalAndFillValidForm()
+    fireEvent.click(sendButton)
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(fakeT('officials.duplicatePhone')))
+    expect(screen.getByRole('alert')).toHaveTextContent('officials.duplicatePhone')
+  })
+
+  it('400: shows invalid-phone toast and marks the phone field invalid', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse(400))
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+      />
+    )
+
+    const sendButton = await openAddModalAndFillValidForm()
+    fireEvent.click(sendButton)
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(fakeT('officials.invalidPhone')))
+    expect(screen.getByRole('alert')).toHaveTextContent('officials.invalidPhone')
+  })
+
   it('503: shows service-unavailable toast and does not mark the phone field invalid', async () => {
     fetchMock.mockResolvedValueOnce(makeResponse(503))
     render(
@@ -323,6 +367,130 @@ describe('OfficialsList — handleAdd error branches', () => {
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith(fakeT('officials.addUnexpectedError'))
     )
+    expect(screen.getByRole('alert')).toHaveTextContent('officials.addUnexpectedError')
+    // The raw server message is logged for diagnosis but kept off the screen.
+    expect(logger.error).toHaveBeenCalledWith(
+      'Unexpected /api/officials error response',
+      undefined,
+      {
+        status: 404,
+        message: 'Duplicate key value violates constraint officials_phone_tenant_idx',
+      }
+    )
+  })
+})
+
+describe('OfficialsList — handleAdd success', () => {
+  const created: OfficialListItem = {
+    id: 'off-new',
+    tenant_id: 'tenant-1',
+    name: 'New Official',
+    phone: '46701234567',
+    invite_status: 'invited',
+    user_id: null,
+    sms_opt_out: false,
+    avatar_url: null,
+    created_at: '2026-01-01T00:00:00Z',
+  }
+
+  it('200 with smsSent false: still appends the official, then toasts the SMS failure', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeResponse(200, { json: { official: created, smsSent: false } })
+    )
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+      />
+    )
+
+    const sendButton = await openAddModalAndFillValidForm()
+    fireEvent.click(sendButton)
+
+    // The row appearing is the point: the official was created server-side, so
+    // a failed invite SMS must not make them vanish from the list.
+    await waitFor(() => expect(screen.getByText('New Official')).toBeInTheDocument())
+    expect(toastError).toHaveBeenCalledWith(
+      fakeT('officials.addedSmsFailed', { name: 'New Official' })
+    )
+  })
+
+  it('200 with smsSent true: appends the official and toasts nothing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeResponse(200, { json: { official: created, smsSent: true } })
+    )
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+      />
+    )
+
+    const sendButton = await openAddModalAndFillValidForm()
+    fireEvent.click(sendButton)
+
+    await waitFor(() => expect(screen.getByText('New Official')).toBeInTheDocument())
+    expect(toastError).not.toHaveBeenCalled()
+  })
+})
+
+describe('OfficialsList — handleRemove', () => {
+  // Like resend, the row's "remove" button only opens the confirm dialog; the
+  // dialog's own "remove"-labeled confirm button triggers the DELETE.
+  function clickRemoveAndConfirm() {
+    const [rowButton] = screen.getAllByRole('button', { name: 'officials.remove' })
+    fireEvent.click(rowButton)
+
+    const confirmButton = screen
+      .getAllByRole('button', { name: 'officials.remove' })
+      .find((button) => button !== rowButton)
+    fireEvent.click(confirmButton!)
+  }
+
+  it('failed DELETE: toasts the remove error and leaves the official in the list', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse(500))
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+      />
+    )
+
+    clickRemoveAndConfirm()
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        fakeT('officials.removeError', { name: 'Jane Referee' })
+      )
+    )
+    expect(screen.getByText('Jane Referee')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/officials/off-1?tenantId=tenant-1',
+      expect.objectContaining({ method: 'DELETE' })
+    )
+  })
+
+  it('successful DELETE: drops the official from the list without toasting', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse(200))
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+      />
+    )
+
+    clickRemoveAndConfirm()
+
+    await waitFor(() => expect(screen.queryByText('Jane Referee')).toBeNull())
+    expect(toastError).not.toHaveBeenCalled()
   })
 })
 
