@@ -18,8 +18,8 @@ export function BottomTabBar({ tenantSlug, showAccount }: Props) {
 
   const tabs = [
     { href: `/${tenantSlug}/home`, label: t('nav.home'), Icon: House },
-    { href: `/${tenantSlug}/schedule`, label: t('nav.mySchedule'), Icon: Calendar },
     { href: `/${tenantSlug}/event-info`, label: t('nav.eventInfo'), Icon: Info },
+    { href: `/${tenantSlug}/schedule`, label: t('nav.mySchedule'), Icon: Calendar },
     { href: `/${tenantSlug}/announcements`, label: t('nav.announcements'), Icon: Bell },
     ...(showAccount
       ? [{ href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User }]
