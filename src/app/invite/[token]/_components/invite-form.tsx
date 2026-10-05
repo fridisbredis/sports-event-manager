@@ -206,10 +206,11 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             {t('signIn.codeSentTo', { phone: initialPhone })}
           </p>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
+            <label htmlFor="invite-otp" className="block text-xs font-semibold text-gray-700 mb-2">
               {t('signIn.codeLabel')}
             </label>
             <input
+              id="invite-otp"
               type="text"
               inputMode="numeric"
               maxLength={6}
@@ -345,19 +346,27 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             {t('confirmation.notificationsInfo')}
           </p>
 
-          <button
-            type="button"
-            onClick={() => setPrivacyAccepted((v) => !v)}
-            className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-sm text-left transition-colors ${
+          {/* A native checkbox, not a <button>: the consent control's text ends in a
+              link to the privacy policy. Nesting that link inside a button left the
+              button with no accessible name and swallowed centre clicks, so the
+              label wraps only the prefix and the link sits outside it. */}
+          <div
+            className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
               privacyAccepted
                 ? 'border-tenant-primary bg-tenant-primary-tint'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
-            <div
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                privacyAccepted ? 'border-tenant-primary bg-tenant-primary' : 'border-gray-300'
-              }`}
+            <input
+              id="privacy-accepted"
+              type="checkbox"
+              checked={privacyAccepted}
+              onChange={(e) => setPrivacyAccepted(e.target.checked)}
+              className="peer sr-only"
+            />
+            <label
+              htmlFor="privacy-accepted"
+              className="mt-0.5 flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border border-gray-300 transition-colors peer-checked:border-tenant-primary peer-checked:bg-tenant-primary peer-focus-visible:ring-2 peer-focus-visible:ring-tenant-primary peer-focus-visible:ring-offset-2"
             >
               {privacyAccepted && (
                 <svg
@@ -370,20 +379,21 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               )}
-            </div>
+            </label>
             <span className="text-gray-700">
-              {t('confirmation.privacyCheckPrefix')}{' '}
+              <label htmlFor="privacy-accepted" className="cursor-pointer">
+                {t('confirmation.privacyCheckPrefix')}
+              </label>{' '}
               <a
                 href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
                 className="underline hover:text-gray-900"
               >
                 {t('confirmation.privacyCheckLinkText')}
               </a>
             </span>
-          </button>
+          </div>
         </div>
       </div>
 
