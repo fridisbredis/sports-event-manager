@@ -146,7 +146,7 @@ function DaySelector({
   }
 
   return (
-    <nav aria-label={label} className="-mx-5 px-5 mb-6 overflow-x-auto">
+    <nav aria-label={label} className="-mx-5 px-5 pb-1 mb-6 overflow-x-auto scrollbar-none">
       <div className="flex gap-2 w-max">
         {days.map((day) => {
           const isSelected = day === selectedDay
