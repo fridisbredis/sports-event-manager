@@ -113,7 +113,12 @@ test.describe('OFF-01 officials roster', () => {
   }) => {
     await page.goto(`${base}/officials`)
 
-    const adminRow = page.getByRole('row').filter({ hasText: /— Event admin$/ })
+    // Not anchored with $: hasText matches the row's whole concatenated text,
+    // which runs on past the name cell into the number and status cells
+    // ('…— Event admin+46 70 990 00 01Confirmed'). An end anchor can therefore
+    // never match a grid row, and this silently asserted on a shape the markup
+    // never had.
+    const adminRow = page.getByRole('row').filter({ hasText: /— Event admin/ })
     await expect(adminRow).toHaveCount(1)
 
     // Implicitly Confirmed — never shown as Invited, since no SMS invite is
@@ -211,11 +216,12 @@ test.describe('ACCT-01 admin account', () => {
 
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()
 
-    // The seeded admin has no officials row, so page.tsx renders the
-    // admin-only form: label 'Name' plus the description 'Editable'.
-    // (The shared official form would read 'Name (editable)' instead.)
-    await expect(page.getByLabel('Name', { exact: true })).toBeEditable()
-    await expect(page.getByText('Mobile number')).toBeVisible()
+    // The admin has a roster row since F-MNT-20 (ensure_admin_roster_row,
+    // migration 20260911130436), so page.tsx renders the same AccountForm as
+    // the official-facing screen rather than an admin-only variant — the
+    // admin-only form this test used to assert on no longer exists.
+    await expect(page.getByLabel('Name (editable)')).toBeEditable()
+    await expect(page.getByText('Mobile number (read-only)')).toBeVisible()
   })
 
   // Admin-only, and deliberately shown even at zero: an admin's sidebar has no

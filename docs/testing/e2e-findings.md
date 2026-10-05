@@ -390,27 +390,54 @@ passing against the dev database before I noticed.
 ---
 
 **[BUG] Two admin specs still assume the tenant admin has no officials row**
-Priority: Medium
+Priority: Medium — RESOLVED
 
-Found while fixing F9, left alone as out of scope. Both fail on `main`:
+Found while fixing F9, left alone as out of scope at the time. Both failed on
+`main`; both were confirmed stale tests, not broken screens, and are fixed:
 
 - `ACCT-01 admin account › shows an editable name and a read-only number` —
-  expects the admin-only form (label `Name`), but the admin now has an
-  officials row, so the shared official form renders (`Name (editable)`). The
-  test's own comment states the old assumption out loud.
+  expected the admin-only form (label `Name`). There is no admin-only form any
+  more: `admin/account/page.tsx` renders the same `AccountForm` as the
+  official-facing screen and `notFound()`s when the roster row is missing. Now
+  asserts `Name (editable)` / `Mobile number (read-only)`.
 - `OFF-01 officials roster › lists the admin on the roster as Event admin` —
-  the `— Event admin$` row never matches.
+  the `/— Event admin$/` filter never matched. `hasText` tests the row's whole
+  concatenated text, which runs on past the name into the number and status
+  cells (`…— Event admin+46 70 990 00 01Confirmed`), so an end anchor cannot
+  match a grid row at all. The assertion was never capable of passing in this
+  markup; dropping the anchor matches exactly one row.
 
-Both look like fallout from F-MNT-20 (#187), which gave tenant admins their
-roster row — the behaviour changed, the specs did not. Worth confirming the
-screens are right and the tests merely stale before changing either.
+Both were fallout from F-MNT-20 (#187), which gave tenant admins their roster
+row — the behaviour changed, the specs did not. The screens were correct
+throughout.
 
 ---
 
 **[TEST] Run integration + E2E suites in CI**
-Priority: Low (needs discussion)
+Priority: Low — E2E DONE, integration was already there
 
-Neither the integration suite nor E2E runs in `quality.yml` today — only lint,
-format, typecheck and unit tests. Both need a local Supabase stack in the
-runner, so this is a real piece of work, not a config tweak. Worth scoping
-before committing to it.
+Half of this was a stale premise: `test-integration` has been a job in
+`quality.yml` for some time, and it is what made the E2E job cheap to add —
+the hard parts (pinned Supabase CLI, `supabase start`, waiting for PostgREST
+to accept service-role queries) were already solved and proven there.
+
+The E2E job now runs on every PR. What it needs beyond the integration
+recipe:
+
+- `npx playwright install --with-deps chromium` — one browser, because
+  `playwright.config.ts` defines a single project.
+- `SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: dummy` on `supabase start`. The value
+  is irrelevant: `[auth.sms.test_otp]` intercepts the seed numbers before
+  Twilio is called, which is what makes real UI sign-in possible on a runner.
+- No seed step. `global-setup.ts` runs `npm run seed:dev:local` itself when
+  the tenant is missing, which it always is on a fresh runner; seeding twice
+  would make the seed script throw, by design.
+- No env pinning. With `CI` set, `reuseExistingServer` is false, so Playwright
+  always starts its own dev server with the local stack pinned — and there is
+  no `.env.local` on a runner for it to misread (F8).
+- The HTML report is uploaded on failure, carrying the trace and screenshot
+  for each one. Without it a CI-only failure can only be debugged by
+  reproducing it locally.
+
+Runtime is ~3 minutes locally from cold, including seeding and five real
+sign-ins; `timeout-minutes: 30` is a hang ceiling, not an expectation.
