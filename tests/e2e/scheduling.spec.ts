@@ -41,6 +41,19 @@ const STAGE_DAY_2 = 'Day 2'
 const FINISH_LINE = 'Finish line'
 const WATER_STATION = 'Water station'
 
+// The seed's stage dates are relative — SEED_DAYS in scripts/seed-dev.ts maps
+// offsets [0, 1, 2] onto today's *UTC* date and names the stages 'Day 1'..'Day
+// 3' in that order. So 'Day 2' is tomorrow, and it moves every midnight. Derive
+// it the same way the seed does rather than writing the date out: a literal is
+// correct for exactly one day, which is how this test came to fail the morning
+// after it was written.
+function seedDayDate(offset: number): string {
+  const day = new Date()
+  day.setUTCHours(0, 0, 0, 0)
+  day.setUTCDate(day.getUTCDate() + offset)
+  return day.toISOString().slice(0, 10)
+}
+
 // Autosave has no completion signal in the DOM — no Save button, no toast on
 // success. What it does do is router.refresh() once the server action returns,
 // so the cell stops being a Skeleton and renders its work-area name. Waiting on
@@ -229,7 +242,8 @@ test.describe('SCHED-01 stage and day in the URL', () => {
     // wrong stage on reload, because getCurrentStage() matches nothing once the
     // event's dates have passed.
     await expect(page).toHaveURL(/stage=[0-9a-f-]+&day=\d{4}-\d{2}-\d{2}/)
-    await expect(page).toHaveURL(/day=2026-10-06/)
+    // 'Day 2' is seed offset 1 — see seedDayDate above.
+    await expect(page).toHaveURL(new RegExp(`day=${seedDayDate(1)}`))
   })
 
   test('restores stage and day from a shared link, but not the view', async ({

@@ -62,16 +62,8 @@ const ALL_EXPIRED_INVITES: PendingOfficialInvite[] = [
   MULTIPLE_INVITES_WITH_EXPIRED[1],
 ]
 
-// The privacy prefix text sits next to a separate <a> link inside the same
-// button, so an exact-string getByText match would fail — this matches the
-// <span> wrapper by its own (non-exact) text instead. A real click on it
-// bubbles up to the button's onClick like a genuine user click would.
 function acceptPrivacy() {
-  const prefix = screen.getByText(
-    (content, element) =>
-      element?.tagName === 'SPAN' && content.startsWith('confirmation.privacyCheckPrefix')
-  )
-  fireEvent.click(prefix)
+  fireEvent.click(screen.getByRole('checkbox'))
 }
 
 beforeEach(() => {
@@ -167,6 +159,22 @@ describe('ConfirmInviteForm', () => {
     expect(screen.getByText('confirmInvite.expiredStateMessage')).toBeInTheDocument()
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
     expect(screen.queryByText('confirmInvite.confirmButton')).not.toBeInTheDocument()
+  })
+
+  // The consent control used to be a <button> wrapping the privacy link: that
+  // left it with no accessible name, and the link's stopPropagation swallowed
+  // clicks on the centre of the control. Both halves are pinned here.
+  it('names the consent checkbox and toggles it from the text but not the link', () => {
+    render(<ConfirmInviteForm invites={SINGLE_INVITE} />)
+
+    const consent = screen.getByRole('checkbox', { name: 'confirmation.privacyCheckPrefix' })
+    expect(consent).not.toBeChecked()
+
+    fireEvent.click(screen.getByText('confirmation.privacyCheckPrefix'))
+    expect(consent).toBeChecked()
+
+    fireEvent.click(screen.getByRole('link', { name: 'confirmation.privacyCheckLinkText' }))
+    expect(consent).toBeChecked()
   })
 
   it('shows an error toast when confirmInviteByPhone resolves with an error', async () => {
