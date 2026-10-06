@@ -22,3 +22,13 @@ export const AUTH_ERROR_KEYS: Record<string, string> = {
 export function authErrorKey(code: string | undefined): string {
   return AUTH_ERROR_KEYS[code ?? ''] ?? 'signIn.error'
 }
+
+// Whether a provider error code is one the user caused and the UI already
+// explains — a mistyped code, too many attempts, a number that is not
+// registered. These are the normal failure paths of a login form, not faults:
+// logging them at error level sends every wrong digit to Sentry (logger.error
+// reports there, REL-02) and buries real breakage in noise. Callers log these
+// at warn and keep error for codes this map does not know.
+export function isExpectedAuthError(code: string | undefined): boolean {
+  return code !== undefined && code in AUTH_ERROR_KEYS
+}

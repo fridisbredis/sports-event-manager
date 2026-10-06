@@ -4,6 +4,7 @@ import { POST } from './route'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkLoginVerifyRateLimit } from '@/lib/rate-limit'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
+import { logger } from '@/lib/logger'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
@@ -21,6 +22,10 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/audit/log-auth-event', () => ({
   logAuthEvent: vi.fn(),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
 function makeRequest(body: unknown) {
@@ -146,6 +151,41 @@ describe('POST /api/auth/verify-otp', () => {
       event: 'otp_verify_failed',
       errorCode: 'otp_expired',
     })
+  })
+
+  // logger.error reports to Sentry (REL-02), and a mistyped code is the most
+  // common thing that happens to this route — routing it to error would raise
+  // an issue for every wrong digit and bury real breakage among them.
+  it('logs an expected auth error at warn, not error', async () => {
+    vi.mocked(checkLoginVerifyRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    const verifyOtp = vi.fn().mockResolvedValue({
+      error: { message: 'Token has expired or is invalid', code: 'otp_expired', status: 400 },
+    })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ auth: { verifyOtp } } as never)
+
+    await POST(makeRequest({ phone: PHONE, token: TOKEN }))
+
+    expect(logger.warn).toHaveBeenCalledWith('verifyOtp failed', {
+      code: 'otp_expired',
+      message: 'Token has expired or is invalid',
+    })
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('still logs an unrecognised provider code at error', async () => {
+    vi.mocked(checkLoginVerifyRateLimit).mockResolvedValue({ allowed: true, retryAfterSeconds: 0 })
+    const verifyOtp = vi.fn().mockResolvedValue({
+      error: { message: 'provider exploded', code: 'unexpected_failure', status: 500 },
+    })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ auth: { verifyOtp } } as never)
+
+    await POST(makeRequest({ phone: PHONE, token: TOKEN }))
+
+    expect(logger.error).toHaveBeenCalledWith('verifyOtp failed', undefined, {
+      code: 'unexpected_failure',
+      message: 'provider exploded',
+    })
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 
   it('treats a null error with no user as a failure, not a success', async () => {

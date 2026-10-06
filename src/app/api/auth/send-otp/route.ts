@@ -4,6 +4,7 @@ import { checkLoginSendRateLimit, type RateLimitResult } from '@/lib/rate-limit'
 import { stripE164Plus } from '@/lib/phone'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
+import { isExpectedAuthError } from '@/lib/auth/auth-error-keys'
 import { z } from 'zod'
 
 // E.164, leading '+' optional. normalizePhoneToE164 strips the '+' so its output
@@ -57,7 +58,16 @@ export async function POST(request: NextRequest) {
     // CLAUDE.md: never expose raw errors to the client — error.code is a
     // stable GoTrue enum the login page already maps to a translated
     // message; error.message is developer-worded prose meant for logs.
-    logger.error('signInWithOtp failed', undefined, { code: error.code, message: error.message })
+    // Same split as verify-otp: a rate-limited or unregistered number is an
+    // expected outcome the UI explains, so it is a warn rather than a Sentry
+    // report. Unmapped codes stay at error. See the note there on why the two
+    // calls are written out rather than selected by condition.
+    const details = { code: error.code, message: error.message }
+    if (isExpectedAuthError(error.code)) {
+      logger.warn('signInWithOtp failed', details)
+    } else {
+      logger.error('signInWithOtp failed', undefined, details)
+    }
     await logAuthEvent({ phone, event: 'otp_send_failed', errorCode: error.code ?? null })
     return NextResponse.json(
       { error: 'Request failed', code: error.code },
