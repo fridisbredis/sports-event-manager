@@ -121,22 +121,56 @@ export const test = base.extend<RoleFixtures>({
 //
 // Rather than probe for hydration (Next exposes no public signal, and React
 // Aria's data-* attributes are internals), assert the click's own effect and
-// let Playwright retry the pair. Once the handler is attached the first
-// attempt succeeds, so this costs nothing on an already-hydrated page.
+// retry the pair. Once the handler is attached the first attempt succeeds, so
+// this costs nothing on an already-hydrated page.
 //
 // `expectVisible` is the outcome the click should produce — usually the dialog
-// or row it opens. It must be cheap and side-effect free: it runs on every
-// attempt, and a click that already worked will be repeated if it does not
-// become visible, so pass something the click itself causes.
+// it opens or the heading of the page it navigates to. It must be cheap and
+// side-effect free: it is polled on every attempt.
+//
+// Two things the retry has to respect, both learned from CI:
+//
+//   - A click that navigates removes the button. Re-clicking then fails with
+//     "element(s) not found" for the rest of the timeout, which is how the
+//     `+ Add work area` case failed on the first run of this helper. So only
+//     re-click while the target is still attached, and keep waiting on the
+//     outcome when it is gone — the click did land.
+//   - The outcome can be slow the first time. A route the dev server has not
+//     compiled takes seconds to render, so the per-attempt wait has to be
+//     generous enough not to give up on a click that worked.
 export async function clickWhenInteractive(
   target: Locator,
   expectVisible: Locator,
-  timeout = 15_000
+  timeout = 30_000
 ) {
-  await expect(async () => {
-    await target.click()
-    await expect(expectVisible).toBeVisible({ timeout: 1_000 })
-  }).toPass({ timeout })
+  const deadline = Date.now() + timeout
+
+  await target.click()
+
+  for (;;) {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) {
+      // One last full-length check so the failure message names the outcome
+      // that never appeared, rather than a bare timeout.
+      await expect(expectVisible).toBeVisible({ timeout: 1_000 })
+      return
+    }
+
+    const appeared = await expectVisible
+      .waitFor({ state: 'visible', timeout: Math.min(2_000, remaining) })
+      .then(() => true)
+      .catch(() => false)
+    if (appeared) return
+
+    // The click produced nothing yet. Re-click only if the button is still
+    // there: if it is gone the click did take effect and something slower —
+    // a navigation, a route still compiling — is in flight, so keep waiting.
+    if (await target.count()) {
+      await target
+        .click({ timeout: Math.min(5_000, Math.max(1, deadline - Date.now())) })
+        .catch(() => {})
+    }
+  }
 }
 
 export { expect }
