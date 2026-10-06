@@ -425,8 +425,24 @@
     },
     "githubActions": {
       "title": "GitHub Actions",
+      "dev": "Deploy to dev",
+      "prod": "Deploy to prod",
       "deployRuns": "Deploy runs",
-      "note": "Latest run for deploy-dev.yml / deploy-prod.yml."
+      "note": "Latest run per deploy workflow.",
+      "noteUnknown": "Couldn't fetch live data right now — check GitHub for current status.",
+      "never": "Never run",
+      "conclusion": {
+        "success": "success",
+        "failure": "failure",
+        "cancelled": "cancelled",
+        "timed_out": "timed out",
+        "action_required": "action required",
+        "neutral": "neutral",
+        "skipped": "skipped",
+        "startup_failure": "startup failure",
+        "stale": "stale",
+        "running": "running"
+      }
     }
   }
 }

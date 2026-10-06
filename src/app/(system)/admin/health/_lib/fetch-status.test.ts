@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fetchSupabaseStatus, fetchTwilioStatus, fetchSentryStatus } from './fetch-status'
+import {
+  fetchSupabaseStatus,
+  fetchTwilioStatus,
+  fetchSentryStatus,
+  fetchGitHubActionsStatus,
+} from './fetch-status'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -292,5 +297,125 @@ describe('fetchSentryStatus', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }))
 
     expect(await fetchSentryStatus()).toEqual({ status: 'ok', unresolvedCount: 0 })
+  })
+})
+
+describe('fetchGitHubActionsStatus', () => {
+  const ENV = process.env
+
+  function runResponse(run: Record<string, unknown> | null) {
+    return {
+      ok: true,
+      json: () => Promise.resolve({ workflow_runs: run ? [run] : [] }),
+    }
+  }
+
+  beforeEach(() => {
+    process.env = { ...ENV }
+    delete process.env.GITHUB_API_TOKEN
+  })
+
+  afterEach(() => {
+    process.env = ENV
+    vi.unstubAllGlobals()
+  })
+
+  it('reports ok and one row per deploy workflow when both succeeded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        runResponse({
+          conclusion: 'success',
+          html_url: 'https://github.com/run/1',
+          run_started_at: '2026-10-06T10:00:00Z',
+        })
+      )
+    )
+
+    const result = await fetchGitHubActionsStatus()
+
+    expect(result.status).toBe('ok')
+    expect(result.runs).toHaveLength(2)
+    expect(result.runs?.map((r) => r.workflow)).toEqual(['deploy-dev.yml', 'deploy-prod.yml'])
+  })
+
+  it('reports error when any deploy workflow failed', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(runResponse({ conclusion: 'success', html_url: 'u' }))
+      .mockResolvedValueOnce(runResponse({ conclusion: 'failure', html_url: 'u' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect((await fetchGitHubActionsStatus()).status).toBe('error')
+  })
+
+  it('does not treat a cancelled run as a broken deploy', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(runResponse({ conclusion: 'cancelled' })))
+
+    expect((await fetchGitHubActionsStatus()).status).toBe('ok')
+  })
+
+  it('reports an in-progress run as running, not as a failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(runResponse({ conclusion: null })))
+
+    const result = await fetchGitHubActionsStatus()
+
+    expect(result.status).toBe('ok')
+    expect(result.runs?.[0].conclusion).toBe('running')
+  })
+
+  it('still reports the workflow that answered when the other one fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(runResponse({ conclusion: 'success', html_url: 'u' }))
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchGitHubActionsStatus()
+
+    expect(result.status).toBe('ok')
+    expect(result.runs).toHaveLength(1)
+    expect(result.runs?.[0].workflow).toBe('deploy-dev.yml')
+  })
+
+  it('returns unknown when neither workflow answers (e.g. rate limited)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }))
+
+    expect(await fetchGitHubActionsStatus()).toEqual({ status: 'unknown' })
+  })
+
+  it('returns unknown when a workflow has never run', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(runResponse(null)))
+
+    expect(await fetchGitHubActionsStatus()).toEqual({ status: 'unknown' })
+  })
+
+  it('returns unknown when the request throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')))
+
+    expect(await fetchGitHubActionsStatus()).toEqual({ status: 'unknown' })
+  })
+
+  it('sends no Authorization header when no token is set (public repo)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(runResponse({ conclusion: 'success' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchGitHubActionsStatus()
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect((init as { headers: Record<string, string> }).headers.Authorization).toBeUndefined()
+  })
+
+  it('sends the token when one is set, so a private repo or rate limit is a config change', async () => {
+    process.env.GITHUB_API_TOKEN = 'ghp_test'
+    const fetchMock = vi.fn().mockResolvedValue(runResponse({ conclusion: 'success' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchGitHubActionsStatus()
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect((init as { headers: Record<string, string> }).headers.Authorization).toBe(
+      'Bearer ghp_test'
+    )
   })
 })
