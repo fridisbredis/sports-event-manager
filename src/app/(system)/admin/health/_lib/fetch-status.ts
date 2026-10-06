@@ -189,3 +189,121 @@ export async function fetchSentryStatus(): Promise<SentryStatus> {
     return { status: 'unknown' }
   }
 }
+
+export type WorkflowConclusion =
+  | 'success'
+  | 'failure'
+  | 'cancelled'
+  | 'timed_out'
+  | 'action_required'
+  | 'neutral'
+  | 'skipped'
+  | 'startup_failure'
+  | 'stale'
+  | 'running'
+
+export interface WorkflowRun {
+  /** The workflow file name, e.g. 'deploy-dev.yml' — the key the caller
+   *  asked for, echoed back so a caller fanning out over several files can
+   *  tell the results apart without relying on array order. */
+  workflow: string
+  conclusion: WorkflowConclusion
+  /** ISO-8601, as GitHub returns it. Formatted for display at the UI edge,
+   *  not here, so this stays serialisable across the server/client boundary. */
+  startedAt: string
+  /** Deep link to the run itself, so a failure is one click from its log. */
+  url: string
+}
+
+export interface GitHubActionsStatus {
+  status: 'ok' | 'error' | 'unknown'
+  runs?: WorkflowRun[]
+}
+
+// The repo is public, so this reads workflow runs unauthenticated: no new
+// secret, and no change to either deploy workflow. The cost is GitHub's
+// 60-requests-per-hour-per-IP unauthenticated limit, which the 60s
+// `revalidate` below keeps well clear of — the page is system-admin-only and
+// all visitors share one cached result per minute.
+//
+// If this ever starts reporting 'unknown' from rate limiting (or the repo
+// goes private), the fix is additive: set GITHUB_API_TOKEN as a runtime env
+// var the way SENTRY_API_TOKEN already is and send it as a Bearer header
+// here. Nothing else in this function changes, which is why the token is
+// read optionally rather than being required up front.
+const GITHUB_REPO = 'fridisbredis/sports-event-manager'
+const DEPLOY_WORKFLOWS = ['deploy-dev.yml', 'deploy-prod.yml'] as const
+
+// Which conclusions count as "the deploy is broken". Exported because the
+// card tints the same rows red that drive the badge here — keeping one set
+// means the badge and the row colour can never disagree. A cancelled or
+// skipped run is deliberately not a failure: those are usually a superseded
+// push, not something to wake up for.
+export const FAILED_CONCLUSIONS: ReadonlySet<WorkflowConclusion> = new Set([
+  'failure',
+  'timed_out',
+  'startup_failure',
+])
+
+export async function fetchGitHubActionsStatus(): Promise<GitHubActionsStatus> {
+  const token = process.env.GITHUB_API_TOKEN
+
+  try {
+    const runs = await Promise.all(
+      DEPLOY_WORKFLOWS.map(async (workflow): Promise<WorkflowRun | null> => {
+        const response = await fetch(
+          `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${workflow}/runs?per_page=1`,
+          {
+            headers: {
+              Accept: 'application/vnd.github+json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            next: { revalidate: 60 },
+            signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+          }
+        )
+
+        if (!response.ok) {
+          logger.warn('Health dashboard: GitHub workflow runs request failed', {
+            error: new Error(`status ${response.status} for ${workflow}`),
+          })
+          return null
+        }
+
+        const data = (await response.json()) as {
+          workflow_runs?: {
+            conclusion?: string | null
+            html_url?: string
+            run_started_at?: string
+          }[]
+        }
+        const run = data.workflow_runs?.[0]
+        if (!run) return null
+
+        return {
+          workflow,
+          // An in-progress run has conclusion: null until it finishes —
+          // reporting that as a failure would make every deploy look broken
+          // while it is still running, so it gets its own value instead.
+          conclusion: (run.conclusion ?? 'running') as WorkflowConclusion,
+          startedAt: run.run_started_at ?? '',
+          url: run.html_url ?? `https://github.com/${GITHUB_REPO}/actions/workflows/${workflow}`,
+        }
+      })
+    )
+
+    const found = runs.filter((run): run is WorkflowRun => run !== null)
+
+    // A partial result is still worth showing: if dev answered and prod
+    // didn't, the dev row is real information. Only a total blank is
+    // 'unknown', matching how the Twilio and Sentry probes degrade.
+    if (found.length === 0) return { status: 'unknown' }
+
+    const hasFailure = found.some((run) => FAILED_CONCLUSIONS.has(run.conclusion))
+
+    return { status: hasFailure ? 'error' : 'ok', runs: found }
+  } catch (error) {
+    logger.warn('Health dashboard: GitHub workflow runs request threw', { error })
+    return { status: 'unknown' }
+  }
+}

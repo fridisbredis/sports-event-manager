@@ -425,8 +425,24 @@
     },
     "githubActions": {
       "title": "GitHub Actions",
+      "dev": "Deploy till dev",
+      "prod": "Deploy till prod",
       "deployRuns": "Deploy-körningar",
-      "note": "Senaste körningen för deploy-dev.yml / deploy-prod.yml."
+      "note": "Senaste körningen per deploy-workflow.",
+      "noteUnknown": "Kunde inte hämta livedata just nu — kolla GitHub för aktuell status.",
+      "never": "Aldrig körd",
+      "conclusion": {
+        "success": "lyckades",
+        "failure": "misslyckades",
+        "cancelled": "avbruten",
+        "timed_out": "tidsgräns nådd",
+        "action_required": "åtgärd krävs",
+        "neutral": "neutral",
+        "skipped": "överhoppad",
+        "startup_failure": "startfel",
+        "stale": "inaktuell",
+        "running": "pågår"
+      }
     }
   }
 }
