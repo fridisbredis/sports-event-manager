@@ -126,11 +126,21 @@ export function TimeInput(props: TimeInputProps) {
   )
 }
 
+// `label` names the visible field, but HeroUI renders the two date inputs
+// inside a role="group" that React Aria labels separately — and it takes no
+// name from the surrounding label, so the group is announced unnamed and
+// useLabel warns once per segment (six per open modal, in the stage modal's
+// case). Default aria-label to the same string unless a caller gives its own,
+// which names the group without changing anything visible.
 export function DateRangePicker(props: DateRangePickerProps) {
+  const groupLabel =
+    props['aria-label'] ?? (typeof props.label === 'string' ? props.label : undefined)
+
   return (
     <HeroDateRangePicker
       variant="faded"
       {...props}
+      aria-label={groupLabel}
       classNames={{
         ...props.classNames,
         label: `${FIELD_LABEL} ${props.classNames?.label ?? ''}`,
