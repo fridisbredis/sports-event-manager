@@ -15,11 +15,24 @@ interface StatusCardLink {
   href: string
 }
 
+interface StatusCardFact {
+  label: string
+  value: string
+  /** Turns the value into a link to the thing it describes — e.g. a failed
+   *  workflow run, so the log is one click away rather than a hunt through
+   *  the Actions tab. Plain text when omitted. */
+  href?: string
+  /** Tints the value red when the fact itself is the bad news, so a failed
+   *  row is findable without reading every value. Cards whose facts are
+   *  neutral readings (a project ref, an SMS count) leave this off. */
+  tone?: 'default' | 'error'
+}
+
 interface StatusCardProps {
   title: string
   status?: Status
   statusLabels?: Record<Status, string>
-  facts?: { label: string; value: string }[]
+  facts?: StatusCardFact[]
   links: StatusCardLink[]
   note?: string
 }
@@ -40,12 +53,30 @@ export function StatusCard({ title, status, statusLabels, facts, links, note }: 
 
       {facts && facts.length > 0 && (
         <dl className="mt-4 space-y-2">
-          {facts.map((fact) => (
-            <div key={fact.label} className="flex items-baseline justify-between gap-4 text-sm">
-              <dt className="text-ink-label">{fact.label}</dt>
-              <dd className="break-all text-right font-mono font-medium text-ink">{fact.value}</dd>
-            </div>
-          ))}
+          {facts.map((fact) => {
+            const valueClass = `break-all text-right font-mono font-medium ${
+              fact.tone === 'error' ? 'text-destructive' : 'text-ink'
+            }`
+            return (
+              <div key={fact.label} className="flex items-baseline justify-between gap-4 text-sm">
+                <dt className="text-ink-label">{fact.label}</dt>
+                <dd className={valueClass}>
+                  {fact.href ? (
+                    <a
+                      href={fact.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-edge-field underline-offset-4 transition-colors hover:decoration-current"
+                    >
+                      {fact.value}
+                    </a>
+                  ) : (
+                    fact.value
+                  )}
+                </dd>
+              </div>
+            )
+          })}
         </dl>
       )}
 

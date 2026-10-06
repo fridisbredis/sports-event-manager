@@ -5,7 +5,14 @@ import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { StatusCard } from './_components/status-card'
-import { fetchSupabaseStatus, fetchTwilioStatus, fetchSentryStatus } from './_lib/fetch-status'
+import {
+  fetchSupabaseStatus,
+  fetchTwilioStatus,
+  fetchSentryStatus,
+  fetchGitHubActionsStatus,
+  FAILED_CONCLUSIONS,
+} from './_lib/fetch-status'
+import { relativeTime } from './_lib/relative-time'
 import {
   currentSupabaseProjectRef,
   AZURE_DEV_RESOURCE_GROUP,
@@ -17,17 +24,19 @@ export default async function SystemHealthPage() {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
 
-  const t = await getServerTranslation(await getUserLanguage(), 'admin')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'admin')
   const statusLabels = {
     ok: t('health.status.ok'),
     error: t('health.status.error'),
     unknown: t('health.status.unknown'),
   }
 
-  const [supabase, twilio, sentry] = await Promise.all([
+  const [supabase, twilio, sentry, githubActions] = await Promise.all([
     fetchSupabaseStatus(),
     fetchTwilioStatus(),
     fetchSentryStatus(),
+    fetchGitHubActionsStatus(),
   ])
   const supabaseProjectRef = currentSupabaseProjectRef()
   const isLocalSupabase = supabaseProjectRef === 'local (Docker)'
@@ -172,13 +181,35 @@ export default async function SystemHealthPage() {
 
         <StatusCard
           title={t('health.githubActions.title')}
+          status={githubActions.status}
+          statusLabels={statusLabels}
+          facts={githubActions.runs?.map((run) => {
+            const when = relativeTime(run.startedAt, language)
+            const conclusion = t(`health.githubActions.conclusion.${run.conclusion}`)
+            return {
+              label: t(
+                run.workflow === 'deploy-prod.yml'
+                  ? 'health.githubActions.prod'
+                  : 'health.githubActions.dev'
+              ),
+              value: when ? `${conclusion} · ${when}` : conclusion,
+              href: run.url,
+              tone: FAILED_CONCLUSIONS.has(run.conclusion)
+                ? ('error' as const)
+                : ('default' as const),
+            }
+          })}
+          note={
+            githubActions.status === 'unknown'
+              ? t('health.githubActions.noteUnknown')
+              : t('health.githubActions.note')
+          }
           links={[
             {
               label: t('health.githubActions.deployRuns'),
               href: 'https://github.com/fridisbredis/sports-event-manager/actions',
             },
           ]}
-          note={t('health.githubActions.note')}
         />
       </div>
     </div>
