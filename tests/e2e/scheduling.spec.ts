@@ -37,11 +37,19 @@ const SCHEDULING = `/${SEED_TENANT_SLUG}/admin/scheduling`
 // granularity, each with 'Finish line' (ceiling 4) and 'Water station'
 // (ceiling 2). Day 1 is the default stage and where the seeded assignments are;
 // Day 2 is what the URL tests switch to.
-const STAGE_DAY_2 = 'Day 2'
-
 const STAGE_DAY_1 = 'Day 1'
+const STAGE_DAY_2 = 'Day 2'
 const FINISH_LINE = 'Finish line'
 const WATER_STATION = 'Water station'
+
+// The seed's stage dates are relative — SEED_DAYS in scripts/seed-dev.ts maps
+// offsets [0, 1, 2] onto the *UTC* date of the run and names the stages
+// 'Day 1'..'Day 3' in that order. So the dates move, and no literal written
+// here stays true: that is how this spec came to fail the morning after it was
+// written. Deriving them from today's date is not enough either — the seed only
+// reseeds when the tenant is absent (F7), so a stack seeded last week still
+// serves last week's dates. The specs below therefore read what the screen
+// pins and assert the relationship between the days, never the days themselves.
 
 // Autosave has no completion signal in the DOM — no Save button, no toast on
 // success. What it does do is router.refresh() once the server action returns,

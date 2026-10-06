@@ -73,6 +73,18 @@ test.describe('WS-02 work area configuration', () => {
   test('adds and removes an operating window row', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/workstations/new`)
 
+    // Wait for the form to be interactive before driving it. The page is a
+    // server component wrapping a 'use client' form, and both buttons below
+    // are HeroUI's, whose onPress is attached by React Aria at hydration —
+    // the markup renders and passes Playwright's actionability checks well
+    // before that, so an early click lands on a live-looking dead button and
+    // silently does nothing. Asserting on a heading is not enough: that is in
+    // the SSR payload too. Typing into the name field is, because its value
+    // only sticks once React owns the input.
+    const name = page.getByLabel('Name')
+    await name.fill('Hydration probe')
+    await expect(name).toHaveValue('Hydration probe')
+
     // Each window row has one "Start" TimeInput, which HeroUI renders as a
     // group of hour/minute spinbuttons rather than a single labelled field —
     // so count the groups, not inputs.

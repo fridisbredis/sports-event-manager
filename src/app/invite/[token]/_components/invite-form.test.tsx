@@ -40,7 +40,7 @@ const RESEND_COOLDOWN_SECONDS = 30
 function fillAndSubmit() {
   render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
   fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
-  fireEvent.click(screen.getByText('confirmation.privacyCheckPrefix'))
+  fireEvent.click(screen.getByRole('checkbox'))
   fireEvent.click(screen.getByText('confirmation.confirmButton'))
 }
 
@@ -94,9 +94,11 @@ describe('InviteForm provider error mapping', () => {
       signInWithOtp.mockResolvedValueOnce({ error: null })
       fillAndSubmit()
 
-      // Reaching the OTP step is what exposes the resend button.
+      // Reaching the OTP step is what exposes the resend button. Queried by
+      // label rather than placeholder: the label used to be uncoupled from the
+      // input, leaving the placeholder as the field's only name.
       await act(async () => {})
-      expect(screen.getByPlaceholderText('000000')).toBeInTheDocument()
+      expect(screen.getByLabelText('signIn.codeLabel')).toBeInTheDocument()
 
       // One second at a time, letting React commit in between: the cooldown
       // effect lists resendCooldown as a dependency, so every tick tears the

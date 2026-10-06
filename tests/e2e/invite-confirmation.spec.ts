@@ -52,34 +52,31 @@ function storedPhone(phone: string): string {
   return phone.replace(/^\+/, '')
 }
 
-// The privacy consent control is a <button> wrapping the label text and a
-// nested <a href="/privacy">. Two consequences, both covered by the A11Y note
-// at the bottom of this file:
+// The privacy consent control is a native checkbox whose accessible name comes
+// from the <label> around the prefix text; the policy link sits outside that
+// label, so it neither steals the name nor swallows the click. Addressable by
+// role+name like the rest of the suite.
 //
-//   1. The nested link leaves the button with no accessible name, so it cannot
-//      be addressed by role+name like the rest of the suite — hence hasText.
-//   2. The link sits across the button's centre point and calls
-//      stopPropagation, so Playwright's default centre click is swallowed and
-//      the box never toggles. Click the left edge, where the checkbox is and
-//      where a real user aiming at the checkbox would click.
+// The input itself is sr-only (1px, clipped) — the visible box and text are its
+// two labels — so check() clicks a 1px target. Click the text label instead,
+// which is what a real user hits and what keeps this robust if the visually
+// hidden input ever moves.
 function privacyConsent(page: Page) {
-  return page.locator('button', { hasText: 'I accept the' })
+  return page.getByRole('checkbox', { name: 'I accept the' })
 }
 
 async function acceptPrivacy(page: Page) {
-  await privacyConsent(page).click({ position: { x: 14, y: 20 } })
+  await page.getByText('I accept the', { exact: true }).click()
+  await expect(privacyConsent(page)).toBeChecked()
 }
 
 // Drives the OTP step of the *invite* form. It is not the /login form —
 // different labels, no country select, and the number is fixed by the token —
 // so signInThroughUi cannot be reused here.
 async function completeInviteOtp(page: Page) {
-  // By placeholder, not by label: the invite form's "6-digit code" <label> has
-  // no htmlFor and the <input> no id, so they are not associated and
-  // getByLabel finds nothing. (The /login form does associate them, which is
-  // why fixtures/auth.ts can use getByLabel there.) Third item in the A11Y
-  // note at the bottom of this file.
-  const codeField = page.getByPlaceholder('000000')
+  // By label, like fixtures/auth.ts does on /login: the invite form's
+  // "6-digit code" <label> now carries htmlFor and the <input> a matching id.
+  const codeField = page.getByLabel('6-digit code')
   await expect(codeField).toBeVisible()
   await codeField.fill(OTP_CODE)
   await page.getByRole('button', { name: 'Verify' }).click()
@@ -321,31 +318,18 @@ test.describe('AUTH-02 multi-tenant and expiry states on /confirm-invite', () =>
   })
 })
 
-// A11Y, found while writing this spec — the privacy-consent control on both
-// /invite/[token] and /confirm-invite nests <a href="/privacy"> inside the
-// <button>, and that one structural choice breaks it two ways:
+// A11Y — the defects this spec originally documented are all fixed, by
+// the same change that made these selectors ordinary again:
 //
-//   - No accessible name. A button containing a link derives no name from its
-//     own text, so a screen reader announces an unnamed button for the single
-//     control gating SEC-09 consent.
-//   - Unclickable at its centre. The link spans the middle of the button and
-//     calls stopPropagation, so a click there is swallowed. Only the edges
-//     toggle consent. A sighted mouse user aiming at the words "privacy
-//     policy" — a reasonable thing to do — hits the link; aiming at the
-//     checkbox works. On a 390px-wide phone the link covers much of the row.
+//   - The privacy-consent control was a <button> with <a href="/privacy">
+//     nested inside it, which left it with no accessible name and swallowed
+//     centre clicks (the link called stopPropagation across the middle of the
+//     row). It is now a native checkbox, with the policy link outside the
+//     label. Addressable by getByRole('checkbox', { name: ... }).
+//   - The invite form's "6-digit code" <label> carried no htmlFor and its
+//     <input> no id, so the field's only accessible name was its placeholder.
+//     They are associated now, so getByLabel works here as it does on /login.
 //
-// The tests above work around both (hasText, and a left-edge click position),
-// which is why they do not use plain getByRole + click like the rest of the
-// suite.
-//
-// Separately, on the invite form's OTP step the "6-digit code" <label> carries
-// no htmlFor and the <input> no id, so they are never associated: the field's
-// only accessible name is its "000000" placeholder, and a screen reader user
-// hears the placeholder rather than the label. /login's own OTP field does
-// associate the two — this is a divergence in the invite form, not a
-// house style.
-//
-// Worth a Trello card covering all three: move the policy link out of the
-// consent button, give that button an aria-label, and wire up htmlFor/id on
-// the OTP field. That would let these selectors become ordinary getByRole /
-// getByLabel calls.
+// Both landed in "a11y(invite): make the privacy consent control a real
+// checkbox". If a selector here starts failing again, check whether that
+// markup regressed before working around it.
