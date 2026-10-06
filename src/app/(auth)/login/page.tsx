@@ -12,7 +12,7 @@ import { SignInButton } from './_components/sign-in-button'
 import { LinkAction } from './_components/link-action'
 import { toastError, parseRetryAfterMinutes } from '@/lib/toast'
 import { logger } from '@/lib/logger'
-import { authErrorKey } from '@/lib/auth/auth-error-keys'
+import { authErrorKey, isExpectedAuthError } from '@/lib/auth/auth-error-keys'
 import {
   normalizePhoneToE164,
   isValidPhoneForCountry,
@@ -105,10 +105,17 @@ export default function LoginPage() {
     if (error) {
       // Keep the provider's own text for debugging, but never show it to the
       // user — it is untranslated and worded for developers.
-      logger.error('[auth] sign-in request failed', undefined, {
-        code: error.code,
-        message: error.message,
-      })
+      //
+      // warn, not error, when the code is one authErrorKey already has a
+      // message for (below): those are the form's normal failure paths, and
+      // logger.error reports to Sentry (REL-02). Mirrors the same split in
+      // api/auth/{send,verify}-otp.
+      const details = { code: error.code, message: error.message }
+      if (isExpectedAuthError(error.code)) {
+        logger.warn('[auth] sign-in request failed', details)
+      } else {
+        logger.error('[auth] sign-in request failed', undefined, details)
+      }
       if (error.retryAfterMinutes !== undefined) {
         toastError(
           t('signIn.tooManyRequests', {
@@ -139,10 +146,12 @@ export default function LoginPage() {
     const { error } = await postJson('/api/auth/send-otp', { phone: normalizedPhone })
     setResending(false)
     if (error) {
-      logger.error('[auth] resend OTP failed', undefined, {
-        code: error.code,
-        message: error.message,
-      })
+      const details = { code: error.code, message: error.message }
+      if (isExpectedAuthError(error.code)) {
+        logger.warn('[auth] resend OTP failed', details)
+      } else {
+        logger.error('[auth] resend OTP failed', undefined, details)
+      }
       if (error.retryAfterMinutes !== undefined) {
         toastError(
           t('signIn.tooManyRequests', {
