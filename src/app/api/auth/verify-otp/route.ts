@@ -4,6 +4,7 @@ import { checkLoginVerifyRateLimit, type RateLimitResult } from '@/lib/rate-limi
 import { stripE164Plus } from '@/lib/phone'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { logger } from '@/lib/logger'
+import { isExpectedAuthError } from '@/lib/auth/auth-error-keys'
 import { z } from 'zod'
 import { locales } from '@/lib/i18n/config'
 import { logQueryError } from '@/lib/db/query-error'
@@ -62,7 +63,18 @@ export async function POST(request: NextRequest) {
     // CLAUDE.md: never expose raw errors to the client — error.code is a
     // stable GoTrue enum the login page already maps to a translated
     // message; error.message is developer-worded prose meant for logs.
-    logger.error('verifyOtp failed', undefined, { code: error.code, message: error.message })
+    // A mistyped or expired code is the form working, not breaking, so it is
+    // logged at warn: logger.error reports to Sentry (REL-02), and every wrong
+    // digit landing there buries real failures. Unmapped codes stay at error.
+    // Spelled out rather than picking the method by condition — warn takes
+    // (message, context) and error takes (message, error, context), so a
+    // shared call would quietly pass the context as the error.
+    const details = { code: error.code, message: error.message }
+    if (isExpectedAuthError(error.code)) {
+      logger.warn('verifyOtp failed', details)
+    } else {
+      logger.error('verifyOtp failed', undefined, details)
+    }
     await logAuthEvent({ phone, event: 'otp_verify_failed', errorCode: error.code ?? null })
     return NextResponse.json(
       { error: 'Request failed', code: error.code },

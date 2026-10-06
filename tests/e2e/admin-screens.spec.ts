@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/auth'
+import { test, expect, clickWhenInteractive } from './fixtures/auth'
 import { SEED_TENANT_SLUG } from './fixtures/users'
 
 // WS-01/WS-02 work areas, OFF-01 officials, COMM-01 communication and the
@@ -52,10 +52,12 @@ test.describe('WS-01 work areas list', () => {
 test.describe('WS-02 work area configuration', () => {
   test('new work area form requires a name', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/workstations`)
-    await page.getByRole('button', { name: '+ Add work area' }).first().click()
+    await clickWhenInteractive(
+      page.getByRole('button', { name: '+ Add work area' }).first(),
+      page.getByRole('heading', { name: 'Add work area' })
+    )
 
     await expect(page).toHaveURL(new RegExp('/workstations/new'))
-    await expect(page.getByRole('heading', { name: 'Add work area' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByText('Name is required.')).toBeVisible()
@@ -73,25 +75,18 @@ test.describe('WS-02 work area configuration', () => {
   test('adds and removes an operating window row', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/workstations/new`)
 
-    // Wait for the form to be interactive before driving it. The page is a
-    // server component wrapping a 'use client' form, and both buttons below
-    // are HeroUI's, whose onPress is attached by React Aria at hydration —
-    // the markup renders and passes Playwright's actionability checks well
-    // before that, so an early click lands on a live-looking dead button and
-    // silently does nothing. Asserting on a heading is not enough: that is in
-    // the SSR payload too. Typing into the name field is, because its value
-    // only sticks once React owns the input.
-    const name = page.getByLabel('Name')
-    await name.fill('Hydration probe')
-    await expect(name).toHaveValue('Hydration probe')
-
     // Each window row has one "Start" TimeInput, which HeroUI renders as a
     // group of hour/minute spinbuttons rather than a single labelled field —
     // so count the groups, not inputs.
     const starts = page.getByRole('group', { name: 'Start' })
     const before = await starts.count()
 
-    await page.getByRole('button', { name: '+ Add window' }).click()
+    // clickWhenInteractive, not click: the button is HeroUI's and does nothing
+    // until React Aria attaches onPress at hydration. See fixtures/auth.ts.
+    await clickWhenInteractive(
+      page.getByRole('button', { name: '+ Add window' }),
+      starts.nth(before)
+    )
     await expect(starts).toHaveCount(before + 1)
 
     // "Remove" also labels the to-do rows further down the form, so take the
@@ -144,9 +139,10 @@ test.describe('OFF-01 officials roster', () => {
 
   test('add-official modal validates name and number', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/officials`)
-    await page.getByRole('button', { name: 'Add official' }).first().click()
 
     const modal = page.getByRole('dialog')
+    await clickWhenInteractive(page.getByRole('button', { name: 'Add official' }).first(), modal)
+
     await expect(modal.getByText('Add official')).toBeVisible()
 
     // Send is gated on both fields; an invalid number keeps it disabled.
@@ -169,9 +165,9 @@ test.describe('OFF-01 officials roster', () => {
   test('removing an official asks for confirmation first', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/officials`)
 
-    await page.getByRole('button', { name: 'Remove' }).first().click()
-
     const dialog = page.getByRole('dialog')
+    await clickWhenInteractive(page.getByRole('button', { name: 'Remove' }).first(), dialog)
+
     await expect(dialog.getByText(/also frees any work-area assignments/)).toBeVisible()
 
     // Cancel, not confirm: the removal is destructive and the roster is shared

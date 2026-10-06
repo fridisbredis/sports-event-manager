@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/auth'
+import { test, expect, clickWhenInteractive } from './fixtures/auth'
 import { SEED_TENANT_SLUG } from './fixtures/users'
 
 // EVT-01 Event dashboard and EVT-02 Event configuration.
@@ -126,9 +126,10 @@ test.describe('EVT-02 event configuration', () => {
     tenantAdminPage: page,
   }) => {
     await page.goto(EVENT_CONFIG)
-    await page.getByRole('button', { name: '+ Add stage' }).click()
 
     const modal = page.getByRole('dialog')
+    await clickWhenInteractive(page.getByRole('button', { name: '+ Add stage' }), modal)
+
     // HeroUI's ModalHeader renders a plain div, so there is no heading role to
     // match here — the title is just text inside the dialog.
     await expect(modal.getByText('Add stage')).toBeVisible()
@@ -149,9 +150,10 @@ test.describe('EVT-02 event configuration', () => {
 
   test('stage modal requires a name', async ({ tenantAdminPage: page }) => {
     await page.goto(EVENT_CONFIG)
-    await page.getByRole('button', { name: '+ Add stage' }).click()
 
     const modal = page.getByRole('dialog')
+    await clickWhenInteractive(page.getByRole('button', { name: '+ Add stage' }), modal)
+
     await modal.getByRole('button', { name: 'Save stage' }).click()
     await expect(modal.getByText('Name is required.')).toBeVisible()
 

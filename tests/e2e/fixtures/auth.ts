@@ -1,4 +1,4 @@
-import { test as base, expect, type Page, type Browser } from '@playwright/test'
+import { test as base, expect, type Locator, type Page, type Browser } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { USERS, OTP_CODE, type RoleKey } from './users'
@@ -108,5 +108,69 @@ export const test = base.extend<RoleFixtures>({
   officialSingleDayPage: roleFixture('officialSingleDay'),
   officialNoShiftsPage: roleFixture('officialNoShifts'),
 })
+
+// Clicks a control that only works once React has hydrated, retrying until the
+// click actually takes effect.
+//
+// The admin screens are server components wrapping 'use client' forms, and
+// their buttons are HeroUI's, whose onPress comes from React Aria. Before
+// hydration the markup is in the DOM and passes every actionability check
+// Playwright makes — visible, enabled, stable — so a click lands on a
+// live-looking dead button and silently does nothing. Waiting on a heading
+// does not help: headings are in the SSR payload too.
+//
+// Rather than probe for hydration (Next exposes no public signal, and React
+// Aria's data-* attributes are internals), assert the click's own effect and
+// retry the pair. Once the handler is attached the first attempt succeeds, so
+// this costs nothing on an already-hydrated page.
+//
+// `expectVisible` is the outcome the click should produce — usually the dialog
+// it opens or the heading of the page it navigates to. It must be cheap and
+// side-effect free: it is polled on every attempt.
+//
+// Two things the retry has to respect, both learned from CI:
+//
+//   - A click that navigates removes the button. Re-clicking then fails with
+//     "element(s) not found" for the rest of the timeout, which is how the
+//     `+ Add work area` case failed on the first run of this helper. So only
+//     re-click while the target is still attached, and keep waiting on the
+//     outcome when it is gone — the click did land.
+//   - The outcome can be slow the first time. A route the dev server has not
+//     compiled takes seconds to render, so the per-attempt wait has to be
+//     generous enough not to give up on a click that worked.
+export async function clickWhenInteractive(
+  target: Locator,
+  expectVisible: Locator,
+  timeout = 30_000
+) {
+  const deadline = Date.now() + timeout
+
+  await target.click()
+
+  for (;;) {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) {
+      // One last full-length check so the failure message names the outcome
+      // that never appeared, rather than a bare timeout.
+      await expect(expectVisible).toBeVisible({ timeout: 1_000 })
+      return
+    }
+
+    const appeared = await expectVisible
+      .waitFor({ state: 'visible', timeout: Math.min(2_000, remaining) })
+      .then(() => true)
+      .catch(() => false)
+    if (appeared) return
+
+    // The click produced nothing yet. Re-click only if the button is still
+    // there: if it is gone the click did take effect and something slower —
+    // a navigation, a route still compiling — is in flight, so keep waiting.
+    if (await target.count()) {
+      await target
+        .click({ timeout: Math.min(5_000, Math.max(1, deadline - Date.now())) })
+        .catch(() => {})
+    }
+  }
+}
 
 export { expect }

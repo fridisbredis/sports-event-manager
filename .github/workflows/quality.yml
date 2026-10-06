@@ -184,6 +184,23 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # No .next cache step here, deliberately. The suite runs against `next
+      # dev`, which compiles each route on first request, and that cost is real:
+      # two thirds of a local run sits in the 17 tests that sign in, and the
+      # three slowest take ~32s where two later ones running the same helper
+      # take 1.1s, because by then the route is built.
+      #
+      # Caching Turbopack's dev tree does not recover it. Measured on this job:
+      # 652s and 886s on cache misses against 716s on a hit — no better than the
+      # spread between runners, while storing ~430 MB per entry against a 10 GB
+      # repo ceiling that would start evicting the npm and Playwright caches.
+      # (A first attempt cached .next/cache, which only `next build` writes, and
+      # silently saved nothing; .next/dev/cache is the right path and still did
+      # not help.)
+      #
+      # If this is worth another look, the lead is the compile itself — not
+      # where its artifacts are stored.
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:

@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import InviteForm from './invite-form'
@@ -121,5 +122,13 @@ describe('InviteForm provider error mapping', () => {
 
     expect(toastError).toHaveBeenCalledWith('signIn.invalidCode')
     expect(toastError).not.toHaveBeenCalledWith('Token has expired')
+
+    // warn, not error: logger.error reports to Sentry (REL-02), and a code the
+    // UI already has a message for is a normal outcome, not a fault.
+    expect(logger.warn).toHaveBeenCalledWith('[auth] invite OTP resend failed', {
+      code: 'otp_expired',
+      message: 'Token has expired',
+    })
+    expect(logger.error).not.toHaveBeenCalled()
   })
 })

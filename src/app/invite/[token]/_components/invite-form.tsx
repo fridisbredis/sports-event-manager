@@ -8,7 +8,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { defaultLocale, type Locale } from '@/lib/i18n/config'
 import { toastError } from '@/lib/toast'
 import { logger } from '@/lib/logger'
-import { authErrorKey } from '@/lib/auth/auth-error-keys'
+import { authErrorKey, isExpectedAuthError } from '@/lib/auth/auth-error-keys'
 
 const RESEND_COOLDOWN_SECONDS = 30
 
@@ -66,10 +66,12 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
       // user — it is untranslated and worded for developers. Same handling as
       // the sign-in page, which calls the same signInWithOtp and so can return
       // exactly the same codes.
-      logger.error('[auth] invite OTP request failed', undefined, {
-        code: error.code,
-        message: error.message,
-      })
+      const details = { code: error.code, message: error.message }
+      if (isExpectedAuthError(error.code)) {
+        logger.warn('[auth] invite OTP request failed', details)
+      } else {
+        logger.error('[auth] invite OTP request failed', undefined, details)
+      }
       toastError(t(authErrorKey(error.code)))
     } else {
       setResendCooldown(RESEND_COOLDOWN_SECONDS)
@@ -83,10 +85,12 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
     const { error } = await supabase.auth.signInWithOtp({ phone: initialPhone })
     setResending(false)
     if (error) {
-      logger.error('[auth] invite OTP resend failed', undefined, {
-        code: error.code,
-        message: error.message,
-      })
+      const details = { code: error.code, message: error.message }
+      if (isExpectedAuthError(error.code)) {
+        logger.warn('[auth] invite OTP resend failed', details)
+      } else {
+        logger.error('[auth] invite OTP resend failed', undefined, details)
+      }
       toastError(t(authErrorKey(error.code)))
       return
     }
