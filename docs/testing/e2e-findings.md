@@ -27,29 +27,34 @@ Nothing exercised a browser. That leaves two classes of defect uncovered:
 
 ## Status of the suite
 
-127 tests, all green. Counts below are from `--list` on 2026-10-05; the table
-drifted from the suite between write-ups, so three of them are corrections
-rather than additions.
+136 tests, all green. Counts below are from `--list` on 2026-10-06.
 
-| Spec                       | Screens                                     | Tests       |
-| -------------------------- | ------------------------------------------- | ----------- |
-| `auth.spec.ts`             | AUTH-01                                     | 8           |
-| `access-control.spec.ts`   | permission matrix, every screen             | 54          |
-| `admin-event.spec.ts`      | EVT-01, EVT-02                              | 15          |
-| `admin-screens.spec.ts`    | WS-01, WS-02, OFF-01, COMM-01, ACCT-01      | 14          |
-| `official-screens.spec.ts` | HOME-01, INFO-01, MYSCH-01, ANN-01, ACCT-01 | 16          |
-| `scheduling.spec.ts`       | SCHED-01                                    | 13          |
-| `system-admin.spec.ts`     | SYS-01, SYS-02                              | 7           |
-| —                          | AUTH-02 (invite confirmation)               | not started |
+| Spec                          | Screens                                     | Tests |
+| ----------------------------- | ------------------------------------------- | ----- |
+| `auth.spec.ts`                | AUTH-01                                     | 8     |
+| `access-control.spec.ts`      | permission matrix, every screen             | 54    |
+| `admin-event.spec.ts`         | EVT-01, EVT-02                              | 15    |
+| `admin-screens.spec.ts`       | WS-01, WS-02, OFF-01, COMM-01, ACCT-01      | 14    |
+| `official-screens.spec.ts`    | HOME-01, INFO-01, MYSCH-01, ANN-01, ACCT-01 | 16    |
+| `scheduling.spec.ts`          | SCHED-01                                    | 13    |
+| `system-admin.spec.ts`        | SYS-01, SYS-02                              | 7     |
+| `invite-confirmation.spec.ts` | AUTH-02                                     | 9     |
 
 A full run takes about 6 minutes on one worker.
 
+This table has drifted from the suite more than once — it is written by hand
+after a run and nothing enforces it. Treat `--list` as the authority and this
+as a summary, and re-check it before quoting a number.
+
 Not covered, and worth knowing:
 
-- **AUTH-02**, invite confirmation. Two implementations exist —
-  `/invite/[token]` and `/confirm-invite` — and which one is live needs
-  resolving first.
 - **Participant screens**, deferred in v1 and not built.
+
+AUTH-02 is covered as of #241. The note that used to sit here — two rival
+implementations, with the live one needing to be resolved first — was wrong:
+`/invite/[token]` and `/confirm-invite` are both live and serve different
+entry points (the SMS link, and the invitee who never opens it and just signs
+in with their number). `invite-confirmation.spec.ts` covers both.
 
 ---
 
@@ -391,6 +396,35 @@ when the stage is _changed_, never on first load. A test that needs a stage id
 has to change stage to get one; reading it from the initial URL yields an empty
 string.
 
+### F14 — A date literal in a spec passed until the day it didn't
+
+**Severity: low (test infrastructure). Fixed 2026-10-06.**
+
+`scheduling.spec.ts` asserted `toHaveURL(/day=2026-10-06/)` for the day pinned
+when the stage changes to Day 2. The seed builds its stages relative to the day
+it runs (`SEED_DAYS`), so that literal was true only on a stack seeded the day
+the assertion was written. It failed on the next run against a stack seeded a
+day later, reporting a mismatch between two dates that both looked plausible.
+
+The fix asserts the relationship rather than the value: read the day for Day 1,
+read it again for Day 2, and check the second is one day after the first. That
+is what the screen actually promises, and it holds whenever the stack was
+seeded.
+
+Two things worth carrying forward:
+
+- The seed script says this already. The comment above `SEED_DAYS` reads "a
+  hardcoded date stops exercising it the moment that date passes" — the fixture
+  had been made relative precisely so tests would not need literals, and a spec
+  then wrote one anyway. A convention documented at the fixture does not
+  propagate to the specs on its own.
+- **Selecting two stages in a row hits F13 one step further on.** `selectStage()`
+  waits for the URL to _match a shape_, and after the first selection the URL
+  already matches it — so the helper returns immediately on the second call and
+  a read straight after gets the previous stage's day. Waiting on a shape is
+  only a sufficient signal the first time. The second selection now waits for
+  the day to change.
+
 ---
 
 ## Suggested Trello cards
@@ -412,7 +446,13 @@ Includes three layers of guard against running at dev or prod.
 Priority: — (done, PR `test/e2e-remaining-screens`)
 
 EVT-01/02, WS-01/02, OFF-01, COMM-01, ACCT-01, HOME-01, INFO-01, MYSCH-01,
-ANN-01, SYS-01/02. Brings the suite to 113 tests, green.
+ANN-01, SYS-01/02. Brought the suite to 113 tests at the time it landed; see
+the status table above for the current count.
+
+Re-audited 2026-10-06, because the card kept being picked up as if it were
+open. Every screen it names does have coverage and the specs are all present.
+One test in `scheduling.spec.ts` was failing — not a gap in this card's scope
+but a date literal that had aged out (see F14) — now fixed, suite green at 136.
 
 ---
 
