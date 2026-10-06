@@ -190,15 +190,26 @@ jobs:
       # enough to be visible: the server went quiet for 68s mid-suite on the
       # run that exposed the WS-02 hydration race.
       #
-      # Restoring .next/cache carries Turbopack's compilation artifacts between
-      # runs. The key is the lockfile plus a hash of everything that can change
-      # what is compiled, so a source edit misses and recompiles rather than
-      # serving a stale module; restore-keys let an edited branch still start
-      # from the nearest previous cache instead of from nothing.
-      - name: Restore Next.js build cache
+      # Restoring Turbopack's dev cache carries those artifacts between runs.
+      # The path is .next/dev/cache, not .next/cache: `next dev` writes its own
+      # tree under .next/dev and never creates .next/cache, which only `next
+      # build` produces. Caching the wrong one silently saves nothing — the
+      # first attempt here did exactly that, and the job log said so ("Path
+      # Validation Error: Path(s) ... do(es) not exist").
+      #
+      # The key is the lockfile plus a hash of everything that can change what
+      # is compiled, so a source edit misses and recompiles rather than serving
+      # a stale module; restore-keys let an edited branch still start from the
+      # nearest previous cache instead of from nothing.
+      #
+      # This tree is large (~430 MB locally, compressed well below that by the
+      # action). GitHub evicts least-recently-used entries at a 10 GB repo
+      # ceiling, so a handful of these can crowd out other caches — worth
+      # watching if npm or Playwright caches start missing.
+      - name: Restore Next.js dev cache
         uses: actions/cache@v4
         with:
-          path: .next/cache
+          path: .next/dev/cache
           key: next-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.[jt]s', 'src/**/*.[jt]sx', 'next.config.*', 'tsconfig.json', 'tailwind.config.*', 'postcss.config.*') }}
           restore-keys: |
             next-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
