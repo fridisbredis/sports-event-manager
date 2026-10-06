@@ -38,6 +38,8 @@ const SCHEDULING = `/${SEED_TENANT_SLUG}/admin/scheduling`
 // (ceiling 2). Day 1 is the default stage and where the seeded assignments are;
 // Day 2 is what the URL tests switch to.
 const STAGE_DAY_2 = 'Day 2'
+
+const STAGE_DAY_1 = 'Day 1'
 const FINISH_LINE = 'Finish line'
 const WATER_STATION = 'Water station'
 
@@ -223,13 +225,33 @@ test.describe('SCHED-01 stage and day in the URL', () => {
     await expect(page.getByRole('button', { name: 'Previous day' })).toBeDisabled()
     await expect(page.getByRole('button', { name: 'Next day' })).toBeDisabled()
 
-    await selectStage(page, STAGE_DAY_2)
+    // Read the day each stage pins rather than asserting a date. The seed
+    // builds its stages relative to the day it ran and only reseeds when the
+    // tenant is absent (F7), so the actual dates depend on when this stack was
+    // seeded — a literal here passes until midnight UTC and then fails for a
+    // reason that has nothing to do with the screen. What the screen promises
+    // is the relationship: Day N pins stage N's own date, and the seeded stages
+    // are consecutive.
+    await selectStage(page, STAGE_DAY_1)
+    const dayOne = new URL(page.url()).searchParams.get('day') ?? ''
+    expect(dayOne).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 
-    // changeDay() always pushes both params: a day-only URL reverts to the
-    // wrong stage on reload, because getCurrentStage() matches nothing once the
-    // event's dates have passed.
-    await expect(page).toHaveURL(/stage=[0-9a-f-]+&day=\d{4}-\d{2}-\d{2}/)
-    await expect(page).toHaveURL(/day=2026-10-06/)
+    // Wait for the day to *change*, not merely for the URL to look right.
+    // selectStage()'s shape check is already satisfied by the push above, so it
+    // would return before this second push lands and leave the read below on
+    // Day 1's date (F13, one step further on).
+    await page.getByRole('button', { name: /^Day \d$/ }).click()
+    await page.getByRole('menuitemradio', { name: STAGE_DAY_2 }).click()
+    await expect(page.getByRole('button', { name: STAGE_DAY_2 })).toBeVisible()
+    await expect(page).toHaveURL(
+      new RegExp(`stage=[0-9a-f-]{36}&day=(?!${dayOne})\\d{4}-\\d{2}-\\d{2}`)
+    )
+
+    const dayTwo = new URL(page.url()).searchParams.get('day') ?? ''
+
+    const oneDayLater = new Date(`${dayOne}T00:00:00Z`)
+    oneDayLater.setUTCDate(oneDayLater.getUTCDate() + 1)
+    expect(dayTwo).toBe(oneDayLater.toISOString().slice(0, 10))
   })
 
   test('restores stage and day from a shared link, but not the view', async ({
