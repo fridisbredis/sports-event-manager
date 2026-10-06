@@ -184,36 +184,22 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      # The suite runs against `next dev`, which compiles each route the first
-      # time it is requested rather than ahead of time. On a cold runner that
-      # cost is paid again for every route the tests visit, and it is slow
-      # enough to be visible: the server went quiet for 68s mid-suite on the
-      # run that exposed the WS-02 hydration race.
+      # No .next cache step here, deliberately. The suite runs against `next
+      # dev`, which compiles each route on first request, and that cost is real:
+      # two thirds of a local run sits in the 17 tests that sign in, and the
+      # three slowest take ~32s where two later ones running the same helper
+      # take 1.1s, because by then the route is built.
       #
-      # Restoring Turbopack's dev cache carries those artifacts between runs.
-      # The path is .next/dev/cache, not .next/cache: `next dev` writes its own
-      # tree under .next/dev and never creates .next/cache, which only `next
-      # build` produces. Caching the wrong one silently saves nothing — the
-      # first attempt here did exactly that, and the job log said so ("Path
-      # Validation Error: Path(s) ... do(es) not exist").
+      # Caching Turbopack's dev tree does not recover it. Measured on this job:
+      # 652s and 886s on cache misses against 716s on a hit — no better than the
+      # spread between runners, while storing ~430 MB per entry against a 10 GB
+      # repo ceiling that would start evicting the npm and Playwright caches.
+      # (A first attempt cached .next/cache, which only `next build` writes, and
+      # silently saved nothing; .next/dev/cache is the right path and still did
+      # not help.)
       #
-      # The key is the lockfile plus a hash of everything that can change what
-      # is compiled, so a source edit misses and recompiles rather than serving
-      # a stale module; restore-keys let an edited branch still start from the
-      # nearest previous cache instead of from nothing.
-      #
-      # This tree is large (~430 MB locally, compressed well below that by the
-      # action). GitHub evicts least-recently-used entries at a 10 GB repo
-      # ceiling, so a handful of these can crowd out other caches — worth
-      # watching if npm or Playwright caches start missing.
-      - name: Restore Next.js dev cache
-        uses: actions/cache@v4
-        with:
-          path: .next/dev/cache
-          key: next-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.[jt]s', 'src/**/*.[jt]sx', 'next.config.*', 'tsconfig.json', 'tailwind.config.*', 'postcss.config.*') }}
-          restore-keys: |
-            next-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-            next-e2e-${{ runner.os }}-
+      # If this is worth another look, the lead is the compile itself — not
+      # where its artifacts are stored.
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
