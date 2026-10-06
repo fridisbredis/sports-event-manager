@@ -35,7 +35,7 @@ jobs:
 
       - name: Preview pending DB migrations (prod)
         run: |
-          supabase link --project-ref rauvaxuypujbeintnnoe
+          bash scripts/supabase-link-retry.sh rauvaxuypujbeintnnoe
           supabase db push --dry-run
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
