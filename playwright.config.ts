@@ -41,11 +41,22 @@ export default defineConfig({
     timezoneId: 'Europe/Stockholm',
   },
 
-  // Every worker competes for the same seeded users and the same GoTrue
-  // rate limits (sms_sent = 30/h, token_verifications = 30/5min). Signing in
-  // is amortized by storageState reuse in tests/e2e/fixtures/auth.ts, but
-  // parallel workers still mutate one shared tenant's data, so writes would
-  // race. Serial by default; CI keeps a single worker for reproducibility.
+  // Serial, measured rather than assumed. Four workers were tried: the suite
+  // got slower and less reliable, not faster -- 5.1-7.3 min with a failing
+  // sign-in against 4.0-4.5 min clean here.
+  //
+  // The reason is that sign-in is the long pole and it does not parallelise.
+  // GoTrue's ceilings are per IP (sign_in_sign_ups, token_verifications in
+  // supabase/config.toml) and every worker shares one, so the whole run draws
+  // on a single budget; serially the ~15 sign-ins spread across the run, in
+  // parallel they land in one window. Raising those limits 5x locally did not
+  // fix it either, so there is more to it than the ceiling -- the remaining
+  // failure was a sign-in that reached the OTP step and never got past it.
+  //
+  // Worth another look only with that failure understood first. Two things
+  // that came out of the attempt are kept because they are correct either way:
+  // the toggle tenant below and the storageState freshness check in
+  // tests/e2e/fixtures/auth.ts.
   workers: 1,
   fullyParallel: false,
 

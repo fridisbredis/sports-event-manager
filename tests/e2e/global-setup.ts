@@ -1,7 +1,13 @@
 import { spawnSync } from 'node:child_process'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../src/types/database'
-import { NON_LOGIN_FIXTURES, SEED_TENANT_SLUG, SYSTEM_ADMIN_PHONE, USERS } from './fixtures/users'
+import {
+  NON_LOGIN_FIXTURES,
+  SEED_TENANT_SLUG,
+  SYSTEM_ADMIN_PHONE,
+  TOGGLE_TENANT_SLUG,
+  USERS,
+} from './fixtures/users'
 
 // Reads the local stack's credentials the same way scripts/seed-dev-local.mjs
 // does. Playwright's globalSetup runs before any test file, in its own process,
@@ -245,6 +251,38 @@ async function clearLeakedAssignments(admin: SupabaseClient<Database>) {
   if (error) throw error
 }
 
+// SYS-02's deactivation test needs a tenant it can switch off without
+// consequences. Created here rather than in the seed script: it carries no
+// event, work areas or officials, exists only for that one toggle, and the
+// seed is for data that looks like a real tenant's.
+//
+// Reset to active on every run, not just created — a run killed between the
+// toggle and its restore would otherwise leave it off, and the test asserts
+// the transition from active.
+async function ensureToggleTenant(admin: SupabaseClient<Database>) {
+  const { data: existing, error: readError } = await admin
+    .from('tenants')
+    .select('id, is_active')
+    .eq('slug', TOGGLE_TENANT_SLUG)
+    .maybeSingle()
+  if (readError) throw readError
+
+  if (existing) {
+    if (existing.is_active) return
+    const { error } = await admin.from('tenants').update({ is_active: true }).eq('id', existing.id)
+    if (error) throw error
+    return
+  }
+
+  const { error } = await admin.from('tenants').insert({
+    name: 'E2E Toggle Klubben',
+    slug: TOGGLE_TENANT_SLUG,
+    is_active: true,
+    tier: 'standard',
+  })
+  if (error) throw error
+}
+
 export default async function globalSetup() {
   const { apiUrl, serviceRoleKey } = readLocalStackCredentials()
 
@@ -262,6 +300,8 @@ export default async function globalSetup() {
 
   // After ensureSystemAdmin, so the system admin's own row is pinned too.
   await pinTestUserLanguage(admin)
+
+  await ensureToggleTenant(admin)
 
   // After ensureSeedData, so there is a tenant to clean within.
   await clearLeakedAssignments(admin)

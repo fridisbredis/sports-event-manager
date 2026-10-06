@@ -63,9 +63,27 @@ export async function signInThroughUi(page: Page, phone: string) {
 // Signs in once per role per run and caches the cookies on disk. GoTrue's local
 // rate limits (sms_sent 30/h, token_verifications 30/5min) are low enough that
 // one sign-in per test would exhaust them partway through a full-suite run.
+// A cached session is only as good as the access token inside it. GoTrue issues
+// those with a one-hour life, but writes them into a cookie whose own expiry is
+// years out — so Playwright keeps sending a token the server stopped accepting,
+// the proxy treats the request as signed out and redirects to /login, and being
+// "logged in" it bounces back, which surfaces as ERR_TOO_MANY_REDIRECTS rather
+// than as an auth failure. Re-signing in on age is what keeps a cache left over
+// from an earlier day from failing the next run in a way that looks like a
+// routing bug.
+const STATE_MAX_AGE_MS = 30 * 60 * 1000
+
+function isFresh(statePath: string): boolean {
+  try {
+    return Date.now() - fs.statSync(statePath).mtimeMs < STATE_MAX_AGE_MS
+  } catch {
+    return false
+  }
+}
+
 async function storageStateFor(role: RoleKey, browser: Browser) {
   const statePath = path.join(STATE_DIR, `${role}.json`)
-  if (fs.existsSync(statePath)) return statePath
+  if (isFresh(statePath)) return statePath
 
   fs.mkdirSync(STATE_DIR, { recursive: true })
   const context = await browser.newContext()
