@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { test, expect } from './fixtures/auth'
+import { test, expect, clickWhenInteractive } from './fixtures/auth'
 import { SEED_TENANT_SLUG } from './fixtures/users'
 
 // SYS-01 tenant management and SYS-02 tenant detail.
@@ -27,9 +27,10 @@ test.describe('SYS-01 tenant management', () => {
     systemAdminPage: page,
   }) => {
     await page.goto('/admin')
-    await page.getByRole('button', { name: 'Create tenant' }).first().click()
 
     const modal = page.getByRole('dialog')
+    await clickWhenInteractive(page.getByRole('button', { name: 'Create tenant' }).first(), modal)
+
     const create = modal.getByRole('button', { name: 'Create' })
     await expect(create).toBeDisabled()
 

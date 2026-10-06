@@ -1,4 +1,4 @@
-import { test as base, expect, type Page, type Browser } from '@playwright/test'
+import { test as base, expect, type Locator, type Page, type Browser } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { USERS, OTP_CODE, type RoleKey } from './users'
@@ -108,5 +108,35 @@ export const test = base.extend<RoleFixtures>({
   officialSingleDayPage: roleFixture('officialSingleDay'),
   officialNoShiftsPage: roleFixture('officialNoShifts'),
 })
+
+// Clicks a control that only works once React has hydrated, retrying until the
+// click actually takes effect.
+//
+// The admin screens are server components wrapping 'use client' forms, and
+// their buttons are HeroUI's, whose onPress comes from React Aria. Before
+// hydration the markup is in the DOM and passes every actionability check
+// Playwright makes — visible, enabled, stable — so a click lands on a
+// live-looking dead button and silently does nothing. Waiting on a heading
+// does not help: headings are in the SSR payload too.
+//
+// Rather than probe for hydration (Next exposes no public signal, and React
+// Aria's data-* attributes are internals), assert the click's own effect and
+// let Playwright retry the pair. Once the handler is attached the first
+// attempt succeeds, so this costs nothing on an already-hydrated page.
+//
+// `expectVisible` is the outcome the click should produce — usually the dialog
+// or row it opens. It must be cheap and side-effect free: it runs on every
+// attempt, and a click that already worked will be repeated if it does not
+// become visible, so pass something the click itself causes.
+export async function clickWhenInteractive(
+  target: Locator,
+  expectVisible: Locator,
+  timeout = 15_000
+) {
+  await expect(async () => {
+    await target.click()
+    await expect(expectVisible).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout })
+}
 
 export { expect }
