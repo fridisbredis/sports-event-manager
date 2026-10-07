@@ -30,7 +30,14 @@ const STATE_DIR = path.resolve(__dirname, '../.auth')
 async function clearLoginBudget(phone: string) {
   const url = process.env.E2E_SUPABASE_URL
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return
+  // Loud, not a silent skip: without this the number keeps its accumulated
+  // sends and the run fails later as "Too many attempts", several tests away
+  // from the cause. globalSetup sets both.
+  if (!url || !key) {
+    throw new Error(
+      'E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY are unset — globalSetup did not run.'
+    )
+  }
 
   const admin = createClient<Database>(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -82,9 +89,20 @@ export async function signInThroughUi(page: Page, phone: string) {
     await page.waitForTimeout(2_000)
   }
 
-  await codeField.fill(OTP_CODE)
+  // fill, then assert the value stuck. The OTP field is a controlled HeroUI
+  // input and Verify is gated on `otp.length === 6`, so a fill that lands
+  // before React has hydrated writes to the DOM, never reaches state, and
+  // leaves Verify disabled for the rest of the test — which surfaces as a
+  // 60s timeout on a button that is visibly right there. Same hydration race
+  // the admin screens hit, seen on an input instead of a button.
+  const verify = page.getByRole('button', { name: 'Verify' })
+  await expect(async () => {
+    await codeField.fill(OTP_CODE)
+    await expect(codeField).toHaveValue(OTP_CODE, { timeout: 1_000 })
+    await expect(verify).toBeEnabled({ timeout: 1_000 })
+  }).toPass({ timeout: 15_000 })
 
-  await page.getByRole('button', { name: 'Verify' }).click()
+  await verify.click()
 
   // verifyOtp() does router.push('/') and '/' resolves the role-based redirect,
   // so landing anywhere other than /login means the session took hold.

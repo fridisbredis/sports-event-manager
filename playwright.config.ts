@@ -41,29 +41,30 @@ export default defineConfig({
     timezoneId: 'Europe/Stockholm',
   },
 
-  // One worker per spec file, tests within a file still serial.
+  // Serial. Four workers were tried properly and do not hold, for two separate
+  // reasons -- recorded here because the attempt looked like it was working
+  // several times before each one surfaced.
   //
-  // Two things had to be fixed before this was safe, both in this PR. SYS-02's
-  // deactivation test switched the *seed* tenant off, which locks out every
-  // admin in the suite while it is off; it now owns a throwaway tenant. And
-  // signInThroughUi now clears the number's own send budget first: the app
-  // allows 5 per phone per hour, the busiest numbers sign in twice per run, and
-  // the retry loop spends another send per attempt — so a throttled sign-in
-  // burned the rest of the budget trying to recover, which is what failed every
-  // earlier attempt at this.
+  // Rate limits. The app allows 5 sends per phone per hour and GoTrue adds its
+  // own per-IP ceilings (sign_in_sign_ups, token_verifications); every worker
+  // shares that IP, so the budget belongs to the run. Clearing a number's own
+  // counters before signing in as it (fixtures/auth.ts) was enough locally and
+  // not on CI, where the runner compresses the same ~15 sign-ins into a
+  // narrower window and GoTrue's ceiling binds instead.
   //
-  // The specs that write to the shared seed tenant each restore what they
-  // changed (F7) and touch different parts of it — a work area's windows, the
-  // event name, one slot in the grid — so they do not collide across files.
+  // Fixture corruption, which is the harder one. The specs that write to the
+  // seed tenant restore what they changed, but a restore racing another
+  // worker's read does not put everything back: after two parallel runs the
+  // seed's four assignments for +46709900002 were down to three, and the
+  // damage is silent until some later run fails in a spec that did nothing
+  // wrong. Run counts fell 136 -> 134 -> 129 across three consecutive runs.
   //
-  // fullyParallel stays false. Within a file the tests share one tenant's rows
-  // and several read what a sibling just restored, so running them against each
-  // other is a different problem from running files side by side.
-  //
-  // Four, measured: 4.0-4.5 min serial against 2.8-3.1 min over four clean runs
-  // at four. Eight was tried earlier and was worse on both counts; four also
-  // matches the runner's cores. Raise it only with a measurement behind it.
-  workers: 4,
+  // Making this work needs per-worker fixture isolation -- a tenant per worker,
+  // not one shared mutable tenant -- which is a larger change than a config
+  // flag. Four separate bug fixes came out of the attempt and are kept: the
+  // toggle tenant, the storageState freshness check, the OTP hydration guard
+  // and the dashboard tile wait.
+  workers: 1,
   fullyParallel: false,
 
   forbidOnly: !!process.env.CI,
