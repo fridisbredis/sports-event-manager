@@ -251,6 +251,7 @@
     "legendFilled": "Filled (colour per work area)",
     "legendAssignable": "Assignable",
     "legendOutsideWindow": "Outside operating window — disabled",
+    "legendTimeOff": "Declared time off — can still be assigned",
     "legendCapacity": "Assigned / capacity",
     "legendOverCapacity": "Over capacity",
     "colOfficial": "Official",
@@ -271,6 +272,11 @@
     "slotModalAssigned": "Assigned",
     "slotModalAvailable": "Available at {{time}}",
     "slotModalAdd": "Add",
+    "slotModalStatus": {
+      "available": "Available",
+      "timeOff": "Declared time off",
+      "assigned": "Already assigned"
+    },
     "slotModalRemove": "Remove",
     "slotModalEmpty": "All officials are already assigned at this time.",
     "dragPaintPickPerson_one": "Assign to {{count}} slot",
@@ -285,7 +291,10 @@
     "noWorkAreasTitle": "No work areas for this stage",
     "noWorkAreasHint": "Add work areas in Work areas before assigning officials here.",
     "noConfirmedOfficialsTitle": "No confirmed officials yet",
-    "noConfirmedOfficialsHint": "Officials must accept their invite before they can be scheduled."
+    "noConfirmedOfficialsHint": "Officials must accept their invite before they can be scheduled.",
+    "unavailableAssigned_one": "{{count}} assignment falls in declared time off.",
+    "unavailableAssigned_other": "{{count}} assignments fall in declared time off.",
+    "unavailableCell": "This official declared time off — you can still assign them"
   },
   "communication": {
     "title": "Communication",

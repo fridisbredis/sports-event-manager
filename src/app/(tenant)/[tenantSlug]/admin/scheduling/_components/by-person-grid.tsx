@@ -12,7 +12,7 @@ import {
   workAreaBorderColor,
   workAreaColorMap,
 } from '@/lib/theme/work-area-colors'
-import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
+import { STRIPED_TIME_OFF_STYLE, STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
 interface ByPersonGridProps {
@@ -22,6 +22,8 @@ interface ByPersonGridProps {
   stageWorkstations: WorkstationData[]
   activeAssignments: LocalAssignment[]
   doubleBookedOfficials: Set<string>
+  /** `officialId:slotStartISO` keys covered by a self-reported absence. */
+  unavailableSlots: Set<string>
   pickerCell: {
     officialId: string
     slotStart: string
@@ -39,6 +41,7 @@ export function ByPersonGrid({
   stageWorkstations,
   activeAssignments,
   doubleBookedOfficials,
+  unavailableSlots,
   pickerCell,
   onCellClick,
   pendingCells,
@@ -152,15 +155,21 @@ export function ByPersonGrid({
                     ? stageWorkstations.find((w) => w.id === assignment.workstation_id)
                     : undefined
                   const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
+                  const isUnavailable = unavailableSlots.has(`${official.id}:${slotStart}`)
                   const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
 
                   // Double-booking is a warning and keeps its orange styling —
                   // the work-area palette is decorative and must not mask it.
                   const color = ws ? (wsColors.get(ws.id) ?? WORK_AREA_COLORS[0]) : undefined
+                  // Double-booking outranks an absence: it is a hard
+                  // conflict, this is an advisory one, and two warning styles
+                  // on one cell read as neither.
                   const cellStyle = assignment
                     ? isDoubleBooked
                       ? 'bg-orange-50 border border-orange-200'
-                      : 'border'
+                      : isUnavailable
+                        ? 'border ring-2 ring-orange-300 ring-offset-1'
+                        : 'border'
                     : ''
                   const cellColors =
                     assignment && !isDoubleBooked && color
@@ -196,11 +205,17 @@ export function ByPersonGrid({
                           </span>
                         </button>
                       ) : activeSlotSet.has(slotStart) ? (
+                        // Still a button when the official declared time off:
+                        // the stripes say "they would rather not", not "you
+                        // cannot". Blocking the click here would be the hard
+                        // block this feature deliberately is not.
                         <button
                           onClick={(e) =>
                             onCellClick(official.id, slot, undefined, e.currentTarget)
                           }
+                          title={isUnavailable ? t('scheduling.unavailableCell') : undefined}
                           className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
+                          style={isUnavailable ? STRIPED_TIME_OFF_STYLE : undefined}
                         />
                       ) : (
                         <div className="w-full h-10 rounded-md" style={STRIPED_UNAVAILABLE_STYLE} />

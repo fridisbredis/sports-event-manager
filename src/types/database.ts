@@ -525,6 +525,54 @@ export type Database = {
           },
         ]
       }
+      official_unavailability: {
+        Row: {
+          created_at: string
+          ends_at: string
+          id: string
+          official_id: string
+          reason: string | null
+          starts_at: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          id?: string
+          official_id: string
+          reason?: string | null
+          starts_at: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          id?: string
+          official_id?: string
+          reason?: string | null
+          starts_at?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'official_unavailability_official_id_fkey'
+            columns: ['official_id']
+            isOneToOne: false
+            referencedRelation: 'officials'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'official_unavailability_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       officials: {
         Row: {
           avatar_url: string | null

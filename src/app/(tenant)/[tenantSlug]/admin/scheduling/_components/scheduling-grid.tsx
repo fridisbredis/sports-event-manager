@@ -13,6 +13,7 @@ import {
   computeDoubleBookedOfficials,
   computeDoubleBookedDetails,
   uniqueIdsFromCellKeys,
+  formatSlotLabel,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
 import { getAssignmentsForCell } from './grid-helpers'
@@ -22,6 +23,11 @@ import { SchedulingLegend } from './scheduling-legend'
 import { SchedulingPrintStyles, SchedulingPrintHeader } from './scheduling-print-chrome'
 import { SchedulingToolbar } from './scheduling-toolbar'
 import { ConflictBanners } from './conflict-banners'
+import {
+  buildUnavailableSlotKeys,
+  findUnavailableAssignments,
+  type UnavailabilityPeriod,
+} from '@/lib/scheduling/unavailability'
 import { SchedulingViewToggle } from './scheduling-view-toggle'
 import { ByPersonGrid } from './by-person-grid'
 import { ByWorkAreaGrid } from './by-work-area-grid'
@@ -50,6 +56,8 @@ interface Props {
   workstations: WorkstationData[]
   officials: OfficialData[]
   initialAssignments: AssignmentData[]
+  /** Self-reported absences overlapping the day on screen. Advisory only. */
+  unavailability: UnavailabilityPeriod[]
   initialSelectedDay: string
   initialSelectedStageId: string
 }
@@ -64,6 +72,7 @@ export function SchedulingGrid({
   workstations,
   officials,
   initialAssignments,
+  unavailability,
   initialSelectedDay,
   initialSelectedStageId,
 }: Props) {
@@ -175,6 +184,35 @@ export function SchedulingGrid({
     () => computeDoubleBookedOfficials(assignments),
     [assignments]
   )
+
+  // Cells covered by a declared absence, as `officialId:slotStartISO` keys —
+  // the same shape as doubleBookedOfficials, so the grid's per-cell lookup
+  // stays one `.has()` rather than a scan over periods.
+  const unavailableSlots = useMemo(
+    () => buildUnavailableSlotKeys(unavailability, slots, granularityMin),
+    [unavailability, slots, granularityMin]
+  )
+
+  // Assignments an admin has made over someone's declared absence. This WARNS
+  // and never blocks: the capacity rule this follows treats an over-ceiling
+  // assignment the same way, and on event day an admin must be able to call
+  // someone in regardless of a declaration made weeks earlier.
+  const unavailableConflicts = useMemo(
+    () => findUnavailableAssignments(activeAssignments, unavailability),
+    [activeAssignments, unavailability]
+  )
+
+  const unavailableDetails = useMemo(() => {
+    const nameById = new Map(officials.map((o) => [o.id, o.name]))
+    return unavailableConflicts.map((a) => ({
+      officialName: nameById.get(a.official_id) ?? '—',
+      time: formatSlotLabel(new Date(a.timeslot_start)),
+      reason:
+        unavailability.find(
+          (p) => p.official_id === a.official_id && p.reason !== null && p.reason.length > 0
+        )?.reason ?? null,
+    }))
+  }, [unavailableConflicts, officials, unavailability])
 
   const overCapacityCount = useMemo(
     () => uniqueIdsFromCellKeys(overCapacityCells),
@@ -414,6 +452,7 @@ export function SchedulingGrid({
         overCapacityDetails={overCapacityDetails}
         doubleBookedCount={doubleBookedCount}
         doubleBookedDetails={doubleBookedDetails}
+        unavailableDetails={unavailableDetails}
       />
 
       <SchedulingViewToggle view={view} onChange={setView} />
@@ -435,6 +474,7 @@ export function SchedulingGrid({
           stageWorkstations={stageWorkstations}
           activeAssignments={activeAssignments}
           doubleBookedOfficials={doubleBookedOfficials}
+          unavailableSlots={unavailableSlots}
           pickerCell={pickerCell}
           onCellClick={handleCellClick}
           pendingCells={pendingCells}
@@ -486,6 +526,7 @@ export function SchedulingGrid({
           onSearchChange={setWsSlotModalSearch}
           activeAssignments={activeAssignments}
           officials={officials}
+          unavailableSlots={unavailableSlots}
           onRemove={handleWsSlotRemove}
           onAdd={handleWsSlotAdd}
           onClose={closeWsSlotModal}

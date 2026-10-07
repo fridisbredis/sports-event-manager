@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import { ScheduleView, type AssignmentRow } from './schedule-view'
 import { I18nProvider } from '@/components/i18n-provider'
 
 const STRINGS = {
   title: 'My schedule',
-  readOnly: 'Read-only',
+  scheduleOwner: 'Set by organisers',
   byTime: 'Time',
   byWorkstation: 'Work area',
   noAssignments: 'No assignments',
@@ -15,6 +15,9 @@ const STRINGS = {
   dayTabsLabel: 'Days',
   todoLabel: 'To do',
   infoLabel: 'Good to know',
+  manageAvailability: 'Manage time off',
+  timeOffOnDay: 'Declared time off',
+  timeOffAllDay: 'All day',
 }
 
 function slot(id: string, start: string, end: string, ws: AssignmentRow['workstations']) {
@@ -80,6 +83,8 @@ const CHECKLIST_PROPS = {
   checks: new Map(),
   currentUserId: null,
   checklistStrings: CHECKLIST_STRINGS,
+  // No declared time off by default; the cases that care pass their own.
+  timeOff: [],
 }
 
 function renderView(view: 'time' | 'work-area', assignments: AssignmentRow[]) {
@@ -434,8 +439,11 @@ describe('ScheduleView day label', () => {
   it('renders the single day as a static label, not a link that goes nowhere', () => {
     renderDays('work-area', ['2026-08-12'], '2026-08-12')
 
-    expect(screen.queryByRole('link')).toBeNull()
+    // Scoped to the day nav rather than the whole screen: the header also
+    // carries a standing link to the time-off screen, which is not a day tab
+    // and must not make this assertion fail.
     expect(screen.queryByRole('navigation', { name: STRINGS.dayTabsLabel })).toBeNull()
+    expect(screen.queryByRole('link', { name: /augusti|aug/ })).toBeNull()
   })
 
   it('shows the date once, not twice, on the time view for a single day', () => {
@@ -447,8 +455,12 @@ describe('ScheduleView day label', () => {
   it('still renders clickable day tabs when there is more than one day', () => {
     renderDays('work-area', ['2026-08-12', '2026-08-13'], '2026-08-12')
 
-    expect(screen.getByRole('navigation', { name: STRINGS.dayTabsLabel })).toBeTruthy()
-    expect(screen.getAllByRole('link')).toHaveLength(2)
+    const dayNav = screen.getByRole('navigation', { name: STRINGS.dayTabsLabel })
+    expect(dayNav).toBeTruthy()
+    // Counted within the day nav, not across the screen — the header's
+    // time-off link is a link too, and counting it here would make this test
+    // break on an unrelated addition rather than on a day-tab regression.
+    expect(within(dayNav).getAllByRole('link')).toHaveLength(2)
   })
 
   it('leaves the date to the tabs on the time view across several days', () => {
@@ -507,5 +519,121 @@ describe('ScheduleView checklist grouping', () => {
 
     expect(screen.queryByText('To do')).not.toBeInTheDocument()
     expect(screen.getByText('Good to know')).toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView declared time off', () => {
+  beforeEach(() => localStorage.clear())
+
+  const DAY = '2026-08-12'
+
+  function renderWithTimeOff(
+    timeOff: { id: string; starts_at: string; ends_at: string; reason: string | null }[],
+    assignments: AssignmentRow[] = [],
+    days: string[] = [DAY]
+  ) {
+    localStorage.setItem('official-schedule-view', 'time')
+    return render(
+      <ScheduleView
+        assignments={assignments}
+        days={days}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        timeOff={timeOff.map((p) => ({ ...p, official_id: 'off-1' }))}
+      />
+    )
+  }
+
+  it('shows the strip on a day with no shifts at all', () => {
+    // The commonest case, and the reason the strip renders outside the
+    // schedule's branches: declaring a day off usually means there is nothing
+    // else on that day, and rendering inside them would hide it exactly then.
+    renderWithTimeOff(
+      [
+        {
+          id: 'p1',
+          starts_at: `${DAY}T00:00:00.000Z`,
+          ends_at: '2026-08-13T00:00:00.000Z',
+          reason: null,
+        },
+      ],
+      [],
+      []
+    )
+
+    expect(screen.getByText(STRINGS.timeOffOnDay, { exact: false })).toBeInTheDocument()
+    expect(screen.getByText(STRINGS.timeOffAllDay, { exact: false })).toBeInTheDocument()
+  })
+
+  it('renders nothing when no time off is declared', () => {
+    renderWithTimeOff([])
+
+    expect(screen.queryByText(STRINGS.timeOffOnDay, { exact: false })).not.toBeInTheDocument()
+  })
+
+  it('shows the clipped times for a partial-day period', () => {
+    renderWithTimeOff([
+      {
+        id: 'p1',
+        starts_at: `${DAY}T10:00:00.000Z`,
+        ends_at: `${DAY}T12:00:00.000Z`,
+        reason: null,
+      },
+    ])
+
+    expect(screen.getByText(/10:00/)).toBeInTheDocument()
+    expect(screen.getByText(/12:00/)).toBeInTheDocument()
+    // A partial period is not "all day", even though it is time off.
+    expect(screen.queryByText(STRINGS.timeOffAllDay, { exact: false })).not.toBeInTheDocument()
+  })
+
+  it('reads a multi-day period as all day on a day it spans', () => {
+    // Clipped to the day on screen: printing the period's own distant start
+    // and end would say "away 09:00–17:00" on a day the person is away the
+    // whole time.
+    renderWithTimeOff([
+      {
+        id: 'p1',
+        starts_at: '2026-08-11T09:00:00.000Z',
+        ends_at: '2026-08-14T17:00:00.000Z',
+        reason: null,
+      },
+    ])
+
+    expect(screen.getByText(STRINGS.timeOffAllDay, { exact: false })).toBeInTheDocument()
+  })
+
+  it('shows the reason when one was given', () => {
+    renderWithTimeOff([
+      {
+        id: 'p1',
+        starts_at: `${DAY}T00:00:00.000Z`,
+        ends_at: '2026-08-13T00:00:00.000Z',
+        reason: 'Jobbar',
+      },
+    ])
+
+    expect(screen.getByText('Jobbar')).toBeInTheDocument()
+  })
+
+  it('still shows the shifts underneath — a declaration does not cancel them', () => {
+    // An admin may schedule over a declaration, so the two legitimately
+    // coexist and the official must see both.
+    renderWithTimeOff(
+      [
+        {
+          id: 'p1',
+          starts_at: `${DAY}T00:00:00.000Z`,
+          ends_at: '2026-08-13T00:00:00.000Z',
+          reason: null,
+        },
+      ],
+      [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)]
+    )
+
+    expect(screen.getByText(STRINGS.timeOffOnDay, { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Depån')).toBeInTheDocument()
   })
 })

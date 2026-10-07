@@ -7,6 +7,19 @@ export const STRIPED_UNAVAILABLE_STYLE = {
     'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
 }
 
+// A self-reported absence, NOT the same thing as a closed operating window.
+// Deliberately a different hatch from STRIPED_UNAVAILABLE_STYLE above: that
+// one is grey and means "the work area is shut, nothing can go here", and this
+// one is amber and means "this person asked not to be scheduled, but you may".
+// Reusing the grey would collapse a hard constraint and an advisory one into
+// one visual, which is exactly the confusion the legend exists to prevent.
+// Opposite diagonal as well as a different hue, so the two stay distinct for a
+// viewer who cannot rely on colour.
+export const STRIPED_TIME_OFF_STYLE = {
+  background:
+    'repeating-linear-gradient(-45deg, #fed7aa, #fed7aa 3px, transparent 3px, transparent 8px)',
+}
+
 export function toLocalAssignments(
   inserted: NonNullable<SaveAssignmentsResult['inserted']>,
   granularityMin: number

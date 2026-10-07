@@ -39,7 +39,7 @@
   },
   "mySchedule": {
     "title": "My schedule",
-    "readOnly": "Read-only",
+    "scheduleOwner": "Set by organisers",
     "byTime": "Time",
     "byWorkstation": "Work area",
     "noAssignments": "No assignments yet",
@@ -51,7 +51,9 @@
     "time": "Time",
     "checklist": "Checklist",
     "todoLabel": "To do",
-    "infoLabel": "Good to know"
+    "infoLabel": "Good to know",
+    "timeOffOnDay": "Declared time off",
+    "timeOffAllDay": "All day"
   },
   "announcements": {
     "title": "Announcements",
@@ -101,5 +103,31 @@
     "confirmCancel": "No, keep it",
     "confirmConfirm": "Yes, uncheck",
     "saveFailed": "Could not save. Try again."
+  },
+  "availability": {
+    "pageTitle": "Availability",
+    "title": "Time off",
+    "description": "Tell the organisers when you are not available to be scheduled.",
+    "advisoryNote": "This is a heads-up for the organisers, not a block. They can still schedule you — talk to them if something is fixed.",
+    "emptyTitle": "No time off declared",
+    "emptyDescription": "Add a period and the organisers will see it when they build the schedule.",
+    "addButton": "Add time off",
+    "periodLabel": "Period",
+    "allDayLabel": "All day",
+    "startTimeLabel": "From time",
+    "endTimeLabel": "To time",
+    "allDay": "All day",
+    "reasonLabel": "Reason (optional)",
+    "reasonPlaceholder": "e.g. working",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Time off saved",
+    "withdrawn": "Time off removed",
+    "withdrawLabel": "Remove this period",
+    "saveFailed": "Could not save your time off. Try again.",
+    "deleteFailed": "Could not remove the period. Try again.",
+    "errorEndBeforeStart": "The end must be after the start.",
+    "manageLink": "Manage time off",
+    "eventDatesHint": "The event runs {{from}} – {{to}}."
   }
 }

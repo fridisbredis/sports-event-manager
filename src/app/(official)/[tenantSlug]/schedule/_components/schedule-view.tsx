@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { CalendarCheck, CalendarX } from 'lucide-react'
+import { CalendarCheck, CalendarOff, CalendarX } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
+import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import { workAreaColorMap, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './checklist-item-row'
 import { dateLocaleFor } from '@/lib/i18n/date-locale'
@@ -39,7 +40,9 @@ type View = 'time' | 'work-area'
 
 interface Strings {
   title: string
-  readOnly: string
+  /** Who decides this schedule — not a claim that the page is read-only:
+   *  the checklist items on it are written by officials. */
+  scheduleOwner: string
   byTime: string
   byWorkstation: string
   noAssignments: string
@@ -49,6 +52,9 @@ interface Strings {
   dayTabsLabel: string
   todoLabel: string
   infoLabel: string
+  manageAvailability: string
+  timeOffOnDay: string
+  timeOffAllDay: string
 }
 // Order matters: it is both the visual order of the two halves and the order
 // the arrow keys step through. `label` keys into Strings so the labels stay
@@ -71,6 +77,8 @@ interface Props {
   /** The viewer, to tell their own tick from a colleague's. */
   currentUserId: string | null
   checklistStrings: ChecklistStrings
+  /** The viewer's own declared time off overlapping the selected day. */
+  timeOff: UnavailabilityPeriod[]
 }
 
 function formatTime(ts: string, language?: string): string {
@@ -174,6 +182,73 @@ function DaySelector({
         })}
       </div>
     </nav>
+  )
+}
+
+/**
+ * The viewer's own declared time off for the day on screen.
+ *
+ * Shown on the schedule rather than only on the availability page, because
+ * this is the screen an official actually opens — having to navigate elsewhere
+ * to recall what you told the organisers is how a declaration gets forgotten
+ * and someone turns up anyway.
+ *
+ * Amber and dashed, matching the admin grid's hatch for the same thing: a
+ * declaration is advisory on both sides, and it must not read like a shift.
+ * The strip deliberately does NOT claim the shifts below are cancelled — an
+ * admin can schedule over a declaration, so the two can legitimately coexist
+ * and the official needs to see both.
+ */
+function TimeOffStrip({
+  timeOff,
+  day,
+  strings,
+}: {
+  timeOff: UnavailabilityPeriod[]
+  day: string
+  strings: Strings
+}) {
+  if (timeOff.length === 0) return null
+
+  // Clipped to the day on screen: a Friday-to-Sunday absence renders on
+  // Saturday as "all day", not as its own distant start and end times, which
+  // would read as though the person were away only at those moments.
+  const dayStart = new Date(`${day}T00:00:00.000Z`).getTime()
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000
+
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      {timeOff.map((period) => {
+        const from = Math.max(new Date(period.starts_at).getTime(), dayStart)
+        const to = Math.min(new Date(period.ends_at).getTime(), dayEnd)
+        const coversWholeDay = from <= dayStart && to >= dayEnd
+
+        return (
+          <div
+            key={period.id}
+            className="flex items-start gap-3 rounded-lg border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5"
+          >
+            <CalendarOff className="mt-0.5 size-4 shrink-0 text-orange-500" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-orange-900">
+                {strings.timeOffOnDay}
+                <span className="font-normal text-orange-700">
+                  {' · '}
+                  {coversWholeDay
+                    ? strings.timeOffAllDay
+                    : `${formatTime(new Date(from).toISOString())}–${formatTime(
+                        new Date(to).toISOString()
+                      )}`}
+                </span>
+              </p>
+              {period.reason ? (
+                <p className="mt-0.5 truncate text-xs text-orange-700">{period.reason}</p>
+              ) : null}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -416,6 +491,7 @@ export function ScheduleView({
   checks,
   currentUserId,
   checklistStrings,
+  timeOff,
 }: Props) {
   const [view, setView] = useState<View>('time')
 
@@ -472,9 +548,22 @@ export function ScheduleView({
       <div className="flex items-center justify-between mb-5">
         <h1 className="page-title">{strings.title}</h1>
         <span className="rounded-full border border-edge px-3 py-1 text-sm font-medium text-ink-faint">
-          {strings.readOnly}
+          {strings.scheduleOwner}
         </span>
       </div>
+
+      {/* The way in to declaring time off. It lives here rather than as a
+          sixth bottom tab: five tabs already share a 375px viewport at ~75px
+          each, and a sixth would clip the labels. This screen is also where
+          the question actually arises — you look at your shifts, then say
+          when you cannot work. */}
+      <Link
+        href={`/${tenantSlug}/availability`}
+        className="mb-5 flex items-center gap-2 rounded-lg border border-edge px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-gray-50"
+      >
+        <CalendarOff className="size-4 shrink-0" aria-hidden="true" />
+        <span>{strings.manageAvailability}</span>
+      </Link>
 
       {/* View toggle. A sliding segmented control: one grey track holding a
           single filled thumb that moves between the two halves, rather than
@@ -525,6 +614,12 @@ export function ScheduleView({
         tenantSlug={tenantSlug}
         label={strings.dayTabsLabel}
       />
+
+      {/* Above the content, and outside every branch below: a day with time
+          off and no shifts is the commonest case of all, and rendering this
+          inside the schedule branches would hide the declaration on exactly
+          the day it matters most. */}
+      {selectedDay ? <TimeOffStrip timeOff={timeOff} day={selectedDay} strings={strings} /> : null}
 
       {/* Content */}
       {hasNoAssignmentsAtAll ? (

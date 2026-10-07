@@ -41,7 +41,7 @@ vi.mock('@/lib/logger', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'not', 'order', 'limit', 'range', 'gte', 'lt']) {
+  for (const method of ['select', 'eq', 'not', 'order', 'limit', 'range', 'gte', 'gt', 'lt']) {
     builder[method] = vi.fn(() => builder)
   }
   builder.single = vi.fn(() => Promise.resolve(result))
@@ -101,14 +101,36 @@ function mockResolvedTenant(officialId: string | null = 'off-1') {
   })
 }
 
-// The page issues two reads against `assignments`: the dates-only day list,
-// then the windowed read for the selected day. Order matters — the second
-// query's `?day=` is resolved from the first query's result.
+// The page issues two reads against `assignments` — the dates-only day list,
+// then the windowed read for the selected day — plus reads against other
+// tables (checklist state, declared time off) whose order relative to those is
+// an implementation detail.
+//
+// The two `assignments` builders are still handed out in order, because that
+// order is load-bearing: the second query's day is resolved from the first
+// query's result. Everything else is dispatched by table name and defaults to
+// an empty result, so adding a read to the page does not break every test here
+// the way a purely positional mock did.
 function mockQueries(dayResult: unknown, windowResult: unknown = { data: [] }) {
   const dayBuilder = chain(dayResult)
   const windowBuilder = chain(windowResult)
-  const fromMock = vi.fn().mockReturnValueOnce(dayBuilder).mockReturnValueOnce(windowBuilder)
-  return { dayBuilder, windowBuilder, fromMock }
+  const otherBuilders = new Map<string, Record<string, unknown>>()
+
+  let assignmentReads = 0
+  const fromMock = vi.fn((table: string) => {
+    if (table === 'assignments') {
+      assignmentReads += 1
+      return assignmentReads === 1 ? dayBuilder : windowBuilder
+    }
+    let builder = otherBuilders.get(table)
+    if (!builder) {
+      builder = chain({ data: [] })
+      otherBuilders.set(table, builder)
+    }
+    return builder
+  })
+
+  return { dayBuilder, windowBuilder, fromMock, otherBuilders }
 }
 
 beforeEach(() => {

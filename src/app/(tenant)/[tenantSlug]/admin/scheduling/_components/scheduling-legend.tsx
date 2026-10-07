@@ -1,5 +1,5 @@
 import { useTranslation } from '@/lib/i18n/client'
-import { STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
+import { STRIPED_TIME_OFF_STYLE, STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 
 export function SchedulingLegend() {
   const { t } = useTranslation('admin')
@@ -36,6 +36,16 @@ export function SchedulingLegend() {
           style={STRIPED_UNAVAILABLE_STYLE}
         />
         {t('scheduling.legendOutsideWindow')}
+      </span>
+      {/* Sits next to the outside-window swatch on purpose: the two hatches
+          are the pair most at risk of being read as the same thing, and
+          showing them adjacent is what makes the difference legible. */}
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block h-4 w-8 rounded-sm border border-orange-200"
+          style={STRIPED_TIME_OFF_STYLE}
+        />
+        {t('scheduling.legendTimeOff')}
       </span>
     </div>
   )

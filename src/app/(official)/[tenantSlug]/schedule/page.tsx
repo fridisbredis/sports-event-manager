@@ -7,6 +7,7 @@ import { ScheduleView, type AssignmentRow, type CheckMap } from './_components/s
 import { checkReadCeiling } from '@/lib/db/bounded-read'
 import { logger } from '@/lib/logger'
 import { distinctDays, dayWindow, resolveSelectedDay } from '@/lib/scheduling/day-window'
+import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -141,6 +142,41 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     })
   }
 
+  // The official's own declared time off for the day on screen, so the
+  // schedule says it rather than making them open another page to recall what
+  // they told the organisers. Own rows only — the RLS policy allows nothing
+  // else, and the explicit filter states that at the call site too.
+  let timeOff: UnavailabilityPeriod[] = []
+
+  if (officialId && selectedDay) {
+    const { start, end } = dayWindow(selectedDay)
+
+    // Overlap, not start-of-day: a period running Friday to Sunday starts
+    // before Saturday and must still show on Saturday.
+    const { data: timeOffRows, error: timeOffError } = await supabase
+      .from('official_unavailability')
+      .select('id, official_id, starts_at, ends_at, reason')
+      .eq('official_id', officialId)
+      .eq('tenant_id', tenant.id)
+      .lt('starts_at', end)
+      .gt('ends_at', start)
+      .order('starts_at')
+
+    // Deliberately not fatal, unlike the assignment reads above: this screen's
+    // job on event day is to show the shifts, and losing the time-off strip
+    // must not take the schedule with it. Logged rather than swallowed
+    // (F-REL-10) so a persistent failure is visible.
+    if (timeOffError) {
+      logger.error('Official schedule: time off failed to load', timeOffError, {
+        tenantId: tenant.id,
+        officialId,
+        day: selectedDay,
+      })
+    } else {
+      timeOff = (timeOffRows ?? []) as UnavailabilityPeriod[]
+    }
+  }
+
   // Check state for the day on screen. One query for every station the
   // official works today rather than one per station: the shift screen is
   // opened on a phone on event day, and N+1 round trips over a field
@@ -224,7 +260,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
 
   const strings = {
     title: t('mySchedule.title'),
-    readOnly: t('mySchedule.readOnly'),
+    scheduleOwner: t('mySchedule.scheduleOwner'),
     byTime: t('mySchedule.byTime'),
     byWorkstation: t('mySchedule.byWorkstation'),
     noAssignments: t('mySchedule.noAssignments'),
@@ -234,6 +270,9 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     dayTabsLabel: t('mySchedule.dayTabsLabel'),
     todoLabel: t('mySchedule.todoLabel'),
     infoLabel: t('mySchedule.infoLabel'),
+    manageAvailability: t('availability.manageLink'),
+    timeOffOnDay: t('mySchedule.timeOffOnDay'),
+    timeOffAllDay: t('mySchedule.timeOffAllDay'),
   }
 
   // Passed as raw templates, not interpolated here: this object crosses into
@@ -265,6 +304,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       checks={checks}
       currentUserId={user.id}
       checklistStrings={checklistStrings}
+      timeOff={timeOff}
     />
   )
 }

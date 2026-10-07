@@ -3,7 +3,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getCurrentStage } from '@/lib/scheduling/grid-logic'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
+import { logger } from '@/lib/logger'
 import { SchedulingGrid } from './_components/scheduling-grid'
+import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -33,6 +35,43 @@ export async function fetchAssignmentsForDay(
 
   if (error) throw error
   return data ?? []
+}
+
+// Self-reported unavailability overlapping the day on screen, for the grid's
+// advisory overlay. Scoped to the day the same way assignments are, and by
+// overlap rather than by start: a period running Friday to Sunday starts
+// before Saturday and must still shade Saturday's cells.
+//
+// Read with the admin's RLS client — the tenant_admin policy on this table is
+// what admits it. An official reading the same table sees only their own rows.
+export async function fetchUnavailabilityForDay(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string,
+  day: string
+): Promise<UnavailabilityPeriod[]> {
+  const dayStart = new Date(`${day}T00:00:00.000Z`)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
+
+  // Half-open overlap, matching periodsOverlap: a period ending exactly at
+  // midnight belongs to the previous day and must not shade this one.
+  const { data, error } = await supabase
+    .from('official_unavailability')
+    .select('id, official_id, starts_at, ends_at, reason')
+    .eq('tenant_id', tenantId)
+    .lt('starts_at', dayEnd.toISOString())
+    .gt('ends_at', dayStart.toISOString())
+
+  // Never fatal: this is an advisory overlay on a screen whose primary job is
+  // assigning shifts. An admin must still be able to schedule when the overlay
+  // cannot load — losing the warning degrades the screen, losing the grid
+  // breaks it. Logged rather than swallowed, per F-REL-10.
+  if (error) {
+    logger.error('Scheduling: unavailability read failed', error, { tenantId, day })
+    return []
+  }
+
+  return (data ?? []) as UnavailabilityPeriod[]
 }
 
 export default async function SchedulingPage({ params, searchParams }: Props) {
@@ -111,9 +150,12 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
         ? today
         : selectedStageDays[0]
 
-  const assignments = selectedDay
-    ? await fetchAssignmentsForDay(supabase, tenant.id, selectedDay)
-    : []
+  const [assignments, unavailability] = selectedDay
+    ? await Promise.all([
+        fetchAssignmentsForDay(supabase, tenant.id, selectedDay),
+        fetchUnavailabilityForDay(supabase, tenant.id, selectedDay),
+      ])
+    : [[], []]
 
   return (
     <div className="px-8 py-8">
@@ -126,6 +168,7 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
         workstations={workstations ?? []}
         officials={officials ?? []}
         initialAssignments={assignments}
+        unavailability={unavailability}
         initialSelectedDay={selectedDay ?? ''}
         initialSelectedStageId={selectedStage?.id ?? ''}
       />

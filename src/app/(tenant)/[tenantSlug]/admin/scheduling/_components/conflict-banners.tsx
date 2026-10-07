@@ -1,4 +1,4 @@
-import { CircleX, Info } from 'lucide-react'
+import { CalendarOff, CircleX, Info } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import type {
   computeDoubleBookedDetails,
@@ -35,16 +35,25 @@ function ConflictBanner({
   )
 }
 
+/** One assignment made over a self-reported absence. */
+export interface UnavailableDetail {
+  officialName: string
+  time: string
+  reason: string | null
+}
+
 export function ConflictBanners({
   overCapacityCount,
   overCapacityDetails,
   doubleBookedCount,
   doubleBookedDetails,
+  unavailableDetails,
 }: {
   overCapacityCount: number
   overCapacityDetails: OverCapacityDetail[]
   doubleBookedCount: number
   doubleBookedDetails: DoubleBookedDetail[]
+  unavailableDetails: UnavailableDetail[]
 }) {
   const { t } = useTranslation('admin')
   return (
@@ -71,6 +80,23 @@ export function ConflictBanners({
           {doubleBookedDetails.map((d, i) => (
             <li key={i}>
               {d.officialName} — {d.time} ({d.workAreaNames.join(', ')})
+            </li>
+          ))}
+        </ConflictBanner>
+      )}
+      {/* Warning, not danger: an official's self-reported absence is softer
+          data than a double-booking, which is a physical impossibility. This
+          is someone saying they would rather not — the admin decides. */}
+      {unavailableDetails.length > 0 && (
+        <ConflictBanner
+          tone="warning"
+          icon={<CalendarOff className="w-4 h-4 text-orange-500 shrink-0" />}
+          heading={t('scheduling.unavailableAssigned', { count: unavailableDetails.length })}
+        >
+          {unavailableDetails.map((d, i) => (
+            <li key={i}>
+              {d.officialName} — {d.time}
+              {d.reason ? ` (${d.reason})` : ''}
             </li>
           ))}
         </ConflictBanner>
