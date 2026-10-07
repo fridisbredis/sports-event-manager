@@ -60,10 +60,15 @@ test.describe('EVT-01 dashboard', () => {
       // Each screen is linked twice: once from the sidebar (inside <aside>) and
       // once from the Admin Areas grid. The grid is what this test is about, so
       // exclude the sidebar rather than taking .first(), which is the sidebar.
-      await page
-        .locator(`a:not(aside a)`, { hasText: new RegExp(`^${name}`) })
-        .first()
-        .click()
+      const tile = page.locator(`a:not(aside a)`, { hasText: new RegExp(`^${name}`) }).first()
+
+      // Wait for the tile before clicking it. The dashboard is a server
+      // component and the grid arrives with the document, but under load the
+      // click can otherwise land while the page is still being replaced — the
+      // navigation is then dropped and the test waits out its timeout on the
+      // dashboard URL it never left.
+      await expect(tile).toBeVisible()
+      await tile.click()
       await expect(page).toHaveURL(new RegExp(`${path}$`))
     })
   }

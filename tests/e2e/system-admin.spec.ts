@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect, clickWhenInteractive } from './fixtures/auth'
-import { SEED_TENANT_SLUG } from './fixtures/users'
+import { SEED_TENANT_SLUG, TOGGLE_TENANT_SLUG } from './fixtures/users'
 
 // SYS-01 tenant management and SYS-02 tenant detail.
 // Role: system admin — the only role that reaches these at all.
@@ -60,11 +60,13 @@ test.describe('SYS-02 tenant detail', () => {
   // Resolve the seed tenant's detail URL rather than hardcoding an id. The row
   // link carries the tenant's *name*; the slug sits in a sibling paragraph, so
   // find the row by slug and then click the link inside it.
-  async function gotoSeedTenant(page: Page): Promise<void> {
+  async function gotoTenant(page: Page, slug: string): Promise<void> {
     await page.goto('/admin')
-    await page.getByRole('row').filter({ hasText: SEED_TENANT_SLUG }).getByRole('link').click()
+    await page.getByRole('row').filter({ hasText: slug }).getByRole('link').click()
     await expect(page).toHaveURL(/\/admin\/[0-9a-f-]{36}$/)
   }
+
+  const gotoSeedTenant = (page: Page) => gotoTenant(page, SEED_TENANT_SLUG)
 
   test('shows activation state and feature tier', async ({ systemAdminPage: page }) => {
     await gotoSeedTenant(page)
@@ -100,8 +102,13 @@ test.describe('SYS-02 tenant detail', () => {
     ).toBeVisible()
   })
 
+  // Against its own throwaway tenant, not the seed one. Deactivating a tenant
+  // locks out its admins for as long as it is off (requireTenantAdmin refuses
+  // an inactive tenant), so doing that to the shared seed tenant breaks
+  // whatever else is running — which is what pinned the suite to a single
+  // worker. TOGGLE_TENANT_SLUG carries no data and nothing else reads it.
   test('deactivating a tenant is reflected in the list', async ({ systemAdminPage: page }) => {
-    await gotoSeedTenant(page)
+    await gotoTenant(page, TOGGLE_TENANT_SLUG)
 
     const toggle = page.getByRole('switch')
     await toggle.click()
@@ -110,13 +117,12 @@ test.describe('SYS-02 tenant detail', () => {
 
     await page.goto('/admin')
     await expect(
-      page.getByRole('row').filter({ hasText: SEED_TENANT_SLUG }).getByText('Inactive')
+      page.getByRole('row').filter({ hasText: TOGGLE_TENANT_SLUG }).getByText('Inactive')
     ).toBeVisible()
 
-    // Reactivate: an inactive tenant locks its own admins out
-    // (requireTenantAdmin refuses inactive tenants), which would break every
-    // other spec in this suite.
-    await gotoSeedTenant(page)
+    // Put it back, so a rerun starts from the active state this asserts the
+    // transition out of. global-setup resets it too, for a run that dies here.
+    await gotoTenant(page, TOGGLE_TENANT_SLUG)
     await page.getByRole('switch').click()
     await expect(page.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
   })

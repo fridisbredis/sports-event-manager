@@ -41,11 +41,29 @@ export default defineConfig({
     timezoneId: 'Europe/Stockholm',
   },
 
-  // Every worker competes for the same seeded users and the same GoTrue
-  // rate limits (sms_sent = 30/h, token_verifications = 30/5min). Signing in
-  // is amortized by storageState reuse in tests/e2e/fixtures/auth.ts, but
-  // parallel workers still mutate one shared tenant's data, so writes would
-  // race. Serial by default; CI keeps a single worker for reproducibility.
+  // Serial. Four workers were tried properly and do not hold, for two separate
+  // reasons -- recorded here because the attempt looked like it was working
+  // several times before each one surfaced.
+  //
+  // Rate limits. The app allows 5 sends per phone per hour and GoTrue adds its
+  // own per-IP ceilings (sign_in_sign_ups, token_verifications); every worker
+  // shares that IP, so the budget belongs to the run. Clearing a number's own
+  // counters before signing in as it (fixtures/auth.ts) was enough locally and
+  // not on CI, where the runner compresses the same ~15 sign-ins into a
+  // narrower window and GoTrue's ceiling binds instead.
+  //
+  // Fixture corruption, which is the harder one. The specs that write to the
+  // seed tenant restore what they changed, but a restore racing another
+  // worker's read does not put everything back: after two parallel runs the
+  // seed's four assignments for +46709900002 were down to three, and the
+  // damage is silent until some later run fails in a spec that did nothing
+  // wrong. Run counts fell 136 -> 134 -> 129 across three consecutive runs.
+  //
+  // Making this work needs per-worker fixture isolation -- a tenant per worker,
+  // not one shared mutable tenant -- which is a larger change than a config
+  // flag. Four separate bug fixes came out of the attempt and are kept: the
+  // toggle tenant, the storageState freshness check, the OTP hydration guard
+  // and the dashboard tile wait.
   workers: 1,
   fullyParallel: false,
 

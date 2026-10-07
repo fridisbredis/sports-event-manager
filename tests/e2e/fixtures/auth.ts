@@ -2,6 +2,9 @@ import { test as base, expect, type Locator, type Page, type Browser } from '@pl
 import fs from 'node:fs'
 import path from 'node:path'
 import { USERS, OTP_CODE, type RoleKey } from './users'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../../../src/types/database'
+import { loginPhoneRateLimitKey } from '../../../src/lib/rate-limit'
 
 const STATE_DIR = path.resolve(__dirname, '../.auth')
 
@@ -10,7 +13,42 @@ const STATE_DIR = path.resolve(__dirname, '../.auth')
 // produces. Kept as a real UI flow rather than an injected session so AUTH-01
 // is genuinely covered and so a regression in the form breaks the whole suite
 // loudly instead of going unnoticed.
+// Drops this number's login counters right before signing in as it.
+//
+// The app allows 5 sends per phone per hour (LOGIN_SEND_LIMIT), which is
+// generous for a person and tight for a suite: the busiest numbers sign in
+// twice per run — once to fill the storageState cache, once in auth.spec's
+// role loop — and the retry below spends another send per attempt, so a
+// throttled sign-in burns the rest of the budget trying to recover from being
+// throttled. global-setup clears these once, but they then accumulate for the
+// rest of the run.
+//
+// Scoped to the one number about to be used, so the limiter stays in force for
+// every other phone and every other path. It is covered directly by
+// rate-limit.test.ts and by the route tests; what is pointless here is the
+// suite throttling itself.
+async function clearLoginBudget(phone: string) {
+  const url = process.env.E2E_SUPABASE_URL
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY
+  // Loud, not a silent skip: without this the number keeps its accumulated
+  // sends and the run fails later as "Too many attempts", several tests away
+  // from the cause. globalSetup sets both.
+  if (!url || !key) {
+    throw new Error(
+      'E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY are unset — globalSetup did not run.'
+    )
+  }
+
+  const admin = createClient<Database>(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const keys = [loginPhoneRateLimitKey('send', phone), loginPhoneRateLimitKey('verify', phone)]
+  const { error } = await admin.from('rate_limit_hits').delete().in('key', keys)
+  if (error) throw error
+}
+
 export async function signInThroughUi(page: Page, phone: string) {
+  await clearLoginBudget(phone)
   await page.goto('/login')
 
   // The form posts normalizePhoneToE164(), which strips the leading '+'. Typing
@@ -51,9 +89,20 @@ export async function signInThroughUi(page: Page, phone: string) {
     await page.waitForTimeout(2_000)
   }
 
-  await codeField.fill(OTP_CODE)
+  // fill, then assert the value stuck. The OTP field is a controlled HeroUI
+  // input and Verify is gated on `otp.length === 6`, so a fill that lands
+  // before React has hydrated writes to the DOM, never reaches state, and
+  // leaves Verify disabled for the rest of the test — which surfaces as a
+  // 60s timeout on a button that is visibly right there. Same hydration race
+  // the admin screens hit, seen on an input instead of a button.
+  const verify = page.getByRole('button', { name: 'Verify' })
+  await expect(async () => {
+    await codeField.fill(OTP_CODE)
+    await expect(codeField).toHaveValue(OTP_CODE, { timeout: 1_000 })
+    await expect(verify).toBeEnabled({ timeout: 1_000 })
+  }).toPass({ timeout: 15_000 })
 
-  await page.getByRole('button', { name: 'Verify' }).click()
+  await verify.click()
 
   // verifyOtp() does router.push('/') and '/' resolves the role-based redirect,
   // so landing anywhere other than /login means the session took hold.
@@ -63,9 +112,27 @@ export async function signInThroughUi(page: Page, phone: string) {
 // Signs in once per role per run and caches the cookies on disk. GoTrue's local
 // rate limits (sms_sent 30/h, token_verifications 30/5min) are low enough that
 // one sign-in per test would exhaust them partway through a full-suite run.
+// A cached session is only as good as the access token inside it. GoTrue issues
+// those with a one-hour life, but writes them into a cookie whose own expiry is
+// years out — so Playwright keeps sending a token the server stopped accepting,
+// the proxy treats the request as signed out and redirects to /login, and being
+// "logged in" it bounces back, which surfaces as ERR_TOO_MANY_REDIRECTS rather
+// than as an auth failure. Re-signing in on age is what keeps a cache left over
+// from an earlier day from failing the next run in a way that looks like a
+// routing bug.
+const STATE_MAX_AGE_MS = 30 * 60 * 1000
+
+function isFresh(statePath: string): boolean {
+  try {
+    return Date.now() - fs.statSync(statePath).mtimeMs < STATE_MAX_AGE_MS
+  } catch {
+    return false
+  }
+}
+
 async function storageStateFor(role: RoleKey, browser: Browser) {
   const statePath = path.join(STATE_DIR, `${role}.json`)
-  if (fs.existsSync(statePath)) return statePath
+  if (isFresh(statePath)) return statePath
 
   fs.mkdirSync(STATE_DIR, { recursive: true })
   const context = await browser.newContext()

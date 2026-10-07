@@ -12,6 +12,14 @@
 // local stack without stealing each other's users.
 
 export const SEED_TENANT_SLUG = 'seed-klubben'
+
+// A tenant that exists only to be switched off. SYS-02's deactivation test
+// needs a tenant it can toggle, and doing that to the seed tenant locks out
+// every admin in the suite for as long as it is off — requireTenantAdmin
+// refuses an inactive tenant — which is a global side effect no amount of
+// per-test cleanup makes safe to run alongside anything else. Giving that one
+// test its own tenant is what lets the suite run on several workers.
+export const TOGGLE_TENANT_SLUG = 'e2e-toggle-klubben'
 export const OTP_CODE = '000000'
 
 export const SYSTEM_ADMIN_PHONE = '+46709900007'
