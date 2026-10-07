@@ -2,6 +2,9 @@ import { test as base, expect, type Locator, type Page, type Browser } from '@pl
 import fs from 'node:fs'
 import path from 'node:path'
 import { USERS, OTP_CODE, type RoleKey } from './users'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../../../src/types/database'
+import { loginPhoneRateLimitKey } from '../../../src/lib/rate-limit'
 
 const STATE_DIR = path.resolve(__dirname, '../.auth')
 
@@ -10,7 +13,35 @@ const STATE_DIR = path.resolve(__dirname, '../.auth')
 // produces. Kept as a real UI flow rather than an injected session so AUTH-01
 // is genuinely covered and so a regression in the form breaks the whole suite
 // loudly instead of going unnoticed.
+// Drops this number's login counters right before signing in as it.
+//
+// The app allows 5 sends per phone per hour (LOGIN_SEND_LIMIT), which is
+// generous for a person and tight for a suite: the busiest numbers sign in
+// twice per run — once to fill the storageState cache, once in auth.spec's
+// role loop — and the retry below spends another send per attempt, so a
+// throttled sign-in burns the rest of the budget trying to recover from being
+// throttled. global-setup clears these once, but they then accumulate for the
+// rest of the run.
+//
+// Scoped to the one number about to be used, so the limiter stays in force for
+// every other phone and every other path. It is covered directly by
+// rate-limit.test.ts and by the route tests; what is pointless here is the
+// suite throttling itself.
+async function clearLoginBudget(phone: string) {
+  const url = process.env.E2E_SUPABASE_URL
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return
+
+  const admin = createClient<Database>(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const keys = [loginPhoneRateLimitKey('send', phone), loginPhoneRateLimitKey('verify', phone)]
+  const { error } = await admin.from('rate_limit_hits').delete().in('key', keys)
+  if (error) throw error
+}
+
 export async function signInThroughUi(page: Page, phone: string) {
+  await clearLoginBudget(phone)
   await page.goto('/login')
 
   // The form posts normalizePhoneToE164(), which strips the leading '+'. Typing

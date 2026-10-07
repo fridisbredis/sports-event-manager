@@ -41,23 +41,29 @@ export default defineConfig({
     timezoneId: 'Europe/Stockholm',
   },
 
-  // Serial, measured rather than assumed. Four workers were tried: the suite
-  // got slower and less reliable, not faster -- 5.1-7.3 min with a failing
-  // sign-in against 4.0-4.5 min clean here.
+  // One worker per spec file, tests within a file still serial.
   //
-  // The reason is that sign-in is the long pole and it does not parallelise.
-  // GoTrue's ceilings are per IP (sign_in_sign_ups, token_verifications in
-  // supabase/config.toml) and every worker shares one, so the whole run draws
-  // on a single budget; serially the ~15 sign-ins spread across the run, in
-  // parallel they land in one window. Raising those limits 5x locally did not
-  // fix it either, so there is more to it than the ceiling -- the remaining
-  // failure was a sign-in that reached the OTP step and never got past it.
+  // Two things had to be fixed before this was safe, both in this PR. SYS-02's
+  // deactivation test switched the *seed* tenant off, which locks out every
+  // admin in the suite while it is off; it now owns a throwaway tenant. And
+  // signInThroughUi now clears the number's own send budget first: the app
+  // allows 5 per phone per hour, the busiest numbers sign in twice per run, and
+  // the retry loop spends another send per attempt — so a throttled sign-in
+  // burned the rest of the budget trying to recover, which is what failed every
+  // earlier attempt at this.
   //
-  // Worth another look only with that failure understood first. Two things
-  // that came out of the attempt are kept because they are correct either way:
-  // the toggle tenant below and the storageState freshness check in
-  // tests/e2e/fixtures/auth.ts.
-  workers: 1,
+  // The specs that write to the shared seed tenant each restore what they
+  // changed (F7) and touch different parts of it — a work area's windows, the
+  // event name, one slot in the grid — so they do not collide across files.
+  //
+  // fullyParallel stays false. Within a file the tests share one tenant's rows
+  // and several read what a sibling just restored, so running them against each
+  // other is a different problem from running files side by side.
+  //
+  // Four, measured: 4.0-4.5 min serial against 2.8-3.1 min over four clean runs
+  // at four. Eight was tried earlier and was worse on both counts; four also
+  // matches the runner's cores. Raise it only with a measurement behind it.
+  workers: 4,
   fullyParallel: false,
 
   forbidOnly: !!process.env.CI,

@@ -22,7 +22,11 @@ function phoneRateLimitKey(tenantId: string, phone: string): string {
 // Login is not tenant-scoped — the same phone can hold roles across tenants,
 // and the caller has no tenant context until after they're authenticated —
 // so this key has no tenant segment, unlike phoneRateLimitKey above.
-function loginPhoneRateLimitKey(prefix: string, phone: string): string {
+//
+// Exported for the E2E suite, which clears the row for a number right before
+// signing in as it (tests/e2e/fixtures/auth.ts). Sharing the derivation rather
+// than restating it there is what keeps the two from drifting apart.
+export function loginPhoneRateLimitKey(prefix: string, phone: string): string {
   const canonical = phone.replace(/\D/g, '')
   const hash = createHash('sha256').update(canonical).digest('hex')
   return `login:${prefix}:${hash}`
