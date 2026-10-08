@@ -258,6 +258,20 @@ export default function LoginPage() {
           </div>
         </form>
       )}
+
+      {/* Shown in both steps: GDPR asks that people can read how their phone
+          number is handled before they hand it over, not only after. Opens in
+          a new tab so a half-finished sign-in isn't thrown away. */}
+      <p className="mt-10 text-center">
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-md text-sm text-ink-soft underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          {t('signIn.privacyLink')}
+        </a>
+      </p>
     </main>
   )
 }
