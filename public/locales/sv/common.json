@@ -44,6 +44,19 @@
     "toast": "Något gick fel. Försök igen.",
     "navHint": "De andra flikarna fungerar fortfarande."
   },
+  "privacyPage": {
+    "title": "Integritetspolicy",
+    "draftBadge": "Utkast — slutgiltigt innehåll saknas",
+    "draftBody": "Det här är en preliminär integritetspolicy. Den slutgiltiga versionen, som anger exakt vilka personuppgifter vi samlar in, varför och hur länge, har ännu inte levererats av arrangören.",
+    "summaryHeading": "Kort sammanfattning",
+    "dataHeading": "Vad vi sparar",
+    "dataBody": "Ditt namn och ditt mobilnummer. Numret används för att logga in dig och för att skicka SMS om dina uppdrag.",
+    "purposeHeading": "Varför",
+    "purposeBody": "För att kunna schemalägga funktionärer och nå dig med ändringar som rör dina pass.",
+    "retentionHeading": "Hur länge",
+    "retentionBody": "Om du slutar logga in anonymiseras ditt konto automatiskt efter 24 månader. Du får ett SMS en månad innan det sker.",
+    "backToSignIn": "Tillbaka till inloggningen"
+  },
   "actions": {
     "save": "Spara",
     "cancel": "Avbryt",
