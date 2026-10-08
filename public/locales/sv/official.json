@@ -57,6 +57,8 @@
     "title": "Meddelanden",
     "noAnnouncements": "Inga meddelanden än",
     "noAnnouncementsDescription": "Uppdateringar från arrangörerna visas här.",
+    "today": "Idag",
+    "yesterday": "Igår",
     "older": "Äldre meddelanden",
     "newer": "Nyare meddelanden",
     "noOlderAnnouncements": "Inga äldre meddelanden",

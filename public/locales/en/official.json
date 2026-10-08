@@ -57,6 +57,8 @@
     "title": "Announcements",
     "noAnnouncements": "No announcements yet",
     "noAnnouncementsDescription": "Updates from event organisers will show up here.",
+    "today": "Today",
+    "yesterday": "Yesterday",
     "older": "Older announcements",
     "newer": "Newer announcements",
     "noOlderAnnouncements": "No older announcements",
