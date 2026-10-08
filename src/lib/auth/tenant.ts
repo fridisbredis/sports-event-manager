@@ -701,3 +701,16 @@ export const hasAccountScreen = cache(async (tenantSlug: string): Promise<boolea
   // the render; on official screens it reuses the layout's.
   return (await getOfficialTenant(tenantSlug))?.officialId != null
 })
+
+// Whether to offer this caller the admin surface from an official screen.
+// An admin who is also on the roster sees both surfaces for the same tenant
+// and currently has no way to cross between them except editing the URL.
+//
+// Keyed on admin access, not on a roster row — the mirror image of
+// hasAccountScreen above. Goes through getAdminTenant for the same
+// memoisation reason: on admin screens the layout has already resolved it, so
+// this is free there, and on official screens it costs the one admin-access
+// check that answering the question requires at all.
+export const hasAdminScreens = cache(async (tenantSlug: string): Promise<boolean> => {
+  return (await getAdminTenant(tenantSlug)) != null
+})

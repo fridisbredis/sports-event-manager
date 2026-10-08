@@ -10,6 +10,7 @@ import {
   Users,
   CalendarClock,
   MessageSquare,
+  Smartphone,
   UserCircle,
   LogOut,
   PanelLeftClose,
@@ -126,6 +127,11 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
           {navItems.map((item) => navLink(item.segment, item.label, item.icon))}
         </nav>
         <div className="border-t border-gray-100 py-2">
+          {/* The official surface for this same tenant. Shown to every admin,
+              not gated on showAccount: access there comes from the admin role
+              (see resolveOfficialSurfaceAccess), while an officials row only
+              decides whether their own schedule has anything in it. */}
+          {navLink('home', t('navigation.officialView'), Smartphone)}
           {showAccount && navLink('admin/account', t('navigation.account'), UserCircle)}
           <LogoutButton
             title={collapsed ? t('navigation.logOut') : undefined}
