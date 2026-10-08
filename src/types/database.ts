@@ -1072,6 +1072,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_own_official_row: { Args: { p_official_id: string }; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
       publish_event: {
         Args: { p_event_id: string; p_tenant_id: string }
@@ -1117,6 +1118,14 @@ export type Database = {
           earliest_timeslot_start: string
           over_capacity: number
         }[]
+      }
+      shares_shift_with_caller: {
+        Args: {
+          p_timeslot_end: string
+          p_timeslot_start: string
+          p_workstation_id: string
+        }
+        Returns: boolean
       }
       sync_event_facilities: {
         Args: { p_event_id: string; p_facilities: Json; p_tenant_id: string }

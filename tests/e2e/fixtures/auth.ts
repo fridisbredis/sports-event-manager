@@ -56,7 +56,11 @@ export async function signInThroughUi(page: Page, phone: string) {
   // parsePhoneNumberFromString accepts E.164 whatever country is selected.
   await page.getByLabel('Phone number').fill(phone)
 
-  const sendButton = page.getByRole('button', { name: 'Send code' })
+  // exact: the OTP step's button is "Resend code (30s)", which contains "Send
+  // code" case-insensitively and so matches a non-exact name filter. Without
+  // this, a stray retry targets the resend countdown instead of the phone
+  // step's own button.
+  const sendButton = page.getByRole('button', { name: 'Send code', exact: true })
   // Enabled only once isValidPhoneForCountry() passes, so waiting on it doubles
   // as an assertion that the number was accepted as valid.
   await expect(sendButton).toBeEnabled()
@@ -66,14 +70,36 @@ export async function signInThroughUi(page: Page, phone: string) {
   // staying put with a toast, which is indistinguishable from a broken
   // selector at the point of failure — so retry the send rather than letting
   // the suite fail on throttling that has nothing to do with the test.
+  //
+  // clearLoginBudget() above only clears the *app's* counters; GoTrue's
+  // max_frequency is its own ceiling and cannot be cleared from the database,
+  // so this loop is what absorbs it. It matters more than it looks: against a
+  // production build the suite is fast enough to put two sends for the same
+  // number inside the same second, and GoTrue answers
+  // `over_sms_send_rate_limit` ("you can only request this after 0 seconds").
+  // Against `next dev` the per-route compile happened to space the sends out
+  // far enough that this was rarely hit.
   const codeField = page.getByLabel('6-digit code')
   for (let attempt = 1; ; attempt++) {
+    // Only ever click while the phone step is actually still on screen.
+    //
+    // This guard is the whole point of the loop's shape. On success the form
+    // swaps step 2 in place and the same button becomes the OTP step's
+    // "Resend code (30s)" countdown — a *different* control that happens to
+    // match a loose selector. A retry that fired after a send had already
+    // succeeded therefore clicked resend, and Playwright waited out the full
+    // 30s cooldown for it to become enabled. That cost ~31s per sign-in and
+    // was the single largest line item in the suite: 13 tests at ~31s each,
+    // 400s of a 470s run, on sign-ins that had already worked on click one.
+    if (await codeField.isVisible({ timeout: 100 }).catch(() => false)) break
     await sendButton.click()
 
-    // Step 2 renders in place — same route, no navigation.
+    // Step 2 renders in place — same route, no navigation. It is a local state
+    // flip once /api/auth/send-otp answers, so it lands in well under a second
+    // on a warm server; 5s is slack for a cold one, not an expected wait.
     if (await codeField.isVisible({ timeout: 5_000 }).catch(() => false)) break
 
-    if (attempt === 4) {
+    if (attempt === 6) {
       const toast = await page
         .getByRole('alert')
         .first()
@@ -86,7 +112,10 @@ export async function signInThroughUi(page: Page, phone: string) {
           'Supabase project; if it mentions attempts, the login rate limit has not reset.'
       )
     }
-    await page.waitForTimeout(2_000)
+    // Just past GoTrue's 1s max_frequency. Six attempts at this spacing still
+    // cover a number that is briefly throttled, while costing a fraction of
+    // what four attempts at 2s did.
+    await page.waitForTimeout(1_200)
   }
 
   // fill, then assert the value stuck. The OTP field is a controlled HeroUI
