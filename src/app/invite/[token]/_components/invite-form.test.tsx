@@ -7,12 +7,15 @@ import { toastError } from '@/lib/toast'
 // Returns the i18n key so assertions name the key rather than a translation —
 // which is the whole point here: the bug was provider text reaching the user
 // instead of a key.
-const { fakeT } = vi.hoisted(() => ({
+const { fakeT, changeLanguage } = vi.hoisted(() => ({
   fakeT: (key: string, vars?: Record<string, unknown>) =>
     vars ? `${key}:${JSON.stringify(vars)}` : key,
+  changeLanguage: vi.fn(),
 }))
 
-vi.mock('@/lib/i18n/client', () => ({ useTranslation: () => ({ t: fakeT }) }))
+vi.mock('@/lib/i18n/client', () => ({
+  useTranslation: () => ({ t: fakeT, i18n: { changeLanguage } }),
+}))
 
 vi.mock('i18next', () => ({
   default: { changeLanguage: vi.fn(), language: 'en' },
@@ -28,11 +31,17 @@ vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }))
 
-const { signInWithOtp } = vi.hoisted(() => ({ signInWithOtp: vi.fn() }))
+const { signInWithOtp, verifyOtp } = vi.hoisted(() => ({
+  signInWithOtp: vi.fn(),
+  verifyOtp: vi.fn(),
+}))
 
 vi.mock('@/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => ({ auth: { signInWithOtp, verifyOtp: vi.fn() } }),
+  createSupabaseBrowserClient: () => ({ auth: { signInWithOtp, verifyOtp } }),
 }))
+
+const fetchMock = vi.fn()
+vi.stubGlobal('fetch', fetchMock)
 
 const PHONE = '46701234567'
 const RESEND_COOLDOWN_SECONDS = 30
@@ -130,5 +139,83 @@ describe('InviteForm provider error mapping', () => {
       message: 'Token has expired',
     })
     expect(logger.error).not.toHaveBeenCalled()
+  })
+})
+
+// The language control moved out of the sticky header into the form flow as a
+// <select>. The choice is still only sent when the invitee actually picks one
+// — an untouched control must not write a preference, or an absent
+// user_preferences row stops meaning "never chose".
+describe('InviteForm language selection', () => {
+  beforeEach(() => {
+    signInWithOtp.mockReset()
+    verifyOtp.mockReset()
+    fetchMock.mockReset()
+    changeLanguage.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  async function confirmWith(pick?: string) {
+    signInWithOtp.mockResolvedValue({ error: null })
+    verifyOtp.mockResolvedValue({ data: { session: { access_token: 'tok' } }, error: null })
+    fetchMock.mockResolvedValue({ ok: true })
+
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    if (pick !== undefined) {
+      fireEvent.change(screen.getByLabelText('confirmation.languageLabel'), {
+        target: { value: pick },
+      })
+    }
+    fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByText('confirmation.confirmButton'))
+
+    await screen.findByLabelText('signIn.codeLabel')
+    fireEvent.change(screen.getByLabelText('signIn.codeLabel'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('signIn.verifyButton'))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    return JSON.parse(fetchMock.mock.calls[0][1].body)
+  }
+
+  it('renders each locale in its own language, not translated', () => {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    const select = screen.getByLabelText('confirmation.languageLabel')
+    expect(select).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Svenska' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'English' })).toBeInTheDocument()
+  })
+
+  it('omits language from the confirm call when the invitee never picks one', async () => {
+    const body = await confirmWith()
+    expect(body).not.toHaveProperty('language')
+  })
+
+  it('sends the chosen language on the confirm call', async () => {
+    const body = await confirmWith('sv')
+    expect(body.language).toBe('sv')
+  })
+
+  // The select replaced LanguageSwitcher, which called i18n.changeLanguage
+  // itself. Carrying the value in React state alone left the control showing
+  // the new language while every string on the page stayed in the old one.
+  it('repaints the form in the chosen language', () => {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    fireEvent.change(screen.getByLabelText('confirmation.languageLabel'), {
+      target: { value: 'sv' },
+    })
+    expect(changeLanguage).toHaveBeenCalledWith('sv')
+  })
+
+  it('does not switch language when the value is unchanged', () => {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    fireEvent.change(screen.getByLabelText('confirmation.languageLabel'), {
+      target: { value: 'en' },
+    })
+    expect(changeLanguage).not.toHaveBeenCalled()
   })
 })
