@@ -38,7 +38,6 @@ export default async function TenantLayout({ children, params }: Props) {
         <SidebarNav
           tenantSlug={tenantSlug}
           adminLabel={t('navigation.adminLabel')}
-          language={language}
           showAccount={showAccount}
         />
         <div className="min-w-0 flex-1">{children}</div>

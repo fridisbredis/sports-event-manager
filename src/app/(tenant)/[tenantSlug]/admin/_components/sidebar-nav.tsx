@@ -18,13 +18,10 @@ import {
 } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import { LogoutButton } from '@/components/logout-button'
-import { LanguageSwitcher } from '@/components/language-switcher'
-import type { Locale } from '@/lib/i18n/config'
 
 interface Props {
   tenantSlug: string
   adminLabel: string
-  language: Locale
   // False when the caller has no `officials` row in this tenant, so ACCT-01
   // has nothing to show them — see hasAccountScreen in lib/auth/tenant.
   showAccount: boolean
@@ -32,12 +29,9 @@ interface Props {
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({ tenantSlug, adminLabel, language, showAccount }: Props) {
+export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation('admin')
-  // Shared with every other language control in the app, so it lives in
-  // `common` rather than being duplicated into the admin namespace.
-  const { t: tCommon } = useTranslation('common')
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
@@ -132,18 +126,6 @@ export function SidebarNav({ tenantSlug, adminLabel, language, showAccount }: Pr
           {navItems.map((item) => navLink(item.segment, item.label, item.icon))}
         </nav>
         <div className="border-t border-gray-100 py-2">
-          {/* The collapsed rail is 4rem wide, which the two options do not fit
-              side by side — so they stack rather than the control disappearing
-              until the rail is reopened. The caps label goes with them: at this
-              width "EN"/"SV" alone would read as two more nav items. */}
-          <div className={`border-b border-gray-100 pb-3 pt-1 ${collapsed ? 'px-3' : 'px-6'}`}>
-            {!collapsed && <p className="section-label mb-1.5">{tCommon('language.label')}</p>}
-            <LanguageSwitcher
-              current={language}
-              fill={!collapsed}
-              variant={collapsed ? 'stacked' : 'outlined'}
-            />
-          </div>
           {showAccount && navLink('admin/account', t('navigation.account'), UserCircle)}
           <LogoutButton
             title={collapsed ? t('navigation.logOut') : undefined}
