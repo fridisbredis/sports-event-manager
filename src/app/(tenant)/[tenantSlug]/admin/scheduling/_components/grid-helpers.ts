@@ -1,6 +1,13 @@
 import { slotEndTime } from '@/lib/scheduling/grid-logic'
 import type { SaveAssignmentsResult } from '../actions'
-import type { LocalAssignment, OfficialData, WorkstationData } from './scheduling-types'
+import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
+import type {
+  LocalAssignment,
+  OfficialData,
+  PickerCandidate,
+  PickerStatus,
+  WorkstationData,
+} from './scheduling-types'
 
 export const STRIPED_UNAVAILABLE_STYLE = {
   background:
@@ -99,4 +106,61 @@ export function resolveCellActionLabel(
     return officials.find((o) => o.id === assignment.official_id)?.name ?? '—'
   }
   return workstations.find((w) => w.id === assignment.workstation_id)?.name ?? '—'
+}
+
+/** Sort order for the picker list: free first, then the unpickable ones. */
+const STATUS_ORDER: Record<PickerStatus, number> = {
+  available: 0,
+  timeOff: 1,
+  timeOffAdmin: 2,
+  assigned: 3,
+}
+
+/** Which statuses make a person unpickable. */
+export const BLOCKED_PICKER_STATUSES: ReadonlySet<PickerStatus> = new Set<PickerStatus>([
+  'timeOff',
+  'timeOffAdmin',
+  'assigned',
+])
+
+export function sortCandidates(candidates: PickerCandidate[]): PickerCandidate[] {
+  return [...candidates].sort(
+    (a, b) =>
+      STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+      a.official.name.localeCompare(b.official.name)
+  )
+}
+
+/**
+ * Why each official is or is not a pick across a run of one or more slots.
+ *
+ * Both picking surfaces go through here — a single-cell click passes one
+ * slot, a drag-paint gesture passes the run it painted — so the two can never
+ * disagree about who is pickable. A run is only pickable if the person is
+ * free across ALL of its slots, since one pick writes an assignment to every
+ * one of them. Blocked people are returned rather than dropped: the modal
+ * shows them disabled, so an admin hunting for someone finds them with a
+ * reason instead of an unexplained absence.
+ */
+export function buildPickerCandidates(
+  officials: OfficialData[],
+  cellStarts: string[],
+  activeAssignments: LocalAssignment[],
+  periodsByCell: Map<string, UnavailabilityPeriod[]>
+): PickerCandidate[] {
+  const busy = new Set(
+    activeAssignments.filter((a) => cellStarts.includes(a.timeslot_start)).map((a) => a.official_id)
+  )
+  return officials.map((off) => {
+    let status: PickerStatus = 'available'
+    if (busy.has(off.id)) {
+      status = 'assigned'
+    } else {
+      const periods = cellStarts.flatMap((cs) => periodsByCell.get(`${off.id}:${cs}`) ?? [])
+      if (periods.length > 0) {
+        status = dominantAuthor(periods) === 'tenant_admin' ? 'timeOffAdmin' : 'timeOff'
+      }
+    }
+    return { official: off, status }
+  })
 }

@@ -33,6 +33,14 @@ interface ByPersonGridProps {
   periodsByCell: Map<string, UnavailabilityPeriod[]>
   /** In-progress paint along one person's row, or null. */
   personDrag: PersonDrag
+  /**
+   * The run a finished drag is still choosing a work area for, as
+   * `officialId` plus its slot-start keys. The live `personDrag` clears on
+   * pointer-up, which is exactly when the picker opens — without this the
+   * painted cells would go dark while the admin is still looking at the
+   * picker asking what to put in them.
+   */
+  pendingPaint: { officialId: string; cellStarts: Set<string> } | null
   onPersonDragStart: (officialId: string, officialName: string, idx: number) => void
   onPersonDragEnter: (officialId: string, idx: number) => void
   /** Opens the popup listing what covers a hatched cell. */
@@ -55,6 +63,7 @@ export function ByPersonGrid({
   unavailableSlots,
   periodsByCell,
   personDrag,
+  pendingPaint,
   onPersonDragStart,
   onPersonDragEnter,
   onTimeOffClick,
@@ -142,6 +151,21 @@ export function ByPersonGrid({
         <tbody>
           {officials.map((official) => {
             const personColor = personColors.get(official.id) ?? WORK_AREA_COLORS[0]
+            // Which hatch, if any, each cell of this row draws — computed once
+            // for the whole row so a cell can see its neighbours. A run is a
+            // stretch of the SAME kind: an admin-recorded absence sitting next
+            // to a self-declared one is two blocks, not one, because they say
+            // different things.
+            const rowHatch = slots.map((slot) => {
+              const slotStart = slot.toISOString()
+              if (assignmentMap.has(`${official.id}:${slotStart}`)) return null
+              if (!activeSlotSet.has(slotStart)) return 'closed'
+              const key = `${official.id}:${slotStart}`
+              if (!unavailableSlots.has(key)) return null
+              return dominantAuthor(periodsByCell.get(key) ?? []) === 'tenant_admin'
+                ? 'timeOffAdmin'
+                : 'timeOffSelf'
+            })
             return (
               <tr key={official.id} className="border-b border-edge-soft last:border-0">
                 <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-edge-soft">
@@ -172,13 +196,46 @@ export function ByPersonGrid({
                   const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
                   const cellKey = `${official.id}:${slotStart}`
                   const isUnavailable = unavailableSlots.has(cellKey)
-                  // Which hatch to draw. Both kinds block equally; this only
-                  // says whose note it is, so an admin can tell their own
-                  // entry from the official's at a glance.
-                  const timeOffAuthor = isUnavailable
-                    ? dominantAuthor(periodsByCell.get(cellKey) ?? [])
-                    : null
                   const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
+
+                  // Where this cell sits in its run of same-kind hatching.
+                  //
+                  // The hatch is NOT drawn per cell. A 45-degree repeating
+                  // gradient tiles diagonally, so every element that paints it
+                  // restarts the pattern at its own corner; abutting the cells
+                  // and shifting each one's `background-position` cannot fix
+                  // that, because a horizontal shift moves a diagonal pattern
+                  // along BOTH axes and lands between stripes (80px of shift
+                  // is 56.57px perpendicular, 0.57px short of the 8px period —
+                  // an error that compounds across the run).
+                  //
+                  // So the run's FIRST cell paints the whole thing, as one
+                  // absolutely positioned overlay spanning every cell of the
+                  // run. One element, one origin, no seams to align.
+                  const hatch = rowHatch[slotArrIdx]
+                  const sameAsLeft = hatch !== null && rowHatch[slotArrIdx - 1] === hatch
+                  const sameAsRight = hatch !== null && rowHatch[slotArrIdx + 1] === hatch
+                  const startsRun = hatch !== null && !sameAsLeft
+                  let runLength = 0
+                  if (startsRun) {
+                    while (rowHatch[slotArrIdx + runLength] === hatch) runLength++
+                  }
+                  // The cells sit in `px-1` table cells, which is the visible
+                  // gap between them. Inside a run that gap has to go, or the
+                  // overlay would be interrupted by the table's own padding.
+                  const seamPadding = `${sameAsLeft ? 'pl-0' : 'pl-1'} ${sameAsRight ? 'pr-0' : 'pr-1'}`
+                  // Spans this cell plus the rest of the run, including the
+                  // `px-1` gutters that sit between them.
+                  const runOverlayStyle = startsRun
+                    ? {
+                        ...(hatch === 'closed'
+                          ? STRIPED_UNAVAILABLE_STYLE
+                          : hatch === 'timeOffAdmin'
+                            ? STRIPED_TIME_OFF_ADMIN_STYLE
+                            : STRIPED_TIME_OFF_STYLE),
+                        width: `calc(${runLength * 100}% + ${(runLength - 1) * 8}px)`,
+                      }
+                    : undefined
 
                   // Double-booking is a warning and keeps its orange styling —
                   // the work-area palette is decorative and must not mask it.
@@ -208,13 +265,26 @@ export function ByPersonGrid({
                   // Painted range, drawn live while the pointer is down.
                   // Normalised because a drag can run right-to-left.
                   const inPaint =
-                    personDrag !== null &&
-                    personDrag.officialId === official.id &&
-                    slotArrIdx >= Math.min(personDrag.startIdx, personDrag.currentIdx) &&
-                    slotArrIdx <= Math.max(personDrag.startIdx, personDrag.currentIdx)
+                    (personDrag !== null &&
+                      personDrag.officialId === official.id &&
+                      slotArrIdx >= Math.min(personDrag.startIdx, personDrag.currentIdx) &&
+                      slotArrIdx <= Math.max(personDrag.startIdx, personDrag.currentIdx)) ||
+                    (pendingPaint !== null &&
+                      pendingPaint.officialId === official.id &&
+                      pendingPaint.cellStarts.has(slotStart))
 
                   return (
-                    <td key={slotStart} className="relative px-1 py-2 align-top">
+                    <td key={slotStart} className={`relative py-2 align-top ${seamPadding}`}>
+                      {/* One element per run, so the diagonal pattern is
+                          continuous by construction rather than by alignment.
+                          Sits behind the per-slot hit areas above it. */}
+                      {startsRun && (
+                        <div
+                          aria-hidden
+                          className="pointer-events-none absolute inset-y-2 left-0 h-10 rounded-md"
+                          style={runOverlayStyle}
+                        />
+                      )}
                       {isPending ? (
                         <Skeleton className="h-10 w-full rounded-md" />
                       ) : assignment ? (
@@ -267,12 +337,11 @@ export function ByPersonGrid({
                             // read as a larger, mis-seated box. The bordered
                             // cells draw their border INSIDE h-10 (border-box),
                             // so a plain h-10 here matches them exactly.
-                            className="h-10 w-full rounded-md transition-opacity hover:opacity-75"
-                            style={
-                              timeOffAuthor === 'tenant_admin'
-                                ? STRIPED_TIME_OFF_ADMIN_STYLE
-                                : STRIPED_TIME_OFF_STYLE
-                            }
+                            // Transparent: the run's first cell paints the
+                            // hatch for the whole run. This stays a per-slot
+                            // hit area so the popup still knows which slot
+                            // was clicked.
+                            className="relative z-10 h-10 w-full transition-opacity hover:opacity-75"
                             title={t('scheduling.timeOffBlockedCell')}
                           />
                         ) : (
@@ -302,8 +371,7 @@ export function ByPersonGrid({
                           // Same reasoning as the time-off cell above: no
                           // border, so the hatch stops at the same edge the
                           // other cells' borders sit on.
-                          className="h-10 w-full rounded-md"
-                          style={STRIPED_UNAVAILABLE_STYLE}
+                          className="h-10 w-full"
                         />
                       )}
                     </td>

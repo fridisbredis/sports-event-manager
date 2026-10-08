@@ -150,6 +150,31 @@ export function ByWorkAreaGrid({
             const overflowBySlot = getOverflowBySlot(activeAssignments, ws.id, ws.capacity_ceiling)
             const hasOverflow = overflowBySlot.size > 0
 
+            // Out-of-window hatching depends only on this work area's
+            // operating windows, so one pass per work area serves the summary
+            // row and every numbered slot row underneath it. Index i holds
+            // how far into a closed run slot i sits, or null when it is open.
+            const isClosed = slots.map(
+              (slot) => !isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
+            )
+            const closedSeam = (i: number) =>
+              `${i > 0 && isClosed[i - 1] ? 'pl-0' : 'pl-1'} ${
+                i < slots.length - 1 && isClosed[i + 1] ? 'pr-0' : 'pr-1'
+              }`
+            // A run's first cell paints the hatch for the whole run as one
+            // overlay; see the note in by-person-grid for why the pattern
+            // cannot be stitched together from per-cell backgrounds.
+            const closedRunLength = (i: number) => {
+              if (!isClosed[i] || (i > 0 && isClosed[i - 1])) return 0
+              let n = 0
+              while (isClosed[i + n]) n++
+              return n
+            }
+            const closedOverlayStyle = (i: number) => ({
+              ...STRIPED_UNAVAILABLE_STYLE,
+              width: `calc(${closedRunLength(i) * 100}% + ${(closedRunLength(i) - 1) * 8}px)`,
+            })
+
             return (
               <React.Fragment key={ws.id}>
                 {/* Summary row (always visible) */}
@@ -193,7 +218,7 @@ export function ByWorkAreaGrid({
                       </div>
                     </div>
                   </td>
-                  {slots.map((slot) => {
+                  {slots.map((slot, slotArrIdx) => {
                     const slotStart = slot.toISOString()
                     const key = `${ws.id}:${slotStart}`
                     const count = countMap.get(key) ?? 0
@@ -206,11 +231,15 @@ export function ByWorkAreaGrid({
 
                     if (!inWindow) {
                       return (
-                        <td key={slotStart} className="px-1 py-2">
-                          <div
-                            className="w-full h-10 rounded-md"
-                            style={STRIPED_UNAVAILABLE_STYLE}
-                          />
+                        <td key={slotStart} className={`relative py-2 ${closedSeam(slotArrIdx)}`}>
+                          {closedRunLength(slotArrIdx) > 0 && (
+                            <div
+                              aria-hidden
+                              className="pointer-events-none absolute inset-y-2 left-0 h-10 rounded-md"
+                              style={closedOverlayStyle(slotArrIdx)}
+                            />
+                          )}
+                          <div className="w-full h-10" />
                         </td>
                       )
                     }
@@ -285,11 +314,20 @@ export function ByWorkAreaGrid({
 
                         if (!inWindow) {
                           return (
-                            <td key={slotStart} className="px-1 py-1.5">
+                            <td
+                              key={slotStart}
+                              className={`relative py-1.5 ${closedSeam(slotArrIdx)}`}
+                            >
+                              {closedRunLength(slotArrIdx) > 0 && (
+                                <div
+                                  aria-hidden
+                                  className="pointer-events-none absolute inset-y-1.5 left-0 h-10 rounded-md opacity-30"
+                                  style={closedOverlayStyle(slotArrIdx)}
+                                />
+                              )}
                               <div
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
-                                className="w-full h-10 rounded-md opacity-30"
-                                style={STRIPED_UNAVAILABLE_STYLE}
+                                className="relative z-10 w-full h-10"
                               />
                             </td>
                           )
