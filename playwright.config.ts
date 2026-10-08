@@ -10,6 +10,20 @@ loadEnv({ path: path.resolve(__dirname, '.env.local.e2e'), override: false })
 
 const BASE_URL = process.env.E2E_LOCAL_URL ?? 'http://localhost:3000'
 
+// Run the suite against `next build && next start` instead of `next dev`.
+//
+// Why this exists: `next dev` compiles each route on first request, and that
+// cost dominates the run. Measured on the full suite — 136 tests, median 0.6s —
+// six tests took ~32s each and accounted for 197s of 309s. They are not doing
+// anything expensive: signInThroughUi() takes 0.9s on its own, and in a run of
+// just the role loop the first test paid 34.1s while the next four, same helper
+// and same assertions, took ~1.1s. The 32s is route compilation, nothing else.
+//
+// Default off, so a local `npm run test:e2e` keeps dev's fast startup and HMR
+// while iterating. CI sets it: there, every route is cold, which is why the job
+// takes ~9.5 min against ~5 min locally.
+const E2E_AGAINST_BUILD = process.env.E2E_AGAINST_BUILD === '1'
+
 // Refuse to run against anything but localhost. Mirrors the loopback interlock
 // in tests/integration/setup-env.ts — the suite signs in as seeded users and
 // writes through the UI, which must never happen against a shared environment.
@@ -82,9 +96,18 @@ export default defineConfig({
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
-  // Dev server, never a prebuilt bundle: NEXT_PUBLIC_* is inlined at build
-  // time, so a .next built against dev-cloud would silently authenticate
-  // against the wrong Supabase project (DEVELOPMENT.md documents this trap).
+  // NEXT_PUBLIC_* is inlined at build time, so a .next built against dev-cloud
+  // would silently authenticate against the wrong Supabase project
+  // (DEVELOPMENT.md documents this trap). This used to read "dev server, never
+  // a prebuilt bundle", but the real requirement is the right env *at build
+  // time*, not dev mode: localSupabaseEnv() below is passed to the build as
+  // well as to the server, so under E2E_AGAINST_BUILD the bundle is compiled
+  // against the local stack. Verified by grepping .next/static after a build —
+  // the local URL is inlined and the dev-cloud project ref appears nowhere.
+  //
+  // What stays true is that a bundle built *without* that env is unsafe, which
+  // is why this never reuses an existing server in build mode and why CI builds
+  // inside this config rather than consuming an artifact from another job.
   //
   // The env below is the other half of that trap. .env.local ships with the
   // dev *cloud* URL active and the local one commented out, so a plain
@@ -93,10 +116,13 @@ export default defineConfig({
   // Overriding here (Next.js gives process.env precedence over .env.local)
   // pins the dev server to the local stack without editing a tracked file.
   webServer: {
-    command: 'npm run dev',
+    command: E2E_AGAINST_BUILD ? 'npm run build && npm run start' : 'npm run dev',
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    // Never reuse a server for a build run: a server someone started by hand is
+    // a dev server, which is exactly what this mode exists to avoid.
+    reuseExistingServer: !process.env.CI && !E2E_AGAINST_BUILD,
+    // `next build` has to compile the whole app before the server listens.
+    timeout: E2E_AGAINST_BUILD ? 600_000 : 120_000,
     env: localSupabaseEnv(),
   },
 })
