@@ -51,6 +51,7 @@ interface AdminDashboardCached {
   race_stage_count: number
   over_capacity: number
   double_booked: number
+  time_off_clash: number
   earliest_day: string | null
   earliest_stage_id: string | null
 }
@@ -190,8 +191,102 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
     expect(payload.race_stage_count).toBe(1)
     expect(payload.over_capacity).toBe(1)
     expect(payload.double_booked).toBe(0)
+    expect(payload.time_off_clash).toBe(0)
     expect(payload.earliest_day).toBe('2026-09-20')
     expect(payload.earliest_stage_id).toBe(stage.id)
+  })
+
+  // Exercises the path through cache_rpc_reader specifically. This function
+  // is SECURITY DEFINER and reads official_unavailability as that role, so a
+  // missing grant fails loudly (42501) but a missing SELECT policy under
+  // FORCE RLS does not: the join simply matches nothing and the count comes
+  // back a silent zero. Only a fixture that actually clashes catches that.
+  it('counts an official scheduled over their declared time off', async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('PERF-06 Dashboard Time Off')
+    createdTenantIds.push(tenant.id)
+
+    const { data: event } = await admin
+      .from('events')
+      .insert({ tenant_id: tenant.id, name: 'Time Off Event', event_type: 'race' })
+      .select()
+      .single()
+      .throwOnError()
+
+    const { data: stage } = await admin
+      .from('event_stages')
+      .insert({
+        tenant_id: tenant.id,
+        event_id: event!.id,
+        name: 'Race',
+        stage_type: 'race',
+        stage_date: '2026-09-20',
+      })
+      .select()
+      .single()
+      .throwOnError()
+
+    const { data: workstation } = await admin
+      .from('workstations')
+      .insert({
+        tenant_id: tenant.id,
+        event_id: event!.id,
+        stage_id: stage!.id,
+        name: 'Finish line',
+        capacity_ceiling: 4,
+      })
+      .select()
+      .single()
+      .throwOnError()
+
+    const { data: official } = await admin
+      .from('officials')
+      .insert({
+        tenant_id: tenant.id,
+        name: 'Away That Day',
+        phone: await randomPhone(),
+        invite_status: 'confirmed',
+      })
+      .select()
+      .single()
+      .throwOnError()
+
+    const timeslotStart = '2026-09-20T10:00:00.000Z'
+    const timeslotEnd = '2026-09-20T10:30:00.000Z'
+
+    await admin
+      .from('official_unavailability')
+      .insert({
+        tenant_id: tenant.id,
+        official_id: official!.id,
+        starts_at: timeslotStart,
+        ends_at: timeslotEnd,
+        created_by_role: 'official',
+      })
+      .throwOnError()
+
+    await admin
+      .from('assignments')
+      .insert({
+        tenant_id: tenant.id,
+        official_id: official!.id,
+        workstation_id: workstation!.id,
+        timeslot_start: timeslotStart,
+        timeslot_end: timeslotEnd,
+        slot_index: 0,
+        status: 'assigned',
+      })
+      .throwOnError()
+
+    const { data, error } = await callRpc(admin, tenant.id)
+    expect(error).toBeNull()
+    const payload = data as unknown as AdminDashboardCached
+
+    expect(payload.time_off_clash).toBe(1)
+    expect(payload.over_capacity).toBe(0)
+    expect(payload.double_booked).toBe(0)
+    expect(payload.earliest_day).toBe('2026-09-20')
+    expect(payload.earliest_stage_id).toBe(stage!.id)
   })
 
   it('returns a null event, zero counts, and no warnings when the tenant has no event row', async () => {
@@ -208,6 +303,7 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
     expect(payload.race_stage_count).toBe(0)
     expect(payload.over_capacity).toBe(0)
     expect(payload.double_booked).toBe(0)
+    expect(payload.time_off_clash).toBe(0)
     expect(payload.earliest_day).toBeNull()
     expect(payload.earliest_stage_id).toBeNull()
   })
@@ -237,6 +333,7 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
     expect(payload.race_stage_count).toBe(0)
     expect(payload.over_capacity).toBe(0)
     expect(payload.double_booked).toBe(0)
+    expect(payload.time_off_clash).toBe(0)
   })
 
   it("does not leak another tenant's officials counts, race-stage count, or warnings", async () => {

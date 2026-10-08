@@ -32,6 +32,7 @@ interface AdminDashboardCached {
   race_stage_count: number
   over_capacity: number
   double_booked: number
+  time_off_clash: number
   earliest_day: string | null
   earliest_stage_id: string | null
 }
@@ -98,6 +99,7 @@ export default async function DashboardPage({ params }: Props) {
     race_stage_count: raceStageCount,
     over_capacity: overCapacity,
     double_booked: doubleBooked,
+    time_off_clash: timeOffClash,
     earliest_day: earliestDay,
     earliest_stage_id: earliestStageId,
   } = await getAdminDashboardCached(tenant.id)
@@ -118,7 +120,7 @@ export default async function DashboardPage({ params }: Props) {
     })
     reviewHref = `/${tenantSlug}/admin/scheduling?${params.toString()}`
   }
-  const totalWarnings = overCapacity + doubleBooked
+  const totalWarnings = overCapacity + doubleBooked + timeOffClash
 
   const tenantId = tenant.id
 
@@ -167,6 +169,8 @@ export default async function DashboardPage({ params }: Props) {
           overCapacityLabel={t('dashboard.overCapacity')}
           doubleBooked={doubleBooked}
           doubleBookedLabel={t('dashboard.doubleBooked')}
+          timeOffClash={timeOffClash}
+          timeOffClashLabel={t('dashboard.timeOffClash')}
           allClearLabel={t('dashboard.allClear')}
           issuesLabel={t('dashboard.issues', { count: totalWarnings })}
           reviewHref={reviewHref}

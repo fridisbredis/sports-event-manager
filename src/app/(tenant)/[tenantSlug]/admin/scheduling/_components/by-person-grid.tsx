@@ -197,6 +197,13 @@ export function ByPersonGrid({
                   const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
                   const cellKey = `${official.id}:${slotStart}`
                   const isUnavailable = unavailableSlots.has(cellKey)
+                  // Who recorded the absence this shift sits on, so the
+                  // badge below is tinted the same as the block would have
+                  // been — amber for the official's own, slate for ours.
+                  const clashAuthor =
+                    isUnavailable && assignment
+                      ? dominantAuthor(periodsByCell.get(cellKey) ?? [])
+                      : null
                   const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
 
                   // A blocked cell is drawn as exactly the same box as a
@@ -258,12 +265,17 @@ export function ByPersonGrid({
                   // the save action refuses either — but a cell that is
                   // already assigned twice is the one an admin has to act on,
                   // and two warning styles on one cell read as neither.
+                  // A shift laid over someone's time off used to be marked
+                  // with an orange ring. The ring said "something is wrong
+                  // here" without saying what, and now that an absence is
+                  // drawn as a filled block with a calendar icon, a shift
+                  // covering one lost every visual tie to the thing it
+                  // clashes with. The corner badge below says it in the same
+                  // language instead, so the ring is redundant.
                   const cellStyle = assignment
                     ? isDoubleBooked
                       ? 'bg-orange-50 border border-orange-200'
-                      : isUnavailable
-                        ? 'border ring-2 ring-inset ring-orange-300'
-                        : 'border'
+                      : 'border'
                     : ''
                   const cellColors =
                     assignment && !isDoubleBooked && color
@@ -302,6 +314,27 @@ export function ByPersonGrid({
                             <CalendarOff className={`size-4 ${runIconTint}`} aria-hidden="true" />
                           )}
                         </div>
+                      )}
+                      {/* Corner badge rather than anything inline: the card's
+                          two lines are already tight, and a mark that overlaps
+                          the edge reads as applied TO the shift — which is
+                          what a clash is. Sits outside the button because the
+                          card clips its own overflow. */}
+                      {clashAuthor && (
+                        <span
+                          className={`pointer-events-none absolute right-0 top-1 z-20 flex size-4 items-center justify-center rounded-full border bg-white ${
+                            clashAuthor === 'tenant_admin' ? 'border-slate-300' : 'border-amber-200'
+                          }`}
+                        >
+                          <CalendarOff
+                            className={`size-2.5 ${
+                              clashAuthor === 'tenant_admin'
+                                ? TIME_OFF_ICON.admin
+                                : TIME_OFF_ICON.self
+                            }`}
+                            aria-hidden="true"
+                          />
+                        </span>
                       )}
                       {isPending ? (
                         <Skeleton className="h-10 w-full rounded-md" />

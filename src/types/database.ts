@@ -1117,6 +1117,7 @@ export type Database = {
           earliest_stage_id: string
           earliest_timeslot_start: string
           over_capacity: number
+          time_off_clash: number
         }[]
       }
       shares_shift_with_caller: {

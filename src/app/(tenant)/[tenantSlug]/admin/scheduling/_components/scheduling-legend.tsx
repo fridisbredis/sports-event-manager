@@ -59,6 +59,14 @@ export function SchedulingLegend() {
         </span>
         {t('scheduling.legendTimeOffAdmin')}
       </span>
+      {/* The badge as it appears on a shift card: a small white disc on the
+          card's corner, tinted by who recorded the absence underneath. */}
+      <span className="flex items-center gap-2">
+        <span className="inline-flex size-4 items-center justify-center rounded-full border border-amber-200 bg-white">
+          <CalendarOff className={`size-2.5 ${TIME_OFF_ICON.self}`} aria-hidden="true" />
+        </span>
+        {t('scheduling.legendClashTimeOff')}
+      </span>
     </div>
   )
 }
