@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialLayout from './layout'
-import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
+import { AdminViewLink } from './_components/admin-view-link'
 
 // getOfficialTenant resolves the tenant only after the official-surface
 // access check passes, so a null return means either "no such tenant" or
@@ -10,6 +11,7 @@ import { BottomTabBar } from './_components/bottom-tab-bar'
 vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getOfficialTenant: vi.fn(),
+  hasAdminScreens: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -23,6 +25,10 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('./_components/bottom-tab-bar', () => ({
   BottomTabBar: vi.fn(() => null),
+}))
+
+vi.mock('./_components/admin-view-link', () => ({
+  AdminViewLink: vi.fn(() => null),
 }))
 
 vi.mock('@/lib/theme/tenant-theme-style', () => ({
@@ -50,9 +56,10 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 // The layout no longer queries Supabase itself — it resolves the caller and the
 // tenant through the memoised helpers, which carry the access check.
-function mockUser(userId: string | null, tenant: unknown) {
+function mockUser(userId: string | null, tenant: unknown, isAdmin = false) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
   vi.mocked(getOfficialTenant).mockResolvedValue(tenant as never)
+  vi.mocked(hasAdminScreens).mockResolvedValue(isAdmin)
 }
 
 beforeEach(() => {
@@ -119,5 +126,41 @@ describe('OfficialLayout', () => {
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
     expect(findByType(result, BottomTabBar)!.props.showAccount).toBe(false)
+  })
+  // The cross-surface link (both directions) exists because an admin who is
+  // also on the roster has two surfaces for the same tenant and otherwise no
+  // way between them but editing the URL.
+  it('offers the admin view to a caller who passes the admin access check', async () => {
+    mockUser(
+      'user-1',
+      {
+        id: TENANT_ID,
+        slug: 'viadal',
+        color_palette: 'blue',
+        is_active: true,
+        officialId: 'off-1',
+      },
+      true
+    )
+
+    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
+
+    const link = findByType(result, AdminViewLink)
+    expect(link).not.toBeNull()
+    expect(link!.props).toEqual({ tenantSlug: 'viadal' })
+  })
+
+  it('hides the admin view from a plain official', async () => {
+    mockUser('user-1', {
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      is_active: true,
+      officialId: 'off-1',
+    })
+
+    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
+
+    expect(findByType(result, AdminViewLink)).toBeNull()
   })
 })
