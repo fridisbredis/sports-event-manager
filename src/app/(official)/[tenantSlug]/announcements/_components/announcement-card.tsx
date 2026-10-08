@@ -20,10 +20,11 @@ export function AnnouncementCard({ time, body }: Props) {
         <Bell className="size-5" strokeWidth={2} aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-ink-label">{time}</p>
-        {/* The body is the reason the card exists, so it carries the weight
-            the old text-sm gave away to the timestamp above it. */}
-        <p className="mt-1 text-[17px] leading-relaxed text-ink">{body}</p>
+        <p className="text-xs text-ink-label">{time}</p>
+        {/* The body is the reason the card exists, so it still outweighs the
+            timestamp above it — but both have stepped down from the earlier
+            17px/text-sm pairing, keeping the gap while shrinking the card. */}
+        <p className="mt-1 text-sm leading-relaxed text-ink">{body}</p>
       </div>
     </AppCard>
   )
