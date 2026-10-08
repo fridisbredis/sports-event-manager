@@ -86,13 +86,19 @@ function personCell(page: Page, official: string, slotIndex: number) {
     .nth(slotIndex + SLOT_COLUMN_OFFSET)
 }
 
-// The picker renders as a floating panel marked data-picker-cell, headed
-// "Assign to". Scoping to it matters: its buttons are named "<work area>
+// The picker renders as a floating panel marked data-person-drag-picker. It
+// replaced the old click-to-open data-picker-cell panel when the row became
+// drag-to-paint: an empty cell now carries only pointer handlers, and a
+// pointerup anywhere opens the picker for the painted run — so a plain click
+// still reaches it, as a one-slot paint.
+//
+// Scoping to the panel matters: its options are named "<work area>
 // <n>/<ceiling>", exactly like the filled cells already in the grid, so an
-// unscoped getByRole would be ambiguous the moment any cell is filled.
+// unscoped getByRole would be ambiguous the moment any cell is filled. The
+// colour swatch is aria-hidden, so it does not enter the accessible name.
 function pickerOption(page: Page, workArea: string) {
   return page
-    .locator('[data-picker-cell]')
+    .locator('[data-person-drag-picker]')
     .getByRole('button', { name: new RegExp(`^${workArea}`) })
 }
 
@@ -458,7 +464,7 @@ test.describe('SCHED-01 over capacity warns rather than blocks', () => {
     // And the picker only ever offers work areas whose window covers the slot,
     // so an assignable cell cannot be pointed at a closed work area either.
     await personCell(page, 'Seed Official No Shifts', 0).getByRole('button').click()
-    await expect(page.locator('[data-picker-cell]')).toBeVisible()
+    await expect(page.locator('[data-person-drag-picker]')).toBeVisible()
     await expect(pickerOption(page, FINISH_LINE)).toBeVisible()
     await page.keyboard.press('Escape')
   })

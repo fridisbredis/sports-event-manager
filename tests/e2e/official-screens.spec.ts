@@ -79,11 +79,24 @@ test.describe('INFO-01 event info', () => {
 })
 
 test.describe('MYSCH-01 my schedule', () => {
-  test('is read-only and offers both views', async ({ officialConfirmedPage: page }) => {
+  test('says who owns the schedule and offers both views', async ({
+    officialConfirmedPage: page,
+  }) => {
     await page.goto(`${base}/schedule`)
 
-    await expect(page.getByRole('heading', { name: 'My schedule' })).toBeVisible()
-    await expect(page.getByText('Read-only')).toBeVisible()
+    const heading = page.getByRole('heading', { name: 'My schedule' })
+    await expect(heading).toBeVisible()
+
+    // "Set by organisers", not the old "Read-only": officials now write
+    // checklist items and declare time off, so the page is no longer read-only
+    // — what the badge claims is who decides the shifts on it.
+    //
+    // exact: true on purpose. The same words end several time-off strings
+    // ("Time off set by organisers", and the availability screen's own badge),
+    // so a substring match becomes a strict-mode violation the moment an
+    // admin-set period lands on the selected day. The badge is the only place
+    // the phrase stands alone.
+    await expect(page.getByText('Set by organisers', { exact: true })).toBeVisible()
 
     // The view switch is a radiogroup, not two buttons — one either/or
     // choice, which is what lets a screen reader announce "1 of 2".
