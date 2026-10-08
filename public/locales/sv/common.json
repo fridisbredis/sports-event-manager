@@ -55,6 +55,7 @@
     "purposeBody": "För att kunna schemalägga funktionärer och nå dig med ändringar som rör dina pass.",
     "retentionHeading": "Hur länge",
     "retentionBody": "Om du slutar logga in anonymiseras ditt konto automatiskt efter 24 månader. Du får ett SMS en månad innan det sker.",
+    "back": "Tillbaka till appen",
     "backToSignIn": "Tillbaka till inloggningen"
   },
   "actions": {

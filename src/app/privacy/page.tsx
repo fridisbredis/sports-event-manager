@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { getCurrentUser } from '@/lib/auth/tenant'
 
 export const metadata = {
   title: 'Privacy policy — Sports Event Manager',
@@ -13,6 +14,13 @@ export const metadata = {
 export default async function PrivacyPage() {
   const language = await getUserLanguage()
   const t = await getServerTranslation(language)
+
+  // Both links below point at '/', which routes by session: it sends a signed-
+  // out reader to /login and a signed-in one to their own start page. Only the
+  // wording has to know the difference — "Back to sign in" is plainly wrong for
+  // someone who arrived here from their own account screen. Free to ask:
+  // getUserLanguage above already resolved the same memoised user.
+  const signedIn = (await getCurrentUser()) != null
 
   // Each block is a question someone actually arrives with, rather than a
   // heading lifted from the legal text. Kept as data so the draft notice and
@@ -61,14 +69,15 @@ export default async function PrivacyPage() {
         ))}
       </dl>
 
-      {/* Most arrivals come from the sign-in page or an invite form, mid-task.
-          The way back matters more than it would on a page reached from a nav. */}
+      {/* Most arrivals come mid-task — from sign-in, an invite form, or the
+          account screen — so the way back matters more than it would on a page
+          reached from a nav. */}
       <div className="mt-14 border-t border-edge-soft pt-6">
         <Link
-          href="/login"
+          href="/"
           className="rounded-md text-[15px] font-semibold text-ink-soft underline decoration-edge decoration-1 underline-offset-4 transition-colors hover:text-ink hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
-          {t('privacyPage.backToSignIn')}
+          {signedIn ? t('privacyPage.back') : t('privacyPage.backToSignIn')}
         </Link>
       </div>
     </main>
