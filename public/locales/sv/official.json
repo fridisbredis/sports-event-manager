@@ -4,7 +4,8 @@
     "mySchedule": "Mitt schema",
     "eventInfo": "Evenemangsinfo",
     "announcements": "Meddelanden",
-    "account": "Konto"
+    "account": "Konto",
+    "adminView": "Adminvy"
   },
   "home": {
     "title": "Funktionärsstart",

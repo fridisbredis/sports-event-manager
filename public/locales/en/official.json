@@ -4,7 +4,8 @@
     "mySchedule": "My schedule",
     "eventInfo": "Event info",
     "announcements": "Announcements",
-    "account": "Account"
+    "account": "Account",
+    "adminView": "Admin view"
   },
   "home": {
     "title": "Official Home",
