@@ -2,106 +2,51 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ScrollShadow } from '@hero
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/form-fields'
-import { formatSlotLabel } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
-import type { OfficialData, LocalAssignment } from './scheduling-types'
-import type { WsSlotModal as WsSlotModalState } from './use-scheduling-grid-interaction'
-
-/**
- * What the picker says about one official at this slot.
- *
- * Ordered by how much it should discourage picking that person, which is also
- * the order the list sorts in: free first, then the two that cannot be picked
- * at all — time off (blocked since Peter's call of 2026-10-07) and already
- * working.
- */
-type PickerStatus = 'available' | 'timeOff' | 'timeOffAdmin' | 'assigned'
-
-const STATUS_ORDER: Record<PickerStatus, number> = {
-  available: 0,
-  timeOff: 1,
-  timeOffAdmin: 2,
-  assigned: 3,
-}
-
-/** Which statuses make a person unpickable for this slot. */
-const BLOCKED: ReadonlySet<PickerStatus> = new Set<PickerStatus>([
-  'timeOff',
-  'timeOffAdmin',
-  'assigned',
-])
+import { BLOCKED_PICKER_STATUSES, sortCandidates } from './grid-helpers'
+import { useArmedAfterGesture } from './use-armed-after-gesture'
+import type { LocalAssignment, OfficialData, PickerCandidate } from './scheduling-types'
 
 interface WsSlotModalProps {
-  wsSlotModal: NonNullable<WsSlotModalState>
-  wsSlotModalSearch: string
+  /** Modal heading — differs between a single slot and a painted run. */
+  title: string
+  /** Label above the list, naming what the picks apply to. */
+  listLabel: string
+  candidates: PickerCandidate[]
+  search: string
   onSearchChange: (value: string) => void
-  activeAssignments: LocalAssignment[]
+  /** Already-assigned people to offer removal for; empty for a painted run. */
+  assignedInSlot: LocalAssignment[]
   officials: OfficialData[]
-  /** `officialId:slotStartISO` keys covered by any kind of time off. */
-  unavailableSlots: Set<string>
-  /** The periods behind those keys, to tell admin-set from self-declared. */
-  periodsByCell: Map<string, UnavailabilityPeriod[]>
-  onRemove: (assignment: LocalAssignment) => void
+  onRemove?: (assignment: LocalAssignment) => void
   onAdd: (officialId: string) => void
   onClose: () => void
+  /**
+   * Whether the pointer was still down when this opened — true for the
+   * drag-to-paint gesture, false for an ordinary click on a cell.
+   */
+  openedMidGesture?: boolean
 }
 
 export function WsSlotModal({
-  wsSlotModal,
-  wsSlotModalSearch,
+  title,
+  listLabel,
+  candidates,
+  search,
   onSearchChange,
-  activeAssignments,
+  assignedInSlot,
   officials,
-  unavailableSlots,
-  periodsByCell,
   onRemove,
   onAdd,
   onClose,
+  openedMidGesture = false,
 }: WsSlotModalProps) {
   const { t } = useTranslation('admin')
 
-  const slot = new Date(wsSlotModal.slotStart)
-  const assignedInSlot = activeAssignments.filter(
-    (a) =>
-      a.workstation_id === wsSlotModal.workstationId &&
-      a.timeslot_start === wsSlotModal.slotStart &&
-      a.slot_index === wsSlotModal.slotIndex
-  )
-  const assignedAtSlot = new Set(
-    activeAssignments
-      .filter((a) => a.timeslot_start === wsSlotModal.slotStart)
-      .map((a) => a.official_id)
-  )
+  const armed = useArmedAfterGesture(openedMidGesture)
 
-  // Every official, each carrying why they are or are not a good pick —
-  // rather than silently dropping the ones who cannot be picked. Hiding them
-  // answered "who can I add" but not "where is everyone", so an admin looking
-  // for a specific person found an absence with no explanation. The status
-  // says which, and Add is disabled for the ones the server would refuse.
-  const candidatesAll = officials
-    .map((off) => {
-      const cellKey = `${off.id}:${wsSlotModal.slotStart}`
-      let status: PickerStatus = 'available'
-      if (assignedAtSlot.has(off.id)) {
-        status = 'assigned'
-      } else if (unavailableSlots.has(cellKey)) {
-        status =
-          dominantAuthor(periodsByCell.get(cellKey) ?? []) === 'tenant_admin'
-            ? 'timeOffAdmin'
-            : 'timeOff'
-      }
-      return { official: off, status }
-    })
-    .sort(
-      (a, b) =>
-        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
-        a.official.name.localeCompare(b.official.name)
-    )
-
-  const candidates = candidatesAll.filter((c) =>
-    c.official.name.toLowerCase().includes(wsSlotModalSearch.toLowerCase())
-  )
+  const sorted = sortCandidates(candidates)
+  const visible = sorted.filter((c) => c.official.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <Modal
@@ -117,19 +62,13 @@ export function WsSlotModal({
       <ModalContent>
         {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
-              {t('scheduling.slotModalTitle', {
-                index: wsSlotModal.slotIndex,
-                ws: wsSlotModal.wsName,
-                time: formatSlotLabel(slot),
-              })}
-            </ModalHeader>
+            <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">{title}</ModalHeader>
             <ModalBody>
-              {assignedInSlot.length === 0 && candidatesAll.length === 0 && (
+              {assignedInSlot.length === 0 && sorted.length === 0 && (
                 <p className="text-sm text-ink-label">{t('scheduling.slotModalEmpty')}</p>
               )}
 
-              {assignedInSlot.length > 0 && (
+              {assignedInSlot.length > 0 && onRemove && (
                 <div>
                   <p className="section-label mb-2">{t('scheduling.slotModalAssigned')}</p>
                   {assignedInSlot.map((a) => {
@@ -154,11 +93,9 @@ export function WsSlotModal({
                 </div>
               )}
 
-              {assignedInSlot.length === 0 && candidatesAll.length > 0 && (
+              {assignedInSlot.length === 0 && sorted.length > 0 && (
                 <div>
-                  <p className="section-label mb-2">
-                    {t('scheduling.slotModalAvailable', { time: formatSlotLabel(slot) })}
-                  </p>
+                  <p className="section-label mb-2">{listLabel}</p>
                   <Input
                     type="text"
                     size="sm"
@@ -167,55 +104,92 @@ export function WsSlotModal({
                     // placeholder is not exposed as an accessible name, and
                     // vanishes once the field has text.
                     aria-label={t('scheduling.slotModalSearchPlaceholder')}
-                    value={wsSlotModalSearch}
+                    value={search}
                     onValueChange={onSearchChange}
                     className="mb-2"
                   />
-                  {candidates.length === 0 ? (
+                  {visible.length === 0 ? (
                     <p className="text-sm text-ink-label px-1 py-2">
                       {t('scheduling.slotModalNoResults')}
                     </p>
                   ) : (
-                    <ScrollShadow className="flex flex-col max-h-80 divide-y divide-gray-100">
-                      {candidates.map(({ official, status }) => (
-                        <div
-                          key={official.id}
-                          className="flex items-center justify-between gap-3 px-2 py-2"
-                        >
-                          <div className="flex min-w-0 flex-col items-start gap-1">
-                            <span className="truncate text-sm text-gray-900">{official.name}</span>
-                            {/* Green for pickable, red for an outright clash,
-                                amber for either kind of time off — matching
-                                the hatches on the grid itself. */}
-                            <Chip
-                              size="sm"
-                              variant="flat"
-                              color={
-                                status === 'available'
-                                  ? 'success'
-                                  : status === 'assigned'
-                                    ? 'danger'
-                                    : 'warning'
+                    <ScrollShadow className="flex max-h-80 flex-col gap-0.5">
+                      {visible.map(({ official, status }) => {
+                        const blocked = BLOCKED_PICKER_STATUSES.has(status)
+                        return (
+                          // The whole row is the control, not just the button
+                          // at its end: the row is what an admin aims at, and
+                          // a 40px-wide target beside a full-width row reads
+                          // as a slip waiting to happen. "Add" stays as the
+                          // affordance that says what a click does, but it is
+                          // painted rather than focusable — two tab stops per
+                          // person would double the keyboard path for no gain.
+                          //
+                          // A div with a button role rather than a <button>:
+                          // HeroUI's Chip renders a div, and a div inside a
+                          // button is invalid nesting that the browser
+                          // repairs by hoisting it OUT of the button —
+                          // which silently cost the name its click target.
+                          //
+                          // Disabled, not hidden: an admin looking for a
+                          // person needs to find them and see why they are
+                          // unavailable. The server refuses these too — the
+                          // disabled state is a courtesy, not the guard.
+                          <div
+                            key={official.id}
+                            role="button"
+                            tabIndex={blocked ? -1 : 0}
+                            aria-disabled={blocked}
+                            onClick={() => {
+                              if (!blocked && armed) onAdd(official.id)
+                            }}
+                            onKeyDown={(e) => {
+                              if (blocked) return
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                onAdd(official.id)
                               }
-                            >
-                              {t(`scheduling.slotModalStatus.${status}`)}
-                            </Chip>
-                          </div>
-                          {/* Disabled, not hidden: an admin looking for a
-                              person needs to find them and see why they are
-                              unavailable. The server refuses these too — the
-                              disabled state is a courtesy, not the guard. */}
-                          <Button
-                            variant="bordered"
-                            size="sm"
-                            className="shrink-0"
-                            isDisabled={BLOCKED.has(status)}
-                            onPress={() => onAdd(official.id)}
+                            }}
+                            className={`flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left transition-colors ${
+                              blocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100'
+                            }`}
                           >
-                            {t('scheduling.slotModalAdd')}
-                          </Button>
-                        </div>
-                      ))}
+                            <span className="truncate text-sm text-gray-900">{official.name}</span>
+                            {/* Status and action sit together at the end of
+                                the row: the chip qualifies the Add beside it
+                                — why this one is dimmed — so reading them as
+                                one unit beats a stacked two-line row. */}
+                            <span className="flex shrink-0 items-center gap-2">
+                              {/* Green for pickable, red for an outright clash,
+                                  amber for either kind of time off — matching
+                                  the hatches on the grid itself. */}
+                              <Chip
+                                size="sm"
+                                variant="flat"
+                                color={
+                                  status === 'available'
+                                    ? 'success'
+                                    : status === 'assigned'
+                                      ? 'danger'
+                                      : 'warning'
+                                }
+                              >
+                                {t(`scheduling.slotModalStatus.${status}`)}
+                              </Chip>
+                              <span
+                                aria-hidden="true"
+                                className={`rounded-md border px-3 py-1 text-xs ${
+                                  blocked
+                                    ? 'border-gray-200 text-gray-300'
+                                    : 'border-gray-300 text-gray-700'
+                                }`}
+                              >
+                                {t('scheduling.slotModalAdd')}
+                              </span>
+                            </span>
+                          </div>
+                        )
+                      })}
                     </ScrollShadow>
                   )}
                 </div>

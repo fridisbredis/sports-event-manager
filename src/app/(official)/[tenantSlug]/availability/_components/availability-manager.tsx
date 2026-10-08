@@ -300,13 +300,12 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
                         {period.reason ??
                           formatPeriodTime(period, t('availability.allDay'), language)}
                       </p>
-                      {!isOwn && (
-                        <p className="mt-1 flex items-center gap-1 text-[11px] text-ink-faint">
-                          <Lock className="size-3 shrink-0" aria-hidden="true" />
-                          {t('availability.setByOrganisers')}
-                        </p>
-                      )}
                     </div>
+                    {/* The bin and the lock share this trailing column: both
+                        answer "can I withdraw this one?", so putting them in
+                        one place lets a reader scan a single column down the
+                        list instead of hunting the answer inside each row's
+                        text. */}
                     {isOwn ? (
                       <Button
                         isIconOnly
@@ -320,10 +319,13 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
                         <Trash2 className="size-4 text-ink-faint" aria-hidden="true" />
                       </Button>
                     ) : (
-                      // No disabled button in its place: a greyed-out bin still
-                      // reads as "this might work", and the lock line above
-                      // already says why it cannot.
-                      <span className="w-8 shrink-0" aria-hidden="true" />
+                      // No disabled bin in its place: a greyed-out button still
+                      // reads as "this might work", where the lock says plainly
+                      // why there is nothing to press.
+                      <span className="flex shrink-0 items-center gap-1 text-[11px] text-ink-faint">
+                        <Lock className="size-3 shrink-0" aria-hidden="true" />
+                        {t('availability.setByOrganisers')}
+                      </span>
                     )}
                   </li>
                 )

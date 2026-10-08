@@ -283,6 +283,7 @@
     "slotModalEmpty": "All officials are already assigned at this time.",
     "dragPaintPickPerson_one": "Assign to {{count}} slot",
     "dragPaintPickPerson_other": "Assign to {{count}} slots",
+    "dragPaintRange": "{{ws}} · {{from}}–{{to}}",
     "dragPaintSaving": "Saving...",
     "slotModalSearchPlaceholder": "Search by name...",
     "slotModalNoResults": "No officials match your search.",
@@ -310,6 +311,10 @@
     "timeOffBlockedCell": "Time off — cannot be scheduled",
     "legendTimeOffAdmin": "Time off set by organisers",
     "dragPaintPickArea": "{{name}} · {{count}} slots",
+    "dragPaintPickAreaTitle_one": "Assign {{name}} to {{count}} slot",
+    "dragPaintPickAreaTitle_other": "Assign {{name}} to {{count}} slots",
+    "dragPaintPickAreaLabel": "Work areas open at these times",
+    "dragPaintNoOpenAreas": "No work area is open across all of these slots.",
     "dragPaintTimeOff": "Mark as time off",
     "timeOffOnlyOwnerRemoves": "Only the official can remove this."
   },

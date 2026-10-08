@@ -226,8 +226,8 @@ function DaySelector({
 /**
  * Amber for what the official declared, slate for what the organisers did.
  *
- * The same pairing the admin grid hatches with (`STRIPED_TIME_OFF_STYLE` and
- * `STRIPED_TIME_OFF_ADMIN_STYLE`), deliberately: a colour that means
+ * The same pairing the admin grid fills with (`TIME_OFF_FILL`), deliberately:
+ * a colour that means
  * "the organisers recorded this" on one screen cannot mean something else on
  * the other, or the two sides stop describing the same event.
  *
