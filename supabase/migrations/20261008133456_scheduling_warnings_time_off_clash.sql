@@ -31,8 +31,7 @@
 -- this warning is the earliest one, so that lookup is a separate left join
 -- which leaves stage_id null rather than dropping the row.
 --
--- Forward-fix: replaces two functions, plus one additive policy and grant.
---   No data change.
+-- Forward-fix: replace
 --   Rollback: re-run migration 0040 (scheduling_warning_counts) and
 --             0054 (get_admin_dashboard_cached) in that order, which restore
 --             the two-count shape. Callers reading the new key must be
@@ -44,6 +43,17 @@
 --               from cache_rpc_reader;
 --             -- FORCE ROW LEVEL SECURITY is left on deliberately: it is a
 --             -- tightening, and 0054 makes the same call for its tables.
+--   Data:     no data change — two functions replaced, one policy and one
+--             grant added
+--   Blast:    the dashboard's warning panel undercounts (no time-off figure)
+--             until the fix lands; the grid's own banner is unaffected, since
+--             it computes the same clash client-side
+--   Window:   compatible — both functions keep every key they already
+--             returned and only add `time_off_clash`, so the deployed image
+--             destructures the payload exactly as before and ignores the new
+--             key. The added policy and grant widen cache_rpc_reader's
+--             access rather than narrowing it, so nothing the old code reads
+--             stops being readable.
 -- ============================================================================
 
 -- `create or replace` cannot widen a set-returning function's row type, so
