@@ -40,7 +40,7 @@
   },
   "mySchedule": {
     "title": "Mitt schema",
-    "readOnly": "Endast läsbar",
+    "scheduleOwner": "Sätts av arrangörerna",
     "byTime": "Tid",
     "byWorkstation": "Arbetsområde",
     "noAssignments": "Inga uppdrag än",
@@ -52,7 +52,13 @@
     "time": "Tid",
     "checklist": "Checklista",
     "todoLabel": "Att göra",
-    "infoLabel": "Bra att veta"
+    "infoLabel": "Bra att veta",
+    "timeOffOnDay": "Angiven frånvaro",
+    "timeOffAllDay": "Hela dagen",
+    "withYouOnShift": "Med dig på det här passet",
+    "timeOffSetByOrganisers": "Frånvaro satt av arrangörerna",
+    "timeOffClash": "Du har angett att du är ledig den här tiden",
+    "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden"
   },
   "announcements": {
     "title": "Meddelanden",
@@ -103,5 +109,34 @@
     "confirmCancel": "Nej, behåll",
     "confirmConfirm": "Ja, avmarkera",
     "saveFailed": "Kunde inte spara. Försök igen."
+  },
+  "availability": {
+    "pageTitle": "Tillgänglighet",
+    "title": "Frånvaro",
+    "description": "Berätta för arrangörerna när du inte kan bli schemalagd.",
+    "blockingNote": "Arrangörerna kan inte schemalägga dig under en period du har angett. Ett pass som redan ligger i ditt schema står kvar – du ser en varning på det, så hör av dig till arrangörerna.",
+    "emptyTitle": "Ingen frånvaro angiven",
+    "emptyDescription": "Lägg till en period så ser arrangörerna den när de lägger schemat.",
+    "addButton": "Lägg till frånvaro",
+    "periodLabel": "Period",
+    "allDayLabel": "Hela dagen",
+    "startTimeLabel": "Från klockan",
+    "endTimeLabel": "Till klockan",
+    "allDay": "Hela dagen",
+    "reasonLabel": "Anledning (frivilligt)",
+    "reasonPlaceholder": "t.ex. jobbar",
+    "save": "Spara",
+    "cancel": "Avbryt",
+    "saved": "Frånvaron sparad",
+    "withdrawn": "Frånvaron borttagen",
+    "withdrawLabel": "Ta bort perioden",
+    "saveFailed": "Kunde inte spara din frånvaro. Försök igen.",
+    "deleteFailed": "Kunde inte ta bort perioden. Försök igen.",
+    "errorEndBeforeStart": "Sluttiden måste vara efter starttiden.",
+    "manageLink": "Hantera frånvaro",
+    "eventDatesHint": "Eventet pågår {{from}} – {{to}}.",
+    "sectionLabel": "Frånvaro",
+    "setByOrganisers": "Satt av arrangörerna",
+    "notOwned": "Arrangörerna satte den här – bara de kan ta bort den."
   }
 }

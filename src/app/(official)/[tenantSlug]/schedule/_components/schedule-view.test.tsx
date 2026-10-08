@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { ScheduleView, type AssignmentRow } from './schedule-view'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, within, fireEvent } from '@testing-library/react'
+import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
+import { buildTimeline, ScheduleView, type AssignmentRow } from './schedule-view'
 import { I18nProvider } from '@/components/i18n-provider'
 
 const STRINGS = {
   title: 'My schedule',
-  readOnly: 'Read-only',
+  scheduleOwner: 'Set by organisers',
   byTime: 'Time',
   byWorkstation: 'Work area',
   noAssignments: 'No assignments',
@@ -15,6 +16,13 @@ const STRINGS = {
   dayTabsLabel: 'Days',
   todoLabel: 'To do',
   infoLabel: 'Good to know',
+  manageAvailability: 'Manage time off',
+  timeOffOnDay: 'Declared time off',
+  timeOffSetByOrganisers: 'Time off set by organisers',
+  timeOffAllDay: 'All day',
+  withYouOnShift: 'With you on this shift',
+  timeOffClash: 'You said you were away at this time',
+  timeOffClashAdmin: 'The organisers marked you away at this time',
 }
 
 function slot(id: string, start: string, end: string, ws: AssignmentRow['workstations']) {
@@ -80,6 +88,13 @@ const CHECKLIST_PROPS = {
   checks: new Map(),
   currentUserId: null,
   checklistStrings: CHECKLIST_STRINGS,
+  // No declared time off by default; the cases that care pass their own.
+  timeOff: [],
+  // No colleagues by default — the shift-peer cases build their own map.
+  shiftPeers: new Map<string, string[]>(),
+  // The collapsible panel starts closed, so these only have to satisfy types.
+  allTimeOff: [],
+  eventDates: null,
 }
 
 function renderView(view: 'time' | 'work-area', assignments: AssignmentRow[]) {
@@ -434,8 +449,11 @@ describe('ScheduleView day label', () => {
   it('renders the single day as a static label, not a link that goes nowhere', () => {
     renderDays('work-area', ['2026-08-12'], '2026-08-12')
 
-    expect(screen.queryByRole('link')).toBeNull()
+    // Scoped to the day nav rather than the whole screen: the header also
+    // carries a standing link to the time-off screen, which is not a day tab
+    // and must not make this assertion fail.
     expect(screen.queryByRole('navigation', { name: STRINGS.dayTabsLabel })).toBeNull()
+    expect(screen.queryByRole('link', { name: /augusti|aug/ })).toBeNull()
   })
 
   it('shows the date once, not twice, on the time view for a single day', () => {
@@ -447,8 +465,12 @@ describe('ScheduleView day label', () => {
   it('still renders clickable day tabs when there is more than one day', () => {
     renderDays('work-area', ['2026-08-12', '2026-08-13'], '2026-08-12')
 
-    expect(screen.getByRole('navigation', { name: STRINGS.dayTabsLabel })).toBeTruthy()
-    expect(screen.getAllByRole('link')).toHaveLength(2)
+    const dayNav = screen.getByRole('navigation', { name: STRINGS.dayTabsLabel })
+    expect(dayNav).toBeTruthy()
+    // Counted within the day nav, not across the screen — the header's
+    // time-off link is a link too, and counting it here would make this test
+    // break on an unrelated addition rather than on a day-tab regression.
+    expect(within(dayNav).getAllByRole('link')).toHaveLength(2)
   })
 
   it('leaves the date to the tabs on the time view across several days', () => {
@@ -507,5 +529,581 @@ describe('ScheduleView checklist grouping', () => {
 
     expect(screen.queryByText('To do')).not.toBeInTheDocument()
     expect(screen.getByText('Good to know')).toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView declared time off', () => {
+  beforeEach(() => localStorage.clear())
+
+  const DAY = '2026-08-12'
+
+  function renderWithTimeOff(
+    timeOff: { id: string; starts_at: string; ends_at: string; reason: string | null }[],
+    assignments: AssignmentRow[] = [],
+    days: string[] = [DAY]
+  ) {
+    // Work-area view: that is where the strip lives now. The time view folds
+    // the same periods into its timeline instead, covered further down.
+    localStorage.setItem('official-schedule-view', 'work-area')
+    return render(
+      <ScheduleView
+        assignments={assignments}
+        days={days}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        timeOff={timeOff.map((p) => ({ ...p, official_id: 'off-1' }))}
+      />
+    )
+  }
+
+  it('shows the strip on a day with no shifts at all', () => {
+    // The commonest case, and the reason the strip renders outside the
+    // schedule's branches: declaring a day off usually means there is nothing
+    // else on that day, and rendering inside them would hide it exactly then.
+    renderWithTimeOff(
+      [
+        {
+          id: 'p1',
+          starts_at: `${DAY}T00:00:00.000Z`,
+          ends_at: '2026-08-13T00:00:00.000Z',
+          reason: null,
+        },
+      ],
+      [],
+      []
+    )
+
+    expect(screen.getByText(STRINGS.timeOffOnDay, { exact: false })).toBeInTheDocument()
+    expect(screen.getByText(STRINGS.timeOffAllDay, { exact: false })).toBeInTheDocument()
+  })
+
+  it('renders nothing when no time off is declared', () => {
+    renderWithTimeOff([])
+
+    expect(screen.queryByText(STRINGS.timeOffOnDay, { exact: false })).not.toBeInTheDocument()
+  })
+
+  it('shows the clipped times for a partial-day period', () => {
+    renderWithTimeOff([
+      {
+        id: 'p1',
+        starts_at: `${DAY}T10:00:00.000Z`,
+        ends_at: `${DAY}T12:00:00.000Z`,
+        reason: null,
+      },
+    ])
+
+    expect(screen.getByText(/10:00/)).toBeInTheDocument()
+    expect(screen.getByText(/12:00/)).toBeInTheDocument()
+    // A partial period is not "all day", even though it is time off.
+    expect(screen.queryByText(STRINGS.timeOffAllDay, { exact: false })).not.toBeInTheDocument()
+  })
+
+  it('reads a multi-day period as all day on a day it spans', () => {
+    // Clipped to the day on screen: printing the period's own distant start
+    // and end would say "away 09:00–17:00" on a day the person is away the
+    // whole time.
+    renderWithTimeOff([
+      {
+        id: 'p1',
+        starts_at: '2026-08-11T09:00:00.000Z',
+        ends_at: '2026-08-14T17:00:00.000Z',
+        reason: null,
+      },
+    ])
+
+    expect(screen.getByText(STRINGS.timeOffAllDay, { exact: false })).toBeInTheDocument()
+  })
+
+  it('shows the reason when one was given', () => {
+    renderWithTimeOff([
+      {
+        id: 'p1',
+        starts_at: `${DAY}T00:00:00.000Z`,
+        ends_at: '2026-08-13T00:00:00.000Z',
+        reason: 'Jobbar',
+      },
+    ])
+
+    expect(screen.getByText('Jobbar')).toBeInTheDocument()
+  })
+
+  it('still shows the shifts underneath — a declaration does not cancel them', () => {
+    // An admin may schedule over a declaration, so the two legitimately
+    // coexist and the official must see both.
+    renderWithTimeOff(
+      [
+        {
+          id: 'p1',
+          starts_at: `${DAY}T00:00:00.000Z`,
+          ends_at: '2026-08-13T00:00:00.000Z',
+          reason: null,
+        },
+      ],
+      [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)]
+    )
+
+    expect(screen.getByText(STRINGS.timeOffOnDay, { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Depån')).toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView time off authorship', () => {
+  beforeEach(() => localStorage.clear())
+
+  it("labels organiser-recorded time off as such, not as the official's own", () => {
+    // The two are different facts. An official seeing "you declared this" for
+    // something the organisers recorded would reasonably think the app made it
+    // up — which is exactly what the first version of this strip did.
+    localStorage.setItem('official-schedule-view', 'work-area')
+    render(
+      <ScheduleView
+        assignments={[]}
+        days={['2026-08-12']}
+        selectedDay="2026-08-12"
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        timeOff={[
+          {
+            id: 'p1',
+            official_id: 'off-1',
+            starts_at: '2026-08-12T07:00:00.000Z',
+            ends_at: '2026-08-12T08:00:00.000Z',
+            reason: null,
+            created_by_role: 'tenant_admin',
+          },
+        ]}
+      />
+    )
+
+    expect(screen.getByText(STRINGS.timeOffSetByOrganisers, { exact: false })).toBeInTheDocument()
+    expect(screen.queryByText(STRINGS.timeOffOnDay, { exact: false })).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView shift peers', () => {
+  beforeEach(() => localStorage.clear())
+
+  const DAY = '2026-08-12'
+
+  function renderWithPeers(peers: Map<string, string[]>, assignments: AssignmentRow[]) {
+    localStorage.setItem('official-schedule-view', 'time')
+    return render(
+      <ScheduleView
+        assignments={assignments}
+        days={[DAY]}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        shiftPeers={peers}
+      />
+    )
+  }
+
+  it('lists the colleagues on the same shift', () => {
+    const start = `${DAY}T08:00:00.000Z`
+    renderWithPeers(new Map([[`${DEPOT.id}|${start}`, ['Anna Andersson', 'Bosse Bergström']]]), [
+      slot('a1', start, `${DAY}T09:00:00.000Z`, DEPOT),
+    ])
+
+    expect(screen.getByText(STRINGS.withYouOnShift)).toBeInTheDocument()
+    expect(screen.getByText(/Anna Andersson/)).toBeInTheDocument()
+    expect(screen.getByText(/Bosse Bergström/)).toBeInTheDocument()
+  })
+
+  it('renders nothing when the viewer works the shift alone', () => {
+    renderWithPeers(new Map(), [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)])
+
+    expect(screen.queryByText(STRINGS.withYouOnShift)).not.toBeInTheDocument()
+  })
+
+  it('unions peers across a multi-slot run, without repeating a name', () => {
+    // A three-hour shift is three assignment rows. A colleague on only part of
+    // it still belongs on the card, and one present throughout must be listed
+    // once rather than three times.
+    const h8 = `${DAY}T08:00:00.000Z`
+    const h9 = `${DAY}T09:00:00.000Z`
+    const h10 = `${DAY}T10:00:00.000Z`
+
+    renderWithPeers(
+      new Map([
+        [`${DEPOT.id}|${h8}`, ['Anna Andersson']],
+        [`${DEPOT.id}|${h9}`, ['Anna Andersson', 'Bosse Bergström']],
+      ]),
+      [
+        slot('a1', h8, h9, DEPOT),
+        slot('a2', h9, h10, DEPOT),
+        slot('a3', h10, `${DAY}T11:00:00.000Z`, DEPOT),
+      ]
+    )
+
+    expect(screen.getByText('Anna Andersson · Bosse Bergström')).toBeInTheDocument()
+  })
+
+  it('keeps peers with the right shift when the day has two different ones', () => {
+    const h8 = `${DAY}T08:00:00.000Z`
+    const h13 = `${DAY}T13:00:00.000Z`
+
+    renderWithPeers(
+      new Map([
+        [`${DEPOT.id}|${h8}`, ['Anna Andersson']],
+        [`${SOCIAL_MEDIA.id}|${h13}`, ['Bosse Bergström']],
+      ]),
+      [
+        slot('a1', h8, `${DAY}T09:00:00.000Z`, DEPOT),
+        slot('a2', h13, `${DAY}T14:00:00.000Z`, SOCIAL_MEDIA),
+      ]
+    )
+
+    expect(screen.getByText('Anna Andersson')).toBeInTheDocument()
+    expect(screen.getByText('Bosse Bergström')).toBeInTheDocument()
+    expect(screen.getAllByText(STRINGS.withYouOnShift)).toHaveLength(2)
+  })
+})
+
+describe('ScheduleView time view interleaves time off', () => {
+  beforeEach(() => localStorage.clear())
+
+  const DAY = '2026-08-12'
+
+  function renderTimeView(
+    assignments: AssignmentRow[],
+    timeOff: Partial<UnavailabilityPeriod>[] = []
+  ) {
+    localStorage.setItem('official-schedule-view', 'time')
+    return render(
+      <ScheduleView
+        assignments={assignments}
+        days={[DAY]}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        timeOff={timeOff.map((p, i) => ({
+          id: `p${i}`,
+          official_id: 'off-1',
+          reason: null,
+          created_by_role: 'official' as const,
+          starts_at: '',
+          ends_at: '',
+          ...p,
+        }))}
+      />
+    )
+  }
+
+  it('places an absence before a later shift, in clock order', () => {
+    // The whole point: 07:00–08:00 off then 08:00–09:00 on reads as one day,
+    // where two stacked blocks made it a comparison exercise.
+    const { container } = renderTimeView(
+      [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      [{ starts_at: `${DAY}T07:00:00.000Z`, ends_at: `${DAY}T08:00:00.000Z` }]
+    )
+
+    const text = container.textContent ?? ''
+    expect(text.indexOf(STRINGS.timeOffOnDay)).toBeLessThan(text.indexOf('Depån'))
+  })
+
+  it('places an absence after an earlier shift', () => {
+    const { container } = renderTimeView(
+      [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      [{ starts_at: `${DAY}T10:00:00.000Z`, ends_at: `${DAY}T12:00:00.000Z` }]
+    )
+
+    const text = container.textContent ?? ''
+    expect(text.indexOf('Depån')).toBeLessThan(text.indexOf(STRINGS.timeOffOnDay))
+  })
+
+  it('shows the absence times in the timeline gutter', () => {
+    renderTimeView([], [{ starts_at: `${DAY}T10:00:00.000Z`, ends_at: `${DAY}T12:00:00.000Z` }])
+
+    expect(screen.getByText(/10:00/)).toBeInTheDocument()
+    expect(screen.getByText(/12:00/)).toBeInTheDocument()
+  })
+
+  it('renders a whole-day absence as all day rather than 00:00–00:00', () => {
+    renderTimeView([], [{ starts_at: `${DAY}T00:00:00.000Z`, ends_at: '2026-08-13T00:00:00.000Z' }])
+
+    expect(screen.getByText(STRINGS.timeOffAllDay)).toBeInTheDocument()
+  })
+
+  it('does not also render the separate strip in this view', () => {
+    // Both would state the same absence twice on one screen.
+    renderTimeView(
+      [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      [{ starts_at: `${DAY}T07:00:00.000Z`, ends_at: `${DAY}T08:00:00.000Z` }]
+    )
+
+    expect(screen.getAllByText(STRINGS.timeOffOnDay)).toHaveLength(1)
+  })
+})
+
+describe('buildTimeline', () => {
+  const run = (start: string) =>
+    ({ workAreaId: 'ws', span: { start, end: start }, slots: [] }) as never
+
+  const period = (id: string, startsAt: string) =>
+    ({
+      id,
+      official_id: 'off-1',
+      starts_at: startsAt,
+      ends_at: startsAt,
+      reason: null,
+    }) as UnavailabilityPeriod
+
+  it('orders by start time across both kinds', () => {
+    const merged = buildTimeline(
+      [run('2026-08-12T08:00:00.000Z'), run('2026-08-12T14:00:00.000Z')],
+      [period('p1', '2026-08-12T10:00:00.000Z')]
+    )
+
+    expect(merged.map((e) => e.kind)).toEqual(['shift', 'timeOff', 'shift'])
+  })
+
+  it('puts a shift first when both start at the same instant', () => {
+    const merged = buildTimeline(
+      [run('2026-08-12T08:00:00.000Z')],
+      [period('p1', '2026-08-12T08:00:00.000Z')]
+    )
+
+    expect(merged.map((e) => e.kind)).toEqual(['shift', 'timeOff'])
+  })
+
+  it('compares instants, not strings, across timestamp shapes', () => {
+    // PostgREST returns `+00:00` while assignments are normalised to `.000Z`.
+    // Sorted as text, `+` sorts below `.` and the absence would jump the queue.
+    const merged = buildTimeline(
+      [run('2026-08-12T08:00:00.000Z')],
+      [period('p1', '2026-08-12T09:00:00+00:00')]
+    )
+
+    expect(merged.map((e) => e.kind)).toEqual(['shift', 'timeOff'])
+  })
+})
+
+describe('ScheduleView shift/time-off clash warning', () => {
+  beforeEach(() => localStorage.clear())
+
+  const DAY = '2026-08-12'
+
+  function renderClash({
+    view,
+    assignments,
+    timeOff,
+  }: {
+    view: 'time' | 'work-area'
+    assignments: AssignmentRow[]
+    timeOff: UnavailabilityPeriod[]
+  }) {
+    localStorage.setItem('official-schedule-view', view)
+    return render(
+      <ScheduleView
+        assignments={assignments}
+        days={[DAY]}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        timeOff={timeOff}
+      />
+    )
+  }
+
+  function period(overrides: Partial<UnavailabilityPeriod> = {}): UnavailabilityPeriod {
+    return {
+      id: 'p1',
+      official_id: 'off-1',
+      starts_at: `${DAY}T08:00:00.000Z`,
+      ends_at: `${DAY}T09:00:00.000Z`,
+      reason: null,
+      created_by_role: 'official',
+      ...overrides,
+    }
+  }
+
+  it('flags a shift that falls inside the official’s own declaration', () => {
+    // The admin grid hard-blocks new assignments on a declared period, so this
+    // only arises when the time off is booked after the shift already exists.
+    // Nothing is cleared then — by design — so the official is the one person
+    // who sees both halves, and the only one the app can warn.
+    renderClash({
+      view: 'time',
+      assignments: [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      timeOff: [period()],
+    })
+
+    expect(screen.getByText(STRINGS.timeOffClash)).toBeInTheDocument()
+  })
+
+  it('names the organisers when they recorded the time off', () => {
+    renderClash({
+      view: 'time',
+      assignments: [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      timeOff: [period({ created_by_role: 'tenant_admin' })],
+    })
+
+    expect(screen.getByText(STRINGS.timeOffClashAdmin)).toBeInTheDocument()
+    expect(screen.queryByText(STRINGS.timeOffClash)).not.toBeInTheDocument()
+  })
+
+  it('leaves a shift that merely abuts the absence unflagged', () => {
+    // Half-open: starting the minute an absence ends is not a clash, and a
+    // chip there would train officials to ignore the real ones.
+    renderClash({
+      view: 'time',
+      assignments: [slot('a1', `${DAY}T09:00:00.000Z`, `${DAY}T10:00:00.000Z`, DEPOT)],
+      timeOff: [period()],
+    })
+
+    expect(screen.queryByText(STRINGS.timeOffClash)).not.toBeInTheDocument()
+    expect(screen.queryByText(STRINGS.timeOffClashAdmin)).not.toBeInTheDocument()
+  })
+
+  it('flags the clashing stretch only, on a station worked twice', () => {
+    renderClash({
+      view: 'work-area',
+      assignments: [
+        slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT),
+        slot('a2', `${DAY}T13:00:00.000Z`, `${DAY}T14:00:00.000Z`, DEPOT),
+      ],
+      timeOff: [period()],
+    })
+
+    // One card, two spans, one chip — not a card-level flag that would claim
+    // the afternoon stretch clashes too.
+    expect(screen.getAllByText(STRINGS.timeOffClash)).toHaveLength(1)
+  })
+
+  it('warns in the work-area view as well as the timeline', () => {
+    renderClash({
+      view: 'work-area',
+      assignments: [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      timeOff: [period()],
+    })
+
+    expect(screen.getByText(STRINGS.timeOffClash)).toBeInTheDocument()
+  })
+
+  it('shows no chip on a shift with no time off at all', () => {
+    renderClash({
+      view: 'time',
+      assignments: [slot('a1', `${DAY}T08:00:00.000Z`, `${DAY}T09:00:00.000Z`, DEPOT)],
+      timeOff: [],
+    })
+
+    expect(screen.queryByText(STRINGS.timeOffClash)).not.toBeInTheDocument()
+  })
+})
+
+describe('ScheduleView time off colour by author', () => {
+  beforeEach(() => localStorage.clear())
+
+  const DAY = '2026-08-12'
+
+  function renderPeriod(created_by_role: 'official' | 'tenant_admin') {
+    localStorage.setItem('official-schedule-view', 'time')
+    return render(
+      <ScheduleView
+        assignments={[]}
+        days={[DAY]}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+        timeOff={[
+          {
+            id: 'p1',
+            official_id: 'off-1',
+            starts_at: `${DAY}T08:00:00.000Z`,
+            ends_at: `${DAY}T09:00:00.000Z`,
+            reason: null,
+            created_by_role,
+          },
+        ]}
+      />
+    )
+  }
+
+  // The hue is the only thing separating the two at a glance — the labels
+  // differ, but reading them is exactly the work the colour is there to save.
+  // It also has to agree with the admin grid's hatch, where amber already
+  // means "the official declared this" and slate "the organisers recorded it";
+  // a palette that drifted on one side would have the two screens describing
+  // the same period differently.
+  it("tints the official's own declaration amber", () => {
+    const { container } = renderPeriod('official')
+
+    expect(container.querySelector('.bg-orange-50')).not.toBeNull()
+    expect(container.querySelector('.bg-slate-50')).toBeNull()
+  })
+
+  it('tints an organiser-recorded period slate', () => {
+    const { container } = renderPeriod('tenant_admin')
+
+    expect(container.querySelector('.bg-slate-50')).not.toBeNull()
+    expect(container.querySelector('.bg-orange-50')).toBeNull()
+  })
+})
+
+describe('ScheduleView time off disclosure', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    // jsdom implements no layout, so scrollIntoView is simply absent. Stubbed
+    // rather than guarded in the component: the call is real behaviour on a
+    // phone, where the panel opens below the fold.
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+
+  const DAY = '2026-08-12'
+
+  function renderAndOpen() {
+    const result = render(
+      <ScheduleView
+        assignments={[]}
+        days={[DAY]}
+        selectedDay={DAY}
+        tenantSlug="testklubben"
+        strings={STRINGS}
+        {...CHECKLIST_PROPS}
+      />
+    )
+    fireEvent.click(screen.getByText(STRINGS.manageAvailability))
+    return result
+  }
+
+  it('moves focus into the panel when it opens', () => {
+    // Otherwise the disclosure is a trapdoor: content appears below the fold
+    // while focus stays on the button, so the next Tab continues past the
+    // panel entirely and a screen reader announces nothing.
+    renderAndOpen()
+
+    const panel = screen.getByRole('region', { name: STRINGS.manageAvailability })
+    expect(document.activeElement).toBe(panel)
+  })
+
+  it('scrolls the panel into view', () => {
+    renderAndOpen()
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
+  })
+
+  it('keeps the panel out of the tab order itself', () => {
+    // Focusable programmatically, never a Tab stop: the sequence through the
+    // panel should be the controls inside it.
+    renderAndOpen()
+
+    expect(
+      screen.getByRole('region', { name: STRINGS.manageAvailability }).getAttribute('tabindex')
+    ).toBe('-1')
+  })
+
+  it('reports its expanded state on the button', () => {
+    renderAndOpen()
+
+    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
   })
 })

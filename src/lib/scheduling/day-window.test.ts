@@ -6,6 +6,7 @@ import {
   resolveSelectedDay,
   mergeContiguousSlots,
   groupIntoWorkAreaRuns,
+  daysSpanned,
 } from './day-window'
 
 describe('dayKey', () => {
@@ -272,5 +273,49 @@ describe('groupIntoWorkAreaRuns', () => {
 
   it('returns nothing for no slots', () => {
     expect(runs([])).toEqual([])
+  })
+})
+
+describe('daysSpanned', () => {
+  // Derived, never literal: the seed is relative to today.
+  const BASE = new Date()
+  BASE.setUTCHours(0, 0, 0, 0)
+  const day = (offset: number) =>
+    new Date(BASE.getTime() + offset * 86_400_000).toISOString().slice(0, 10)
+
+  it('returns the single day a whole-day period covers, not the next one too', () => {
+    // A whole-day absence is stored as midnight to the NEXT midnight. The end
+    // is exclusive, so the following day is not part of it — getting this
+    // wrong adds a phantom tab to every single-day absence.
+    expect(daysSpanned(`${day(1)}T00:00:00.000Z`, `${day(2)}T00:00:00.000Z`)).toEqual([day(1)])
+  })
+
+  it('covers every day a multi-day period touches', () => {
+    expect(daysSpanned(`${day(1)}T09:00:00.000Z`, `${day(3)}T17:00:00.000Z`)).toEqual([
+      day(1),
+      day(2),
+      day(3),
+    ])
+  })
+
+  it('returns one day for a part-day period', () => {
+    expect(daysSpanned(`${day(1)}T09:00:00.000Z`, `${day(1)}T12:00:00.000Z`)).toEqual([day(1)])
+  })
+
+  it('counts a period that crosses midnight as two days', () => {
+    expect(daysSpanned(`${day(1)}T22:00:00.000Z`, `${day(2)}T06:00:00.000Z`)).toEqual([
+      day(1),
+      day(2),
+    ])
+  })
+
+  it('returns nothing for an empty or inverted period', () => {
+    expect(daysSpanned(`${day(1)}T09:00:00.000Z`, `${day(1)}T09:00:00.000Z`)).toEqual([])
+    expect(daysSpanned(`${day(2)}T09:00:00.000Z`, `${day(1)}T09:00:00.000Z`)).toEqual([])
+  })
+
+  it('matches across the timestamp shapes PostgREST can return', () => {
+    const offsetShape = `${day(1)}T00:00:00+00:00`
+    expect(daysSpanned(offsetShape, `${day(2)}T00:00:00.000Z`)).toEqual([day(1)])
   })
 })

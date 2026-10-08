@@ -41,10 +41,11 @@ vi.mock('@/lib/logger', () => ({
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'not', 'order', 'limit', 'range', 'gte', 'lt']) {
+  for (const method of ['select', 'eq', 'not', 'order', 'limit', 'range', 'gte', 'gt', 'lt']) {
     builder[method] = vi.fn(() => builder)
   }
   builder.single = vi.fn(() => Promise.resolve(result))
+  builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
   return builder
@@ -101,14 +102,42 @@ function mockResolvedTenant(officialId: string | null = 'off-1') {
   })
 }
 
-// The page issues two reads against `assignments`: the dates-only day list,
-// then the windowed read for the selected day. Order matters — the second
-// query's `?day=` is resolved from the first query's result.
-function mockQueries(dayResult: unknown, windowResult: unknown = { data: [] }) {
+// The page issues two reads against `assignments` — the dates-only day list,
+// then the windowed read for the selected day — plus reads against other
+// tables (checklist state, declared time off) whose order relative to those is
+// an implementation detail.
+//
+// The two `assignments` builders are still handed out in order, because that
+// order is load-bearing: the second query's day is resolved from the first
+// query's result. Everything else is dispatched by table name and defaults to
+// an empty result, so adding a read to the page does not break every test here
+// the way a purely positional mock did.
+function mockQueries(
+  dayResult: unknown,
+  windowResult: unknown = { data: [] },
+  // Per-table results for everything that is not `assignments`, so a test can
+  // supply declared time off without caring where in the order it is read.
+  tableResults: Record<string, unknown> = {}
+) {
   const dayBuilder = chain(dayResult)
   const windowBuilder = chain(windowResult)
-  const fromMock = vi.fn().mockReturnValueOnce(dayBuilder).mockReturnValueOnce(windowBuilder)
-  return { dayBuilder, windowBuilder, fromMock }
+  const otherBuilders = new Map<string, Record<string, unknown>>()
+
+  let assignmentReads = 0
+  const fromMock = vi.fn((table: string) => {
+    if (table === 'assignments') {
+      assignmentReads += 1
+      return assignmentReads === 1 ? dayBuilder : windowBuilder
+    }
+    let builder = otherBuilders.get(table)
+    if (!builder) {
+      builder = chain(tableResults[table] ?? { data: [] })
+      otherBuilders.set(table, builder)
+    }
+    return builder
+  })
+
+  return { dayBuilder, windowBuilder, fromMock, otherBuilders }
 }
 
 beforeEach(() => {
@@ -251,8 +280,13 @@ describe('SchedulePage', () => {
 
     const result = await SchedulePage({ params: PARAMS, searchParams: noParams() })
 
-    // Only the day list ran — no day to window, so no second round trip.
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    // No day to window, so the wide second read never runs. Asserted by
+    // counting reads of `assignments` rather than every from() call: the page
+    // also reads official_unavailability to build the tab list, and counting
+    // all calls made this test fail on an unrelated read rather than on the
+    // windowed one it is about.
+    const assignmentReads = fromMock.mock.calls.filter((c) => c[0] === 'assignments').length
+    expect(assignmentReads).toBe(1)
     const view = findByType(result, ScheduleView)
     expect(view!.props.days).toEqual([])
     expect(view!.props.selectedDay).toBeNull()
@@ -417,5 +451,88 @@ describe('SchedulePage', () => {
     expect(logger.warn).not.toHaveBeenCalled()
     const view = findByType(result, ScheduleView)
     expect(view!.props.assignments).toHaveLength(500)
+  })
+})
+
+// The tab list is what tells an official which days matter to them. Before
+// time off fed into it, a day booked off with no shifts on it had no tab at
+// all — so the declaration was invisible on the one screen they actually open.
+describe('SchedulePage day tabs include declared time off', () => {
+  const OFF_DAY = '2026-08-20'
+
+  function timeOff(startsAt: string, endsAt: string) {
+    return {
+      data: [
+        { id: 'p1', official_id: 'off-1', starts_at: startsAt, ends_at: endsAt, reason: null },
+      ],
+    }
+  }
+
+  it('gives a day with time off and no shifts its own tab', async () => {
+    mockResolvedTenant('off-1')
+    const { fromMock } = mockQueries(
+      { data: DAY_ROWS },
+      { data: [] },
+      {
+        official_unavailability: timeOff(`${OFF_DAY}T00:00:00.000Z`, '2026-08-21T00:00:00.000Z'),
+      }
+    )
+    mockUser('user-1', fromMock)
+
+    const result = await SchedulePage({ params: PARAMS, searchParams: noParams() })
+    const view = findByType(result, ScheduleView)
+
+    expect(view!.props.days).toContain(OFF_DAY)
+    // The shift days are still there — this adds, never replaces.
+    expect(view!.props.days).toContain('2026-08-12')
+    expect(view!.props.days).toContain('2026-08-13')
+  })
+
+  it('does not add the day after a whole-day period', async () => {
+    // Stored with an exclusive end at the next midnight, so that next day is
+    // not part of the absence and must not get a phantom tab.
+    mockResolvedTenant('off-1')
+    const { fromMock } = mockQueries(
+      { data: DAY_ROWS },
+      { data: [] },
+      {
+        official_unavailability: timeOff(`${OFF_DAY}T00:00:00.000Z`, '2026-08-21T00:00:00.000Z'),
+      }
+    )
+    mockUser('user-1', fromMock)
+
+    const result = await SchedulePage({ params: PARAMS, searchParams: noParams() })
+    const view = findByType(result, ScheduleView)
+
+    expect(view!.props.days).not.toContain('2026-08-21')
+  })
+
+  it('tabs every day of a multi-day period', async () => {
+    mockResolvedTenant('off-1')
+    const { fromMock } = mockQueries(
+      { data: [] },
+      { data: [] },
+      {
+        official_unavailability: timeOff('2026-08-20T09:00:00.000Z', '2026-08-22T17:00:00.000Z'),
+      }
+    )
+    mockUser('user-1', fromMock)
+
+    const result = await SchedulePage({ params: PARAMS, searchParams: noParams() })
+    const view = findByType(result, ScheduleView)
+
+    expect(view!.props.days).toEqual(['2026-08-20', '2026-08-21', '2026-08-22'])
+  })
+
+  it('keeps the list empty when there are neither shifts nor time off', async () => {
+    // The existing promise: no empty tabs for days nothing happens on.
+    mockResolvedTenant('off-1')
+    const { fromMock } = mockQueries({ data: [] })
+    mockUser('user-1', fromMock)
+
+    const result = await SchedulePage({ params: PARAMS, searchParams: noParams() })
+    const view = findByType(result, ScheduleView)
+
+    expect(view!.props.days).toEqual([])
   })
 })

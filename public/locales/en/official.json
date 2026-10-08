@@ -40,7 +40,7 @@
   },
   "mySchedule": {
     "title": "My schedule",
-    "readOnly": "Read-only",
+    "scheduleOwner": "Set by organisers",
     "byTime": "Time",
     "byWorkstation": "Work area",
     "noAssignments": "No assignments yet",
@@ -52,7 +52,13 @@
     "time": "Time",
     "checklist": "Checklist",
     "todoLabel": "To do",
-    "infoLabel": "Good to know"
+    "infoLabel": "Good to know",
+    "timeOffOnDay": "Declared time off",
+    "timeOffAllDay": "All day",
+    "withYouOnShift": "With you on this shift",
+    "timeOffSetByOrganisers": "Time off set by organisers",
+    "timeOffClash": "You said you were away at this time",
+    "timeOffClashAdmin": "The organisers marked you away at this time"
   },
   "announcements": {
     "title": "Announcements",
@@ -103,5 +109,34 @@
     "confirmCancel": "No, keep it",
     "confirmConfirm": "Yes, uncheck",
     "saveFailed": "Could not save. Try again."
+  },
+  "availability": {
+    "pageTitle": "Availability",
+    "title": "Time off",
+    "description": "Tell the organisers when you are not available to be scheduled.",
+    "blockingNote": "The organisers cannot schedule you during a period you have declared. A shift already in your schedule stays — you will see a warning on it, so talk to the organisers.",
+    "emptyTitle": "No time off declared",
+    "emptyDescription": "Add a period and the organisers will see it when they build the schedule.",
+    "addButton": "Add time off",
+    "periodLabel": "Period",
+    "allDayLabel": "All day",
+    "startTimeLabel": "From time",
+    "endTimeLabel": "To time",
+    "allDay": "All day",
+    "reasonLabel": "Reason (optional)",
+    "reasonPlaceholder": "e.g. working",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Time off saved",
+    "withdrawn": "Time off removed",
+    "withdrawLabel": "Remove this period",
+    "saveFailed": "Could not save your time off. Try again.",
+    "deleteFailed": "Could not remove the period. Try again.",
+    "errorEndBeforeStart": "The end must be after the start.",
+    "manageLink": "Manage time off",
+    "eventDatesHint": "The event runs {{from}} – {{to}}.",
+    "sectionLabel": "Time off",
+    "setByOrganisers": "Set by organisers",
+    "notOwned": "The organisers set this — only they can remove it."
   }
 }

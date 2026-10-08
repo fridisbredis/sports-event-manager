@@ -60,10 +60,21 @@
 --     should produce a loud local 42501 that forces a conscious decision
 --     about whether it belongs on the deny-list.
 --
--- KEEP IN SYNC: 15 tables in `public`. 13 are listed below; rate_limit_hits
--- and sms_queue are handled separately. Adding a table to a migration means
--- adding it here too. A new table gets anon select only, per 0035 — not
--- insert/update/delete, unless a future decision reverses ADR-0002.
+-- KEEP IN SYNC. Adding a table to a migration means either granting in that
+-- migration or adding it here. A new table gets anon select only, per 0035 —
+-- not insert/update/delete, unless a future decision reverses ADR-0002.
+--
+-- Of the 17 tables in `public`: 14 are listed below; rate_limit_hits and
+-- sms_queue are handled separately (service_role only, see the deny-list note
+-- above); and checklist_item_checks, checklist_item_events and
+-- official_unavailability carry their own grants in the migrations that create
+-- them, which is why they are absent here rather than forgotten.
+--
+-- user_preferences was forgotten, and that is what this note exists to stop
+-- recurring: it was created by migration 20261001102501 with no grants of its
+-- own and no entry here, so every local `db reset` left getUserLanguage()
+-- failing 42501 and the app silently falling back to English. Hosted Supabase
+-- grants automatically, so dev and prod never showed it.
 -- ============================================================================
 
 begin;
@@ -98,7 +109,8 @@ grant select on table
   public.announcements,
   public.workstations,
   public.workstation_operating_windows,
-  public.workstation_todos
+  public.workstation_todos,
+  public.user_preferences
 to anon;
 
 grant select, insert, update, delete on table
@@ -114,8 +126,31 @@ grant select, insert, update, delete on table
   public.announcements,
   public.workstations,
   public.workstation_operating_windows,
-  public.workstation_todos
+  public.workstation_todos,
+  public.user_preferences
 to authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- Tables that grant in their own migrations.
+-- ----------------------------------------------------------------------------
+-- checklist_item_checks, checklist_item_events and official_unavailability
+-- each grant `authenticated` in the migration that creates them, which is why
+-- they are absent from the lists above. Those grants omit service_role,
+-- because hosted Supabase supplies it automatically — but a local
+-- `supabase db reset` does not, so anything going through the service client
+-- (the integration suite, and any server-side read that bypasses RLS by
+-- design) fails 42501 locally while working fine on dev and prod.
+--
+-- Granted here rather than by amending those migrations: they are already
+-- applied everywhere, and hosted projects need nothing added.
+
+grant select, insert, update, delete on table
+  public.checklist_item_checks,
+  public.official_unavailability
+to service_role;
+
+grant select, insert on table public.checklist_item_events to service_role;
+
 
 -- ----------------------------------------------------------------------------
 -- rate_limit_hits — service_role only.

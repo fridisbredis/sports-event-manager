@@ -177,6 +177,49 @@ export function useSchedulingAutosave({
     await persistAdditions(additions)
   }
 
+  /**
+   * Fills a painted run of one person's row with one work area.
+   *
+   * The by-work-area paint picks its slot_index from the row being painted;
+   * here there is no such row, so each cell takes the first free slot at that
+   * station — the same rule a single click already uses, applied per cell
+   * because a run can cross slots where different numbers are free.
+   */
+  async function handlePersonPaint(
+    officialId: string,
+    workstationId: string,
+    cellStarts: string[]
+  ) {
+    const additions: AssignmentInput[] = []
+    // Threaded through the loop rather than re-read per cell: each addition
+    // occupies a slot the next one must not reuse, and `assignments` state
+    // does not update until the save returns.
+    const projected = [...assignments]
+
+    for (const slotStart of cellStarts) {
+      const slotIndex = nextLocalFreeSlot(projected, workstationId, slotStart)
+      const addition: AssignmentInput = {
+        official_id: officialId,
+        workstation_id: workstationId,
+        timeslot_start: slotStart,
+        timeslot_end: slotEndTime(new Date(slotStart), granularityMin).toISOString(),
+        slot_index: slotIndex,
+      }
+      additions.push(addition)
+      projected.push({
+        id: null,
+        official_id: officialId,
+        workstation_id: workstationId,
+        timeslot_start: slotStart,
+        timeslot_end: addition.timeslot_end,
+        status: 'assigned',
+        slot_index: slotIndex,
+      })
+    }
+
+    await persistAdditions(additions)
+  }
+
   async function handleWsSlotRemove(assignment: LocalAssignment) {
     if (!assignment.id) return
 
@@ -215,6 +258,7 @@ export function useSchedulingAutosave({
     handleCellAction,
     addAssignment,
     handleDragOfficialPick,
+    handlePersonPaint,
     handleWsSlotRemove,
   }
 }

@@ -8,6 +8,7 @@ import type { AssignmentStatus } from '@/types/app'
 // payload and the RPC.
 
 const rpc = vi.fn()
+const from = vi.fn()
 const getUser = vi.fn()
 const hasAdminAccessToTenant = vi.fn()
 const revalidatePath = vi.fn()
@@ -16,7 +17,7 @@ const loggerWarn = vi.fn()
 const loggerError = vi.fn()
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: async () => ({ auth: { getUser }, rpc }),
+  createSupabaseServerClient: async () => ({ auth: { getUser }, rpc, from }),
 }))
 vi.mock('@/lib/auth/tenant', () => ({
   hasAdminAccessToTenant: (...args: unknown[]) => hasAdminAccessToTenant(...args),
@@ -66,10 +67,22 @@ function rpcResult(result: { data?: unknown; error?: unknown }) {
   }
 }
 
+// The time-off guard reads official_unavailability before the RPC runs. Its
+// builder is chainable and thenable, like PostgREST's.
+function timeOffRows(rows: unknown[] = [], error: unknown = null) {
+  const builder: Record<string, unknown> = {}
+  for (const m of ['select', 'eq', 'in', 'lt', 'gt']) builder[m] = () => builder
+  builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+    Promise.resolve({ data: rows, error }).then(resolve, reject)
+  return builder
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
   hasAdminAccessToTenant.mockResolvedValue(true)
+  // Default: nobody has time off, so existing tests exercise the RPC path.
+  from.mockReturnValue(timeOffRows([]))
 })
 
 describe('saveAssignments RPC error mapping', () => {
@@ -280,5 +293,104 @@ describe('saveAssignments batch caps', () => {
 
     expect(result.error).toBe('Invalid request')
     expect(rpc).not.toHaveBeenCalled()
+  })
+})
+
+// Peter's call of 2026-10-07: an assignment may not be created over a period
+// marked as time off. The block lives here rather than in a DB constraint
+// (see migration 20261006113036's header), which makes this action the only
+// thing enforcing it — a UI-only block would be bypassed by any direct call.
+describe('saveAssignments time-off block', () => {
+  const overlapping = [
+    {
+      official_id: OFFICIAL_ID,
+      starts_at: '2026-09-01T07:00:00+00:00',
+      ends_at: '2026-09-01T12:00:00+00:00',
+    },
+  ]
+
+  it('refuses an addition that lands on declared time off', async () => {
+    from.mockReturnValue(timeOffRows(overlapping))
+
+    const result = await saveAssignments('viadal', TENANT_ID, [VALID_ADDITION], [])
+
+    // The resolved string, not the key: tError translates before returning.
+    // Asserting the text also proves the locale key is present in en.
+    expect(result.error).toBe('That official has time off then and cannot be scheduled.')
+    // The whole batch is rejected before the RPC — nothing partially applied.
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('matches across the timestamp shapes PostgREST and the grid produce', async () => {
+    // The period comes back as `+00:00` and the addition arrives as `.000Z`.
+    // Comparing those as strings gets the overlap wrong, because `+` sorts
+    // below `.` — this pins the instant comparison.
+    from.mockReturnValue(timeOffRows(overlapping))
+
+    const result = await saveAssignments('viadal', TENANT_ID, [VALID_ADDITION], [])
+
+    expect(result.error).toBe('That official has time off then and cannot be scheduled.')
+  })
+
+  it('allows an addition that merely touches the end of a period', async () => {
+    // Half-open: an absence ending 08:00 and a shift starting 08:00 are
+    // adjacent, not in conflict.
+    from.mockReturnValue(
+      timeOffRows([
+        {
+          official_id: OFFICIAL_ID,
+          starts_at: '2026-09-01T06:00:00+00:00',
+          ends_at: '2026-09-01T08:00:00+00:00',
+        },
+      ])
+    )
+    rpc.mockReturnValue(rpcResult({ data: [] }))
+
+    const result = await saveAssignments('viadal', TENANT_ID, [VALID_ADDITION], [])
+
+    expect(result.error).toBeUndefined()
+    expect(rpc).toHaveBeenCalled()
+  })
+
+  it('ignores time off belonging to a different official', async () => {
+    from.mockReturnValue(
+      timeOffRows([
+        {
+          official_id: '99999999-9999-4999-8999-999999999999',
+          starts_at: '2026-09-01T07:00:00+00:00',
+          ends_at: '2026-09-01T12:00:00+00:00',
+        },
+      ])
+    )
+    rpc.mockReturnValue(rpcResult({ data: [] }))
+
+    const result = await saveAssignments('viadal', TENANT_ID, [VALID_ADDITION], [])
+
+    expect(result.error).toBeUndefined()
+  })
+
+  it('does not run the check — or block — when there are only deletions', async () => {
+    // Removing an assignment that sits on time off is exactly how an admin
+    // cleans up an overlap recorded after the fact, so deletions must pass.
+    rpc.mockReturnValue(rpcResult({ data: [] }))
+
+    const result = await saveAssignments('viadal', TENANT_ID, [], [ASSIGNMENT_ID])
+
+    expect(result.error).toBeUndefined()
+    expect(from).not.toHaveBeenCalled()
+    expect(rpc).toHaveBeenCalled()
+  })
+
+  it('fails closed when the time-off read errors', async () => {
+    // Unlike every other read in this codebase, an unknown answer here must
+    // not degrade to "no time off" — that would let the save through exactly
+    // when the guard is broken.
+    from.mockReturnValue(timeOffRows([], { message: 'boom' }))
+
+    const result = await saveAssignments('viadal', TENANT_ID, [VALID_ADDITION], [])
+
+    expect(result.error).toBe('Failed to save assignments. Please try again.')
+    expect(rpc).not.toHaveBeenCalled()
+    expect(loggerError).toHaveBeenCalled()
   })
 })
