@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
-import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
+import { AdminViewLink } from './_components/admin-view-link'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
@@ -29,10 +30,16 @@ export default async function OfficialLayout({ children, params }: Props) {
   // than asking again (F-PERF-07).
   const showAccount = tenant.officialId != null
 
+  // An admin reaching an official screen gets a way back to their own
+  // surface. Costs one admin-access check here (nothing above has resolved
+  // it on this route) and is memoised per render pass like the rest.
+  const showAdminLink = await hasAdminScreens(tenantSlug)
+
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette} />
       <div className="flex flex-col min-h-screen bg-white">
+        {showAdminLink && <AdminViewLink tenantSlug={tenantSlug} />}
         <div className="flex-1 pb-16">{children}</div>
         <BottomTabBar tenantSlug={tenantSlug} showAccount={showAccount} />
       </div>
