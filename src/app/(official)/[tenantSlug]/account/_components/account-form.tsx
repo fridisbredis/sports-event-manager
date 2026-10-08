@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, ChevronRight, LogOut } from 'lucide-react'
+import { CalendarDays, ChevronRight, FileText, LogOut } from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
@@ -286,6 +286,38 @@ export default function AccountForm({
             </Link>
           </>
         )}
+
+        {/* The only route to the privacy policy from inside the app. It is
+            linked from sign-in and from the invite forms, but both of those
+            are passed through once; this is where someone who already has an
+            account can go back and read how their phone number is handled.
+            Sits with the account's own data rather than under a heading of
+            its own — it is about the same thing the fields above hold.
+
+            A plain <a> with target="_blank", matching the invite forms: the
+            page is a document to read, not a step in this screen's flow. */}
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-4 ${CARD_SURFACE} ${
+            isDesktop ? 'mb-8' : 'mb-6'
+          } px-4 py-4 transition-colors hover:bg-surface`}
+        >
+          <FileText
+            aria-hidden="true"
+            strokeWidth={1.7}
+            className="size-8 shrink-0 text-tenant-primary"
+          />
+          <p className="min-w-0 flex-1 text-[15px] font-semibold text-ink">
+            {t('account.privacyPolicy')}
+          </p>
+          <ChevronRight
+            aria-hidden="true"
+            strokeWidth={1.5}
+            className="size-5 shrink-0 text-ink-label"
+          />
+        </a>
 
         {/* Log out — official only. The admin layout already carries one at
             the foot of its sidebar, and two on the same screen is one too

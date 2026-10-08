@@ -145,6 +145,21 @@ describe('AccountForm layout split', () => {
     render(<AccountForm {...baseProps} />)
     expect(screen.queryByText('account.logOut')).toBeTruthy()
   })
+
+  it('links the privacy policy from both layouts', () => {
+    // Unlike the two rows above, this one is not a layout split: it is the
+    // only route to the policy from inside the app for either role, so a
+    // future refactor must not quietly drop it from one of them.
+    for (const layout of ['desktop', undefined] as const) {
+      const { unmount } = render(<AccountForm {...baseProps} layout={layout} />)
+      const link = screen.getByText('account.privacyPolicy').closest('a')
+      expect(link?.getAttribute('href')).toBe('/privacy')
+      // Opening in a tab of its own is what keeps an unsaved field intact.
+      expect(link?.getAttribute('target')).toBe('_blank')
+      expect(link?.getAttribute('rel')).toBe('noopener noreferrer')
+      unmount()
+    }
+  })
 })
 
 describe('AccountForm autosave', () => {

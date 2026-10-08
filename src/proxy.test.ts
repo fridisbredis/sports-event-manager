@@ -117,6 +117,28 @@ describe('proxy — login OTP auth exemption', () => {
   })
 })
 
+describe('proxy — privacy policy auth exemption', () => {
+  // The policy is linked from sign-in and from the invite forms, both of
+  // which are reached without an account. Gating it would redirect those
+  // readers to /login — asking them to consent to a document they cannot
+  // open — so it stays readable signed out.
+  it('serves /privacy without auth', async () => {
+    const res = await proxy(requestFor('/privacy'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  // Control: proves the exemption is an exact match rather than a prefix,
+  // so a future /privacy-settings page does not fall out of the auth gate
+  // by accident.
+  it('control: does not exempt a path merely prefixed with /privacy', async () => {
+    const res = await proxy(requestFor('/privacy-settings'))
+
+    expect(res.headers.get('location')).toBe('http://localhost/login')
+  })
+})
+
 describe('proxy — malformed session cookie', () => {
   // getClaims() can throw a plain Error instead of returning { error } — a
   // token whose segments are valid base64url but decode to non-JSON makes
