@@ -1,4 +1,4 @@
-import { Users } from 'lucide-react'
+import { CalendarOff, Users } from 'lucide-react'
 import { useMemo } from 'react'
 import { Skeleton } from '@heroui/react'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
@@ -12,9 +12,10 @@ import {
   workAreaColorMap,
 } from '@/lib/theme/work-area-colors'
 import {
-  STRIPED_TIME_OFF_STYLE,
-  STRIPED_TIME_OFF_ADMIN_STYLE,
   STRIPED_UNAVAILABLE_STYLE,
+  TIME_OFF_FILL,
+  TIME_OFF_ICON,
+  runEdgeClasses,
 } from './grid-helpers'
 import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import type { PersonDrag } from './use-scheduling-grid-interaction'
@@ -33,6 +34,14 @@ interface ByPersonGridProps {
   periodsByCell: Map<string, UnavailabilityPeriod[]>
   /** In-progress paint along one person's row, or null. */
   personDrag: PersonDrag
+  /**
+   * The run a finished drag is still choosing a work area for, as
+   * `officialId` plus its slot-start keys. The live `personDrag` clears on
+   * pointer-up, which is exactly when the picker opens — without this the
+   * painted cells would go dark while the admin is still looking at the
+   * picker asking what to put in them.
+   */
+  pendingPaint: { officialId: string; cellStarts: Set<string> } | null
   onPersonDragStart: (officialId: string, officialName: string, idx: number) => void
   onPersonDragEnter: (officialId: string, idx: number) => void
   /** Opens the popup listing what covers a hatched cell. */
@@ -55,6 +64,7 @@ export function ByPersonGrid({
   unavailableSlots,
   periodsByCell,
   personDrag,
+  pendingPaint,
   onPersonDragStart,
   onPersonDragEnter,
   onTimeOffClick,
@@ -142,6 +152,21 @@ export function ByPersonGrid({
         <tbody>
           {officials.map((official) => {
             const personColor = personColors.get(official.id) ?? WORK_AREA_COLORS[0]
+            // Which hatch, if any, each cell of this row draws — computed once
+            // for the whole row so a cell can see its neighbours. A run is a
+            // stretch of the SAME kind: an admin-recorded absence sitting next
+            // to a self-declared one is two blocks, not one, because they say
+            // different things.
+            const rowHatch = slots.map((slot) => {
+              const slotStart = slot.toISOString()
+              if (assignmentMap.has(`${official.id}:${slotStart}`)) return null
+              if (!activeSlotSet.has(slotStart)) return 'closed'
+              const key = `${official.id}:${slotStart}`
+              if (!unavailableSlots.has(key)) return null
+              return dominantAuthor(periodsByCell.get(key) ?? []) === 'tenant_admin'
+                ? 'timeOffAdmin'
+                : 'timeOffSelf'
+            })
             return (
               <tr key={official.id} className="border-b border-edge-soft last:border-0">
                 <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-edge-soft">
@@ -172,13 +197,66 @@ export function ByPersonGrid({
                   const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
                   const cellKey = `${official.id}:${slotStart}`
                   const isUnavailable = unavailableSlots.has(cellKey)
-                  // Which hatch to draw. Both kinds block equally; this only
-                  // says whose note it is, so an admin can tell their own
-                  // entry from the official's at a glance.
-                  const timeOffAuthor = isUnavailable
-                    ? dominantAuthor(periodsByCell.get(cellKey) ?? [])
-                    : null
+                  // Who recorded the absence this shift sits on, so the
+                  // badge below is tinted the same as the block would have
+                  // been — amber for the official's own, slate for ours.
+                  const clashAuthor =
+                    isUnavailable && assignment
+                      ? dominantAuthor(periodsByCell.get(cellKey) ?? [])
+                      : null
                   const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
+
+                  // A blocked cell is drawn as exactly the same box as a
+                  // shift card — `h-10 w-full` inside the cell's own padding —
+                  // so the two line up by construction. Earlier versions
+                  // painted the run as one absolutely positioned overlay
+                  // spanning several columns, which could never agree with
+                  // the cards: an overlay escapes the cell's padding box, and
+                  // its width had to be guessed in px the `table-fixed
+                  // w-full` layout does not actually use.
+                  const hatch = rowHatch[slotArrIdx]
+                  const sameAsLeft = hatch !== null && rowHatch[slotArrIdx - 1] === hatch
+                  const sameAsRight = hatch !== null && rowHatch[slotArrIdx + 1] === hatch
+                  // A run reads as one block: its interior corners go square
+                  // and the `px-1` gap between its own cells is removed, so
+                  // the fill is continuous. Its OUTER edges keep both, which
+                  // is what lines the run up with the shift cards beside it.
+                  const seamPadding = `${sameAsLeft ? 'pl-0' : 'pl-1'} ${
+                    sameAsRight ? 'pr-0' : 'pr-1'
+                  }`
+                  const runEdges = runEdgeClasses(sameAsLeft, sameAsRight)
+                  // Only the run's outer sides carry a border: one on an
+                  // interior edge would draw a line through the middle of
+                  // what should read as a single block.
+                  const runBorder =
+                    hatch === 'closed'
+                      ? ''
+                      : `border-y ${sameAsLeft ? '' : 'border-l'} ${sameAsRight ? '' : 'border-r'}`
+                  // The icon marks the run once, in its middle cell, rather
+                  // than repeating in every cell of a long absence.
+                  let runLength = 0
+                  let runStartIdx = slotArrIdx
+                  if (hatch !== null) {
+                    while (rowHatch[runStartIdx - 1] === hatch) runStartIdx--
+                    while (rowHatch[runStartIdx + runLength] === hatch) runLength++
+                  }
+                  const isRunMiddle =
+                    hatch !== null && slotArrIdx === runStartIdx + Math.floor((runLength - 1) / 2)
+                  // A closed operating window keeps its grey hatch: it is a
+                  // different kind of fact from a person being unavailable,
+                  // and the two must not converge on one look.
+                  const runFill =
+                    hatch === 'timeOffAdmin'
+                      ? TIME_OFF_FILL.admin
+                      : hatch === 'timeOffSelf'
+                        ? TIME_OFF_FILL.self
+                        : ''
+                  const runIconTint =
+                    hatch === 'timeOffAdmin'
+                      ? TIME_OFF_ICON.admin
+                      : hatch === 'timeOffSelf'
+                        ? TIME_OFF_ICON.self
+                        : ''
 
                   // Double-booking is a warning and keeps its orange styling —
                   // the work-area palette is decorative and must not mask it.
@@ -187,12 +265,17 @@ export function ByPersonGrid({
                   // the save action refuses either — but a cell that is
                   // already assigned twice is the one an admin has to act on,
                   // and two warning styles on one cell read as neither.
+                  // A shift laid over someone's time off used to be marked
+                  // with an orange ring. The ring said "something is wrong
+                  // here" without saying what, and now that an absence is
+                  // drawn as a filled block with a calendar icon, a shift
+                  // covering one lost every visual tie to the thing it
+                  // clashes with. The corner badge below says it in the same
+                  // language instead, so the ring is redundant.
                   const cellStyle = assignment
                     ? isDoubleBooked
                       ? 'bg-orange-50 border border-orange-200'
-                      : isUnavailable
-                        ? 'border ring-2 ring-inset ring-orange-300'
-                        : 'border'
+                      : 'border'
                     : ''
                   const cellColors =
                     assignment && !isDoubleBooked && color
@@ -208,13 +291,51 @@ export function ByPersonGrid({
                   // Painted range, drawn live while the pointer is down.
                   // Normalised because a drag can run right-to-left.
                   const inPaint =
-                    personDrag !== null &&
-                    personDrag.officialId === official.id &&
-                    slotArrIdx >= Math.min(personDrag.startIdx, personDrag.currentIdx) &&
-                    slotArrIdx <= Math.max(personDrag.startIdx, personDrag.currentIdx)
+                    (personDrag !== null &&
+                      personDrag.officialId === official.id &&
+                      slotArrIdx >= Math.min(personDrag.startIdx, personDrag.currentIdx) &&
+                      slotArrIdx <= Math.max(personDrag.startIdx, personDrag.currentIdx)) ||
+                    (pendingPaint !== null &&
+                      pendingPaint.officialId === official.id &&
+                      pendingPaint.cellStarts.has(slotStart))
 
                   return (
-                    <td key={slotStart} className="relative px-1 py-2 align-top">
+                    <td key={slotStart} className={`relative py-2 align-top ${seamPadding}`}>
+                      {/* The same box a shift card occupies, so a blocked
+                          cell starts and ends exactly where the cards around
+                          it do. */}
+                      {hatch !== null && (
+                        <div
+                          aria-hidden
+                          className={`flex h-10 w-full items-center justify-center ${runEdges} ${runFill} ${runBorder}`}
+                          style={hatch === 'closed' ? STRIPED_UNAVAILABLE_STYLE : undefined}
+                        >
+                          {isRunMiddle && runIconTint && (
+                            <CalendarOff className={`size-4 ${runIconTint}`} aria-hidden="true" />
+                          )}
+                        </div>
+                      )}
+                      {/* Corner badge rather than anything inline: the card's
+                          two lines are already tight, and a mark that overlaps
+                          the edge reads as applied TO the shift — which is
+                          what a clash is. Sits outside the button because the
+                          card clips its own overflow. */}
+                      {clashAuthor && (
+                        <span
+                          className={`pointer-events-none absolute right-0 top-1 z-20 flex size-4 items-center justify-center rounded-full border bg-white ${
+                            clashAuthor === 'tenant_admin' ? 'border-slate-300' : 'border-amber-200'
+                          }`}
+                        >
+                          <CalendarOff
+                            className={`size-2.5 ${
+                              clashAuthor === 'tenant_admin'
+                                ? TIME_OFF_ICON.admin
+                                : TIME_OFF_ICON.self
+                            }`}
+                            aria-hidden="true"
+                          />
+                        </span>
+                      )}
                       {isPending ? (
                         <Skeleton className="h-10 w-full rounded-md" />
                       ) : assignment ? (
@@ -260,19 +381,23 @@ export function ByPersonGrid({
                                 e.currentTarget
                               )
                             }
-                            // No border, transparent or otherwise. A
-                            // transparent border still paints the background
-                            // under itself, so the hatch would bleed 2px past
-                            // the visible edge of the cells either side and
-                            // read as a larger, mis-seated box. The bordered
-                            // cells draw their border INSIDE h-10 (border-box),
-                            // so a plain h-10 here matches them exactly.
-                            className="h-10 w-full rounded-md transition-opacity hover:opacity-75"
-                            style={
-                              timeOffAuthor === 'tenant_admin'
-                                ? STRIPED_TIME_OFF_ADMIN_STYLE
-                                : STRIPED_TIME_OFF_STYLE
-                            }
+                            // Overlaid on the block rather than placed after
+                            // it: both sit in this one cell, so a hit area in
+                            // the normal flow would stack below the block and
+                            // make the row twice as tall. Absolute keeps it
+                            // out of the flow while still covering exactly
+                            // the block's box.
+                            //
+                            // Transparent, and no border of its own: the
+                            // block beneath paints the fill and the edge.
+                            // This is only a per-slot hit area, so the popup
+                            // knows which slot was clicked.
+                            // `inset-0` plus the cell's own padding, because
+                            // that padding is not constant: it collapses to
+                            // zero inside a run so the fill stays continuous.
+                            // A fixed inset would miss the block in exactly
+                            // those cells.
+                            className={`absolute inset-0 z-10 my-2 transition-opacity hover:opacity-75 ${seamPadding}`}
                             title={t('scheduling.timeOffBlockedCell')}
                           />
                         ) : (
@@ -297,15 +422,7 @@ export function ByPersonGrid({
                             }`}
                           />
                         )
-                      ) : (
-                        <div
-                          // Same reasoning as the time-off cell above: no
-                          // border, so the hatch stops at the same edge the
-                          // other cells' borders sit on.
-                          className="h-10 w-full rounded-md"
-                          style={STRIPED_UNAVAILABLE_STYLE}
-                        />
-                      )}
+                      ) : null}
                     </td>
                   )
                 })}

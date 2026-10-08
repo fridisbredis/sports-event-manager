@@ -12,6 +12,8 @@ interface SchedulingWarningsCardProps {
   overCapacityLabel: string
   doubleBooked: number
   doubleBookedLabel: string
+  timeOffClash: number
+  timeOffClashLabel: string
   allClearLabel: string
   issuesLabel: string
   reviewHref: string
@@ -24,12 +26,14 @@ export function SchedulingWarningsCard({
   overCapacityLabel,
   doubleBooked,
   doubleBookedLabel,
+  timeOffClash,
+  timeOffClashLabel,
   allClearLabel,
   issuesLabel,
   reviewHref,
   reviewLabel,
 }: SchedulingWarningsCardProps) {
-  const totalWarnings = overCapacity + doubleBooked
+  const totalWarnings = overCapacity + doubleBooked + timeOffClash
 
   return (
     <AppCard className="card-accent-secondary">
@@ -65,13 +69,20 @@ export function SchedulingWarningsCard({
           {totalWarnings === 0 ? allClearLabel : issuesLabel}
         </Chip>
       </div>
-      <div className="flex items-end gap-8">
+      {/* Wraps rather than squeezing: the labels name their unit now
+          ("Officials double-booked", not "Double-booked"), which is long
+          enough that three across does not fit a narrow card. */}
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
         <BigStat value={overCapacity} label={overCapacityLabel} />
         <BigStat value={doubleBooked} label={doubleBookedLabel} />
+        <BigStat value={timeOffClash} label={timeOffClashLabel} />
       </div>
       {totalWarnings > 0 && (
         <div className="mt-5">
-          <Button as={Link} href={reviewHref} variant="bordered">
+          {/* `sm`: a secondary jump out of a stats card, not the page's
+              main action — at the default size it outweighed the figures
+              it is meant to follow up on. */}
+          <Button as={Link} href={reviewHref} variant="bordered" size="sm">
             {reviewLabel}
           </Button>
         </div>

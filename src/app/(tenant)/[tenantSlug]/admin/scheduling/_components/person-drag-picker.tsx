@@ -1,8 +1,8 @@
-import { ScrollShadow } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ScrollShadow } from '@heroui/react'
 import { CalendarOff } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
-import { Button } from '@/components/ui/button'
 import { WORK_AREA_COLORS, workAreaColorMap } from '@/lib/theme/work-area-colors'
+import { useArmedAfterGesture } from './use-armed-after-gesture'
 import type { WorkstationData } from './scheduling-types'
 import type { PersonDragPicker as PersonDragPickerState } from './use-scheduling-grid-interaction'
 
@@ -14,10 +14,18 @@ interface PersonDragPickerProps {
   countFor: (workstationId: string) => number
   onPickWorkstation: (workstationId: string) => void
   onPickTimeOff: () => void
+  onClose: () => void
 }
 
 /**
  * What to fill a painted run of one person's row with.
+ *
+ * Same modal frame as the slot picker rather than an anchored popup: both
+ * answer "what goes in these painted cells?" at the end of the same gesture,
+ * and a drag that ends near an edge had to flip the popup around to stay on
+ * screen. A centred modal has no edge to fight, and the two surfaces now read
+ * as one feature. The rows match it too — full-width targets, the count
+ * sitting where the slot picker's status chip sits.
  *
  * Time off sits in the same menu as the work areas rather than behind its own
  * control, because at the moment of asking "what is this person doing from
@@ -35,86 +43,114 @@ export function PersonDragPicker({
   countFor,
   onPickWorkstation,
   onPickTimeOff,
+  onClose,
 }: PersonDragPickerProps) {
   const { t } = useTranslation('admin')
 
-  const PICKER_WIDTH = 224 // px, matches w-56
-  const opensLeft =
-    typeof window !== 'undefined' && picker.anchorLeft + PICKER_WIDTH > window.innerWidth
-
+  // This picker only ever opens from a drag's own `pointerup`.
+  const armed = useArmedAfterGesture(true)
   const colors = workAreaColorMap(openWorkstations.map((ws) => ({ id: ws.id, color: ws.color })))
 
   return (
-    <div
-      className="fixed z-50 w-56 rounded-md border border-gray-200 bg-white shadow-lg"
-      style={{
-        top: picker.anchorTop,
-        left: picker.anchorLeft,
-        transform: opensLeft
-          ? 'translate(-100%, calc(-100% - 4px))'
-          : 'translateY(calc(-100% - 4px))',
+    <Modal
+      isOpen
+      size="2xl"
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose()
+        }
       }}
-      data-person-drag-picker
+      classNames={{ base: 'bg-gray-50' }}
     >
-      <p className="truncate px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wider text-gray-400">
-        {t('scheduling.dragPaintPickArea', {
-          name: picker.officialName,
-          count: picker.cellStarts.length,
-        })}
-      </p>
+      {/* Kept across the popup-to-modal change: the e2e suite scopes its
+          option lookups to this, because an option is named "<work area>
+          <n>/<ceiling>" exactly like the filled cells in the grid behind it.
+          An unscoped query goes ambiguous the moment any cell is filled. */}
+      <ModalContent data-person-drag-picker>
+        {() => (
+          <>
+            <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
+              {t('scheduling.dragPaintPickAreaTitle', {
+                name: picker.officialName,
+                count: picker.cellStarts.length,
+              })}
+            </ModalHeader>
+            <ModalBody>
+              <div>
+                <p className="section-label mb-2">{t('scheduling.dragPaintPickAreaLabel')}</p>
+                {openWorkstations.length === 0 ? (
+                  <p className="px-1 py-2 text-sm text-ink-label">
+                    {t('scheduling.dragPaintNoOpenAreas')}
+                  </p>
+                ) : (
+                  <ScrollShadow className="flex max-h-80 flex-col gap-0.5">
+                    {openWorkstations.map((ws) => {
+                      const color = colors.get(ws.id) ?? WORK_AREA_COLORS[0]
+                      return (
+                        <button
+                          key={ws.id}
+                          type="button"
+                          onClick={() => {
+                            if (armed) onPickWorkstation(ws.id)
+                          }}
+                          className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-gray-100"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            {/* `bg`, not `fg`: the pair is a pastel background
+                                and a muted foreground meant to be read ON it,
+                                so a swatch painted in `fg` comes out dark and
+                                greyish. Filled schedule cells use `bg` for the
+                                same reason, and the swatch has to match the
+                                cell it will produce. No border, so the swatch
+                                reads as the flat colour chip the cell will be. */}
+                            <span
+                              className="size-3 shrink-0 rounded-sm"
+                              style={{ backgroundColor: color.bg }}
+                              aria-hidden="true"
+                            />
+                            <span className="truncate text-sm text-gray-900">{ws.name}</span>
+                          </span>
+                          {/* Count and action together at the row's end, the
+                              same shape as the slot picker: the occupancy
+                              qualifies the Add beside it. */}
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="text-xs tabular-nums text-gray-400">
+                              {countFor(ws.id)}/{ws.capacity_ceiling}
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700"
+                            >
+                              {t('scheduling.slotModalAdd')}
+                            </span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </ScrollShadow>
+                )}
+              </div>
 
-      {openWorkstations.length > 0 && (
-        <ScrollShadow className="flex max-h-56 flex-col overflow-y-auto">
-          {openWorkstations.map((ws) => {
-            const color = colors.get(ws.id) ?? WORK_AREA_COLORS[0]
-            return (
-              <Button
-                key={ws.id}
-                variant="light"
-                size="sm"
-                className="h-8 w-full shrink-0 justify-start rounded-none px-3 hover:bg-gray-50"
-                onPress={() => onPickWorkstation(ws.id)}
-              >
-                <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-2">
-                    {/* `bg`, not `fg`: the pair is a pastel background and a
-                        muted foreground meant to be read ON it, so a swatch
-                        painted in `fg` comes out dark and greyish. Filled
-                        schedule cells use `bg` for the same reason, and the
-                        swatch has to match the cell it will produce. The
-                        border keeps the palest shades visible on white. */}
-                    <span
-                      className="size-3 shrink-0 rounded-sm border"
-                      style={{ backgroundColor: color.bg, borderColor: color.fg }}
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">{ws.name}</span>
+              {/* Below a divider, in slate rather than any work-area colour:
+                  this is the one option that is not a place to stand. */}
+              <div className="border-t border-gray-200 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (armed) onPickTimeOff()
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-slate-100"
+                >
+                  <CalendarOff className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  <span className="truncate text-sm text-slate-700">
+                    {t('scheduling.dragPaintTimeOff')}
                   </span>
-                  <span className="shrink-0 text-xs tabular-nums text-gray-400">
-                    {countFor(ws.id)}/{ws.capacity_ceiling}
-                  </span>
-                </span>
-              </Button>
-            )
-          })}
-        </ScrollShadow>
-      )}
-
-      {/* Below a divider, in slate rather than any work-area colour: this is
-          the one option that is not a place to stand. */}
-      <div className="border-t border-gray-100">
-        <Button
-          variant="light"
-          size="sm"
-          className="h-9 w-full shrink-0 justify-start rounded-none px-3 hover:bg-slate-50"
-          onPress={onPickTimeOff}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            <CalendarOff className="size-3.5 shrink-0 text-slate-500" aria-hidden="true" />
-            <span className="truncate text-slate-700">{t('scheduling.dragPaintTimeOff')}</span>
-          </span>
-        </Button>
-      </div>
-    </div>
+                </button>
+              </div>
+            </ModalBody>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   )
 }

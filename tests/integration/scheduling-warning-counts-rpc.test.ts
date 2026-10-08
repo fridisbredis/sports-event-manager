@@ -37,6 +37,30 @@ describe('scheduling_warning_counts RPC', () => {
   let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
   let clientOfficialA: Awaited<ReturnType<typeof signInAsClient>>
 
+  async function seedUnavailability(fields: {
+    tenantId: string
+    officialId: string
+    startsAt: string
+    endsAt: string
+    createdByRole?: 'official' | 'tenant_admin'
+  }) {
+    const admin = serviceClient()
+    const { error } = await admin.from('official_unavailability').insert({
+      tenant_id: fields.tenantId,
+      official_id: fields.officialId,
+      starts_at: fields.startsAt,
+      ends_at: fields.endsAt,
+      created_by_role: fields.createdByRole ?? 'official',
+    })
+    if (error) throw error
+  }
+
+  async function deleteAllUnavailability(tenantId: string) {
+    const admin = serviceClient()
+    const { error } = await admin.from('official_unavailability').delete().eq('tenant_id', tenantId)
+    if (error) throw error
+  }
+
   async function seedAssignment(fields: {
     tenantId: string
     officialId: string
@@ -71,6 +95,7 @@ describe('scheduling_warning_counts RPC', () => {
   function normalizeWarningCounts(row: {
     over_capacity: number
     double_booked: number
+    time_off_clash: number
     earliest_timeslot_start: string | null
     earliest_stage_id: string | null
     earliest_day: string | null
@@ -204,6 +229,7 @@ describe('scheduling_warning_counts RPC', () => {
     return {
       over_capacity: 0,
       double_booked: 0,
+      time_off_clash: 0,
       earliest_timeslot_start: null,
       earliest_stage_id: null,
       earliest_day: null,
@@ -251,6 +277,7 @@ describe('scheduling_warning_counts RPC', () => {
       {
         over_capacity: 1,
         double_booked: 0,
+        time_off_clash: 0,
         earliest_timeslot_start: T1,
         earliest_stage_id: stageA.id,
         earliest_day: '2026-09-20',
@@ -308,6 +335,7 @@ describe('scheduling_warning_counts RPC', () => {
       {
         over_capacity: 0,
         double_booked: 1,
+        time_off_clash: 0,
         earliest_timeslot_start: T1,
         // Both workstations belong to the same stage in this fixture, so the
         // "arbitrary pick" the migration documents is unambiguous here.
@@ -317,6 +345,135 @@ describe('scheduling_warning_counts RPC', () => {
     ])
 
     await deleteAllAssignments(tenantA.id)
+  })
+
+  it('flags an official scheduled inside a period they declared unavailable', async () => {
+    await seedUnavailability({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      startsAt: T1,
+      endsAt: T1_END,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA.id,
+      slotIndex: 0,
+    })
+
+    const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
+      p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
+    })
+
+    expect(error).toBeNull()
+    expect(data?.map(normalizeWarningCounts)).toEqual([
+      {
+        over_capacity: 0,
+        double_booked: 0,
+        time_off_clash: 1,
+        earliest_timeslot_start: T1,
+        earliest_stage_id: stageA.id,
+        earliest_day: '2026-09-20',
+      },
+    ])
+
+    await deleteAllAssignments(tenantA.id)
+    await deleteAllUnavailability(tenantA.id)
+  })
+
+  // Counts PEOPLE, not cells — the same unit as double_booked, so the two
+  // numbers beside each other on the dashboard mean the same kind of thing.
+  it('counts an official once however many of their slots clash', async () => {
+    await seedUnavailability({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      startsAt: EARLY_T,
+      endsAt: T1_END,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA.id,
+      slotIndex: 0,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA.id,
+      slotIndex: 0,
+      timeslotStart: EARLY_T,
+      timeslotEnd: EARLY_T_END,
+    })
+
+    const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
+      p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
+    })
+
+    expect(error).toBeNull()
+    expect(data?.[0]?.time_off_clash).toBe(1)
+
+    await deleteAllAssignments(tenantA.id)
+    await deleteAllUnavailability(tenantA.id)
+  })
+
+  // Half-open on both sides, matching periodsOverlap in
+  // src/lib/scheduling/unavailability.ts: an absence ending exactly when a
+  // shift starts is adjacent, not a clash.
+  it('does not flag an absence that merely abuts the shift', async () => {
+    await seedUnavailability({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      startsAt: EARLY_T,
+      endsAt: T1,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA.id,
+      slotIndex: 0,
+    })
+
+    const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
+      p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
+    })
+
+    expect(error).toBeNull()
+    expect(data?.[0]?.time_off_clash).toBe(0)
+
+    await deleteAllAssignments(tenantA.id)
+    await deleteAllUnavailability(tenantA.id)
+  })
+
+  // An absence recorded by the organisers is the same clash as one the
+  // official declared: both mean this person should not be on this shift.
+  it('flags an absence the organisers recorded, not just a self-declared one', async () => {
+    await seedUnavailability({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      startsAt: T1,
+      endsAt: T1_END,
+      createdByRole: 'tenant_admin',
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA.id,
+      slotIndex: 0,
+    })
+
+    const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
+      p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
+    })
+
+    expect(error).toBeNull()
+    expect(data?.[0]?.time_off_clash).toBe(1)
+
+    await deleteAllAssignments(tenantA.id)
+    await deleteAllUnavailability(tenantA.id)
   })
 
   it('does not flag the same official at the same workstation twice (no-op resave)', async () => {
@@ -394,6 +551,7 @@ describe('scheduling_warning_counts RPC', () => {
       {
         over_capacity: 1,
         double_booked: 1,
+        time_off_clash: 0,
         earliest_timeslot_start: EARLY_T,
         earliest_stage_id: stageA.id,
         earliest_day: '2026-09-10',

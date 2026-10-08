@@ -12,7 +12,13 @@ import {
   workAreaColorMap,
   workAreaDotColor,
 } from '@/lib/theme/work-area-colors'
-import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot } from './grid-helpers'
+import {
+  STRIPED_UNAVAILABLE_STYLE,
+  SLOT_COLUMN_WIDTH_PX,
+  getOverflowBySlot,
+  hatchRunStyle,
+  runEdgeClasses,
+} from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
 interface ByWorkAreaGridProps {
@@ -150,6 +156,28 @@ export function ByWorkAreaGrid({
             const overflowBySlot = getOverflowBySlot(activeAssignments, ws.id, ws.capacity_ceiling)
             const hasOverflow = overflowBySlot.size > 0
 
+            // Out-of-window hatching depends only on this work area's
+            // operating windows, so one pass per work area serves the summary
+            // row and every numbered slot row underneath it. Index i holds
+            // how far into a closed run slot i sits, or null when it is open.
+            const closedRunOffsets = slots.map(() => null as number | null)
+            for (let i = 0; i < slots.length; i++) {
+              if (isWithinWindow(slots[i], granularityMin, ws.workstation_operating_windows)) {
+                continue
+              }
+              const prev = i > 0 ? closedRunOffsets[i - 1] : null
+              closedRunOffsets[i] = prev === null ? 0 : prev + 1
+            }
+            const closedEdges = (i: number) =>
+              runEdgeClasses(
+                i > 0 && closedRunOffsets[i - 1] !== null,
+                i < slots.length - 1 && closedRunOffsets[i + 1] !== null
+              )
+            const closedSeam = (i: number) =>
+              `${i > 0 && closedRunOffsets[i - 1] !== null ? 'pl-0' : 'pl-1'} ${
+                i < slots.length - 1 && closedRunOffsets[i + 1] !== null ? 'pr-0' : 'pr-1'
+              }`
+
             return (
               <React.Fragment key={ws.id}>
                 {/* Summary row (always visible) */}
@@ -193,7 +221,7 @@ export function ByWorkAreaGrid({
                       </div>
                     </div>
                   </td>
-                  {slots.map((slot) => {
+                  {slots.map((slot, slotArrIdx) => {
                     const slotStart = slot.toISOString()
                     const key = `${ws.id}:${slotStart}`
                     const count = countMap.get(key) ?? 0
@@ -206,10 +234,14 @@ export function ByWorkAreaGrid({
 
                     if (!inWindow) {
                       return (
-                        <td key={slotStart} className="px-1 py-2">
+                        <td key={slotStart} className={`py-2 ${closedSeam(slotArrIdx)}`}>
                           <div
-                            className="w-full h-10 rounded-md"
-                            style={STRIPED_UNAVAILABLE_STYLE}
+                            className={`w-full h-10 ${closedEdges(slotArrIdx)}`}
+                            style={hatchRunStyle(
+                              STRIPED_UNAVAILABLE_STYLE,
+                              closedRunOffsets[slotArrIdx] ?? 0,
+                              SLOT_COLUMN_WIDTH_PX
+                            )}
                           />
                         </td>
                       )
@@ -285,11 +317,15 @@ export function ByWorkAreaGrid({
 
                         if (!inWindow) {
                           return (
-                            <td key={slotStart} className="px-1 py-1.5">
+                            <td key={slotStart} className={`py-1.5 ${closedSeam(slotArrIdx)}`}>
                               <div
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
-                                className="w-full h-10 rounded-md opacity-30"
-                                style={STRIPED_UNAVAILABLE_STYLE}
+                                className={`w-full h-10 opacity-30 ${closedEdges(slotArrIdx)}`}
+                                style={hatchRunStyle(
+                                  STRIPED_UNAVAILABLE_STYLE,
+                                  closedRunOffsets[slotArrIdx] ?? 0,
+                                  SLOT_COLUMN_WIDTH_PX
+                                )}
                               />
                             </td>
                           )

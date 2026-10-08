@@ -173,10 +173,9 @@ describe('useSchedulingGridInteraction', () => {
       act(() =>
         result.current.openDragOfficialPicker({
           workstationId: 'ws1',
+          wsName: 'Start line',
           slotIndex: 1,
           cellStarts: ['2026-08-31T09:00:00.000Z'],
-          anchorTop: 1,
-          anchorLeft: 2,
         })
       )
       expect(result.current.dragOfficialPicker?.cellStarts).toEqual(['2026-08-31T09:00:00.000Z'])
@@ -197,5 +196,70 @@ describe('useSchedulingGridInteraction', () => {
       act(() => result.current.setDragSaving(false))
       expect(result.current.dragSaving).toBe(false)
     })
+  })
+})
+
+/**
+ * The two drag pickers are modals, and a modal dismisses itself through its
+ * own overlay. They were once anchored popups closed by this hook matching a
+ * `data-` attribute on their markup — and when they became modals that
+ * attribute went away, so every mousedown counted as "outside", including the
+ * one on a row inside them. That closed the picker before its click could
+ * land, which read as the picker being entirely dead.
+ */
+describe('click-outside dismissal', () => {
+  function mousedownOn(target: EventTarget) {
+    act(() => {
+      target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+  }
+
+  it('leaves the drag official picker open — the modal owns its own dismissal', () => {
+    const { result } = renderHook(() => useSchedulingGridInteraction())
+
+    act(() =>
+      result.current.openDragOfficialPicker({
+        workstationId: 'ws1',
+        wsName: 'Start line',
+        slotIndex: 1,
+        cellStarts: ['2026-08-31T09:00:00.000Z', '2026-08-31T09:15:00.000Z'],
+      })
+    )
+    mousedownOn(document.body)
+
+    expect(result.current.dragOfficialPicker).not.toBeNull()
+  })
+
+  it('leaves the person drag picker open', () => {
+    const { result } = renderHook(() => useSchedulingGridInteraction())
+
+    act(() =>
+      result.current.openPersonDragPicker({
+        officialId: 'o1',
+        officialName: 'Ada',
+        cellStarts: ['2026-08-31T09:00:00.000Z'],
+      })
+    )
+    mousedownOn(document.body)
+
+    expect(result.current.personDragPicker).not.toBeNull()
+  })
+
+  // The anchored popups still rely on this hook, so the dismissal it does own
+  // has to keep working.
+  it('still closes the anchored cell picker', () => {
+    const { result } = renderHook(() => useSchedulingGridInteraction())
+
+    act(() =>
+      result.current.openPickerCell({
+        officialId: 'o1',
+        slotStart: '2026-08-31T09:00:00.000Z',
+        anchorTop: 10,
+        anchorLeft: 20,
+      })
+    )
+    mousedownOn(document.body)
+
+    expect(result.current.pickerCell).toBeNull()
   })
 })

@@ -1,9 +1,6 @@
+import { CalendarOff } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
-import {
-  STRIPED_TIME_OFF_STYLE,
-  STRIPED_TIME_OFF_ADMIN_STYLE,
-  STRIPED_UNAVAILABLE_STYLE,
-} from './grid-helpers'
+import { TIME_OFF_FILL, TIME_OFF_ICON, STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
 
 export function SchedulingLegend() {
   const { t } = useTranslation('admin')
@@ -41,22 +38,34 @@ export function SchedulingLegend() {
         />
         {t('scheduling.legendOutsideWindow')}
       </span>
-      {/* Sits next to the outside-window swatch on purpose: the two hatches
-          are the pair most at risk of being read as the same thing, and
-          showing them adjacent is what makes the difference legible. */}
+      {/* Sits next to the outside-window swatch on purpose: a closed window
+          and an unavailable person are the pair most at risk of being read as
+          the same thing, and showing them adjacent is what makes the
+          difference legible — hatched for "nothing can go here", filled with
+          an icon for "this person is away". */}
       <span className="flex items-center gap-2">
         <span
-          className="inline-block h-4 w-8 rounded-sm border border-orange-200"
-          style={STRIPED_TIME_OFF_STYLE}
-        />
+          className={`inline-flex h-4 w-8 items-center justify-center rounded-sm border ${TIME_OFF_FILL.self}`}
+        >
+          <CalendarOff className={`size-3 ${TIME_OFF_ICON.self}`} aria-hidden="true" />
+        </span>
         {t('scheduling.legendTimeOff')}
       </span>
       <span className="flex items-center gap-2">
         <span
-          className="inline-block h-4 w-8 rounded-sm border border-slate-300"
-          style={STRIPED_TIME_OFF_ADMIN_STYLE}
-        />
+          className={`inline-flex h-4 w-8 items-center justify-center rounded-sm border ${TIME_OFF_FILL.admin}`}
+        >
+          <CalendarOff className={`size-3 ${TIME_OFF_ICON.admin}`} aria-hidden="true" />
+        </span>
         {t('scheduling.legendTimeOffAdmin')}
+      </span>
+      {/* The badge as it appears on a shift card: a small white disc on the
+          card's corner, tinted by who recorded the absence underneath. */}
+      <span className="flex items-center gap-2">
+        <span className="inline-flex size-4 items-center justify-center rounded-full border border-amber-200 bg-white">
+          <CalendarOff className={`size-2.5 ${TIME_OFF_ICON.self}`} aria-hidden="true" />
+        </span>
+        {t('scheduling.legendClashTimeOff')}
       </span>
     </div>
   )
