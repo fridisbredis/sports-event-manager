@@ -62,7 +62,11 @@ export function PersonDragPicker({
       }}
       classNames={{ base: 'bg-gray-50' }}
     >
-      <ModalContent>
+      {/* Kept across the popup-to-modal change: the e2e suite scopes its
+          option lookups to this, because an option is named "<work area>
+          <n>/<ceiling>" exactly like the filled cells in the grid behind it.
+          An unscoped query goes ambiguous the moment any cell is filled. */}
+      <ModalContent data-person-drag-picker>
         {() => (
           <>
             <ModalHeader className="flex flex-col gap-1 text-sm font-semibold">
