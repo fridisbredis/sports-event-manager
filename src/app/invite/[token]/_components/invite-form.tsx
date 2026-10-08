@@ -4,13 +4,20 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/client'
-import { LanguageSwitcher } from '@/components/language-switcher'
-import { defaultLocale, type Locale } from '@/lib/i18n/config'
+import { defaultLocale, locales, type Locale } from '@/lib/i18n/config'
 import { toastError } from '@/lib/toast'
 import { logger } from '@/lib/logger'
 import { authErrorKey, isExpectedAuthError } from '@/lib/auth/auth-error-keys'
 
 const RESEND_COOLDOWN_SECONDS = 30
+
+// Written in their own language, never translated: someone who has landed in
+// a language they cannot read must still be able to find their own. Same rule
+// as LanguageSwitcher, which this select replaces throughout this flow.
+const LANGUAGE_NAMES: Record<Locale, string> = {
+  en: 'English',
+  sv: 'Svenska',
+}
 
 type Step = 'fill-form' | 'verify-otp' | 'confirming' | 'success' | 'invalid'
 
@@ -21,7 +28,11 @@ interface Props {
 }
 
 export default function InviteForm({ token, phone: initialPhone, name: initialName }: Props) {
-  const { t } = useTranslation('auth')
+  // i18n, not just t: changing the language is what this component does when
+  // the select changes, and only i18n.changeLanguage re-renders the strings.
+  // It is the instance from the surrounding provider, never the imported
+  // singleton — on the server that one is shared across every request.
+  const { t, i18n } = useTranslation('auth')
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
 
@@ -44,8 +55,13 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   const [languageChosen, setLanguageChosen] = useState(false)
 
   function handleLanguageChange(next: Locale) {
+    if (next === language) return
     setLanguage(next)
     setLanguageChosen(true)
+    // Repaints the form in the chosen language right away. Nothing is persisted
+    // here — the invitee is still signed out, so the choice rides along on the
+    // confirm call instead.
+    i18n.changeLanguage(next)
   }
 
   useEffect(() => {
@@ -191,19 +207,12 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   if (step === 'verify-otp') {
     return (
       <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
-        {/* Carried onto this step too: it is the last point before the choice is
-            written to the profile at confirm time, and without it someone who
-            switched on the previous step and wants to switch back has no way
-            to. */}
-        <div className="sticky top-0 z-10 flex shrink-0 justify-end bg-white pb-3 pt-6">
-          <LanguageSwitcher
-            current={language}
-            persist={false}
-            onChange={handleLanguageChange}
-            variant="solid"
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto">
+        {/* No language control on this step: it is one field in the same flow as
+            the form behind it, where the choice is made in the Language select.
+            Someone who wants to change it here goes back a step — carrying a
+            second control for the few seconds this step lasts put the same
+            setting in two different shapes. */}
+        <div className="flex-1 overflow-y-auto pt-6">
           <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
           <hr className="border-dashed border-gray-200 mb-8" />
           <p className="text-sm text-gray-500 mb-6">
@@ -253,20 +262,7 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   // fill-form state
   return (
     <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
-      {/* Outside the scrolling region, not just first inside it: whoever opens
-          this link may not read the language it defaults to, so the control
-          that fixes that has to stay reachable however far down the form they
-          have scrolled. The background is opaque so the form does not show
-          through as it scrolls underneath. */}
-      <div className="sticky top-0 z-10 flex shrink-0 justify-end bg-white pb-3 pt-6">
-        <LanguageSwitcher
-          current={language}
-          persist={false}
-          onChange={handleLanguageChange}
-          variant="solid"
-        />
-      </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pt-6">
         <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
         <hr className="border-dashed border-gray-200 mb-8" />
 
@@ -287,6 +283,69 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
+            {/* No icon: this is one of three hints in the form, each sitting under
+                the field it explains. Marking only the first one made it look
+                more important than the other two rather than less plain. */}
+            <p className="mt-2 text-xs text-gray-400 leading-relaxed">
+              {t('confirmation.notificationsInfo')}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-2">
+              {t('confirmation.nameLabel')}
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('confirmation.namePlaceholder')}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
+            />
+          </div>
+
+          {/* Moved out of the sticky header and into the form flow, per the
+              requested field order. It keeps carrying the choice on the
+              confirm call rather than persisting it here — there is still no
+              user row to write to while the invitee is signed out. */}
+          <div>
+            <label
+              htmlFor="invite-language"
+              className="block text-xs font-semibold text-gray-700 mb-2"
+            >
+              {t('confirmation.languageLabel')}
+            </label>
+            {/* appearance-none drops the platform caret, which sits hard against
+                the field's edge and ignores its padding. The replacement is
+                positioned to the same px-4 the text uses, and is pointer-events-none
+                so clicking it still opens the select. */}
+            <div className="relative">
+              <select
+                id="invite-language"
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value as Locale)}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 pr-11 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+              >
+                {locales.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {LANGUAGE_NAMES[loc]}
+                  </option>
+                ))}
+              </select>
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+              </svg>
+            </div>
+            <p className="mt-2 text-xs text-gray-400 leading-relaxed">
+              {t('confirmation.languageHint')}
+            </p>
           </div>
 
           <div>
@@ -321,82 +380,69 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
               </div>
               <span className="text-gray-700">{t('confirmation.availabilityCheck')}</span>
             </button>
+            {/* Sits with the availability choice, not at the foot of the form:
+                "I am available" reads as all-or-nothing, and this is the point
+                where someone who cannot do the whole event would otherwise
+                hesitate. The feature it points at is MYSCH-01's time off. */}
+            <p className="mt-2 text-xs text-gray-400 leading-relaxed">
+              {t('confirmation.availabilityTimeOffHint')}
+            </p>
           </div>
 
+          {/* A <p>, not a <label>: the two labels below already point at the
+              checkbox, and a third would compete with them for its accessible
+              name. The group is tied to it with aria-labelledby instead, so
+              this reads as a heading over the block rather than a second
+              clickable target. */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              {t('confirmation.nameLabel')}
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('confirmation.namePlaceholder')}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none"
-            />
-          </div>
-
-          <p className="flex gap-2 text-xs text-gray-400 leading-relaxed">
-            <svg
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+            <p id="privacy-heading" className="block text-xs font-semibold text-gray-700 mb-2">
+              {t('confirmation.privacyLabel')}
+            </p>
+            <div
+              aria-labelledby="privacy-heading"
+              className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+                privacyAccepted
+                  ? 'border-tenant-primary bg-tenant-primary-tint'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
             >
-              <circle cx="12" cy="12" r="10" />
-              <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-            </svg>
-            {t('confirmation.notificationsInfo')}
-          </p>
-
-          {/* A native checkbox, not a <button>: the consent control's text ends in a
-              link to the privacy policy. Nesting that link inside a button left the
-              button with no accessible name and swallowed centre clicks, so the
-              label wraps only the prefix and the link sits outside it. */}
-          <div
-            className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
-              privacyAccepted
-                ? 'border-tenant-primary bg-tenant-primary-tint'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
-          >
-            <input
-              id="privacy-accepted"
-              type="checkbox"
-              checked={privacyAccepted}
-              onChange={(e) => setPrivacyAccepted(e.target.checked)}
-              className="peer sr-only"
-            />
-            <label
-              htmlFor="privacy-accepted"
-              className="mt-0.5 flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border border-gray-300 transition-colors peer-checked:border-tenant-primary peer-checked:bg-tenant-primary peer-focus-visible:ring-2 peer-focus-visible:ring-tenant-primary peer-focus-visible:ring-offset-2"
-            >
-              {privacyAccepted && (
-                <svg
-                  className="h-2.5 w-2.5 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={3}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </label>
-            <span className="text-gray-700">
-              <label htmlFor="privacy-accepted" className="cursor-pointer">
-                {t('confirmation.privacyCheckPrefix')}
-              </label>{' '}
-              <a
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-gray-900"
+              <input
+                id="privacy-accepted"
+                type="checkbox"
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                className="peer sr-only"
+              />
+              <label
+                htmlFor="privacy-accepted"
+                className="mt-0.5 flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border border-gray-300 transition-colors peer-checked:border-tenant-primary peer-checked:bg-tenant-primary peer-focus-visible:ring-2 peer-focus-visible:ring-tenant-primary peer-focus-visible:ring-offset-2"
               >
-                {t('confirmation.privacyCheckLinkText')}
-              </a>
-            </span>
+                {privacyAccepted && (
+                  <svg
+                    className="h-2.5 w-2.5 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </label>
+              <span className="text-gray-700">
+                <label htmlFor="privacy-accepted" className="cursor-pointer">
+                  {t('confirmation.privacyCheckPrefix')}
+                </label>{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-gray-900"
+                >
+                  {t('confirmation.privacyCheckLinkText')}
+                </a>
+              </span>
+            </div>
           </div>
         </div>
       </div>
