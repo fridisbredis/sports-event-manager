@@ -25,7 +25,8 @@ import {
   workAreaDotColor,
   type WorkAreaColor,
 } from '@/lib/theme/work-area-colors'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { useLanguage } from '@/components/i18n-provider'
 
 // Every rendered id is in the map by construction; this only satisfies the
 // type at the lookup site.
@@ -64,17 +65,20 @@ function utcDateStr(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10)
 }
 
-function utcTimeStr(iso: string): string {
-  return new Date(iso).toLocaleTimeString(DATE_LOCALE, {
+// `language` threads down from the components' useLanguage() so these
+// module-level helpers name weekdays and months in the language of the text
+// around them; the date format itself is regional either way.
+function utcTimeStr(iso: string, language?: string): string {
+  return new Date(iso).toLocaleTimeString(dateLocaleFor(language), {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
   })
 }
 
-function formatWindow(w: OperatingWindow): string {
+function formatWindow(w: OperatingWindow, language?: string): string {
   const dateLabel = (iso: string) =>
-    new Date(iso).toLocaleDateString(DATE_LOCALE, {
+    new Date(iso).toLocaleDateString(dateLocaleFor(language), {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
@@ -83,8 +87,8 @@ function formatWindow(w: OperatingWindow): string {
 
   const startDay = utcDateStr(w.window_start)
   const endDay = utcDateStr(w.window_end)
-  const startTime = utcTimeStr(w.window_start)
-  const endTime = utcTimeStr(w.window_end)
+  const startTime = utcTimeStr(w.window_start, language)
+  const endTime = utcTimeStr(w.window_end, language)
 
   if (startDay !== endDay) {
     return `${dateLabel(w.window_start)} · ${startTime} – ${dateLabel(w.window_end)} · ${endTime}`
@@ -92,13 +96,15 @@ function formatWindow(w: OperatingWindow): string {
   return `${dateLabel(w.window_start)} · ${startTime}–${endTime}`
 }
 
-function formatWindowsSummary(windows: OperatingWindow[]): string {
+function formatWindowsSummary(windows: OperatingWindow[], language?: string): string {
   if (windows.length === 0) return '—'
-  if (windows.length === 1) return formatWindow(windows[0])
+  if (windows.length === 1) return formatWindow(windows[0], language)
 
   const days = new Set(windows.map((w) => utcDateStr(w.window_start)))
   const slots = new Set(
-    windows.map((w) => `${utcTimeStr(w.window_start)}–${utcTimeStr(w.window_end)}`)
+    windows.map(
+      (w) => `${utcTimeStr(w.window_start, language)}–${utcTimeStr(w.window_end, language)}`
+    )
   )
 
   if (windows.length === days.size * slots.size) {
@@ -106,10 +112,10 @@ function formatWindowsSummary(windows: OperatingWindow[]): string {
     return days.size === 1 ? slotList : `${slotList} · ${days.size} days`
   }
 
-  return `${formatWindow(windows[0])} +${windows.length - 1}`
+  return `${formatWindow(windows[0], language)} +${windows.length - 1}`
 }
 
-function formatStageDate(stage: Stage): string {
+function formatStageDate(stage: Stage, language?: string): string {
   if (!stage.start_time) return ''
   const opts: Intl.DateTimeFormatOptions = {
     weekday: 'short',
@@ -117,24 +123,25 @@ function formatStageDate(stage: Stage): string {
     month: 'short',
     timeZone: 'UTC',
   }
-  const start = new Date(stage.start_time).toLocaleDateString(DATE_LOCALE, opts)
+  const start = new Date(stage.start_time).toLocaleDateString(dateLocaleFor(language), opts)
   if (!stage.end_time) return start
   const startDay = utcDateStr(stage.start_time)
   const endDay = utcDateStr(stage.end_time)
   if (startDay === endDay) {
-    const startTime = utcTimeStr(stage.start_time)
-    const endTime = utcTimeStr(stage.end_time)
+    const startTime = utcTimeStr(stage.start_time, language)
+    const endTime = utcTimeStr(stage.end_time, language)
     return `${start} · ${startTime}–${endTime}`
   }
-  const end = new Date(stage.end_time).toLocaleDateString(DATE_LOCALE, opts)
+  const end = new Date(stage.end_time).toLocaleDateString(dateLocaleFor(language), opts)
   return `${start} – ${end}`
 }
 
 function StageTitle({ stage, count }: { stage: Stage; count: number }) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const typeLabel =
     stage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')
-  const dateStr = formatStageDate(stage)
+  const dateStr = formatStageDate(stage, language)
 
   return (
     <div className="flex w-full items-center gap-3">
@@ -176,6 +183,7 @@ function StageContent({
 }) {
   const router = useRouter()
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const count = workstations.length
 
   return (
@@ -221,7 +229,7 @@ function StageContent({
                     </span>
                   </TableCell>
                   <TableCell className="text-[15px] text-ink-soft">
-                    {formatWindowsSummary(windows)}
+                    {formatWindowsSummary(windows, language)}
                   </TableCell>
                   <TableCell className="text-right text-[15px] text-ink-soft">
                     {t('workstations.upTo', { n: ws.capacity_ceiling })}

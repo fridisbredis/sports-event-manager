@@ -12,7 +12,8 @@ import {
 } from '@heroui/react'
 import { workAreaDotColor, type WorkAreaColor } from '@/lib/theme/work-area-colors'
 import { toggleChecklistItem } from '../actions'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { useLanguage } from '@/components/i18n-provider'
 
 export type ChecklistCheck = {
   checked_by: string | null
@@ -67,8 +68,8 @@ interface Props {
   strings: ChecklistStrings
 }
 
-function formatCheckedAt(ts: string): string {
-  return new Date(ts).toLocaleTimeString(DATE_LOCALE, {
+function formatCheckedAt(ts: string, language?: string): string {
+  return new Date(ts).toLocaleTimeString(dateLocaleFor(language), {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
@@ -100,6 +101,9 @@ export function ChecklistItemRow({
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // Above the informational early return below: hooks cannot be called
+  // conditionally, and that return sits between here and the only use.
+  const language = useLanguage()
 
   // Informational items keep the original bullet treatment untouched.
   if (todo.item_type !== 'checkbox') {
@@ -171,7 +175,7 @@ export function ChecklistItemRow({
           <span className="mt-0.5 block text-xs text-gray-400">
             {fill(strings.checkedBy, {
               name: actorName,
-              time: formatCheckedAt(check.checked_at),
+              time: formatCheckedAt(check.checked_at, language),
             })}
           </span>
         ) : null}

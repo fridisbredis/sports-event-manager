@@ -10,7 +10,7 @@ import { PublishSection } from './_components/publish-section'
 import { OfficialsCard } from './_components/officials-card'
 import { SchedulingWarningsCard } from './_components/scheduling-warnings-card'
 import { AdminAreasGrid } from './_components/admin-areas-grid'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -36,14 +36,15 @@ interface AdminDashboardCached {
   earliest_stage_id: string | null
 }
 
-function formatDateRange(start: string | null, end: string | null) {
+function formatDateRange(start: string | null, end: string | null, language: string) {
   if (!start || !end) return null
   const s = new Date(start)
   const e = new Date(end)
   const sDay = s.getUTCDate()
   const eDay = e.getUTCDate()
-  const sMonth = s.toLocaleDateString(DATE_LOCALE, { month: 'short', timeZone: 'UTC' })
-  const eMonth = e.toLocaleDateString(DATE_LOCALE, { month: 'short', timeZone: 'UTC' })
+  const locale = dateLocaleFor(language)
+  const sMonth = s.toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })
+  const eMonth = e.toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })
   const year = e.getUTCFullYear()
   if (sMonth === eMonth) return `${sDay}–${eDay} ${sMonth} ${year}`
   return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`
@@ -51,7 +52,8 @@ function formatDateRange(start: string | null, end: string | null) {
 
 export default async function DashboardPage({ params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation(await getUserLanguage(), 'admin')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'admin')
 
   const user = await getCurrentUser()
   if (!user) redirect('/login')
@@ -120,7 +122,7 @@ export default async function DashboardPage({ params }: Props) {
 
   const tenantId = tenant.id
 
-  const dateRange = event ? formatDateRange(event.start_date, event.end_date) : null
+  const dateRange = event ? formatDateRange(event.start_date, event.end_date, language) : null
   const eventName = event?.name?.trim() || t('dashboard.eventName')
   const eventType = event?.event_type?.trim() || null
   const subtitle = [

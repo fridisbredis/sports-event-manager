@@ -1,5 +1,5 @@
 import { getAllocableRange, getAllocableDays } from './allocable-range'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 // Structural (not imported from the component) so this module has no dependency
@@ -105,9 +105,14 @@ export function isWithinWindow(slot: Date, granMin: number, windows: OperatingWi
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
-export function formatDayLabel(day: string): string {
+// `language` is the UI language of the current render, threaded in from the
+// caller's useLanguage(): these are pure helpers with no hook of their own, and
+// the weekday and month names they produce have to match the surrounding text.
+// Omitting it falls back to the regional default rather than the browser's
+// locale, so a missed call site degrades to Swedish names, never to 10/8/2026.
+export function formatDayLabel(day: string, language?: string): string {
   const date = new Date(`${day}T12:00:00.000Z`)
-  return date.toLocaleDateString(DATE_LOCALE, {
+  return date.toLocaleDateString(dateLocaleFor(language), {
     weekday: 'long',
     day: 'numeric',
     month: 'short',
@@ -115,21 +120,21 @@ export function formatDayLabel(day: string): string {
   })
 }
 
-export function formatSlotLabel(slot: Date): string {
-  return slot.toLocaleTimeString(DATE_LOCALE, {
+export function formatSlotLabel(slot: Date, language?: string): string {
+  return slot.toLocaleTimeString(dateLocaleFor(language), {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
   })
 }
 
-export function formatSlotDateTimeLabel(slot: Date): string {
-  const date = slot.toLocaleDateString(DATE_LOCALE, {
+export function formatSlotDateTimeLabel(slot: Date, language?: string): string {
+  const date = slot.toLocaleDateString(dateLocaleFor(language), {
     day: 'numeric',
     month: 'short',
     timeZone: 'UTC',
   })
-  return `${date} ${formatSlotLabel(slot)}`
+  return `${date} ${formatSlotLabel(slot, language)}`
 }
 
 export function initials(name: string): string {

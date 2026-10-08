@@ -13,7 +13,7 @@ import { StageVenueCard } from './_components/stage-venue-card'
 import { FacilityChips } from './_components/facility-chips'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
 
 interface EventInfoCached {
   event: {
@@ -43,9 +43,9 @@ interface Props {
 // Dates and times render in UTC on purpose. Stage timestamps are stored as
 // wall-clock UTC, so reading them back in the viewer's zone would shift an
 // 08:00 briefing for anyone travelling to the event from another country.
-function formatDate(ts: string | null): string {
+function formatDate(ts: string | null, language: string): string {
   if (!ts) return ''
-  return new Date(ts).toLocaleDateString(DATE_LOCALE, {
+  return new Date(ts).toLocaleDateString(dateLocaleFor(language), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -57,17 +57,20 @@ function formatDate(ts: string | null): string {
 // set when the admin has pinned the day but not yet the hour). The dates
 // section should show the day in both cases, so fall back rather than
 // leaving the row blank.
-function stageDate(stage: { start_time: string | null; stage_date: string | null }): string {
-  if (stage.start_time) return formatDate(stage.start_time)
+function stageDate(
+  stage: { start_time: string | null; stage_date: string | null },
+  language: string
+): string {
+  if (stage.start_time) return formatDate(stage.start_time, language)
   // stage_date is a bare 'YYYY-MM-DD'; append UTC midnight so it is not
   // parsed as local time and pulled back a day west of Greenwich.
-  if (stage.stage_date) return formatDate(stage.stage_date + 'T00:00:00Z')
+  if (stage.stage_date) return formatDate(stage.stage_date + 'T00:00:00Z', language)
   return ''
 }
 
-function formatTime(ts: string | null): string {
+function formatTime(ts: string | null, language: string): string {
   if (!ts) return ''
-  return new Date(ts).toLocaleTimeString(DATE_LOCALE, {
+  return new Date(ts).toLocaleTimeString(dateLocaleFor(language), {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
@@ -76,7 +79,8 @@ function formatTime(ts: string | null): string {
 
 export default async function EventInfoPage({ params }: Props) {
   const { tenantSlug } = await params
-  const t = await getServerTranslation(await getUserLanguage(), 'official')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'official')
 
   const user = await getCurrentUser()
 
@@ -120,7 +124,7 @@ export default async function EventInfoPage({ params }: Props) {
   // INFO-01 officials do see all stages, so they stay — but a stage with
   // neither a day nor a venue has nothing to contribute to those two
   // sections, and an empty row there is noise rather than information.
-  const datedStages = stageList.filter((stage) => stageDate(stage) !== '')
+  const datedStages = stageList.filter((stage) => stageDate(stage, language) !== '')
   const venuedStages = stageList.filter((stage) => stage.venue)
 
   return (
@@ -150,7 +154,7 @@ export default async function EventInfoPage({ params }: Props) {
             stages={datedStages.map((stage) => ({
               id: stage.id,
               name: stage.name,
-              date: stageDate(stage),
+              date: stageDate(stage, language),
             }))}
           />
         </div>
@@ -184,7 +188,10 @@ export default async function EventInfoPage({ params }: Props) {
               // without new columns and matching EVT-02 fields — tracked
               // separately. Until then the card shows the day and the range
               // that do exist, rather than inventing labels for them.
-              const timeRange = [formatTime(stage.start_time), formatTime(stage.end_time)]
+              const timeRange = [
+                formatTime(stage.start_time, language),
+                formatTime(stage.end_time, language),
+              ]
                 .filter(Boolean)
                 .join(' – ')
               return (
@@ -192,7 +199,7 @@ export default async function EventInfoPage({ params }: Props) {
                   key={stage.id}
                   stageNumber={stage.position + 1}
                   name={stage.name}
-                  details={[stageDate(stage), timeRange].filter(Boolean)}
+                  details={[stageDate(stage, language), timeRange].filter(Boolean)}
                 />
               )
             })}

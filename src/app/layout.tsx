@@ -18,16 +18,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   //
   // `lang` is not cosmetic: it is what screen readers switch pronunciation on,
   // and what tells a browser's translate prompt the page is not already in the
-  // reader's language. Date formatting deliberately does NOT follow it — see
-  // src/lib/i18n/date-locale.ts.
+  // reader's language. Date formatting follows only the language half of it —
+  // see src/lib/i18n/date-locale.ts.
   const language = await getUserLanguage()
 
   return (
     <html lang={language} className={heading.variable}>
       <body className="bg-white text-foreground">
-        <Providers>
-          <I18nProvider language={language}>{children}</I18nProvider>
-        </Providers>
+        {/* I18nProvider is the OUTER of the two: Providers reads the current
+            language with useLanguage() to pick HeroUI's date locale, and a
+            context is only readable below its own provider. Nested the other
+            way round it silently read the context default instead, which gave
+            a Swedish user English-named months in the date pickers. */}
+        <I18nProvider language={language}>
+          <Providers>{children}</Providers>
+        </I18nProvider>
       </body>
     </html>
   )
