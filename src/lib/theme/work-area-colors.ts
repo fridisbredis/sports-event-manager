@@ -216,9 +216,18 @@ export function workAreaDotColor(color: WorkAreaColor): string {
 }
 
 /**
- * Soft mix for schedule-grid cell borders — the handoff calls for a calm grid,
- * not an alarm-like one, so borders never use the full-strength hue.
+ * Border colour for schedule-grid cell borders. A filled cell's border matches
+ * its own background, so the card reads as one solid block of colour.
+ *
+ * The earlier `color-mix(in srgb, fg 35%, white)` aimed for a calm grid, but
+ * this palette's foregrounds are deliberately muted near-neutrals (see
+ * `workAreaDotColor` above), so that mix rendered as a grey ring around every
+ * pastel cell rather than a softer shade of the cell's own hue.
+ *
+ * The `border` class stays on the call sites: keeping the 1px box means cell
+ * geometry is unchanged, and empty and over-capacity cells still draw their
+ * own visible borders.
  */
 export function workAreaBorderColor(color: WorkAreaColor): string {
-  return `color-mix(in srgb, ${color.fg} 35%, white)`
+  return color.bg
 }
