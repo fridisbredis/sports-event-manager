@@ -90,7 +90,15 @@ export async function proxy(request: NextRequest) {
   })
   const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null
 
-  if (!user && pathname !== '/login' && !pathname.startsWith('/invite/')) {
+  // The privacy policy has to be readable without an account. The invite
+  // forms ask people to accept it before one exists, and the sign-in page
+  // links it before a number is handed over — gating it behind auth would
+  // bounce all three to /login, i.e. ask for consent to a document the
+  // reader cannot open. Exact match, not a prefix: there is no /privacy/*.
+  const isPublicPath =
+    pathname === '/login' || pathname === '/privacy' || pathname.startsWith('/invite/')
+
+  if (!user && !isPublicPath) {
     // For API routes, return 401 JSON instead of redirecting to login HTML
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
