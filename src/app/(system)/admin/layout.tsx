@@ -23,6 +23,7 @@ export default async function SystemAdminLayout({ children }: Props) {
           language={language}
           labels={{
             tenants: t('systemAdmin.tenants'),
+            privacyPolicy: t('systemAdmin.privacyPolicy'),
             logOut: t('systemAdmin.logOut'),
             // From `common`, not `admin`: the same label sits above every
             // other language control in the app.

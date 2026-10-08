@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutPanelLeft, LogOut } from 'lucide-react'
+import { FileText, LayoutPanelLeft, LogOut } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n/config'
@@ -12,6 +12,7 @@ interface Props {
     tenants: string
     logOut: string
     language: string
+    privacyPolicy: string
   }
   language: Locale
 }
@@ -54,6 +55,20 @@ export function SidebarNav({ labels, language }: Props) {
           <p className="section-label mb-1.5">{labels.language}</p>
           <LanguageSwitcher current={language} fill />
         </div>
+        {/* System admin has no account screen, so this footer is the only
+            place the policy can hang. Styled as an idle nav row rather than a
+            tab: it leaves the app, and never takes the active treatment. */}
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${IDLE_ITEM}`}
+        >
+          <FileText className="size-[18px] shrink-0" strokeWidth={1.5} />
+          <span className="truncate" title={labels.privacyPolicy}>
+            {labels.privacyPolicy}
+          </span>
+        </a>
         <LogoutButton className="flex w-full items-center gap-3 px-6 py-2.5 text-left text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink">
           <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
           <span className="truncate" title={labels.logOut}>

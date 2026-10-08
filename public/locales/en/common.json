@@ -44,6 +44,20 @@
     "toast": "Something went wrong. Please try again.",
     "navHint": "The other tabs still work."
   },
+  "privacyPage": {
+    "title": "Privacy policy",
+    "draftBadge": "Draft — awaiting final content",
+    "draftBody": "This is a placeholder privacy policy. The final version, setting out exactly what personal data we collect, why, and for how long, has not yet been provided by the event organizer.",
+    "summaryHeading": "In short",
+    "dataHeading": "What we store",
+    "dataBody": "Your name and your mobile number. The number is what signs you in, and what we send assignment notifications to.",
+    "purposeHeading": "Why",
+    "purposeBody": "To schedule officials for an event, and to reach you about changes to your own shifts.",
+    "retentionHeading": "How long",
+    "retentionBody": "If you stop signing in, your account is anonymized automatically after 24 months. You get an SMS a month before that happens.",
+    "back": "Back to the app",
+    "backToSignIn": "Back to sign in"
+  },
   "actions": {
     "save": "Save",
     "cancel": "Cancel",
