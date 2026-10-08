@@ -25,40 +25,60 @@
 --      Storing the interval keeps "all of Saturday" a single row, and the
 --      grid expands it to slots at render time.
 --
--- WARN, DO NOT BLOCK — the decision this migration deliberately does NOT encode.
--- Nothing here prevents an admin assigning someone over a declared period, and
--- no constraint or trigger references `assignments`. That follows the capacity
--- rule the project already settled on: over the ceiling warns, only outside a
--- workstation's operating window is hard-blocked. A self-reported absence is
--- softer data than a station's opening hours — it is a request, not a fact —
--- and on event day an admin must be able to call someone in regardless of what
--- they ticked three weeks earlier. The admin grid shows it; the database does
--- not enforce it.
+-- BLOCKING, NOT ADVISORY — and why that is enforced in the app, not here.
+-- Peter's call of 2026-10-07: an admin must not be able to assign someone over
+-- a period marked as time off. That is a change from this feature's first
+-- shape, which only warned.
 --
--- VISIBILITY. Reads are admins-only, NOT the tenant_member_read_* half of the
--- 0004 convention. Officials do not see each other's absences (decided
--- 2026-10-06); an official reads only their own rows, via the self policy.
--- This is narrower than the convention on purpose and the narrowness is the
--- requirement — widening it later is a product decision about personal data,
--- adjacent to the open question about colleague name visibility.
+-- The block lives in the scheduling server action and the grid UI rather than
+-- in a constraint or trigger on `assignments`, for two reasons. First, rows
+-- that already sit on a declared period must survive: time off can be recorded
+-- after the shift was assigned, and a database-level constraint would make
+-- every later write to such a row fail — including the admin's attempt to
+-- remove it. Those rows stay, and the grid's warning banner is what surfaces
+-- them. Second, a trigger would also fire for the GDPR anonymisation job and
+-- the cache RPCs, neither of which should be refused on a scheduling rule.
 --
--- Forward-fix: additive
+-- So: no new assignment may be created over time off (checked in
+-- saveAssignments, which is the only path that writes them), and existing
+-- overlaps are reported rather than erased.
+--
+-- VISIBILITY. An official reads their own periods only — admin-recorded ones
+-- included, since being marked off is something they must be able to see — but
+-- never a colleague's. There is deliberately no tenant_member_read_* policy on
+-- this table. Note this is narrower than `assignments`, where officials DO see
+-- who shares their shift (Peter, 2026-10-07): a name on a shared shift is
+-- roster information, while a reason for being away is not.
+--
+-- OWNERSHIP. Whoever declared a period owns it: an admin may edit and withdraw
+-- the ones they recorded, an official the ones they declared, and neither may
+-- touch the other's. `created_by_role` carries that, and the write policies
+-- below enforce it rather than leaving it to the UI.
+--
+-- Forward-fix: additive, plus one policy replacement
 --   Rollback: drop table if exists public.official_unavailability;
 --             drop function if exists public.is_own_official_row(uuid);
+--             drop function if exists public.shares_shift_with_caller(uuid, timestamptz, timestamptz);
+--             -- and restore the own-rows-only read this migration replaces:
+--             drop policy if exists official_read_own_assignments on public.assignments;
+--             create policy official_read_own_assignments on public.assignments
+--               for select using (exists (select 1 from public.officials o
+--                 where o.id = assignments.official_id and o.user_id = auth.uid()));
 --   Data:     Dropping the table loses every declared period outright, with no
---             copy elsewhere — recoverable only from a backup. Nothing that
---             exists before this migration is read, rewritten or referenced,
---             so no pre-existing data is at risk either way.
---   Blast:    None on deploy. The table starts empty and no existing query
---             joins it; currently deployed code cannot observe it. The grid
---             renders exactly as it does today until this PR's app code ships,
---             and then renders an empty overlay until officials declare
---             something.
+--             copy elsewhere — recoverable only from a backup. No pre-existing
+--             data is read or rewritten, and `assignments` rows are untouched:
+--             the policy change alters who may SELECT them, never their content.
+--   Blast:    The new table starts empty. The assignments policy change is the
+--             one externally visible effect — from the moment it applies, a
+--             confirmed official can read colleagues' rows for shifts they
+--             share, whether or not this PR's UI has shipped. That is the
+--             intended product change (Peter, 2026-10-07) and the reason this
+--             migration must not be applied ahead of that decision.
 --   Window:   Compatible in both directions. Schema-before-code leaves the
---             table unused. Code-before-schema fails the MYSCH-01 declaration
---             form closed (42P01) and leaves the admin grid's overlay empty,
---             without touching the schedule read or the assignment writes —
---             neither depends on this table to render.
+--             table unused and the wider read unexercised by any UI.
+--             Code-before-schema fails the declaration form closed (42P01) and
+--             renders an empty shift-peer list, without touching the schedule
+--             read or the assignment writes.
 -- ============================================================================
 
 
@@ -85,6 +105,22 @@ create table if not exists public.official_unavailability (
   -- declined slot can be weighed rather than just seen. Length-capped because
   -- it renders in a tooltip, not a document.
   reason       text check (reason is null or char_length(reason) <= 200),
+  -- Who declared this period, and therefore who may edit it. Both roles
+  -- produce the same scheduling consequence — the grid blocks the slot either
+  -- way — but each may only touch their own: an admin must not quietly rewrite
+  -- what an official said about their own availability, and an official must
+  -- not delete time off the organisers set for them. The RLS policies below
+  -- are what enforce that; this column is what they read.
+  --
+  -- Also drives the grid's two hatch colours, so an admin can tell at a glance
+  -- which absences came from the roster and which they set themselves.
+  created_by_role text not null default 'official'
+    check (created_by_role in ('official', 'tenant_admin')),
+  -- The acting user, for display ("set by Frida") and for an audit trail that
+  -- survives the roster row being removed. Nullable with on delete set null,
+  -- following migration 0037's reasoning: keep the row, forget the actor,
+  -- rather than having Postgres abort an auth.users delete with 23502.
+  created_by   uuid references auth.users(id) on delete set null,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   constraint official_unavailability_period_valid check (ends_at > starts_at)
@@ -205,34 +241,97 @@ alter table public.official_unavailability enable row level security;
 grant select, insert, update, delete on public.official_unavailability to authenticated;
 revoke insert, update, delete on public.official_unavailability from anon;
 
--- ADMIN: full management. The is_system_admin() clause is mandatory per the
--- project's RLS convention — without it a system_admin cannot reach a tenant
--- where they hold no explicit user_roles row.
-drop policy if exists tenant_admin_manage_official_unavailability
+-- ADMIN READ: every period in the tenant. An admin building the schedule has
+-- to see all of them — that is the whole point of the grid overlay — so the
+-- read half is deliberately wide where the write half below is narrow.
+drop policy if exists tenant_admin_read_official_unavailability
   on public.official_unavailability;
-create policy tenant_admin_manage_official_unavailability
-  on public.official_unavailability for all
+create policy tenant_admin_read_official_unavailability
+  on public.official_unavailability for select
   using (
-    public.get_user_role(tenant_id) = 'tenant_admin'
-    or public.is_system_admin()
-  )
-  with check (
     public.get_user_role(tenant_id) = 'tenant_admin'
     or public.is_system_admin()
   );
 
--- OFFICIAL READ: own rows only. This is the narrow half — there is no
--- tenant_member_read_* policy here, so one official's absences are invisible
--- to another official.
+-- ADMIN WRITE: only the rows an admin set themselves.
+--
+-- This is the ownership rule, and it is deliberately NOT the
+-- tenant_admin_manage_* FOR ALL policy the 0004 convention would give. Whoever
+-- declared a period owns it: an admin may set, edit and withdraw absences they
+-- recorded for someone, but must not rewrite what an official said about their
+-- own availability — that statement belongs to the person who made it, and
+-- silently editing it would leave the official believing something the
+-- schedule no longer reflects.
+--
+-- Enforced here rather than only in the UI because RLS is the layer that
+-- actually holds: the API is reachable without the app.
+drop policy if exists tenant_admin_insert_official_unavailability
+  on public.official_unavailability;
+create policy tenant_admin_insert_official_unavailability
+  on public.official_unavailability for insert
+  with check (
+    created_by_role = 'tenant_admin'
+    and (
+      public.get_user_role(tenant_id) = 'tenant_admin'
+      or public.is_system_admin()
+    )
+  );
+
+-- USING gates which existing rows may be updated; WITH CHECK gates what they
+-- may become. Without the second half an admin could flip created_by_role on
+-- an official's row and then edit it freely.
+drop policy if exists tenant_admin_update_official_unavailability
+  on public.official_unavailability;
+create policy tenant_admin_update_official_unavailability
+  on public.official_unavailability for update
+  using (
+    created_by_role = 'tenant_admin'
+    and (
+      public.get_user_role(tenant_id) = 'tenant_admin'
+      or public.is_system_admin()
+    )
+  )
+  with check (
+    created_by_role = 'tenant_admin'
+    and (
+      public.get_user_role(tenant_id) = 'tenant_admin'
+      or public.is_system_admin()
+    )
+  );
+
+drop policy if exists tenant_admin_delete_official_unavailability
+  on public.official_unavailability;
+create policy tenant_admin_delete_official_unavailability
+  on public.official_unavailability for delete
+  using (
+    created_by_role = 'tenant_admin'
+    and (
+      public.get_user_role(tenant_id) = 'tenant_admin'
+      or public.is_system_admin()
+    )
+  );
+
+-- OFFICIAL READ: own rows only, whoever recorded them. An official sees time
+-- off an admin set for them — they need to know they have been marked off —
+-- but never a colleague's. There is deliberately no tenant_member_read_*
+-- policy here: that is what keeps one official's absences invisible to
+-- another.
 drop policy if exists official_read_own_unavailability on public.official_unavailability;
 create policy official_read_own_unavailability
   on public.official_unavailability for select
   using (public.is_own_official_row(official_id));
 
+-- OFFICIAL WRITE: own rows, and only ones they declared themselves. The
+-- created_by_role half is the mirror of the admin policies above — an official
+-- may not withdraw or rewrite time off the organisers recorded for them, the
+-- same way an admin may not rewrite theirs.
 drop policy if exists official_insert_own_unavailability on public.official_unavailability;
 create policy official_insert_own_unavailability
   on public.official_unavailability for insert
-  with check (public.is_own_official_row(official_id));
+  with check (
+    created_by_role = 'official'
+    and public.is_own_official_row(official_id)
+  );
 
 -- UPDATE needs both halves: USING gates which existing rows are updatable,
 -- WITH CHECK gates what they may become. Without WITH CHECK an official could
@@ -240,8 +339,14 @@ create policy official_insert_own_unavailability
 drop policy if exists official_update_own_unavailability on public.official_unavailability;
 create policy official_update_own_unavailability
   on public.official_unavailability for update
-  using (public.is_own_official_row(official_id))
-  with check (public.is_own_official_row(official_id));
+  using (
+    created_by_role = 'official'
+    and public.is_own_official_row(official_id)
+  )
+  with check (
+    created_by_role = 'official'
+    and public.is_own_official_row(official_id)
+  );
 
 -- Withdrawing a declared period. The SELECT policy above is what makes the row
 -- visible to this DELETE in the first place — a DELETE policy alone silently
@@ -250,7 +355,83 @@ create policy official_update_own_unavailability
 drop policy if exists official_delete_own_unavailability on public.official_unavailability;
 create policy official_delete_own_unavailability
   on public.official_unavailability for delete
-  using (public.is_own_official_row(official_id));
+  using (
+    created_by_role = 'official'
+    and public.is_own_official_row(official_id)
+  );
+
+
+-- ============================================================================
+-- 5. Officials see who shares their shift
+-- ============================================================================
+-- Peter's call of 2026-10-07, and the answer to a question this project has
+-- deliberately held open since 2026-08-05: officials may see the names of
+-- colleagues allocated to the same workstation over the same timeslot, on
+-- MYSCH-01. Full names, not initials.
+--
+-- Until now `official_read_own_assignments` admitted only an official's own
+-- rows, so the shift-peer list had no way to read a colleague's assignment.
+-- This widens that read by exactly one step: a row is visible when the caller
+-- holds a row on the SAME workstation and the SAME timeslot. It does not open
+-- the tenant's roster — an official still cannot enumerate who works where in
+-- general, only who stands next to them.
+--
+-- Note what is NOT widened: official_unavailability keeps its own-rows-only
+-- read. A colleague's name on a shared shift is roster information; a reason
+-- for being away is not.
+--
+-- security definer, same reasoning as is_on_workstation_shift in migration
+-- 20260930084957: the question must be answerable about a shift generally, not
+-- only about rows the caller can already see, and the caller's own RLS on
+-- `assignments` is narrower than that.
+
+create or replace function public.shares_shift_with_caller(
+  p_workstation_id uuid,
+  p_timeslot_start timestamptz,
+  p_timeslot_end   timestamptz
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_workstation_id is not null
+    and exists (
+      select 1
+      from public.assignments a
+      join public.officials o on o.id = a.official_id
+      where a.workstation_id = p_workstation_id
+        and a.timeslot_start = p_timeslot_start
+        and a.timeslot_end   = p_timeslot_end
+        and a.status = 'assigned'
+        and o.user_id = auth.uid()
+        -- An invited-but-unconfirmed official is not schedulable and must not
+        -- gain visibility of a roster, matching canViewOfficialSurfaces.
+        and o.invite_status = 'confirmed'
+    );
+$$;
+
+comment on function public.shares_shift_with_caller is
+  'True when the calling user is a confirmed official assigned to the given '
+  'workstation over exactly the given timeslot. Widens the official read on '
+  'assignments to colleagues on the same shift, and nothing wider.';
+
+-- Replaces the own-rows-only policy. Kept as one policy rather than adding a
+-- second: two permissive SELECT policies OR together, which would work, but
+-- leaves two places to read when asking "what can an official see here".
+drop policy if exists official_read_own_assignments on public.assignments;
+create policy official_read_own_assignments
+  on public.assignments for select
+  using (
+    exists (
+      select 1
+      from public.officials o
+      where o.id = assignments.official_id
+        and o.user_id = auth.uid()
+    )
+    or public.shares_shift_with_caller(workstation_id, timeslot_start, timeslot_end)
+  );
 
 
 -- ============================================================================
@@ -258,6 +439,7 @@ create policy official_delete_own_unavailability
 -- ============================================================================
 -- Verify with:
 --   SELECT tablename, policyname, cmd FROM pg_policies
---    WHERE tablename = 'official_unavailability' ORDER BY policyname;
+--    WHERE tablename IN ('official_unavailability', 'assignments')
+--    ORDER BY tablename, policyname;
 --   SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
 --    WHERE conrelid = 'public.official_unavailability'::regclass;

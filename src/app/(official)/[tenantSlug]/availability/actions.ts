@@ -127,7 +127,7 @@ const withdrawSchema = z.object({
 })
 
 export type WithdrawUnavailabilityInput = z.input<typeof withdrawSchema>
-export type WithdrawUnavailabilityResult = { error?: string }
+export type WithdrawUnavailabilityResult = { error?: string; notOwned?: boolean }
 
 /**
  * Withdraws a period the calling official previously declared.
@@ -158,12 +158,22 @@ export async function withdrawUnavailability(
 
   const supabase = await createSupabaseServerClient()
 
-  const { error } = await supabase
+  // `count: 'exact'` is what makes the ownership rule observable. Without it a
+  // refused delete and a successful one are indistinguishable from here: RLS
+  // removes zero rows and PostgREST reports no error, so the UI would say
+  // "removed" for a period that is still there and reappears on the next load.
+  // The admin counterpart in ../../(tenant)/.../unavailability-actions.ts does
+  // the same for the mirror case.
+  const { error, count } = await supabase
     .from('official_unavailability')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', periodId)
     .eq('official_id', officialId)
     .eq('tenant_id', tenant.id)
+    // Belt and braces alongside the RLS policy, and it states at the call site
+    // what the policy enforces: an official withdraws only their own
+    // declarations, never time off the organisers recorded for them.
+    .eq('created_by_role', 'official')
 
   if (error) {
     logger.error('withdrawUnavailability: delete failed', error, {
@@ -172,6 +182,10 @@ export async function withdrawUnavailability(
       periodId,
     })
     return { error: 'availability.deleteFailed' }
+  }
+
+  if (count === 0) {
+    return { notOwned: true, error: 'availability.notOwned' }
   }
 
   revalidatePath(`/${tenantSlug}/availability`)

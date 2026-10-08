@@ -23,8 +23,13 @@ import { SchedulingLegend } from './scheduling-legend'
 import { SchedulingPrintStyles, SchedulingPrintHeader } from './scheduling-print-chrome'
 import { SchedulingToolbar } from './scheduling-toolbar'
 import { ConflictBanners } from './conflict-banners'
+import { PersonDragPicker } from './person-drag-picker'
+import { TimeOffPopup, type TimeOffCell } from './time-off-popup'
+import { setUnavailability, clearUnavailability } from '../unavailability-actions'
+import { toastError } from '@/lib/toast'
 import {
   buildUnavailableSlotKeys,
+  buildUnavailableSlotMap,
   findUnavailableAssignments,
   type UnavailabilityPeriod,
 } from '@/lib/scheduling/unavailability'
@@ -56,7 +61,8 @@ interface Props {
   workstations: WorkstationData[]
   officials: OfficialData[]
   initialAssignments: AssignmentData[]
-  /** Self-reported absences overlapping the day on screen. Advisory only. */
+  /** Absences overlapping the day on screen. Blocking: the save action
+   *  refuses an assignment that lands on one. */
   unavailability: UnavailabilityPeriod[]
   initialSelectedDay: string
   initialSelectedStageId: string
@@ -109,8 +115,6 @@ export function SchedulingGrid({
   }
 
   const {
-    pickerCell,
-    openPickerCell,
     closePickerCell,
     cellActionCell,
     openCellActionCell,
@@ -129,6 +133,15 @@ export function SchedulingGrid({
     startWsDrag,
     updateWsDragCurrent,
     endWsDrag,
+    personDrag,
+    startPersonDrag,
+    updatePersonDragCurrent,
+    endPersonDrag,
+
+    personDragPicker,
+    openPersonDragPicker,
+    closePersonDragPicker,
+
     dragOfficialPicker,
     openDragOfficialPicker,
     closeDragOfficialPicker,
@@ -190,6 +203,14 @@ export function SchedulingGrid({
   // stays one `.has()` rather than a scan over periods.
   const unavailableSlots = useMemo(
     () => buildUnavailableSlotKeys(unavailability, slots, granularityMin),
+    [unavailability, slots, granularityMin]
+  )
+
+  // Same pass, but keeping the periods themselves — the grid needs to know
+  // WHO recorded an absence to pick its hatch and its tooltip, not just that
+  // one exists.
+  const periodsByCell = useMemo(
+    () => buildUnavailableSlotMap(unavailability, slots, granularityMin),
     [unavailability, slots, granularityMin]
   )
 
@@ -364,15 +385,10 @@ export function SchedulingGrid({
         },
       ])
       endPending(key)
-    } else {
-      const rect = anchor?.getBoundingClientRect()
-      openPickerCell({
-        officialId,
-        slotStart,
-        anchorTop: rect ? rect.top : 0,
-        anchorLeft: rect ? rect.left : 0,
-      })
     }
+    // No else branch any more. Picking a work area for an empty by-person cell
+    // is now the drag picker's job — a click is just a one-slot drag — and
+    // this used to open a second, older menu that offered no time-off option.
   }
 
   async function handleCellAction(action: 'remove' | 'assigned', assignment: LocalAssignment) {
@@ -416,6 +432,139 @@ export function SchedulingGrid({
     setDragSaving(true)
     await autosave.handleDragOfficialPick(picker, officialId)
     setDragSaving(false)
+  }
+
+  // ─── Time-off cell popup ──────────────────────────────────────────────────
+
+  const [timeOffCell, setTimeOffCell] = useState<TimeOffCell | null>(null)
+  const [removingPeriodId, setRemovingPeriodId] = useState<string | null>(null)
+
+  // Local to this component rather than in the interaction hook: the hook owns
+  // the modes that interact with each other (the three pickers close one
+  // another), and this one is independent of all of them.
+  useEffect(() => {
+    if (!timeOffCell) return
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('[data-time-off-popup]')) setTimeOffCell(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [timeOffCell])
+
+  function handleTimeOffClick(
+    officialName: string,
+    periods: UnavailabilityPeriod[],
+    anchor: HTMLElement
+  ) {
+    if (periods.length === 0) return
+    const rect = anchor.getBoundingClientRect()
+    setTimeOffCell({
+      officialName,
+      periods,
+      anchorTop: rect.bottom,
+      anchorLeft: rect.left,
+    })
+  }
+
+  async function handleTimeOffRemove(periodId: string) {
+    setRemovingPeriodId(periodId)
+    const result = await clearUnavailability({ tenantSlug, tenantId, periodId })
+    setRemovingPeriodId(null)
+
+    if (result.error) {
+      toastError(result.error.startsWith('scheduling.') ? t(result.error) : result.error)
+      // A refused delete leaves the period in place, so the popup would be
+      // lying if it stayed open showing a row that is still there.
+      if (result.notOwned) setTimeOffCell(null)
+      return
+    }
+
+    setTimeOffCell(null)
+    router.refresh()
+  }
+
+  // ─── Drag-to-paint (by-person rows) ───────────────────────────────────────
+  //
+  // The gesture mirrors the by-work-area paint, but asks a different question
+  // on release: that one knows the station and asks who, this one knows the
+  // person and asks what — a work area, or time off.
+
+  function handlePersonDragStart(officialId: string, officialName: string, idx: number) {
+    if (dragSaving) return
+    startPersonDrag(officialId, officialName, idx)
+  }
+
+  function handlePersonDragEnter(officialId: string, idx: number) {
+    updatePersonDragCurrent(officialId, idx)
+  }
+
+  // Pointer-up anywhere ends the paint, not just over a cell: releasing
+  // outside the grid must not leave a drag stuck on.
+  useEffect(() => {
+    if (!personDrag) return
+
+    function handleUp(e: PointerEvent) {
+      const drag = personDrag
+      if (!drag) return
+      endPersonDrag()
+
+      const from = Math.min(drag.startIdx, drag.currentIdx)
+      const to = Math.max(drag.startIdx, drag.currentIdx)
+      const cellStarts = slots.slice(from, to + 1).map((s) => s.toISOString())
+      if (cellStarts.length === 0) return
+
+      openPersonDragPicker({
+        officialId: drag.officialId,
+        officialName: drag.officialName,
+        cellStarts,
+        anchorTop: e.clientY,
+        anchorLeft: e.clientX,
+      })
+    }
+
+    document.addEventListener('pointerup', handleUp)
+    return () => document.removeEventListener('pointerup', handleUp)
+  }, [personDrag, slots, endPersonDrag, openPersonDragPicker])
+
+  async function handlePersonDragPickWorkstation(workstationId: string) {
+    if (!personDragPicker) return
+    const picker = personDragPicker
+    closePersonDragPicker()
+    setDragSaving(true)
+    await autosave.handlePersonPaint(picker.officialId, workstationId, picker.cellStarts)
+    setDragSaving(false)
+  }
+
+  async function handlePersonDragPickTimeOff() {
+    if (!personDragPicker) return
+    const picker = personDragPicker
+    closePersonDragPicker()
+    setDragSaving(true)
+
+    // The painted run is contiguous slots, so one period spanning the whole
+    // run — not one row per cell. That is the point of storing an interval.
+    const starts = picker.cellStarts.map((c) => new Date(c).getTime())
+    const startsAt = new Date(Math.min(...starts)).toISOString()
+    const endsAt = slotEndTime(new Date(Math.max(...starts)), granularityMin).toISOString()
+
+    const result = await setUnavailability({
+      tenantSlug,
+      tenantId,
+      officialId: picker.officialId,
+      startsAt,
+      endsAt,
+    })
+
+    setDragSaving(false)
+
+    if (result.error) {
+      toastError(result.error.startsWith('scheduling.') ? t(result.error) : result.error)
+      return
+    }
+
+    // The grid reads unavailability on the server, so the new period only
+    // appears once the route re-renders.
+    router.refresh()
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -475,7 +624,11 @@ export function SchedulingGrid({
           activeAssignments={activeAssignments}
           doubleBookedOfficials={doubleBookedOfficials}
           unavailableSlots={unavailableSlots}
-          pickerCell={pickerCell}
+          periodsByCell={periodsByCell}
+          personDrag={personDrag}
+          onPersonDragStart={handlePersonDragStart}
+          onPersonDragEnter={handlePersonDragEnter}
+          onTimeOffClick={handleTimeOffClick}
           onCellClick={handleCellClick}
           pendingCells={pendingCells}
         />
@@ -518,6 +671,40 @@ export function SchedulingGrid({
         />
       )}
 
+      {timeOffCell && (
+        <TimeOffPopup
+          cell={timeOffCell}
+          onRemove={handleTimeOffRemove}
+          removingId={removingPeriodId}
+        />
+      )}
+
+      {personDragPicker && (
+        <PersonDragPicker
+          picker={personDragPicker}
+          openWorkstations={stageWorkstations.filter((ws) =>
+            personDragPicker.cellStarts.every((cs) =>
+              isWithinWindow(new Date(cs), granularityMin, ws.workstation_operating_windows)
+            )
+          )}
+          // Occupancy at the painted slots. The max rather than a per-slot
+          // figure: the picker offers one choice for the whole run, so the
+          // number that matters is the tightest slot in it.
+          countFor={(wsId) =>
+            Math.max(
+              ...personDragPicker.cellStarts.map(
+                (cs) =>
+                  activeAssignments.filter(
+                    (a) => a.workstation_id === wsId && a.timeslot_start === cs
+                  ).length
+              )
+            )
+          }
+          onPickWorkstation={handlePersonDragPickWorkstation}
+          onPickTimeOff={handlePersonDragPickTimeOff}
+        />
+      )}
+
       {/* Slot modal for by-work-area expanded rows */}
       {wsSlotModal && (
         <WsSlotModal
@@ -527,6 +714,7 @@ export function SchedulingGrid({
           activeAssignments={activeAssignments}
           officials={officials}
           unavailableSlots={unavailableSlots}
+          periodsByCell={periodsByCell}
           onRemove={handleWsSlotRemove}
           onAdd={handleWsSlotAdd}
           onClose={closeWsSlotModal}

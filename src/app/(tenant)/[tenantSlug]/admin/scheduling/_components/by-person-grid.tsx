@@ -1,7 +1,6 @@
 import { Users } from 'lucide-react'
 import { useMemo } from 'react'
-import { ScrollShadow, Skeleton } from '@heroui/react'
-import { Button } from '@/components/ui/button'
+import { Skeleton } from '@heroui/react'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
@@ -12,7 +11,13 @@ import {
   workAreaBorderColor,
   workAreaColorMap,
 } from '@/lib/theme/work-area-colors'
-import { STRIPED_TIME_OFF_STYLE, STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
+import {
+  STRIPED_TIME_OFF_STYLE,
+  STRIPED_TIME_OFF_ADMIN_STYLE,
+  STRIPED_UNAVAILABLE_STYLE,
+} from './grid-helpers'
+import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
+import type { PersonDrag } from './use-scheduling-grid-interaction'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
 interface ByPersonGridProps {
@@ -22,14 +27,20 @@ interface ByPersonGridProps {
   stageWorkstations: WorkstationData[]
   activeAssignments: LocalAssignment[]
   doubleBookedOfficials: Set<string>
-  /** `officialId:slotStartISO` keys covered by a self-reported absence. */
+  /** `officialId:slotStartISO` keys covered by any kind of time off. */
   unavailableSlots: Set<string>
-  pickerCell: {
-    officialId: string
-    slotStart: string
-    anchorTop: number
-    anchorLeft: number
-  } | null
+  /** The periods behind each of those keys, for hatch colour and tooltip. */
+  periodsByCell: Map<string, UnavailabilityPeriod[]>
+  /** In-progress paint along one person's row, or null. */
+  personDrag: PersonDrag
+  onPersonDragStart: (officialId: string, officialName: string, idx: number) => void
+  onPersonDragEnter: (officialId: string, idx: number) => void
+  /** Opens the popup listing what covers a hatched cell. */
+  onTimeOffClick: (
+    officialName: string,
+    periods: UnavailabilityPeriod[],
+    anchor: HTMLElement
+  ) => void
   onCellClick: (officialId: string, slot: Date, ws?: WorkstationData, anchor?: HTMLElement) => void
   pendingCells: Set<string>
 }
@@ -42,7 +53,11 @@ export function ByPersonGrid({
   activeAssignments,
   doubleBookedOfficials,
   unavailableSlots,
-  pickerCell,
+  periodsByCell,
+  personDrag,
+  onPersonDragStart,
+  onPersonDragEnter,
+  onTimeOffClick,
   onCellClick,
   pendingCells,
 }: ByPersonGridProps) {
@@ -148,27 +163,35 @@ export function ByPersonGrid({
                     </span>
                   </div>
                 </td>
-                {slots.map((slot) => {
+                {slots.map((slot, slotArrIdx) => {
                   const slotStart = slot.toISOString()
                   const assignment = assignmentMap.get(`${official.id}:${slotStart}`)
                   const ws = assignment
                     ? stageWorkstations.find((w) => w.id === assignment.workstation_id)
                     : undefined
                   const isDoubleBooked = doubleBookedOfficials.has(`${official.id}:${slotStart}`)
-                  const isUnavailable = unavailableSlots.has(`${official.id}:${slotStart}`)
+                  const cellKey = `${official.id}:${slotStart}`
+                  const isUnavailable = unavailableSlots.has(cellKey)
+                  // Which hatch to draw. Both kinds block equally; this only
+                  // says whose note it is, so an admin can tell their own
+                  // entry from the official's at a glance.
+                  const timeOffAuthor = isUnavailable
+                    ? dominantAuthor(periodsByCell.get(cellKey) ?? [])
+                    : null
                   const wsCount = ws ? (countMap.get(`${ws.id}:${slotStart}`) ?? 0) : 0
 
                   // Double-booking is a warning and keeps its orange styling —
                   // the work-area palette is decorative and must not mask it.
                   const color = ws ? (wsColors.get(ws.id) ?? WORK_AREA_COLORS[0]) : undefined
-                  // Double-booking outranks an absence: it is a hard
-                  // conflict, this is an advisory one, and two warning styles
-                  // on one cell read as neither.
+                  // Double-booking outranks an absence. Both are now hard —
+                  // the save action refuses either — but a cell that is
+                  // already assigned twice is the one an admin has to act on,
+                  // and two warning styles on one cell read as neither.
                   const cellStyle = assignment
                     ? isDoubleBooked
                       ? 'bg-orange-50 border border-orange-200'
                       : isUnavailable
-                        ? 'border ring-2 ring-orange-300 ring-offset-1'
+                        ? 'border ring-2 ring-inset ring-orange-300'
                         : 'border'
                     : ''
                   const cellColors =
@@ -182,16 +205,30 @@ export function ByPersonGrid({
 
                   const isPending = pendingCells.has(`p:${official.id}:${slotStart}`)
 
+                  // Painted range, drawn live while the pointer is down.
+                  // Normalised because a drag can run right-to-left.
+                  const inPaint =
+                    personDrag !== null &&
+                    personDrag.officialId === official.id &&
+                    slotArrIdx >= Math.min(personDrag.startIdx, personDrag.currentIdx) &&
+                    slotArrIdx <= Math.max(personDrag.startIdx, personDrag.currentIdx)
+
                   return (
-                    <td key={slotStart} className="px-1 py-2 relative">
+                    <td key={slotStart} className="relative px-1 py-2 align-top">
                       {isPending ? (
-                        <Skeleton className="w-full h-10 rounded-md" />
+                        <Skeleton className="h-10 w-full rounded-md" />
                       ) : assignment ? (
                         <button
                           onClick={(e) =>
                             onCellClick(official.id, slot, undefined, e.currentTarget)
                           }
-                          className={`flex w-full h-10 flex-col items-center justify-center gap-1 rounded-md px-1 font-medium transition-colors hover:brightness-95 ${cellStyle} ${cellColors ? '' : 'text-gray-700'}`}
+                          // `h-10` alone is a MINIMUM on a flex column: two text lines plus
+                          // `gap-1` measure taller than 40px, so this button grew
+                          // while the empty and hatched cells stayed exactly 40px —
+                          // and with the row centring each cell independently, no two
+                          // kinds of cell lined up. `overflow-hidden` holds the
+                          // content to the box; the labels already truncate.
+                          className={`flex h-10 max-h-10 w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-md px-1 font-medium transition-colors hover:brightness-95 ${cellStyle} ${cellColors ? '' : 'text-gray-700'}`}
                           style={cellColors}
                         >
                           <span className="w-full truncate text-center text-[11px] leading-none">
@@ -205,20 +242,69 @@ export function ByPersonGrid({
                           </span>
                         </button>
                       ) : activeSlotSet.has(slotStart) ? (
-                        // Still a button when the official declared time off:
-                        // the stripes say "they would rather not", not "you
-                        // cannot". Blocking the click here would be the hard
-                        // block this feature deliberately is not.
-                        <button
-                          onClick={(e) =>
-                            onCellClick(official.id, slot, undefined, e.currentTarget)
-                          }
-                          title={isUnavailable ? t('scheduling.unavailableCell') : undefined}
-                          className="w-full h-10 rounded-md border border-transparent hover:border-gray-200 hover:bg-gray-50 transition-colors"
-                          style={isUnavailable ? STRIPED_TIME_OFF_STYLE : undefined}
-                        />
+                        // Time off is a hard block (Peter, 2026-10-07): the
+                        // cell stops being a button entirely rather than
+                        // opening a picker that would then be refused by the
+                        // server. The two hatches distinguish who recorded it.
+                        isUnavailable ? (
+                          // Clickable, but never to assign: the popup says
+                          // what covers the cell and offers removal only for
+                          // periods this admin recorded. Keeping it a button
+                          // is what makes the block explainable rather than
+                          // just inert.
+                          <button
+                            onClick={(e) =>
+                              onTimeOffClick(
+                                official.name,
+                                periodsByCell.get(cellKey) ?? [],
+                                e.currentTarget
+                              )
+                            }
+                            // No border, transparent or otherwise. A
+                            // transparent border still paints the background
+                            // under itself, so the hatch would bleed 2px past
+                            // the visible edge of the cells either side and
+                            // read as a larger, mis-seated box. The bordered
+                            // cells draw their border INSIDE h-10 (border-box),
+                            // so a plain h-10 here matches them exactly.
+                            className="h-10 w-full rounded-md transition-opacity hover:opacity-75"
+                            style={
+                              timeOffAuthor === 'tenant_admin'
+                                ? STRIPED_TIME_OFF_ADMIN_STYLE
+                                : STRIPED_TIME_OFF_STYLE
+                            }
+                            title={t('scheduling.timeOffBlockedCell')}
+                          />
+                        ) : (
+                          <button
+                            // No onClick: a plain click is just a one-slot
+                            // drag, and the release handler opens the same
+                            // picker. Two code paths to the same menu is what
+                            // produced two different menus.
+                            // Drag-to-paint across this person's row. Pointer
+                            // events rather than mouse, so a stylus and a
+                            // trackpad behave the same; the row is only ever
+                            // painted on a desktop, since SCHED-01 is
+                            // edit-on-desktop and view-only on mobile.
+                            onPointerDown={() =>
+                              onPersonDragStart(official.id, official.name, slotArrIdx)
+                            }
+                            onPointerEnter={() => onPersonDragEnter(official.id, slotArrIdx)}
+                            className={`h-10 w-full rounded-md border transition-colors ${
+                              inPaint
+                                ? 'border-tenant-primary bg-tenant-primary-tint'
+                                : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                            }`}
+                          />
+                        )
                       ) : (
-                        <div className="w-full h-10 rounded-md" style={STRIPED_UNAVAILABLE_STYLE} />
+                        <div
+                          // Same reasoning as the time-off cell above: no
+                          // border, so the hatch stops at the same edge the
+                          // other cells' borders sit on.
+                          className="h-10 w-full rounded-md"
+                          style={STRIPED_UNAVAILABLE_STYLE}
+                        />
                       )}
                     </td>
                   )
@@ -234,50 +320,6 @@ export function ByPersonGrid({
           {t('scheduling.noAssignmentsToday')}
         </div>
       )}
-
-      {/* Work-area picker */}
-      {pickerCell &&
-        (() => {
-          const slot = new Date(pickerCell.slotStart)
-          const openWorkstations = stageWorkstations.filter((ws) =>
-            isWithinWindow(slot, granularityMin, ws.workstation_operating_windows)
-          )
-          if (openWorkstations.length === 0) return null
-          return (
-            <div
-              className="fixed w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50"
-              style={{
-                top: pickerCell.anchorTop,
-                left: pickerCell.anchorLeft,
-                transform: 'translateY(calc(-100% - 4px))',
-              }}
-              data-picker-cell
-            >
-              <div className="px-3 pt-2 pb-1 text-xs text-gray-400 font-medium uppercase tracking-wider">
-                {t('scheduling.assignTo')}
-              </div>
-              <ScrollShadow className="flex flex-col max-h-64 overflow-y-auto">
-                {openWorkstations.map((ws) => {
-                  const count = countMap.get(`${ws.id}:${pickerCell.slotStart}`) ?? 0
-                  return (
-                    <Button
-                      key={ws.id}
-                      variant="light"
-                      size="sm"
-                      className="w-full h-8 shrink-0 justify-between rounded-none px-3"
-                      onPress={() => onCellClick(pickerCell.officialId, slot, ws)}
-                    >
-                      <span className="truncate">{ws.name}</span>
-                      <span className="ml-2 text-xs text-gray-400 tabular-nums shrink-0">
-                        {count}/{ws.capacity_ceiling}
-                      </span>
-                    </Button>
-                  )
-                })}
-              </ScrollShadow>
-            </div>
-          )
-        })()}
     </div>
   )
 }

@@ -1,5 +1,9 @@
 import { useTranslation } from '@/lib/i18n/client'
-import { STRIPED_TIME_OFF_STYLE, STRIPED_UNAVAILABLE_STYLE } from './grid-helpers'
+import {
+  STRIPED_TIME_OFF_STYLE,
+  STRIPED_TIME_OFF_ADMIN_STYLE,
+  STRIPED_UNAVAILABLE_STYLE,
+} from './grid-helpers'
 
 export function SchedulingLegend() {
   const { t } = useTranslation('admin')
@@ -46,6 +50,13 @@ export function SchedulingLegend() {
           style={STRIPED_TIME_OFF_STYLE}
         />
         {t('scheduling.legendTimeOff')}
+      </span>
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block h-4 w-8 rounded-sm border border-slate-300"
+          style={STRIPED_TIME_OFF_ADMIN_STYLE}
+        />
+        {t('scheduling.legendTimeOffAdmin')}
       </span>
     </div>
   )

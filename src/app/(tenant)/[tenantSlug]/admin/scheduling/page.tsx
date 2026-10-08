@@ -37,8 +37,8 @@ export async function fetchAssignmentsForDay(
   return data ?? []
 }
 
-// Self-reported unavailability overlapping the day on screen, for the grid's
-// advisory overlay. Scoped to the day the same way assignments are, and by
+// Unavailability overlapping the day on screen, for the grid's blocked-cell
+// overlay. Scoped to the day the same way assignments are, and by
 // overlap rather than by start: a period running Friday to Sunday starts
 // before Saturday and must still shade Saturday's cells.
 //
@@ -57,15 +57,17 @@ export async function fetchUnavailabilityForDay(
   // midnight belongs to the previous day and must not shade this one.
   const { data, error } = await supabase
     .from('official_unavailability')
-    .select('id, official_id, starts_at, ends_at, reason')
+    .select('id, official_id, starts_at, ends_at, reason, created_by_role')
     .eq('tenant_id', tenantId)
     .lt('starts_at', dayEnd.toISOString())
     .gt('ends_at', dayStart.toISOString())
 
-  // Never fatal: this is an advisory overlay on a screen whose primary job is
-  // assigning shifts. An admin must still be able to schedule when the overlay
-  // cannot load — losing the warning degrades the screen, losing the grid
-  // breaks it. Logged rather than swallowed, per F-REL-10.
+  // Never fatal: this overlay marks blocked cells on a screen whose primary
+  // job is assigning shifts. An admin must still be able to schedule when it
+  // cannot load — losing the shading degrades the screen, losing the grid
+  // breaks it, and the save action re-checks the periods server-side anyway,
+  // so a missing overlay cannot let an assignment through. Logged rather than
+  // swallowed, per F-REL-10.
   if (error) {
     logger.error('Scheduling: unavailability read failed', error, { tenantId, day })
     return []

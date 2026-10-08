@@ -28,7 +28,8 @@
     "unknownColorPalette": "Okänd färgpalett",
     "signOutFailed": "Kunde inte logga ut. Försök igen.",
     "slotTaken": "Någon annan hann före på den tidsluckan. Ladda om schemat och försök igen.",
-    "batchTooLarge": "För många inplaneringar i en sparning. Dela upp ändringen i mindre delar."
+    "batchTooLarge": "För många inplaneringar i en sparning. Dela upp ändringen i mindre delar.",
+    "assignmentOnTimeOff": "Funktionären har frånvaro då och kan inte schemaläggas."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

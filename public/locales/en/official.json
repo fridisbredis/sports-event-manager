@@ -53,7 +53,11 @@
     "todoLabel": "To do",
     "infoLabel": "Good to know",
     "timeOffOnDay": "Declared time off",
-    "timeOffAllDay": "All day"
+    "timeOffAllDay": "All day",
+    "withYouOnShift": "With you on this shift",
+    "timeOffSetByOrganisers": "Time off set by organisers",
+    "timeOffClash": "You said you were away at this time",
+    "timeOffClashAdmin": "The organisers marked you away at this time"
   },
   "announcements": {
     "title": "Announcements",
@@ -108,7 +112,7 @@
     "pageTitle": "Availability",
     "title": "Time off",
     "description": "Tell the organisers when you are not available to be scheduled.",
-    "advisoryNote": "This is a heads-up for the organisers, not a block. They can still schedule you — talk to them if something is fixed.",
+    "blockingNote": "The organisers cannot schedule you during a period you have declared. A shift already in your schedule stays — you will see a warning on it, so talk to the organisers.",
     "emptyTitle": "No time off declared",
     "emptyDescription": "Add a period and the organisers will see it when they build the schedule.",
     "addButton": "Add time off",
@@ -128,6 +132,9 @@
     "deleteFailed": "Could not remove the period. Try again.",
     "errorEndBeforeStart": "The end must be after the start.",
     "manageLink": "Manage time off",
-    "eventDatesHint": "The event runs {{from}} – {{to}}."
+    "eventDatesHint": "The event runs {{from}} – {{to}}.",
+    "sectionLabel": "Time off",
+    "setByOrganisers": "Set by organisers",
+    "notOwned": "The organisers set this — only they can remove it."
   }
 }

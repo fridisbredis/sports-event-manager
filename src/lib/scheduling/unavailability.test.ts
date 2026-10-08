@@ -4,6 +4,8 @@ import {
   buildUnavailableSlotKeys,
   periodsCoveringSlot,
   findUnavailableAssignments,
+  mergeAdjacentPeriods,
+  clashingAuthor,
   type UnavailabilityPeriod,
 } from './unavailability'
 
@@ -199,5 +201,130 @@ describe('findUnavailableAssignments', () => {
       [period({ official_id: 'off-2', starts_at: at(9), ends_at: at(12) })]
     )
     expect(conflicts.map((a) => a.official_id)).toEqual(['off-2'])
+  })
+})
+
+describe('mergeAdjacentPeriods', () => {
+  const p = (
+    id: string,
+    startHour: number,
+    endHour: number,
+    overrides: Partial<UnavailabilityPeriod> = {}
+  ): UnavailabilityPeriod => ({
+    id,
+    official_id: 'off-1',
+    starts_at: at(startHour),
+    ends_at: at(endHour),
+    reason: null,
+    created_by_role: 'tenant_admin',
+    ...overrides,
+  })
+
+  it('joins touching periods into one span', () => {
+    // Three drags across one row store three rows. Rendered as three lines
+    // they read as three unrelated absences, when the person is simply away
+    // 07:00–10:00 — this is the bug the merge exists for.
+    const merged = mergeAdjacentPeriods([p('a', 7, 8), p('b', 8, 9), p('c', 9, 10)])
+
+    expect(merged).toHaveLength(1)
+    expect(merged[0].starts_at).toBe(at(7))
+    expect(merged[0].ends_at).toBe(at(10))
+  })
+
+  it('keeps a real gap as two spans', () => {
+    const merged = mergeAdjacentPeriods([p('a', 7, 8), p('b', 11, 14)])
+
+    expect(merged).toHaveLength(2)
+    expect(merged[0].ends_at).toBe(at(8))
+    expect(merged[1].starts_at).toBe(at(11))
+  })
+
+  it('never merges across authors', () => {
+    // Who said it is part of what the line means, so an admin's note and the
+    // official's own must stay separate even when they touch.
+    const merged = mergeAdjacentPeriods([
+      p('a', 7, 8, { created_by_role: 'tenant_admin' }),
+      p('b', 8, 9, { created_by_role: 'official' }),
+    ])
+
+    expect(merged).toHaveLength(2)
+  })
+
+  it('never merges across differing reasons', () => {
+    const merged = mergeAdjacentPeriods([
+      p('a', 7, 8, { reason: 'Working' }),
+      p('b', 8, 9, { reason: 'Away' }),
+    ])
+
+    expect(merged).toHaveLength(2)
+  })
+
+  it('absorbs a period contained within another', () => {
+    const merged = mergeAdjacentPeriods([p('a', 7, 14), p('b', 9, 10)])
+
+    expect(merged).toHaveLength(1)
+    expect(merged[0].ends_at).toBe(at(14))
+  })
+
+  it('sorts before merging, so input order does not matter', () => {
+    const merged = mergeAdjacentPeriods([p('c', 9, 10), p('a', 7, 8), p('b', 8, 9)])
+
+    expect(merged).toHaveLength(1)
+    expect(merged[0].starts_at).toBe(at(7))
+  })
+
+  it('leaves the input array untouched', () => {
+    const input = [p('a', 7, 8), p('b', 8, 9)]
+    mergeAdjacentPeriods(input)
+
+    expect(input).toHaveLength(2)
+    expect(input[0].ends_at).toBe(at(8))
+  })
+})
+
+describe('clashingAuthor', () => {
+  it('is null when the shift sits outside every period', () => {
+    expect(clashingAuthor(at(13), at(14), [period()])).toBeNull()
+  })
+
+  it('is null when the shift only touches a period end', () => {
+    // Half-open, like every other boundary in this file: a shift starting the
+    // minute an absence ends is not a clash, and warning about it would train
+    // officials to ignore the chip.
+    expect(clashingAuthor(at(12), at(13), [period()])).toBeNull()
+  })
+
+  it('names the official when their own declaration overlaps', () => {
+    expect(clashingAuthor(at(11), at(13), [period({ created_by_role: 'official' })])).toBe(
+      'official'
+    )
+  })
+
+  it('names the organisers when they recorded it', () => {
+    expect(clashingAuthor(at(8), at(10), [period({ created_by_role: 'tenant_admin' })])).toBe(
+      'tenant_admin'
+    )
+  })
+
+  it('prefers the organisers when both kinds overlap the same shift', () => {
+    const periods = [
+      period({ id: 'own', created_by_role: 'official' }),
+      period({ id: 'set', created_by_role: 'tenant_admin', starts_at: at(10), ends_at: at(14) }),
+    ]
+    expect(clashingAuthor(at(11), at(12), periods)).toBe('tenant_admin')
+  })
+
+  it('ignores a non-overlapping period of the other kind', () => {
+    // The tie-break must not reach past the overlap test: an admin period
+    // elsewhere in the day cannot relabel a clash with the official's own.
+    const periods = [
+      period({ id: 'own', created_by_role: 'official' }),
+      period({ id: 'set', created_by_role: 'tenant_admin', starts_at: at(18), ends_at: at(20) }),
+    ]
+    expect(clashingAuthor(at(10), at(11), periods)).toBe('official')
+  })
+
+  it('is null with no periods at all', () => {
+    expect(clashingAuthor(at(9), at(10), [])).toBeNull()
   })
 })

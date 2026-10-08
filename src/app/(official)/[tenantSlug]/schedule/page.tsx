@@ -6,8 +6,14 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { ScheduleView, type AssignmentRow, type CheckMap } from './_components/schedule-view'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
 import { logger } from '@/lib/logger'
-import { distinctDays, dayWindow, resolveSelectedDay } from '@/lib/scheduling/day-window'
-import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
+import {
+  distinctDays,
+  dayWindow,
+  daysSpanned,
+  resolveSelectedDay,
+} from '@/lib/scheduling/day-window'
+import { periodsOverlap, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
+import { getEventDateRange, type StageDates } from '@/lib/scheduling/period-bounds'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -53,6 +59,9 @@ export default async function SchedulePage({ params, searchParams }: Props) {
   let assignments: AssignmentRow[] = []
   let days: string[] = []
   let selectedDay: string | null = null
+  // Every period this official declared, for the tab list; narrowed to the
+  // selected day further down for the strip the view renders.
+  let allTimeOff: UnavailabilityPeriod[] = []
 
   if (officialId) {
     // Query 1 of 2 — the day list. Reads every shift this official has, but
@@ -94,7 +103,46 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       context: { tenantId: tenant.id, officialId },
     })
 
-    days = distinctDays(boundedDayRows.map((row) => row.timeslot_start))
+    // Declared time off, read here rather than after the day is chosen because
+    // it feeds the tab list below. Own rows only — the RLS policy allows
+    // nothing else, and the explicit filter states that at the call site too.
+    //
+    // Unscoped by day on purpose: a person declares a handful of periods for
+    // an event, so this is a small read, and knowing all of them is what lets
+    // a day with time off and no shifts get a tab at all.
+    const { data: timeOffRows, error: timeOffError } = await supabase
+      .from('official_unavailability')
+      .select('id, official_id, starts_at, ends_at, reason, created_by_role')
+      .eq('official_id', officialId)
+      .eq('tenant_id', tenant.id)
+      .order('starts_at')
+      .range(0, SCHEDULE_CEILING)
+
+    // Not fatal, unlike the assignment read above: this screen's job on event
+    // day is to show the shifts, and losing the time-off strip must not take
+    // the schedule with it. Logged rather than swallowed (F-REL-10).
+    if (timeOffError) {
+      logger.error('Official schedule: time off failed to load', timeOffError, {
+        tenantId: tenant.id,
+        officialId,
+      })
+    } else {
+      allTimeOff = (timeOffRows ?? []) as UnavailabilityPeriod[]
+    }
+
+    // Tabs come from shifts AND declared time off, not shifts alone. A day
+    // someone has booked off usually has no shifts on it — that is the whole
+    // point of booking it off — so a shifts-only list hid exactly the days the
+    // declaration was about, and the official had no way to see on this screen
+    // that the organisers had been told.
+    //
+    // Still not every day of the event: an official working two days of a
+    // fourteen-day event should see two tabs, not twelve empty ones. This adds
+    // the days that carry something, and nothing else.
+    days = distinctDays([
+      ...boundedDayRows.map((row) => row.timeslot_start),
+      ...allTimeOff.flatMap((period) => daysSpanned(period.starts_at, period.ends_at)),
+    ])
     selectedDay = resolveSelectedDay(requestedDay, days, new Date().toISOString().slice(0, 10))
   }
 
@@ -142,40 +190,113 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     })
   }
 
-  // The official's own declared time off for the day on screen, so the
-  // schedule says it rather than making them open another page to recall what
-  // they told the organisers. Own rows only — the RLS policy allows nothing
-  // else, and the explicit filter states that at the call site too.
-  let timeOff: UnavailabilityPeriod[] = []
+  // SHIFT PEERS (Peter, 2026-10-07). Who else is on each of today's shifts.
+  //
+  // This is what migration 20261006113036's widened `assignments` read exists
+  // for: the RLS policy admits a colleague's row only when the caller holds
+  // one on the same workstation over the same timeslot, so this query cannot
+  // return more than the shifts the viewer actually works — there is no need
+  // to re-filter by the viewer's own slots here, and no way to widen it by
+  // changing the filters below.
+  //
+  // Read with the RLS client deliberately, NOT the service role: the policy is
+  // the thing that bounds this, and reaching past it would turn a scoped read
+  // into a roster dump.
+  const shiftPeers = new Map<string, string[]>()
 
-  if (officialId && selectedDay) {
+  if (officialId && selectedDay && assignments.length > 0) {
     const { start, end } = dayWindow(selectedDay)
 
-    // Overlap, not start-of-day: a period running Friday to Sunday starts
-    // before Saturday and must still show on Saturday.
-    const { data: timeOffRows, error: timeOffError } = await supabase
-      .from('official_unavailability')
-      .select('id, official_id, starts_at, ends_at, reason')
-      .eq('official_id', officialId)
+    const { data: peerRows, error: peersError } = await supabase
+      .from('assignments')
+      .select('workstation_id, timeslot_start, officials ( id, name )')
       .eq('tenant_id', tenant.id)
-      .lt('starts_at', end)
-      .gt('ends_at', start)
-      .order('starts_at')
+      .eq('status', 'assigned')
+      .not('workstation_id', 'is', null)
+      .gte('timeslot_start', start)
+      .lt('timeslot_start', end)
+      .range(0, SCHEDULE_CEILING)
 
-    // Deliberately not fatal, unlike the assignment reads above: this screen's
-    // job on event day is to show the shifts, and losing the time-off strip
-    // must not take the schedule with it. Logged rather than swallowed
-    // (F-REL-10) so a persistent failure is visible.
-    if (timeOffError) {
-      logger.error('Official schedule: time off failed to load', timeOffError, {
+    // Not fatal: losing the peer list degrades a shift card to what it showed
+    // before this feature existed, whereas failing the page would take the
+    // schedule with it. Logged rather than swallowed (F-REL-10).
+    if (peersError) {
+      logger.error('Official schedule: shift peers failed to load', peersError, {
         tenantId: tenant.id,
         officialId,
         day: selectedDay,
       })
     } else {
-      timeOff = (timeOffRows ?? []) as UnavailabilityPeriod[]
+      for (const row of peerRows ?? []) {
+        const peer = row.officials as { id: string; name: string } | null
+        // Skip the viewer themselves — "with you on this shift" lists the
+        // others, and the policy returns the caller's own rows too.
+        if (!peer || peer.id === officialId) continue
+        // Keyed on the pair that defines a shift, matching how the RLS policy
+        // decides visibility and how the grid groups cells.
+        const key = `${row.workstation_id}|${new Date(row.timeslot_start).toISOString()}`
+        const list = shiftPeers.get(key)
+        if (list) {
+          if (!list.includes(peer.name)) list.push(peer.name)
+        } else {
+          shiftPeers.set(key, [peer.name])
+        }
+      }
+      for (const names of shiftPeers.values()) names.sort((a, b) => a.localeCompare(b))
     }
   }
+
+  // Event bounds for the time-off panel's date picker, mirroring the standalone
+  // availability page. Decorative: a failure here leaves the picker unbounded
+  // rather than blocking the schedule.
+  let eventDates: { min: string; max: string } | null = null
+
+  if (officialId) {
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .maybeSingle()
+
+    // Logged rather than swallowed (F-REL-10). Not fatal: losing this only
+    // leaves the time-off panel's date picker unbounded, and failing the whole
+    // schedule over a decorative read would be the worse trade.
+    if (eventError) {
+      logger.error('Official schedule: event lookup failed', eventError, {
+        tenantId: tenant.id,
+      })
+    }
+
+    if (event) {
+      const { data: stageRows, error: stagesError } = await supabase
+        .from('event_stages')
+        .select('stage_date, start_time, end_time')
+        .eq('event_id', event.id)
+        .eq('tenant_id', tenant.id)
+
+      if (stagesError) {
+        logger.error('Official schedule: stage dates failed to load', stagesError, {
+          tenantId: tenant.id,
+          eventId: event.id,
+        })
+      } else {
+        eventDates = getEventDateRange((stageRows ?? []) as StageDates[])
+      }
+    }
+  }
+
+  // The periods overlapping the day on screen. Filtered in memory rather than
+  // re-queried: the full set is already here for the tab list, and it is small.
+  const timeOff = selectedDay
+    ? allTimeOff.filter((period) =>
+        periodsOverlap(
+          period.starts_at,
+          period.ends_at,
+          dayWindow(selectedDay).start,
+          dayWindow(selectedDay).end
+        )
+      )
+    : []
 
   // Check state for the day on screen. One query for every station the
   // official works today rather than one per station: the shift screen is
@@ -272,7 +393,11 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     infoLabel: t('mySchedule.infoLabel'),
     manageAvailability: t('availability.manageLink'),
     timeOffOnDay: t('mySchedule.timeOffOnDay'),
+    timeOffSetByOrganisers: t('mySchedule.timeOffSetByOrganisers'),
     timeOffAllDay: t('mySchedule.timeOffAllDay'),
+    withYouOnShift: t('mySchedule.withYouOnShift'),
+    timeOffClash: t('mySchedule.timeOffClash'),
+    timeOffClashAdmin: t('mySchedule.timeOffClashAdmin'),
   }
 
   // Passed as raw templates, not interpolated here: this object crosses into
@@ -305,6 +430,9 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       currentUserId={user.id}
       checklistStrings={checklistStrings}
       timeOff={timeOff}
+      shiftPeers={shiftPeers}
+      allTimeOff={allTimeOff}
+      eventDates={eventDates}
     />
   )
 }

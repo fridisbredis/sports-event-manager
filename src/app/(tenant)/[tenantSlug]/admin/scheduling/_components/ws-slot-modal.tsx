@@ -4,6 +4,7 @@ import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/form-fields'
 import { formatSlotLabel } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import type { OfficialData, LocalAssignment } from './scheduling-types'
 import type { WsSlotModal as WsSlotModalState } from './use-scheduling-grid-interaction'
 
@@ -11,16 +12,25 @@ import type { WsSlotModal as WsSlotModalState } from './use-scheduling-grid-inte
  * What the picker says about one official at this slot.
  *
  * Ordered by how much it should discourage picking that person, which is also
- * the order the list sorts in: free first, a declared absence next (allowed,
- * but say so), already working last.
+ * the order the list sorts in: free first, then the two that cannot be picked
+ * at all — time off (blocked since Peter's call of 2026-10-07) and already
+ * working.
  */
-type PickerStatus = 'available' | 'timeOff' | 'assigned'
+type PickerStatus = 'available' | 'timeOff' | 'timeOffAdmin' | 'assigned'
 
 const STATUS_ORDER: Record<PickerStatus, number> = {
   available: 0,
   timeOff: 1,
-  assigned: 2,
+  timeOffAdmin: 2,
+  assigned: 3,
 }
+
+/** Which statuses make a person unpickable for this slot. */
+const BLOCKED: ReadonlySet<PickerStatus> = new Set<PickerStatus>([
+  'timeOff',
+  'timeOffAdmin',
+  'assigned',
+])
 
 interface WsSlotModalProps {
   wsSlotModal: NonNullable<WsSlotModalState>
@@ -28,8 +38,10 @@ interface WsSlotModalProps {
   onSearchChange: (value: string) => void
   activeAssignments: LocalAssignment[]
   officials: OfficialData[]
-  /** `officialId:slotStartISO` keys covered by a self-reported absence. */
+  /** `officialId:slotStartISO` keys covered by any kind of time off. */
   unavailableSlots: Set<string>
+  /** The periods behind those keys, to tell admin-set from self-declared. */
+  periodsByCell: Map<string, UnavailabilityPeriod[]>
   onRemove: (assignment: LocalAssignment) => void
   onAdd: (officialId: string) => void
   onClose: () => void
@@ -42,6 +54,7 @@ export function WsSlotModal({
   activeAssignments,
   officials,
   unavailableSlots,
+  periodsByCell,
   onRemove,
   onAdd,
   onClose,
@@ -62,18 +75,22 @@ export function WsSlotModal({
   )
 
   // Every official, each carrying why they are or are not a good pick —
-  // rather than silently dropping the ones already working this slot. Hiding
-  // them answered "who can I add" but not "where is everyone", so an admin
-  // looking for a specific person found an absence with no explanation. The
-  // status says which, and Add stays enabled either way: both an absence and
-  // a clash are warnings here, not blocks.
+  // rather than silently dropping the ones who cannot be picked. Hiding them
+  // answered "who can I add" but not "where is everyone", so an admin looking
+  // for a specific person found an absence with no explanation. The status
+  // says which, and Add is disabled for the ones the server would refuse.
   const candidatesAll = officials
     .map((off) => {
-      const status: PickerStatus = assignedAtSlot.has(off.id)
-        ? 'assigned'
-        : unavailableSlots.has(`${off.id}:${wsSlotModal.slotStart}`)
-          ? 'timeOff'
-          : 'available'
+      const cellKey = `${off.id}:${wsSlotModal.slotStart}`
+      let status: PickerStatus = 'available'
+      if (assignedAtSlot.has(off.id)) {
+        status = 'assigned'
+      } else if (unavailableSlots.has(cellKey)) {
+        status =
+          dominantAuthor(periodsByCell.get(cellKey) ?? []) === 'tenant_admin'
+            ? 'timeOffAdmin'
+            : 'timeOff'
+      }
       return { official: off, status }
     })
     .sort(
@@ -167,28 +184,32 @@ export function WsSlotModal({
                         >
                           <div className="flex min-w-0 flex-col items-start gap-1">
                             <span className="truncate text-sm text-gray-900">{official.name}</span>
-                            {/* Success / warning / danger, matching what each
-                                state means elsewhere on this screen: a clash
-                                is the red one the grid already uses, and a
-                                declared absence the amber advisory. */}
+                            {/* Green for pickable, red for an outright clash,
+                                amber for either kind of time off — matching
+                                the hatches on the grid itself. */}
                             <Chip
                               size="sm"
                               variant="flat"
                               color={
                                 status === 'available'
                                   ? 'success'
-                                  : status === 'timeOff'
-                                    ? 'warning'
-                                    : 'danger'
+                                  : status === 'assigned'
+                                    ? 'danger'
+                                    : 'warning'
                               }
                             >
                               {t(`scheduling.slotModalStatus.${status}`)}
                             </Chip>
                           </div>
+                          {/* Disabled, not hidden: an admin looking for a
+                              person needs to find them and see why they are
+                              unavailable. The server refuses these too — the
+                              disabled state is a courtesy, not the guard. */}
                           <Button
                             variant="bordered"
                             size="sm"
                             className="shrink-0"
+                            isDisabled={BLOCKED.has(status)}
                             onPress={() => onAdd(official.id)}
                           >
                             {t('scheduling.slotModalAdd')}

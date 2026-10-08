@@ -251,7 +251,7 @@
     "legendFilled": "Filled (colour per work area)",
     "legendAssignable": "Assignable",
     "legendOutsideWindow": "Outside operating window — disabled",
-    "legendTimeOff": "Declared time off — can still be assigned",
+    "legendTimeOff": "Time off declared by official",
     "legendCapacity": "Assigned / capacity",
     "legendOverCapacity": "Over capacity",
     "colOfficial": "Official",
@@ -275,7 +275,8 @@
     "slotModalStatus": {
       "available": "Available",
       "timeOff": "Declared time off",
-      "assigned": "Already assigned"
+      "assigned": "Already assigned",
+      "timeOffAdmin": "Time off (set by organisers)"
     },
     "slotModalRemove": "Remove",
     "slotModalEmpty": "All officials are already assigned at this time.",
@@ -294,7 +295,22 @@
     "noConfirmedOfficialsHint": "Officials must accept their invite before they can be scheduled.",
     "unavailableAssigned_one": "{{count}} assignment falls in declared time off.",
     "unavailableAssigned_other": "{{count}} assignments fall in declared time off.",
-    "unavailableCell": "This official declared time off — you can still assign them"
+    "unavailableCell": "Time off — cannot be scheduled",
+    "timeOffSetBy": "Set by organisers",
+    "timeOffDeclared": "Declared by official",
+    "timeOffAddTitle": "Mark as unavailable",
+    "timeOffSave": "Save",
+    "timeOffRemove": "Remove",
+    "timeOffReasonLabel": "Reason (optional)",
+    "timeOffSaveFailed": "Could not save the time off. Try again.",
+    "timeOffDeleteFailed": "Could not remove the time off. Try again.",
+    "timeOffNotOwned": "That time off was declared by the official and only they can remove it.",
+    "timeOffEndBeforeStart": "The end must be after the start.",
+    "timeOffBlockedCell": "Time off — cannot be scheduled",
+    "legendTimeOffAdmin": "Time off set by organisers",
+    "dragPaintPickArea": "{{name}} · {{count}} slots",
+    "dragPaintTimeOff": "Mark as time off",
+    "timeOffOnlyOwnerRemoves": "Only the official can remove this."
   },
   "communication": {
     "title": "Communication",

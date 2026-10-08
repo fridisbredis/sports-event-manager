@@ -166,3 +166,31 @@ export function groupIntoWorkAreaRuns<T extends { timeslot_start: string; timesl
 
   return runs
 }
+
+/**
+ * Every UTC calendar day a half-open period touches, ascending.
+ *
+ * A period running Friday 09:00 to Sunday 17:00 covers three days, and all
+ * three need a tab on MYSCH-01 — listing only its start would hide the middle
+ * of a long absence.
+ *
+ * The end is exclusive, matching how periods are stored: a whole-day absence
+ * ends at the next midnight, and that next day is NOT part of it. Without the
+ * guard below, "all of Saturday" would claim Sunday too.
+ */
+export function daysSpanned(startsAt: string, endsAt: string): string[] {
+  const start = new Date(startsAt)
+  const end = new Date(endsAt)
+  if (!(end.getTime() > start.getTime())) return []
+
+  const days: string[] = []
+  const cursor = new Date(start)
+  cursor.setUTCHours(0, 0, 0, 0)
+
+  while (cursor.getTime() < end.getTime()) {
+    days.push(cursor.toISOString().slice(0, 10))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+
+  return days
+}

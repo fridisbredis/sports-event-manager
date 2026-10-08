@@ -28,7 +28,8 @@
     "unknownColorPalette": "Unknown color palette",
     "signOutFailed": "Could not sign out. Please try again.",
     "slotTaken": "Someone else just took that slot. Please reload the schedule and try again.",
-    "batchTooLarge": "Too many assignments in one save. Split the change into smaller saves."
+    "batchTooLarge": "Too many assignments in one save. Split the change into smaller saves.",
+    "assignmentOnTimeOff": "That official has time off then and cannot be scheduled."
   },
   "notFoundPage": {
     "eyebrow": "No result",

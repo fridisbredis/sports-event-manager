@@ -251,7 +251,7 @@
     "legendFilled": "Ifylld (färg per arbetsområde)",
     "legendAssignable": "Kan planeras in",
     "legendOutsideWindow": "Utanför öppettid — inaktiverad",
-    "legendTimeOff": "Angiven frånvaro – kan ändå schemaläggas",
+    "legendTimeOff": "Frånvaro angiven av funktionären",
     "legendCapacity": "Inplanerade / kapacitet",
     "legendOverCapacity": "Över kapacitet",
     "colOfficial": "Funktionär",
@@ -275,7 +275,8 @@
     "slotModalStatus": {
       "available": "Tillgänglig",
       "timeOff": "Angiven frånvaro",
-      "assigned": "Redan schemalagd"
+      "assigned": "Redan schemalagd",
+      "timeOffAdmin": "Frånvaro (satt av arrangörerna)"
     },
     "slotModalRemove": "Ta bort",
     "slotModalEmpty": "Alla funktionärer är redan inplanerade vid den här tiden.",
@@ -294,7 +295,22 @@
     "noConfirmedOfficialsHint": "Funktionärer måste acceptera sin inbjudan innan de kan schemaläggas.",
     "unavailableAssigned_one": "{{count}} pass ligger på angiven frånvaro.",
     "unavailableAssigned_other": "{{count}} pass ligger på angiven frånvaro.",
-    "unavailableCell": "Funktionären har angett frånvaro – du kan ändå schemalägga"
+    "unavailableCell": "Frånvaro – kan inte schemaläggas",
+    "timeOffSetBy": "Satt av arrangörerna",
+    "timeOffDeclared": "Angiven av funktionären",
+    "timeOffAddTitle": "Markera som otillgänglig",
+    "timeOffSave": "Spara",
+    "timeOffRemove": "Ta bort",
+    "timeOffReasonLabel": "Anledning (frivilligt)",
+    "timeOffSaveFailed": "Kunde inte spara frånvaron. Försök igen.",
+    "timeOffDeleteFailed": "Kunde inte ta bort frånvaron. Försök igen.",
+    "timeOffNotOwned": "Frånvaron är angiven av funktionären och bara hen kan ta bort den.",
+    "timeOffEndBeforeStart": "Sluttiden måste vara efter starttiden.",
+    "timeOffBlockedCell": "Frånvaro – kan inte schemaläggas",
+    "legendTimeOffAdmin": "Frånvaro satt av arrangörerna",
+    "dragPaintPickArea": "{{name}} · {{count}} pass",
+    "dragPaintTimeOff": "Markera som frånvaro",
+    "timeOffOnlyOwnerRemoves": "Bara funktionären kan ta bort den här."
   },
   "communication": {
     "title": "Kommunikation",

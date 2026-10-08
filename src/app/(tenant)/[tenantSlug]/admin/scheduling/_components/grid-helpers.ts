@@ -7,17 +7,27 @@ export const STRIPED_UNAVAILABLE_STYLE = {
     'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
 }
 
-// A self-reported absence, NOT the same thing as a closed operating window.
-// Deliberately a different hatch from STRIPED_UNAVAILABLE_STYLE above: that
-// one is grey and means "the work area is shut, nothing can go here", and this
-// one is amber and means "this person asked not to be scheduled, but you may".
-// Reusing the grey would collapse a hard constraint and an advisory one into
-// one visual, which is exactly the confusion the legend exists to prevent.
-// Opposite diagonal as well as a different hue, so the two stay distinct for a
-// viewer who cannot rely on colour.
+// An absence the official declared, NOT the same thing as a closed operating
+// window. Grey above means "the work area is shut, nothing can go here";
+// amber here means "this person is not available". Both are hard blocks since
+// Peter's call of 2026-10-07, but they are blocked for different reasons and
+// an admin resolves them differently.
+//
+// Opposite diagonal as well as a different hue, so the two stay distinguishable
+// for a viewer who cannot rely on colour.
 export const STRIPED_TIME_OFF_STYLE = {
   background:
-    'repeating-linear-gradient(-45deg, #fed7aa, #fed7aa 3px, transparent 3px, transparent 8px)',
+    'repeating-linear-gradient(-45deg, #fdba74, #fdba74 3px, transparent 3px, transparent 8px)',
+}
+
+// Time off the ORGANISERS recorded, as opposed to the official's own
+// declaration above. Slate rather than amber, same diagonal: the two are the
+// same kind of thing (a person blocked) from two different authors, so they
+// share a direction and differ in hue — where the grey outside-window hatch
+// differs in both, because it is a different kind of thing entirely.
+export const STRIPED_TIME_OFF_ADMIN_STYLE = {
+  background:
+    'repeating-linear-gradient(-45deg, #94a3b8, #94a3b8 3px, transparent 3px, transparent 8px)',
 }
 
 export function toLocalAssignments(

@@ -53,7 +53,11 @@
     "todoLabel": "Att göra",
     "infoLabel": "Bra att veta",
     "timeOffOnDay": "Angiven frånvaro",
-    "timeOffAllDay": "Hela dagen"
+    "timeOffAllDay": "Hela dagen",
+    "withYouOnShift": "Med dig på det här passet",
+    "timeOffSetByOrganisers": "Frånvaro satt av arrangörerna",
+    "timeOffClash": "Du har angett att du är ledig den här tiden",
+    "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden"
   },
   "announcements": {
     "title": "Meddelanden",
@@ -108,7 +112,7 @@
     "pageTitle": "Tillgänglighet",
     "title": "Frånvaro",
     "description": "Berätta för arrangörerna när du inte kan bli schemalagd.",
-    "advisoryNote": "Det här är en upplysning till arrangörerna, inte en spärr. De kan fortfarande schemalägga dig – hör av dig om något är bestämt.",
+    "blockingNote": "Arrangörerna kan inte schemalägga dig under en period du har angett. Ett pass som redan ligger i ditt schema står kvar – du ser en varning på det, så hör av dig till arrangörerna.",
     "emptyTitle": "Ingen frånvaro angiven",
     "emptyDescription": "Lägg till en period så ser arrangörerna den när de lägger schemat.",
     "addButton": "Lägg till frånvaro",
@@ -128,6 +132,9 @@
     "deleteFailed": "Kunde inte ta bort perioden. Försök igen.",
     "errorEndBeforeStart": "Sluttiden måste vara efter starttiden.",
     "manageLink": "Hantera frånvaro",
-    "eventDatesHint": "Eventet pågår {{from}} – {{to}}."
+    "eventDatesHint": "Eventet pågår {{from}} – {{to}}.",
+    "sectionLabel": "Frånvaro",
+    "setByOrganisers": "Satt av arrangörerna",
+    "notOwned": "Arrangörerna satte den här – bara de kan ta bort den."
   }
 }

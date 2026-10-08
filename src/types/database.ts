@@ -528,6 +528,8 @@ export type Database = {
       official_unavailability: {
         Row: {
           created_at: string
+          created_by: string | null
+          created_by_role: string
           ends_at: string
           id: string
           official_id: string
@@ -538,6 +540,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
+          created_by_role?: string
           ends_at: string
           id?: string
           official_id: string
@@ -548,6 +552,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
+          created_by_role?: string
           ends_at?: string
           id?: string
           official_id?: string

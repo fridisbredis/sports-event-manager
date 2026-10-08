@@ -6,11 +6,11 @@ import svAdmin from '../../../../../../../public/locales/sv/admin.json'
 // `scheduling.slotModalStatus` is the only nested object under `scheduling` —
 // every other key there is a flat string. A nested lookup depends on i18next's
 // default `keySeparator: '.'`, which the app's config never sets explicitly,
-// so this pins that the three chips resolve rather than rendering their own
+// so this pins that every chip resolves rather than rendering its own
 // key path at an admin. It also catches the likelier failure: one language
 // gaining a status the other does not.
 describe('slot modal status chips', () => {
-  const statuses = ['available', 'timeOff', 'assigned'] as const
+  const statuses = ['available', 'timeOff', 'timeOffAdmin', 'assigned'] as const
 
   it.each(['en', 'sv'])('resolves every status in %s', async (lng) => {
     const i18n = createInstance()
