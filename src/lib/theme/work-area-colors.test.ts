@@ -174,10 +174,20 @@ describe('workAreaColor', () => {
 })
 
 describe('decorative derivations', () => {
-  it('draws dots in the background colour and mixes borders to 35% of the foreground', () => {
+  it('draws dots and cell borders in the background colour', () => {
     const color = WORK_AREA_COLORS[0]
     expect(workAreaDotColor(color)).toBe(color.bg)
-    expect(workAreaBorderColor(color)).toBe(`color-mix(in srgb, ${color.fg} 35%, white)`)
+    expect(workAreaBorderColor(color)).toBe(color.bg)
+  })
+
+  // The regression this guards: borders used to be a 35% mix of the
+  // FOREGROUND into white. On this palette's muted near-neutral foregrounds
+  // that rendered as a grey ring around every pastel cell, instead of a
+  // softer shade of the cell's own hue.
+  it('never gives a cell a border that differs from its own background', () => {
+    for (const color of WORK_AREA_COLORS) {
+      expect(workAreaBorderColor(color)).toBe(color.bg)
+    }
   })
 
   // The regression this guards: dots used to lighten the FOREGROUND, which on
