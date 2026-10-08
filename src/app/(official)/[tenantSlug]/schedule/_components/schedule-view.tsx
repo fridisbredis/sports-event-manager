@@ -8,7 +8,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { dayKey, mergeContiguousSlots, groupIntoWorkAreaRuns } from '@/lib/scheduling/day-window'
 import { workAreaColorMap, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './checklist-item-row'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { useLanguage } from '@/components/i18n-provider'
 
 type Todo = { id: string; instruction_text: string; position: number; item_type: string }
 
@@ -72,16 +73,16 @@ interface Props {
   checklistStrings: ChecklistStrings
 }
 
-function formatTime(ts: string): string {
-  return new Date(ts).toLocaleTimeString(DATE_LOCALE, {
+function formatTime(ts: string, language?: string): string {
+  return new Date(ts).toLocaleTimeString(dateLocaleFor(language), {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
   })
 }
 
-function formatDayHeader(ts: string): string {
-  return new Date(ts).toLocaleDateString(DATE_LOCALE, {
+function formatDayHeader(ts: string, language?: string): string {
+  return new Date(ts).toLocaleDateString(dateLocaleFor(language), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -93,8 +94,8 @@ function formatDayHeader(ts: string): string {
 // across a phone. Takes a `YYYY-MM-DD` day rather than a full timestamp, so it
 // is anchored to midnight UTC to match the `timeZone: 'UTC'` the rest of this
 // component formats in.
-function formatDayTab(day: string): string {
-  return new Date(`${day}T00:00:00.000Z`).toLocaleDateString(DATE_LOCALE, {
+function formatDayTab(day: string, language?: string): string {
+  return new Date(`${day}T00:00:00.000Z`).toLocaleDateString(dateLocaleFor(language), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -102,7 +103,7 @@ function formatDayTab(day: string): string {
   })
 }
 
-function groupByDay(assignments: AssignmentRow[]) {
+function groupByDay(assignments: AssignmentRow[], language?: string) {
   const groups: { key: string; label: string; rows: AssignmentRow[] }[] = []
   for (const a of assignments) {
     const key = dayKey(a.timeslot_start)
@@ -110,7 +111,7 @@ function groupByDay(assignments: AssignmentRow[]) {
     if (last?.key === key) {
       last.rows.push(a)
     } else {
-      groups.push({ key, label: formatDayHeader(a.timeslot_start), rows: [a] })
+      groups.push({ key, label: formatDayHeader(a.timeslot_start, language), rows: [a] })
     }
   }
   return groups
@@ -131,6 +132,9 @@ function DaySelector({
   tenantSlug: string
   label: string
 }) {
+  // Above the early returns below — hooks cannot be called conditionally.
+  const language = useLanguage()
+
   // Zero days renders the empty state instead, so there is nothing to label.
   if (days.length === 0) return null
 
@@ -142,7 +146,9 @@ function DaySelector({
   // chip that only ever leads back to the page it is on reads as a control
   // that does nothing.
   if (days.length === 1) {
-    return <p className="section-label mb-6">{formatDayHeader(`${days[0]}T00:00:00.000Z`)}</p>
+    return (
+      <p className="section-label mb-6">{formatDayHeader(`${days[0]}T00:00:00.000Z`, language)}</p>
+    )
   }
 
   return (
@@ -162,7 +168,7 @@ function DaySelector({
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {formatDayTab(day)}
+              {formatDayTab(day, language)}
             </Link>
           )
         })}
@@ -172,10 +178,11 @@ function DaySelector({
 }
 
 function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
+  const language = useLanguage()
   // Still grouped even though the window is usually one day: grouping stays
   // correct if a window ever spans a midnight boundary, which is the one case
   // where these headers still earn their place.
-  const groups = groupByDay(assignments)
+  const groups = groupByDay(assignments, language)
 
   // Coloured across the whole day, not per day-group, so a work area keeps
   // one colour down the timeline — and the same colour it has on the
@@ -213,9 +220,9 @@ function TimeView({ assignments }: { assignments: AssignmentRow[] }) {
                   {/* Start and end stacked, not side by side: "08:00-09:00"
                       on one line pushes the card too narrow on a phone. */}
                   <span className="w-14 shrink-0 pt-3 text-sm font-medium leading-tight text-gray-500">
-                    {formatTime(run.span.start)}&ndash;
+                    {formatTime(run.span.start, language)}&ndash;
                     <br />
-                    {formatTime(run.span.end)}
+                    {formatTime(run.span.end, language)}
                   </span>
                   <AppCard
                     className="card-accent-left-themed min-w-0 flex-1"
@@ -254,6 +261,8 @@ function WorkAreaView({
   currentUserId: string | null
   checklistStrings: ChecklistStrings
 }) {
+  const language = useLanguage()
+
   // Group by workstation id, preserving first-seen order. Keyed by a Map
   // rather than re-scanning `groups` per row, so an official with many slots
   // at one station doesn't make this quadratic.
@@ -314,7 +323,7 @@ function WorkAreaView({
             <div className="text-sm text-gray-500 mt-1">
               {spans.map((span) => (
                 <p key={span.start}>
-                  {formatTime(span.start)}&ndash;{formatTime(span.end)}
+                  {formatTime(span.start, language)}&ndash;{formatTime(span.end, language)}
                 </p>
               ))}
             </div>

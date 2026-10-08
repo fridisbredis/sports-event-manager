@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ScheduleView, type AssignmentRow } from './schedule-view'
+import { I18nProvider } from '@/components/i18n-provider'
 
 const STRINGS = {
   title: 'My schedule',
@@ -389,17 +390,29 @@ describe('ScheduleView day label', () => {
     slot('a', '2026-08-12T10:00:00.000Z', '2026-08-12T11:00:00.000Z', SOCIAL_MEDIA),
   ]
 
-  function renderDays(view: 'time' | 'work-area', days: string[], selectedDay: string) {
+  // Wrapped in the provider, and with the language named explicitly: these
+  // labels are the weekday and month names, which now follow the UI language.
+  // Rendering bare would assert against whatever the context default happens
+  // to be, so the Swedish expectations below would start passing or failing on
+  // a change to that default rather than on anything this file is testing.
+  function renderDays(
+    view: 'time' | 'work-area',
+    days: string[],
+    selectedDay: string,
+    language: 'sv' | 'en' = 'sv'
+  ) {
     localStorage.setItem('official-schedule-view', view)
     return render(
-      <ScheduleView
-        assignments={ONE_DAY()}
-        days={days}
-        selectedDay={selectedDay}
-        tenantSlug="testklubben"
-        strings={STRINGS}
-        {...CHECKLIST_PROPS}
-      />
+      <I18nProvider language={language}>
+        <ScheduleView
+          assignments={ONE_DAY()}
+          days={days}
+          selectedDay={selectedDay}
+          tenantSlug="testklubben"
+          strings={STRINGS}
+          {...CHECKLIST_PROPS}
+        />
+      </I18nProvider>
     )
   }
 
@@ -407,6 +420,15 @@ describe('ScheduleView day label', () => {
     renderDays('work-area', ['2026-08-12'], '2026-08-12')
 
     expect(screen.getByText('onsdag 12 augusti')).toBeTruthy()
+  })
+
+  // The regional format is pinned and only the names follow the language, so
+  // an English reader gets 'Wednesday 12 August' — not en-GB's '12/08/2026'
+  // and certainly not en-US's Sunday-first '8/12/2026'.
+  it('names the day in English when that is the UI language', () => {
+    renderDays('work-area', ['2026-08-12'], '2026-08-12', 'en')
+
+    expect(screen.getByText('Wednesday, 12 August')).toBeTruthy()
   })
 
   it('renders the single day as a static label, not a link that goes nowhere', () => {
@@ -445,17 +467,19 @@ describe('ScheduleView day label', () => {
     // the two groups apart and they stay.
     localStorage.setItem('official-schedule-view', 'time')
     render(
-      <ScheduleView
-        assignments={[
-          slot('a', '2026-08-12T22:00:00.000Z', '2026-08-12T23:00:00.000Z', SOCIAL_MEDIA),
-          slot('b', '2026-08-13T00:00:00.000Z', '2026-08-13T01:00:00.000Z', DEPOT),
-        ]}
-        days={['2026-08-12', '2026-08-13']}
-        selectedDay="2026-08-12"
-        tenantSlug="testklubben"
-        strings={STRINGS}
-        {...CHECKLIST_PROPS}
-      />
+      <I18nProvider language="sv">
+        <ScheduleView
+          assignments={[
+            slot('a', '2026-08-12T22:00:00.000Z', '2026-08-12T23:00:00.000Z', SOCIAL_MEDIA),
+            slot('b', '2026-08-13T00:00:00.000Z', '2026-08-13T01:00:00.000Z', DEPOT),
+          ]}
+          days={['2026-08-12', '2026-08-13']}
+          selectedDay="2026-08-12"
+          tenantSlug="testklubben"
+          strings={STRINGS}
+          {...CHECKLIST_PROPS}
+        />
+      </I18nProvider>
     )
 
     expect(screen.getByText('onsdag 12 augusti')).toBeTruthy()

@@ -8,26 +8,31 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
 import { EmptyState } from '@/components/ui/empty-state'
 import { AnnouncementCard } from './_components/announcement-card'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
   searchParams: Promise<{ page?: string }>
 }
 
-function formatAnnouncementTime(ts: string): string {
+// Takes the translator rather than reaching for one: this is a module-level
+// helper with no hook or request scope of its own, and the two relative-day
+// labels are UI strings like any other. They were hardcoded English before, so
+// a Swedish official reading an otherwise Swedish page saw "Today · 14:30".
+function formatAnnouncementTime(ts: string, language: string, t: (key: string) => string): string {
   const date = new Date(ts)
   const todayUTC = new Date().toISOString().slice(0, 10)
   const tsUTC = date.toISOString().slice(0, 10)
   const yesterdayUTC = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
-  const time = date.toLocaleTimeString(DATE_LOCALE, {
+  const locale = dateLocaleFor(language)
+  const time = date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
   })
-  if (tsUTC === todayUTC) return `Today · ${time}`
-  if (tsUTC === yesterdayUTC) return `Yesterday · ${time}`
-  const weekday = date.toLocaleDateString(DATE_LOCALE, { weekday: 'short', timeZone: 'UTC' })
+  if (tsUTC === todayUTC) return `${t('announcements.today')} · ${time}`
+  if (tsUTC === yesterdayUTC) return `${t('announcements.yesterday')} · ${time}`
+  const weekday = date.toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' })
   return `${weekday} · ${time}`
 }
 
@@ -35,7 +40,8 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
   const { tenantSlug } = await params
   const { page: pageParam } = await searchParams
   const page = parsePageParam(pageParam)
-  const t = await getServerTranslation(await getUserLanguage(), 'official')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'official')
 
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
@@ -77,7 +83,7 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
             {items.map((a) => (
               <AnnouncementCard
                 key={a.id}
-                time={formatAnnouncementTime(a.published_at)}
+                time={formatAnnouncementTime(a.published_at, language, t)}
                 body={a.body}
               />
             ))}

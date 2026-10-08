@@ -7,7 +7,8 @@ import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from '@gravity-ui/icons'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { useLanguage } from '@/components/i18n-provider'
 
 interface Props {
   stages: StageInput[]
@@ -64,13 +65,13 @@ function formatTime(iso: string): string {
   return iso.slice(11, 16)
 }
 
-function weekdayFromDateString(dateStr: string): string {
+function weekdayFromDateString(dateStr: string, language?: string): string {
   // Append T00:00Z so the Date is parsed as UTC midnight, giving the correct weekday.
   // The weekday alone cannot be ordered by eye — two stages weeks apart can both
   // read 'Thu', making a correctly sorted list look shuffled. Day and month
   // disambiguate them; the year is omitted because it is already shown once in
   // the event's date range, and repeating it per row crowds the name out.
-  return new Date(dateStr + 'T00:00Z').toLocaleDateString(DATE_LOCALE, {
+  return new Date(dateStr + 'T00:00Z').toLocaleDateString(dateLocaleFor(language), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -86,21 +87,23 @@ function weekdayFromDateString(dateStr: string): string {
  */
 function stageTimeRangeParts(
   start: string | null,
-  end: string | null
+  end: string | null,
+  language?: string
 ): { from: string; to: string | null } | null {
   if (!start) return null
   const startDate = start.slice(0, 10)
   const startTime = start.slice(11, 16)
-  const from = `${weekdayFromDateString(startDate)} ${startTime}`
+  const from = `${weekdayFromDateString(startDate, language)} ${startTime}`
   if (!end) return { from, to: null }
   const endDate = end.slice(0, 10)
   const endTime = end.slice(11, 16)
   if (startDate === endDate) return { from, to: endTime }
-  return { from, to: `${weekdayFromDateString(endDate)} ${endTime}` }
+  return { from, to: `${weekdayFromDateString(endDate, language)} ${endTime}` }
 }
 
 export default function StageList({ stages, onChange }: Props) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const [modalTarget, setModalTarget] = useState<{ index: number | null }>({ index: null })
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -186,7 +189,7 @@ export default function StageList({ stages, onChange }: Props) {
           {effectiveStages.map((stage, i) => {
             const isLastRace = stage.stage_type === 'race' && raceStageCount <= 1
             const isExpanded = expanded.has(i)
-            const timeRange = stageTimeRangeParts(stage.start_time, stage.end_time)
+            const timeRange = stageTimeRangeParts(stage.start_time, stage.end_time, language)
             return (
               <div key={i} className="bg-white">
                 {/* Collapsed row */}

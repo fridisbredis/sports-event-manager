@@ -11,7 +11,8 @@ import { AppCard } from '@/components/ui/app-card'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
-import { DATE_LOCALE } from '@/lib/i18n/date-locale'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { useLanguage } from '@/components/i18n-provider'
 
 type ByChannel<T> = Record<AnnouncementChannel, T>
 
@@ -33,9 +34,9 @@ type PendingAction =
 
 const NO_PUBLISHED: ByChannel<Announcement[]> = { participants: [], officials: [] }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, language?: string): string {
   const d = new Date(iso)
-  return d.toLocaleString(DATE_LOCALE, {
+  return d.toLocaleString(dateLocaleFor(language), {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
@@ -106,6 +107,7 @@ function AnnouncementGuardDialog({
 
 export function CommunicationPanel({ tenantId, page, announcements: initial, hasMore }: Props) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const router = useRouter()
 
   const [channel, setChannel] = useState<AnnouncementChannel>('participants')
@@ -331,7 +333,9 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
               {filtered.map((a) => (
                 <AppCard key={a.id} className="card-accent-left" bodyClassName="px-5 py-4">
                   <p className="text-[15px] leading-snug text-ink">{a.body}</p>
-                  <p className="mt-1 text-sm text-ink-label">{formatDate(a.published_at)}</p>
+                  <p className="mt-1 text-sm text-ink-label">
+                    {formatDate(a.published_at, language)}
+                  </p>
                 </AppCard>
               ))}
             </div>
