@@ -78,6 +78,7 @@
     "assignmentCount_one": "{{count}} uppdrag",
     "assignmentCount_other": "{{count}} uppdrag",
     "viewSchedule": "Visa ditt schema",
+    "privacyPolicy": "Integritetspolicy",
     "save": "Spara",
     "saving": "Sparar…",
     "saved": "Sparat",
