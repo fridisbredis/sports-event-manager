@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import { slotEndTime } from '@/lib/scheduling/grid-logic'
 import type { SaveAssignmentsResult } from '../actions'
 import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
@@ -10,10 +9,21 @@ import type {
   WorkstationData,
 } from './scheduling-types'
 
+// `backgroundAttachment: 'fixed'` anchors the gradient to the viewport rather
+// than to each cell that paints it, so every cell of a run shares one pattern
+// origin and the diagonals carry across the seams unbroken.
+//
+// The earlier approach phase-shifted each cell by its offset into the run,
+// which required knowing the rendered cell width in px. The grids are
+// `table-fixed w-full`, where the `w-20` on the header is a hint the browser
+// is free to overrule when it distributes leftover width — so the constant
+// drifted from the real width and the diagonals visibly stepped at every
+// cell boundary. Anchoring to the viewport needs no width at all.
 export const STRIPED_UNAVAILABLE_STYLE = {
   background:
     'repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 3px, transparent 3px, transparent 8px)',
-}
+  backgroundAttachment: 'fixed',
+} as const
 
 // An absence the official declared, NOT the same thing as a closed operating
 // window. The grey hatch above means "the work area is shut, nothing can go
@@ -44,37 +54,6 @@ export const TIME_OFF_ICON = {
   self: 'text-amber-500',
   admin: 'text-slate-400',
 } as const
-
-/**
- * Rendered width of one slot column, in px — the `w-20` the header cells carry
- * in both grids. Used to re-anchor the hatch gradient across a run; it has to
- * agree with that class or the diagonals drift at the seams.
- */
-export const SLOT_COLUMN_WIDTH_PX = 80
-
-/**
- * The hatch pattern is a `repeating-linear-gradient`, which restarts at the
- * origin of whatever box paints it. Drawn per cell that means every cell
- * begins a fresh stripe, so a run of blocked cells reads as N separate boxes
- * with the diagonals visibly jumping at each seam — even once the borders and
- * gaps between them are gone.
- *
- * Anchoring the gradient to a notional strip that starts at the FIRST cell of
- * the run fixes the phase: each cell shifts its background left by its own
- * offset into the run, so the diagonals carry across the seams as one
- * uninterrupted field. `backgroundPosition` is negative because we are moving
- * the pattern's origin leftwards, out of the cell, to where the run began.
- */
-export function hatchRunStyle(
-  base: { background: string },
-  /** How many cells of this run sit to the left of this one. */
-  offsetInRun: number,
-  /** Rendered width of a single cell, in px. */
-  cellWidth: number
-): CSSProperties {
-  if (offsetInRun === 0) return base
-  return { ...base, backgroundPosition: `-${offsetInRun * cellWidth}px 0` }
-}
 
 /**
  * Rounded corners and seam-suppression for one cell of a horizontal run.
