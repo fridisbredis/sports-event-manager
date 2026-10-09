@@ -78,33 +78,44 @@ export async function declareUnavailability(
   const officialId = tenant.officialId
   if (!officialId) return { error: await tError('actionErrors.notAuthorized') }
 
-  const { startsAt, endsAt } = toPeriodBounds(parsed.data)
+  // A timed range over several days yields one period per day — see
+  // toPeriodBounds. A whole-day range stays a single row.
+  const periods = toPeriodBounds(parsed.data)
 
   // The DB's CHECK enforces this too; catching it here turns a 23514 into a
-  // message naming the actual problem.
-  if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+  // message naming the actual problem. Every period carries the same clock
+  // range, so one reversed pair means they all are — but this checks them all
+  // rather than assuming that, since the assumption would silently stop
+  // holding if the expansion ever varied the times per day.
+  if (periods.some((p) => new Date(p.endsAt).getTime() <= new Date(p.startsAt).getTime())) {
     return { error: 'availability.errorEndBeforeStart' }
   }
 
   const supabase = await createSupabaseServerClient()
 
+  // One .insert() of an array is a single PostgREST request and therefore one
+  // transaction, so a failure on day three leaves no rows behind from days one
+  // and two. Per docs/patterns/atomic-multi-table-writes.md this is exactly the
+  // case that does NOT need an RPC — it is already atomic.
   const { data, error } = await supabase
     .from('official_unavailability')
-    .insert({
-      tenant_id: tenant.id,
-      official_id: officialId,
-      starts_at: startsAt,
-      ends_at: endsAt,
-    })
+    .insert(
+      periods.map((p) => ({
+        tenant_id: tenant.id,
+        official_id: officialId,
+        starts_at: p.startsAt,
+        ends_at: p.endsAt,
+      }))
+    )
     .select('id')
-    .single()
 
   if (error) {
     logger.error('declareUnavailability: insert failed', error, {
       tenantId: tenant.id,
       officialId,
-      startsAt,
-      endsAt,
+      periodCount: periods.length,
+      firstStartsAt: periods[0]?.startsAt,
+      lastEndsAt: periods[periods.length - 1]?.endsAt,
     })
     return { error: 'availability.saveFailed' }
   }
@@ -116,7 +127,8 @@ export async function declareUnavailability(
   // invalidating an admin's render.
   revalidatePath(`/${tenantSlug}/availability`)
 
-  return { id: data.id }
+  // The first row's id, which is what the form uses to confirm the save.
+  return { id: data[0]?.id }
 }
 
 const withdrawSchema = z.object({

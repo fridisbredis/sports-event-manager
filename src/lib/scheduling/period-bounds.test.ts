@@ -15,7 +15,7 @@ function dayOffset(days: number): string {
 describe('toPeriodBounds', () => {
   it('assembles an explicit time range as wall-clock UTC', () => {
     const day = dayOffset(1)
-    const { startsAt, endsAt } = toPeriodBounds({
+    const [{ startsAt, endsAt }] = toPeriodBounds({
       startDate: day,
       endDate: day,
       startTime: '09:00',
@@ -30,7 +30,7 @@ describe('toPeriodBounds', () => {
 
   it('treats a whole single day as midnight to the next midnight', () => {
     const day = dayOffset(2)
-    const { startsAt, endsAt } = toPeriodBounds({ startDate: day, endDate: day })
+    const [{ startsAt, endsAt }] = toPeriodBounds({ startDate: day, endDate: day })
 
     expect(startsAt).toBe(`${day}T00:00:00.000Z`)
     expect(endsAt).toBe(`${dayOffset(3)}T00:00:00.000Z`)
@@ -40,7 +40,7 @@ describe('toPeriodBounds', () => {
     // "Saturday to Sunday" means both days in full. The exclusive upper bound
     // is therefore the start of Monday — getting this wrong silently drops the
     // last day of every multi-day absence.
-    const { startsAt, endsAt } = toPeriodBounds({
+    const [{ startsAt, endsAt }] = toPeriodBounds({
       startDate: dayOffset(1),
       endDate: dayOffset(2),
     })
@@ -49,17 +49,86 @@ describe('toPeriodBounds', () => {
     expect(endsAt).toBe(`${dayOffset(3)}T00:00:00.000Z`)
   })
 
-  it('spans midnight when a timed range crosses days', () => {
-    const { startsAt, endsAt } = toPeriodBounds({
+  // Previously this asserted that 22:00-06:00 over two days became ONE period
+  // running overnight. It no longer does: a timed range repeats per day, and a
+  // reversed pair is a mistake the action and the DB CHECK both reject rather
+  // than something to silently reinterpret as an overnight absence.
+  it('repeats a reversed time range per day rather than rolling it overnight', () => {
+    const periods = toPeriodBounds({
       startDate: dayOffset(1),
       endDate: dayOffset(2),
       startTime: '22:00',
       endTime: '06:00',
     })
 
-    expect(startsAt).toBe(`${dayOffset(1)}T22:00:00.000Z`)
-    expect(endsAt).toBe(`${dayOffset(2)}T06:00:00.000Z`)
-    expect(new Date(endsAt).getTime()).toBeGreaterThan(new Date(startsAt).getTime())
+    expect(periods).toHaveLength(2)
+    expect(periods[0].startsAt).toBe(`${dayOffset(1)}T22:00:00.000Z`)
+    expect(periods[0].endsAt).toBe(`${dayOffset(1)}T06:00:00.000Z`)
+    // Left invalid on purpose, so the caller rejects it instead of storing a
+    // period nobody declared.
+    expect(new Date(periods[0].endsAt).getTime()).toBeLessThan(
+      new Date(periods[0].startsAt).getTime()
+    )
+  })
+
+  // The bug this whole change exists for: "10:00-11:00, three days running"
+  // used to store one 49-hour absence, which made the official unschedulable
+  // through both nights and all of the middle day.
+  it('repeats a timed range on each day of a multi-day span', () => {
+    const periods = toPeriodBounds({
+      startDate: dayOffset(1),
+      endDate: dayOffset(3),
+      startTime: '10:00',
+      endTime: '11:00',
+    })
+
+    expect(periods).toHaveLength(3)
+    expect(periods.map((p) => p.startsAt)).toEqual([
+      `${dayOffset(1)}T10:00:00.000Z`,
+      `${dayOffset(2)}T10:00:00.000Z`,
+      `${dayOffset(3)}T10:00:00.000Z`,
+    ])
+    expect(periods.map((p) => p.endsAt)).toEqual([
+      `${dayOffset(1)}T11:00:00.000Z`,
+      `${dayOffset(2)}T11:00:00.000Z`,
+      `${dayOffset(3)}T11:00:00.000Z`,
+    ])
+    // Nothing covers the night between day one and day two.
+    expect(new Date(periods[0].endsAt).getTime()).toBeLessThan(
+      new Date(periods[1].startsAt).getTime()
+    )
+  })
+
+  it('keeps a whole-day multi-day range as one unbroken period', () => {
+    // The other half of the rule: being away Mon-Wed really is one stretch,
+    // nights included, so it must NOT become three rows.
+    const periods = toPeriodBounds({ startDate: dayOffset(1), endDate: dayOffset(3) })
+
+    expect(periods).toHaveLength(1)
+    expect(periods[0].startsAt).toBe(`${dayOffset(1)}T00:00:00.000Z`)
+    expect(periods[0].endsAt).toBe(`${dayOffset(4)}T00:00:00.000Z`)
+  })
+
+  it('crosses a month boundary when repeating a timed range', () => {
+    // The per-day step is setUTCDate(+1) in a loop, so the month rollover is
+    // worth pinning here too, not just in the whole-day branch.
+    const endOfMonth = new Date(Date.UTC(TODAY.getUTCFullYear(), TODAY.getUTCMonth() + 1, 0))
+    const lastDay = endOfMonth.toISOString().slice(0, 10)
+    const firstOfNext = new Date(endOfMonth.getTime())
+    firstOfNext.setUTCDate(firstOfNext.getUTCDate() + 1)
+    const nextDay = firstOfNext.toISOString().slice(0, 10)
+
+    const periods = toPeriodBounds({
+      startDate: lastDay,
+      endDate: nextDay,
+      startTime: '10:00',
+      endTime: '11:00',
+    })
+
+    expect(periods.map((p) => p.startsAt)).toEqual([
+      `${lastDay}T10:00:00.000Z`,
+      `${nextDay}T10:00:00.000Z`,
+    ])
   })
 
   it('crosses a month boundary without drifting', () => {
@@ -70,7 +139,7 @@ describe('toPeriodBounds', () => {
     const firstOfNext = new Date(endOfMonth.getTime())
     firstOfNext.setUTCDate(firstOfNext.getUTCDate() + 1)
 
-    const { endsAt } = toPeriodBounds({ startDate: lastDay, endDate: lastDay })
+    const [{ endsAt }] = toPeriodBounds({ startDate: lastDay, endDate: lastDay })
 
     expect(endsAt).toBe(`${firstOfNext.toISOString().slice(0, 10)}T00:00:00.000Z`)
   })
@@ -79,7 +148,7 @@ describe('toPeriodBounds', () => {
     // The action rejects this and the DB CHECK refuses it; this pins that the
     // helper itself does not quietly reorder the pair and hide the mistake.
     const day = dayOffset(1)
-    const { startsAt, endsAt } = toPeriodBounds({
+    const [{ startsAt, endsAt }] = toPeriodBounds({
       startDate: day,
       endDate: day,
       startTime: '17:00',
