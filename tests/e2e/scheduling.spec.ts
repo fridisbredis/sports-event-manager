@@ -517,4 +517,85 @@ test.describe('SCHED-01 by work area', () => {
     await page.keyboard.press('Escape')
     await expect(modal).toHaveCount(0)
   })
+
+  // The chrome that keeps the grid readable while you scroll. All three were
+  // regressions in the same afternoon, each invisible to a unit test: the
+  // pinned row and the frozen column only exist once a browser lays out and
+  // scrolls a real grid.
+  test('keeps the work area named above its own slot rows while they scroll', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.goto(SCHEDULING)
+    await page.getByRole('tab', { name: 'By work area' }).click()
+
+    const row = page.getByRole('row').filter({ hasText: FINISH_LINE }).first()
+    await row.getByRole('button', { name: 'Expand' }).click()
+    const firstSlotRow = page
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell', { name: '#1', exact: true }) })
+      .first()
+    await expect(firstSlotRow).toBeVisible()
+
+    // Sticky lives on the cells, not the row: a `tr` has no box of its own to
+    // hold still, so measuring the row would report the scroll either way.
+    const summaryCell = row.locator('td').first()
+    const slotCell = firstSlotRow.locator('td').first()
+
+    const scroller = page.locator('.scheduling-scroll-container')
+    // Shrink the scroll viewport so the seeded ceiling of 4 is enough to
+    // scroll against — the suite must not depend on the seed growing.
+    await scroller.evaluate((el) => ((el as HTMLElement).style.maxHeight = '180px'))
+
+    // Scroll until the summary row has reached the header and is being held
+    // there; sticky does nothing before its anchor.
+    await scroller.evaluate((el) => el.scrollBy(0, 80))
+    await page.waitForTimeout(100)
+
+    const summaryBefore = await summaryCell.boundingBox()
+    const slotBefore = await slotCell.boundingBox()
+
+    await scroller.evaluate((el) => el.scrollBy(0, 100))
+    await expect.poll(async () => (await slotCell.boundingBox())?.y).not.toBe(slotBefore!.y)
+
+    const summaryAfter = await summaryCell.boundingBox()
+    const slotAfter = await slotCell.boundingBox()
+
+    // The slot rows move with the scroll; the pinned summary cell does not.
+    // That difference IS the pinning — without it both shift by the same
+    // amount and a row reading '#13' stops saying which area it belongs to.
+    expect(Math.abs(slotAfter!.y - slotBefore!.y)).toBeGreaterThan(40)
+    expect(Math.abs(summaryAfter!.y - summaryBefore!.y)).toBeLessThan(4)
+
+    // And it parks against the header rather than drifting under it, leaving
+    // no gap for the slot rows to show through.
+    const headerCell = page.locator('thead th').first()
+    const headerBox = await headerCell.boundingBox()
+    const gap = summaryAfter!.y - (headerBox!.y + headerBox!.height)
+    expect(gap).toBeLessThanOrEqual(0)
+    expect(gap).toBeGreaterThan(-12)
+  })
+
+  test('hides the frozen column edge until the grid is scrolled sideways', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.goto(SCHEDULING)
+    await page.getByRole('tab', { name: 'By work area' }).click()
+
+    const nameCell = page
+      .getByRole('row')
+      .filter({ hasText: FINISH_LINE })
+      .first()
+      .locator('td')
+      .first()
+    await expect(nameCell).toBeVisible()
+
+    const edgeOpacity = () => nameCell.evaluate((el) => getComputedStyle(el, '::after').opacity)
+
+    // At rest nothing is hidden behind the column, so the edge would read as a
+    // grey band down an unbroken white surface.
+    expect(await edgeOpacity()).toBe('0')
+
+    await page.locator('.scheduling-scroll-container').evaluate((el) => el.scrollBy(300, 0))
+    await expect.poll(edgeOpacity).toBe('1')
+  })
 })

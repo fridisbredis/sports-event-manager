@@ -16,6 +16,7 @@ import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot, runEdgeClasses } from './
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 import { STICKY_COL_SHADOW, STICKY_COL_SHADOW_HIDDEN } from './scheduling-types'
 import { useHorizontalScrollShadow } from './use-horizontal-scroll-shadow'
+import { useStickyHeaderOffset } from './use-sticky-header-offset'
 
 interface ByWorkAreaGridProps {
   slots: Date[]
@@ -64,6 +65,7 @@ export function ByWorkAreaGrid({
   const { t } = useTranslation('admin')
   const { scrollRef, isScrolled } = useHorizontalScrollShadow()
   const stickyEdgeHidden = isScrolled ? '' : STICKY_COL_SHADOW_HIDDEN
+  const { headerRef, headerOffset } = useStickyHeaderOffset()
 
   const countMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -133,16 +135,16 @@ export function ByWorkAreaGrid({
       )}
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
-          <tr>
+          <tr ref={headerRef}>
             <th
-              className={`sticky top-0 left-0 z-30 bg-white text-left pl-4 pr-5 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-44 border-b border-edge ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+              className={`sticky top-0 left-0 z-40 bg-white text-left pl-4 pr-5 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-44 border-b border-edge ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
             >
               {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
               <th
                 key={slot.toISOString()}
-                className="sticky top-0 z-20 w-20 border-b border-edge-soft bg-white px-1 py-3 text-center text-[13px] font-semibold text-ink"
+                className="sticky top-0 z-30 w-20 border-b border-edge-soft bg-white px-1 py-3 text-center text-[13px] font-semibold text-ink"
               >
                 {formatSlotLabel(slot)}
               </th>
@@ -174,6 +176,20 @@ export function ByWorkAreaGrid({
                 i > 0 && closedRunOffsets[i - 1] !== null,
                 i < slots.length - 1 && closedRunOffsets[i + 1] !== null
               )
+            // Pin the summary row under the time header while its own slot
+            // rows scroll past, so a numbered row like "#13" always has its
+            // work area named directly above it. Only while expanded: a
+            // collapsed row has nothing to scroll past, and pinning every row
+            // at once would stack them all against the header.
+            const pinSummary = isExpanded
+            const pinCell = pinSummary ? 'sticky z-10' : ''
+            // Park the row a few pixels high on purpose, so it tucks *behind*
+            // the header rather than trying to meet its bottom edge exactly.
+            // The header paints above it and is opaque, so the overlap is
+            // invisible — whereas landing even a subpixel low opens a seam the
+            // slot rows show through.
+            const pinStyle = pinSummary ? { top: Math.max(0, headerOffset - 4) } : undefined
+
             const closedSeam = (i: number) =>
               `${i > 0 && closedRunOffsets[i - 1] !== null ? 'pl-0' : 'pl-1'} ${
                 i < slots.length - 1 && closedRunOffsets[i + 1] !== null ? 'pr-0' : 'pr-1'
@@ -184,7 +200,8 @@ export function ByWorkAreaGrid({
                 {/* Summary row (always visible) */}
                 <tr className="border-b border-edge-soft">
                   <td
-                    className={`sticky left-0 z-10 bg-white pl-3 pr-5 py-3 ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+                    className={`sticky left-0 ${pinSummary ? 'z-20' : 'z-10'} bg-white pl-3 pr-5 py-3 ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+                    style={pinStyle}
                   >
                     <div className="flex items-center gap-2">
                       <Button
@@ -237,7 +254,11 @@ export function ByWorkAreaGrid({
 
                     if (!inWindow) {
                       return (
-                        <td key={slotStart} className={`py-2 ${closedSeam(slotArrIdx)}`}>
+                        <td
+                          key={slotStart}
+                          className={`bg-white py-2 ${pinCell} ${closedSeam(slotArrIdx)}`}
+                          style={pinStyle}
+                        >
                           <div
                             className={`w-full h-10 ${closedEdges(slotArrIdx)}`}
                             style={STRIPED_UNAVAILABLE_STYLE}
@@ -246,7 +267,11 @@ export function ByWorkAreaGrid({
                       )
                     }
                     return (
-                      <td key={slotStart} className="px-1 py-2">
+                      <td
+                        key={slotStart}
+                        className={`bg-white px-1 py-2 ${pinCell}`}
+                        style={pinStyle}
+                      >
                         <div
                           className={`flex w-full h-10 flex-col items-center justify-center rounded-md border px-2 text-xs font-medium text-center ${
                             isOver
