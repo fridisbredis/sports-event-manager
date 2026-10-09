@@ -11,7 +11,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
-import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { dateLocaleFor, EVENT_TIME_ZONE } from '@/lib/i18n/date-locale'
 import { useLanguage } from '@/components/i18n-provider'
 
 type ByChannel<T> = Record<AnnouncementChannel, T>
@@ -34,6 +34,11 @@ type PendingAction =
 
 const NO_PUBLISHED: ByChannel<Announcement[]> = { participants: [], officials: [] }
 
+// published_at is a real instant, so it is converted to the event's zone
+// rather than left to the runtime default. Without the explicit zone this
+// renders in the container's zone (UTC on Azure) during the server pass and in
+// the reader's zone after hydration — so it both showed the wrong time in prod
+// and disagreed with itself between the two renders.
 function formatDate(iso: string, language?: string): string {
   const d = new Date(iso)
   return d.toLocaleString(dateLocaleFor(language), {
@@ -42,6 +47,7 @@ function formatDate(iso: string, language?: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone: EVENT_TIME_ZONE,
   })
 }
 

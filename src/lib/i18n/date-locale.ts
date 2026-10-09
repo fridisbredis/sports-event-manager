@@ -38,3 +38,22 @@ export function dateLocaleFor(language?: string | null): string {
   if (!language) return DEFAULT_DATE_LOCALE
   return DATE_LOCALES[language as Locale] ?? DEFAULT_DATE_LOCALE
 }
+
+/**
+ * The event's wall-clock zone, for formatting timestamps that record a real
+ * instant — `published_at` on an announcement, `created_at` on an audit row —
+ * as opposed to the wall-clock-UTC timestamps the scheduling side stores and
+ * renders with `timeZone: 'UTC'`.
+ *
+ * It has to be stated rather than left to the runtime default. Formatting on
+ * the server picks up the container's zone, and the Azure Container Apps image
+ * sets no TZ, so it runs UTC: an announcement published at 15:46 Swedish time
+ * rendered as "13:46" for every official. Leaving it off is only invisible in
+ * local dev, where the laptop already is in Stockholm.
+ *
+ * A single zone is correct for this product — one Swedish event, everyone
+ * physically at it — and it is the same assumption the wall-clock-UTC
+ * convention already bakes in. If the platform ever runs an event in another
+ * country, this becomes a tenant setting rather than a constant.
+ */
+export const EVENT_TIME_ZONE = 'Europe/Stockholm'
