@@ -161,7 +161,7 @@ export default function AccountForm({
       <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-8'}>
         {/* Avatar — clickable, opens a file picker and uploads on pick.
             AvatarPicker centres itself. */}
-        <div className="mb-6">
+        <div className={isDesktop ? 'mb-8' : 'mb-6'}>
           <AvatarPicker
             avatarUrl={avatarUrl}
             name={name}
@@ -176,7 +176,7 @@ export default function AccountForm({
             field / label / field rhythm with the phone row below unbroken.
             It is a hint, not a control: the input is always editable, so it
             carries aria-hidden and no press target of its own. */}
-        <div className="mb-5">
+        <div className={isDesktop ? 'mb-7' : 'mb-6'}>
           <Input
             label={t('account.nameLabel')}
             value={name}
@@ -212,7 +212,7 @@ export default function AccountForm({
             information the official may well want to select and copy, and a
             disabled field is skipped in the tab order and announced as
             unavailable. */}
-        <div className="mb-8">
+        <div className={isDesktop ? 'mb-12' : 'mb-8'}>
           <Input
             label={t('account.phoneLabel')}
             value={formatPhoneForDisplay(phone)}
@@ -225,13 +225,27 @@ export default function AccountForm({
           />
         </div>
 
-        {/* Notifications section */}
-        <p className="section-label mb-3">{t('account.notificationsHeading')}</p>
+        {/* Section rhythm, and the reason these numbers are not
+            interchangeable: a label sits close to the card it names, and the
+            card that ends a section sits much further from the next label.
+            Every gap used to be mb-3 / mb-6 (mobile) and mb-3 / mb-8
+            (desktop), which left the gap WITHIN a section almost the same as
+            the gap BETWEEN two — so each heading read as floating between the
+            card above and the card below rather than belonging to the one
+            under it. The grouping has to come from the spacing here; nothing
+            else on the screen marks where a section starts.
+
+            Desktop is not simply mobile plus a constant. Its cards run to
+            max-w-lg, and at that width the same gap reads tighter, so the
+            ratio is kept but both ends are scaled up. */}
+        <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+          {t('account.notificationsHeading')}
+        </p>
         {/* On desktop this card is followed by the Schedule section, and the
             wider gap separates two sections. On mobile it is the last card
             and the only thing after it is the log-out button, which needs
             less air than a section break. */}
-        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
+        <AppCard className={isDesktop ? 'mb-12' : 'mb-9'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.smsUpdatesLabel')}</p>
@@ -255,8 +269,10 @@ export default function AccountForm({
             everywhere. Switching it re-renders the page, which would
             discard an unsaved name edit — so it is deliberately a separate
             section, not another row in the card above. */}
-        <p className="section-label mb-3">{tCommon('language.label')}</p>
-        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
+        <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+          {tCommon('language.label')}
+        </p>
+        <AppCard className={isDesktop ? 'mb-12' : 'mb-9'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.languageLabel')}</p>
@@ -277,10 +293,14 @@ export default function AccountForm({
             no shifts still needs to be able to look and see that. */}
         {isDesktop && (
           <>
-            <p className="section-label mb-3">{t('account.scheduleHeading')}</p>
+            <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+              {t('account.scheduleHeading')}
+            </p>
             <Link
               href={`/${tenantSlug}/schedule`}
-              className={`flex items-center gap-4 ${CARD_SURFACE} mb-8 px-4 py-4 transition-colors hover:bg-surface`}
+              className={`flex items-center gap-4 ${CARD_SURFACE} ${
+                isDesktop ? 'mb-12' : 'mb-8'
+              } px-4 py-4 transition-colors hover:bg-surface`}
             >
               {/* A calendar, since the row leads to the schedule — the
                   empty square it replaced read as an unchecked checkbox. */}
