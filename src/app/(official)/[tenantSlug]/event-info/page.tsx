@@ -8,8 +8,6 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
-import { StageDateList } from './_components/stage-date-list'
-import { StageVenueCard } from './_components/stage-venue-card'
 import { FacilityChips } from './_components/facility-chips'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
@@ -120,13 +118,6 @@ export default async function EventInfoPage({ params }: Props) {
   const stageList = stages
   const facilityList = facilities
 
-  // Non-race stages (setup, teardown) are internal admin scaffolding. Per
-  // INFO-01 officials do see all stages, so they stay — but a stage with
-  // neither a day nor a venue has nothing to contribute to those two
-  // sections, and an empty row there is noise rather than information.
-  const datedStages = stageList.filter((stage) => stageDate(stage, language) !== '')
-  const venuedStages = stageList.filter((stage) => stage.venue)
-
   return (
     <div className="px-5 pt-10 pb-6">
       <h1 className="page-title mb-6">{t('eventInfo.title')}</h1>
@@ -138,45 +129,17 @@ export default async function EventInfoPage({ params }: Props) {
         description={event?.description ?? null}
       />
 
-      {/* Dates and venues are the two facts an official checks before the
-          event ("which day am I needed, and where do I go"), so they sit
-          above the hour-by-hour programme, which matters on the day itself.
+      {/* One stage list, carrying every fact a stage has — day, hours and
+          venue. It replaces three sections that walked the same stages three
+          times: "Dates by stage", "Location & venue per stage" and this one
+          each repeated the stage names, and the day appeared twice. An
+          official scanning for "when and where am I needed" had to assemble
+          one stage's answer from three places down the screen.
 
-          Unlike the two sections below, these drop out entirely when empty.
-          They are derived views of the same stage list, so an unpublished
-          event would otherwise repeat the identical "nothing yet" card three
-          times down the screen; the programme's empty state already says it
-          once. */}
-      {datedStages.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.datesByStage')}</SectionLabel>
-          <StageDateList
-            stages={datedStages.map((stage) => ({
-              id: stage.id,
-              name: stage.name,
-              date: stageDate(stage, language),
-            }))}
-          />
-        </div>
-      ) : null}
-
-      {venuedStages.length > 0 ? (
-        <div className="mb-8">
-          <SectionLabel>{t('eventInfo.locationAndVenue')}</SectionLabel>
-          <StageVenueCard
-            stages={venuedStages.map((stage) => ({
-              id: stage.id,
-              name: stage.name,
-              venue: stage.venue as string,
-            }))}
-          />
-        </div>
-      ) : null}
-
-      {/* Both sections keep their label when empty rather than vanishing.
-          A stage list that is simply not published yet is a normal state for
-          an official opening the app early, and a screen that silently drops
-          the heading leaves them unsure whether the app failed to load it. */}
+          The section keeps its label when empty rather than vanishing. A
+          stage list that is simply not published yet is a normal state for an
+          official opening the app early, and a screen that silently drops the
+          heading leaves them unsure whether the app failed to load it. */}
       <div className="mb-8">
         <SectionLabel>{t('eventInfo.programme')}</SectionLabel>
         {stageList.length > 0 ? (
@@ -200,6 +163,7 @@ export default async function EventInfoPage({ params }: Props) {
                   stageNumber={stage.position + 1}
                   name={stage.name}
                   details={[stageDate(stage, language), timeRange].filter(Boolean)}
+                  venue={stage.venue}
                 />
               )
             })}
