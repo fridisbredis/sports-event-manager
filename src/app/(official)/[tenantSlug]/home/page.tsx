@@ -28,7 +28,7 @@ function NavCard({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:bg-surface`}
+      className={`card-accent-left flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:border-tenant-primary hover:bg-tenant-primary-tint`}
     >
       {/* The bubble takes the tenant's tint rather than HeroUI's own primary,
           so these follow the palette like every other tinted surface in the
@@ -40,7 +40,7 @@ function NavCard({
         <p className="text-[17px] font-bold leading-snug text-ink">{title}</p>
         <p className="mt-0.5 text-[15px] leading-snug text-ink-muted">{subtitle}</p>
       </div>
-      <ChevronRight className="size-5 shrink-0 text-ink-faint" aria-hidden="true" />
+      <ChevronRight className="size-5 shrink-0 text-tenant-primary" aria-hidden="true" />
     </Link>
   )
 }
@@ -149,8 +149,13 @@ export default async function OfficialHomePage({ params }: Props) {
           <h1 className="text-[22px] font-bold leading-snug text-ink">
             {name ? t('home.greeting', { name }) : t('home.greetingAnon')}
           </h1>
-          <p className="mt-0.5 text-[15px] text-ink-muted">
-            {eventName} · {t('home.eventRole')}
+          {/* The event name is the tenant's own identity, so it carries the
+              tenant colour; the role stays muted. Splitting them means the
+              line reads "which event" first and "what you are in it" second,
+              rather than one flat grey string where both weigh the same. */}
+          <p className="mt-0.5 text-[15px] leading-snug">
+            <span className="font-semibold text-tenant-primary-tint-text">{eventName}</span>
+            <span className="text-ink-muted"> · {t('home.eventRole')}</span>
           </p>
         </div>
       </div>

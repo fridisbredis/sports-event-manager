@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import EventInfoPage from './page'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
@@ -170,6 +171,44 @@ describe('EventInfoPage', () => {
     const result = await EventInfoPage({ params: PARAMS })
 
     expect(result).toBeTruthy()
+  })
+
+  // The day, hours and venue of one stage used to be spread over three
+  // sections that each re-listed every stage. They are now one card, so this
+  // asserts the merged shape rather than just that the page builds: a
+  // regression that split them again would otherwise pass unnoticed.
+  it('shows a stage day, hours and venue together on one card', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Day 1',
+            stage_type: 'race',
+            stage_date: null,
+            start_time: '2026-06-12T07:00:00Z',
+            end_time: '2026-06-12T22:00:00Z',
+            venue: 'Seed Stadium',
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    // The stage name appears once now, not once per section.
+    expect(screen.getAllByText('Day 1')).toHaveLength(1)
+
+    const card = screen.getByText('Day 1').closest('div')?.parentElement as HTMLElement
+    expect(card).toHaveTextContent('07:00')
+    expect(card).toHaveTextContent('22:00')
+    expect(card).toHaveTextContent('Seed Stadium')
   })
 
   it('throws when the RPC returns an error', async () => {
