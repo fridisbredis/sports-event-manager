@@ -595,7 +595,16 @@ test.describe('SCHED-01 by work area', () => {
     // grey band down an unbroken white surface.
     expect(await edgeOpacity()).toBe('0')
 
-    await page.locator('.scheduling-scroll-container').evaluate((el) => el.scrollBy(300, 0))
+    // Narrow the scroller so there is always something to scroll. At this
+    // viewport the seeded grid overflows by under 200px, and the exact figure
+    // moves with font rendering — on CI it can reach zero, leaving scrollBy a
+    // no-op and the assertion below waiting on an edge that correctly never
+    // appears.
+    const scroller = page.locator('.scheduling-scroll-container')
+    await scroller.evaluate((el) => ((el as HTMLElement).style.maxWidth = '600px'))
+    await scroller.evaluate((el) => el.scrollBy(300, 0))
+    await expect.poll(async () => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+
     await expect.poll(edgeOpacity).toBe('1')
   })
 })
