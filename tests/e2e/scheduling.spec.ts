@@ -599,3 +599,31 @@ test.describe('SCHED-01 by work area', () => {
     await expect.poll(edgeOpacity).toBe('1')
   })
 })
+
+test.describe('SCHED-01 legend', () => {
+  // The legend is split by where each entry belongs, and the cell half says
+  // different things per view: an empty cell is an open place by work area but
+  // a free person by person. Showing one view's wording in the other is wrong
+  // and entirely silent.
+  test('explains cells per view, and keeps warnings below the grid', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.goto(SCHEDULING)
+
+    const card = page.locator('.scheduling-scroll-container').locator('..')
+
+    await page.getByRole('tab', { name: 'By work area' }).click()
+    await expect(card.getByText('Assigned / capacity')).toBeVisible()
+    await expect(card.getByText('Assignable', { exact: true })).toBeVisible()
+
+    await page.getByRole('tab', { name: 'By person' }).click()
+    // Capacity is secondary detail inside a shift card here, not something an
+    // empty cell reports, so it has no place in this view's legend.
+    await expect(card.getByText('Assigned / capacity')).toHaveCount(0)
+    await expect(card.getByText('No shift', { exact: true })).toBeVisible()
+
+    // Warnings stay below the grid in both views.
+    await expect(card.getByText('Over capacity')).toHaveCount(0)
+    await expect(page.getByText('Over capacity')).toBeVisible()
+  })
+})

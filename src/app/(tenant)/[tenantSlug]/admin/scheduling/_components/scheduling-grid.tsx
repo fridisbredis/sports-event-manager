@@ -19,7 +19,7 @@ import { useTranslation } from '@/lib/i18n/client'
 import { getAssignmentsForCell, buildPickerCandidates } from './grid-helpers'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SetupEmptyState } from './setup-empty-state'
-import { SchedulingLegend } from './scheduling-legend'
+import { SchedulingWarningLegend } from './scheduling-legend'
 import { SchedulingPrintStyles, SchedulingPrintHeader } from './scheduling-print-chrome'
 import { SchedulingToolbar } from './scheduling-toolbar'
 import { ConflictBanners } from './conflict-banners'
@@ -766,7 +766,7 @@ export function SchedulingGrid({
         />
       )}
 
-      <SchedulingLegend />
+      <SchedulingWarningLegend />
     </div>
   )
 }

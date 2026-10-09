@@ -250,6 +250,8 @@
     "noAssignmentsHint": "Planera in funktionärer på arbetsområden för att bygga schemat för den här etappen. Du behöver bekräftade funktionärer och minst ett arbetsområde.",
     "noConfirmedOfficials": "Inga bekräftade funktionärer än. Funktionärer måste acceptera sin inbjudan för att visas här.",
     "legendDoubleBooked": "Dubbelbokad (samma person, överlappande tidsluckor)",
+    "legendShift": "Pass (färg per arbetsområde)",
+    "legendFree": "Inget pass",
     "legendFilled": "Ifylld (färg per arbetsområde)",
     "legendAssignable": "Kan planeras in",
     "legendOutsideWindow": "Utanför öppettid — inaktiverad",
