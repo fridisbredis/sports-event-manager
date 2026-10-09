@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
-  CalendarDays,
-  MapPin,
+  Trophy,
+  Flag,
   Users,
   CalendarClock,
   MessageSquare,
@@ -53,8 +53,8 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
 
   const navItems: { segment: string; label: string; icon: LucideIcon }[] = [
     { segment: 'admin/dashboard', label: t('navigation.dashboard'), icon: LayoutDashboard },
-    { segment: 'admin/event', label: t('navigation.eventConfig'), icon: CalendarDays },
-    { segment: 'admin/workstations', label: t('navigation.workstations'), icon: MapPin },
+    { segment: 'admin/event', label: t('navigation.eventConfig'), icon: Trophy },
+    { segment: 'admin/workstations', label: t('navigation.workstations'), icon: Flag },
     { segment: 'admin/officials', label: t('navigation.officials'), icon: Users },
     { segment: 'admin/scheduling', label: t('navigation.scheduling'), icon: CalendarClock },
     { segment: 'admin/communication', label: t('navigation.communication'), icon: MessageSquare },
