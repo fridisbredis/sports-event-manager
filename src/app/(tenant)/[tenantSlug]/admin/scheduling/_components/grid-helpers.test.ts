@@ -7,9 +7,7 @@ import {
   resolveCellActionLabel,
   buildPickerCandidates,
   sortCandidates,
-  hatchRunStyle,
   runEdgeClasses,
-  SLOT_COLUMN_WIDTH_PX,
 } from './grid-helpers'
 import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import type {
@@ -338,22 +336,5 @@ describe('runEdgeClasses', () => {
 
   it('leaves interior cells square so the run reads as one block', () => {
     expect(runEdgeClasses(true, true)).toBe('')
-  })
-})
-
-describe('hatchRunStyle', () => {
-  const base = { background: 'repeating-linear-gradient(45deg, #000, #000 3px)' }
-
-  it('leaves the first cell of a run untouched', () => {
-    expect(hatchRunStyle(base, 0, SLOT_COLUMN_WIDTH_PX)).toEqual(base)
-  })
-
-  it('shifts the gradient left by one column per cell into the run', () => {
-    expect(hatchRunStyle(base, 1, 80).backgroundPosition).toBe('-80px 0')
-    expect(hatchRunStyle(base, 3, 80).backgroundPosition).toBe('-240px 0')
-  })
-
-  it('keeps the original background while re-phasing it', () => {
-    expect(hatchRunStyle(base, 2, 80).background).toBe(base.background)
   })
 })

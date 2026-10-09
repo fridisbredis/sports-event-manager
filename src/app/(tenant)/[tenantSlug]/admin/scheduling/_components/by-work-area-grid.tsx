@@ -12,13 +12,7 @@ import {
   workAreaColorMap,
   workAreaDotColor,
 } from '@/lib/theme/work-area-colors'
-import {
-  STRIPED_UNAVAILABLE_STYLE,
-  SLOT_COLUMN_WIDTH_PX,
-  getOverflowBySlot,
-  hatchRunStyle,
-  runEdgeClasses,
-} from './grid-helpers'
+import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot, runEdgeClasses } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
 
 interface ByWorkAreaGridProps {
@@ -237,11 +231,7 @@ export function ByWorkAreaGrid({
                         <td key={slotStart} className={`py-2 ${closedSeam(slotArrIdx)}`}>
                           <div
                             className={`w-full h-10 ${closedEdges(slotArrIdx)}`}
-                            style={hatchRunStyle(
-                              STRIPED_UNAVAILABLE_STYLE,
-                              closedRunOffsets[slotArrIdx] ?? 0,
-                              SLOT_COLUMN_WIDTH_PX
-                            )}
+                            style={STRIPED_UNAVAILABLE_STYLE}
                           />
                         </td>
                       )
@@ -320,12 +310,8 @@ export function ByWorkAreaGrid({
                             <td key={slotStart} className={`py-1.5 ${closedSeam(slotArrIdx)}`}>
                               <div
                                 onPointerEnter={() => onWsDragEnter(ws.id, slotIdx, slotArrIdx)}
-                                className={`w-full h-10 opacity-30 ${closedEdges(slotArrIdx)}`}
-                                style={hatchRunStyle(
-                                  STRIPED_UNAVAILABLE_STYLE,
-                                  closedRunOffsets[slotArrIdx] ?? 0,
-                                  SLOT_COLUMN_WIDTH_PX
-                                )}
+                                className={`w-full h-10 ${closedEdges(slotArrIdx)}`}
+                                style={STRIPED_UNAVAILABLE_STYLE}
                               />
                             </td>
                           )
