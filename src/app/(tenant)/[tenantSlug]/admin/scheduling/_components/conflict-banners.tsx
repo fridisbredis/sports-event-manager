@@ -39,7 +39,6 @@ function ConflictBanner({
 export interface UnavailableDetail {
   officialName: string
   time: string
-  reason: string | null
 }
 
 export function ConflictBanners({
@@ -96,7 +95,6 @@ export function ConflictBanners({
           {unavailableDetails.map((d, i) => (
             <li key={i}>
               {d.officialName} — {d.time}
-              {d.reason ? ` (${d.reason})` : ''}
             </li>
           ))}
         </ConflictBanner>

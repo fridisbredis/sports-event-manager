@@ -112,7 +112,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     // a day with time off and no shifts get a tab at all.
     const { data: timeOffRows, error: timeOffError } = await supabase
       .from('official_unavailability')
-      .select('id, official_id, starts_at, ends_at, reason, created_by_role')
+      .select('id, official_id, starts_at, ends_at, created_by_role')
       .eq('official_id', officialId)
       .eq('tenant_id', tenant.id)
       .order('starts_at')

@@ -28,7 +28,6 @@ const declareSchema = z
       .string()
       .regex(/^\d{2}:\d{2}$/)
       .optional(),
-    reason: z.string().trim().max(200).optional(),
   })
   // Both times or neither. One alone is ambiguous — "from 09:00 until the end
   // of Sunday" and "all of Saturday until 17:00" are different statements and
@@ -64,7 +63,7 @@ export async function declareUnavailability(
     return { error: await tError('actionErrors.notAuthorized') }
   }
 
-  const { tenantSlug, reason } = parsed.data
+  const { tenantSlug } = parsed.data
 
   const user = await getCurrentUser()
   if (!user) return { error: await tError('actionErrors.notAuthorized') }
@@ -96,7 +95,6 @@ export async function declareUnavailability(
       official_id: officialId,
       starts_at: startsAt,
       ends_at: endsAt,
-      reason: reason && reason.length > 0 ? reason : null,
     })
     .select('id')
     .single()

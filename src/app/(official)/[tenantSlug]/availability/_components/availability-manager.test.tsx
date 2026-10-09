@@ -11,7 +11,6 @@ vi.mock('@/lib/i18n/client', () => ({
         'availability.addButton': 'Add time off',
         'availability.periodLabel': 'Period',
         'availability.allDayLabel': 'All day',
-        'availability.reasonLabel': 'Reason',
         'availability.save': 'Save',
         'availability.cancel': 'Cancel',
         'availability.emptyTitle': 'No time off yet',
@@ -41,6 +40,14 @@ describe('AvailabilityManager add form', () => {
     render(<AvailabilityManager tenantSlug="testklubben" periods={[]} eventDates={null} />)
     fireEvent.click(screen.getByText('Add time off'))
   }
+
+  // The reason input was removed from the form. Guards that it stays gone:
+  // the field was optional, so nothing else here would fail if it returned.
+  it('offers no reason field', () => {
+    openForm()
+
+    expect(screen.queryByLabelText('Reason')).toBeNull()
+  })
 
   it('moves focus into the form when it opens', () => {
     // Sharper than the panel disclosure one level up: the Add button is

@@ -123,8 +123,6 @@
     "startTimeLabel": "From time",
     "endTimeLabel": "To time",
     "allDay": "All day",
-    "reasonLabel": "Reason (optional)",
-    "reasonPlaceholder": "e.g. working",
     "save": "Save",
     "cancel": "Cancel",
     "saved": "Time off saved",
