@@ -1,6 +1,6 @@
 'use client'
 
-import { MapPin } from 'lucide-react'
+import { Flag } from 'lucide-react'
 import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -269,7 +269,7 @@ export default function WorkstationsList({ tenantSlug, stages, workstations }: P
       <div>
         <h1 className="page-title mb-6">{t('workstations.title')}</h1>
         <EmptyStateCard
-          Icon={MapPin}
+          Icon={Flag}
           title={t('workstations.noStages')}
           description={t('workstations.noStagesHint')}
         >

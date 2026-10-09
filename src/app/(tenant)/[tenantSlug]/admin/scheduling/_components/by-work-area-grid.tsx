@@ -1,4 +1,4 @@
-import { MapPin } from 'lucide-react'
+import { Flag } from 'lucide-react'
 import React, { useMemo } from 'react'
 import { Skeleton } from '@heroui/react'
 import { Button } from '@/components/ui/button'
@@ -105,7 +105,7 @@ export function ByWorkAreaGrid({
   if (stageWorkstations.length === 0) {
     return (
       <EmptyStateCard
-        Icon={MapPin}
+        Icon={Flag}
         title={t('scheduling.noWorkAreasTitle')}
         description={t('scheduling.noWorkAreasHint')}
       />
