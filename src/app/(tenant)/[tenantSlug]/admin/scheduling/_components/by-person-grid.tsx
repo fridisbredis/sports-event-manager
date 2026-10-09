@@ -20,6 +20,8 @@ import {
 import { dominantAuthor, type UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import type { PersonDrag } from './use-scheduling-grid-interaction'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
+import { STICKY_COL_SHADOW, STICKY_COL_SHADOW_HIDDEN } from './scheduling-types'
+import { useHorizontalScrollShadow } from './use-horizontal-scroll-shadow'
 
 interface ByPersonGridProps {
   slots: Date[]
@@ -72,6 +74,8 @@ export function ByPersonGrid({
   pendingCells,
 }: ByPersonGridProps) {
   const { t } = useTranslation('admin')
+  const { scrollRef, isScrolled } = useHorizontalScrollShadow()
+  const stickyEdgeHidden = isScrolled ? '' : STICKY_COL_SHADOW_HIDDEN
 
   const assignmentMap = useMemo(() => {
     const map = new Map<string, LocalAssignment>()
@@ -131,12 +135,15 @@ export function ByPersonGrid({
 
   return (
     <div
+      ref={scrollRef}
       className={`scheduling-scroll-container ${CARD_SURFACE} overflow-x-auto overflow-y-auto max-h-[70vh] relative`}
     >
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr>
-            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-40 border-b border-r border-edge-soft">
+            <th
+              className={`sticky top-0 left-0 z-30 bg-white text-left pl-4 pr-5 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-40 border-b border-edge ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+            >
               {t('scheduling.colOfficial')}
             </th>
             {slots.map((slot) => (
@@ -169,7 +176,9 @@ export function ByPersonGrid({
             })
             return (
               <tr key={official.id} className="border-b border-edge-soft last:border-0">
-                <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-edge-soft">
+                <td
+                  className={`sticky left-0 z-10 bg-white pl-4 pr-5 py-3 ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+                >
                   <div className="flex items-center gap-2 min-w-0">
                     {/* Same per-person colour the officials roster uses, so a
                       face is recognisable across screens. */}

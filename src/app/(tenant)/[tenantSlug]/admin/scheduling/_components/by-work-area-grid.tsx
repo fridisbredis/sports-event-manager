@@ -14,6 +14,8 @@ import {
 } from '@/lib/theme/work-area-colors'
 import { STRIPED_UNAVAILABLE_STYLE, getOverflowBySlot, runEdgeClasses } from './grid-helpers'
 import type { WorkstationData, OfficialData, LocalAssignment } from './scheduling-types'
+import { STICKY_COL_SHADOW, STICKY_COL_SHADOW_HIDDEN } from './scheduling-types'
+import { useHorizontalScrollShadow } from './use-horizontal-scroll-shadow'
 
 interface ByWorkAreaGridProps {
   slots: Date[]
@@ -60,6 +62,8 @@ export function ByWorkAreaGrid({
   pendingCells,
 }: ByWorkAreaGridProps) {
   const { t } = useTranslation('admin')
+  const { scrollRef, isScrolled } = useHorizontalScrollShadow()
+  const stickyEdgeHidden = isScrolled ? '' : STICKY_COL_SHADOW_HIDDEN
 
   const countMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -109,6 +113,7 @@ export function ByWorkAreaGrid({
 
   return (
     <div
+      ref={scrollRef}
       className={`scheduling-scroll-container ${CARD_SURFACE} overflow-x-auto overflow-y-auto max-h-[70vh]`}
     >
       {hasOutOfWindow && (
@@ -129,7 +134,9 @@ export function ByWorkAreaGrid({
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr>
-            <th className="sticky top-0 left-0 z-30 bg-white text-left px-4 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-44 border-b border-r border-edge-soft">
+            <th
+              className={`sticky top-0 left-0 z-30 bg-white text-left pl-4 pr-5 py-3 text-xs font-semibold uppercase tracking-label text-ink-faint w-44 border-b border-edge ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+            >
               {t('scheduling.colWorkArea')}
             </th>
             {slots.map((slot) => (
@@ -176,7 +183,9 @@ export function ByWorkAreaGrid({
               <React.Fragment key={ws.id}>
                 {/* Summary row (always visible) */}
                 <tr className="border-b border-edge-soft">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-3 border-r border-edge-soft">
+                  <td
+                    className={`sticky left-0 z-10 bg-white pl-3 pr-5 py-3 ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+                  >
                     <div className="flex items-center gap-2">
                       <Button
                         isIconOnly
@@ -280,7 +289,9 @@ export function ByWorkAreaGrid({
                       key={`${ws.id}-slot-${slotIdx}`}
                       className="border-b border-edge-soft bg-gray-50/40"
                     >
-                      <td className="sticky left-0 z-10 bg-gray-50 pl-12 pr-3 py-1.5 border-r border-edge-soft">
+                      <td
+                        className={`sticky left-0 z-10 bg-gray-50 pl-12 pr-5 py-1.5 ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+                      >
                         <span className="font-mono text-xs text-ink-label">#{slotIdx}</span>
                       </td>
                       {slots.map((slot, slotArrIdx) => {
@@ -365,7 +376,9 @@ export function ByWorkAreaGrid({
                     key={`${ws.id}-overflow`}
                     className="border-b border-edge-soft bg-orange-50/20"
                   >
-                    <td className="sticky left-0 z-10 bg-orange-50 pl-12 pr-3 py-1.5 border-r border-edge-soft">
+                    <td
+                      className={`sticky left-0 z-10 bg-orange-50 pl-12 pr-5 py-1.5 ${STICKY_COL_SHADOW} ${stickyEdgeHidden}`}
+                    >
                       <span className="text-xs text-orange-500 font-medium">
                         {t('scheduling.overflowRow')}
                       </span>
