@@ -563,7 +563,7 @@ function TimeView({
                   <AppCard
                     className="card-accent-left-themed min-w-0 flex-1"
                     bodyClassName="px-4 py-3"
-                    style={{ '--card-accent': color.fg } as CSSProperties}
+                    style={{ '--card-accent': color.bg } as CSSProperties}
                   >
                     <p className="text-sm font-semibold text-gray-900">{ws?.name ?? '—'}</p>
                     {ws?.description ? (
@@ -665,6 +665,12 @@ function WorkAreaView({
   // is what tells two cards apart at a glance. `workAreaColorMap` over the
   // whole day's stations rather than `workAreaColor` per card, so two
   // stations on one day can't come out the same colour.
+  //
+  // The edge takes `bg`, not `fg`. The palette's foregrounds are deliberately
+  // muted near-neutrals picked for text contrast, so an edge drawn from one
+  // read as grey rather than as the work area's colour — the same trap
+  // `workAreaDotColor` and `workAreaBorderColor` already document. `bg` is the
+  // identifying colour here.
   const colors = workAreaColorMap(groups.map((g) => ({ id: g.ws.id, color: g.ws.color })))
 
   return (
@@ -685,7 +691,7 @@ function WorkAreaView({
             key={ws.id}
             className="card-accent-left-themed"
             bodyClassName="px-4 py-3"
-            style={{ '--card-accent': color.fg } as CSSProperties}
+            style={{ '--card-accent': color.bg } as CSSProperties}
           >
             <p className="text-sm font-semibold text-gray-900">{ws.name}</p>
             {ws.description ? (

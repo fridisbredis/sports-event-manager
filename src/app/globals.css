@@ -80,12 +80,19 @@
      area cards — instead of just marking it as one. The colour comes from
      `workAreaColorMap`, passed as `--card-accent` on the element; it falls
      back to the tenant primary so the class is never edgeless if a caller
-     forgets. Mixed to the same 28% as the others so one card in a stack does
-     not shout louder than the rest. */
+     forgets.
+
+     Used unmixed, unlike the tenant-themed variants above. Callers pass the
+     palette's `bg`, which is already pastel and tuned to sit quietly, so it
+     needs no lightening — and the 28% mix this used to apply turned every
+     edge into a grey sliver, since a pastel at 28% against white is barely a
+     colour at all. The fallback is a saturated hue and does come out stronger,
+     but it only renders when a caller forgot the variable, which the MYSCH-01
+     tests guard against. */
   .card-accent-left-themed.card-accent-left-themed {
     box-shadow:
       theme('boxShadow.card'),
-      inset 3px 0 0 color-mix(in srgb, var(--card-accent, hsl(var(--tenant-primary))) 28%, white);
+      inset 3px 0 0 var(--card-accent, hsl(var(--tenant-primary)));
   }
 }
 
