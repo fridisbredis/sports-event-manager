@@ -22,7 +22,6 @@ const setSchema = z.object({
   officialId: z.string().uuid(),
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
-  reason: z.string().trim().max(200).optional(),
 })
 
 export type SetUnavailabilityInput = z.input<typeof setSchema>
@@ -50,7 +49,7 @@ export async function setUnavailability(
     return { error: await tError(NOT_AUTHORIZED_KEY) }
   }
 
-  const { tenantSlug, tenantId, officialId, startsAt, endsAt, reason } = parsed.data
+  const { tenantSlug, tenantId, officialId, startsAt, endsAt } = parsed.data
 
   const supabase = await createSupabaseServerClient()
   const {
@@ -78,7 +77,6 @@ export async function setUnavailability(
       // convention and the grid's own slot keys.
       starts_at: new Date(startsAt).toISOString(),
       ends_at: new Date(endsAt).toISOString(),
-      reason: reason && reason.length > 0 ? reason : null,
       created_by_role: 'tenant_admin',
       created_by: user.id,
     })

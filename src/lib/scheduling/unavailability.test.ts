@@ -231,6 +231,21 @@ describe('mergeAdjacentPeriods', () => {
     expect(merged[0].ends_at).toBe(at(10))
   })
 
+  // A timed range declared over several days is stored as one period per day
+  // (toPeriodBounds). Those must stay separate lines: 10:00-11:00 on three
+  // consecutive days is three short absences, and merging them would redraw
+  // them as one 49-hour block — the exact shape this change moved away from.
+  it('keeps the same hour on consecutive days as separate spans', () => {
+    const merged = mergeAdjacentPeriods([
+      p('d1', 10, 11),
+      p('d2', 24 + 10, 24 + 11),
+      p('d3', 48 + 10, 48 + 11),
+    ])
+
+    expect(merged).toHaveLength(3)
+    expect(merged.map((m) => m.starts_at)).toEqual([at(10), at(34), at(58)])
+  })
+
   it('keeps a real gap as two spans', () => {
     const merged = mergeAdjacentPeriods([p('a', 7, 8), p('b', 11, 14)])
 

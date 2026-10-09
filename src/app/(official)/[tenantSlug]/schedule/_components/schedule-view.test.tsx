@@ -617,7 +617,10 @@ describe('ScheduleView declared time off', () => {
     expect(screen.getByText(STRINGS.timeOffAllDay, { exact: false })).toBeInTheDocument()
   })
 
-  it('shows the reason when one was given', () => {
+  // The reason was removed from every screen, but the column still holds text
+  // written before that. Inverted rather than deleted: this now guards that a
+  // stored reason stays out of the UI, which a plain deletion would not.
+  it('never shows a stored reason', () => {
     renderWithTimeOff([
       {
         id: 'p1',
@@ -627,7 +630,7 @@ describe('ScheduleView declared time off', () => {
       },
     ])
 
-    expect(screen.getByText('Jobbar')).toBeInTheDocument()
+    expect(screen.queryByText('Jobbar')).not.toBeInTheDocument()
   })
 
   it('still shows the shifts underneath — a declaration does not cancel them', () => {

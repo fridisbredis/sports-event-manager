@@ -335,9 +335,6 @@ function TimeOffStrip({
                       new Date(to).toISOString()
                     )}`}
               </p>
-              {period.reason ? (
-                <p className={`mt-0.5 truncate text-xs ${palette.label}`}>{period.reason}</p>
-              ) : null}
             </div>
           </div>
         )
@@ -546,11 +543,6 @@ function TimeView({
                           ? strings.timeOffSetByOrganisers
                           : strings.timeOffOnDay}
                       </p>
-                      {period.reason ? (
-                        <p className={`mt-0.5 truncate text-xs ${palette.label}`}>
-                          {period.reason}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
                 )

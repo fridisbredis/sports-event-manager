@@ -230,12 +230,8 @@ export function SchedulingGrid({
     return unavailableConflicts.map((a) => ({
       officialName: nameById.get(a.official_id) ?? '—',
       time: formatSlotLabel(new Date(a.timeslot_start)),
-      reason:
-        unavailability.find(
-          (p) => p.official_id === a.official_id && p.reason !== null && p.reason.length > 0
-        )?.reason ?? null,
     }))
-  }, [unavailableConflicts, officials, unavailability])
+  }, [unavailableConflicts, officials])
 
   const overCapacityCount = useMemo(
     () => uniqueIdsFromCellKeys(overCapacityCells),
