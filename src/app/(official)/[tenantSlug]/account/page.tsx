@@ -48,8 +48,16 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   return (
     <div>
-      <div className="px-5 pt-10 pb-2">
-        <h1 className="text-2xl font-bold text-foreground">{t('account.title')}</h1>
+      {/* page-title like every other heading in the app. This was the one
+          screen still using a local text-2xl/700, which rendered it 4px
+          smaller and a weight lighter than the titles on Event info and
+          Announcements right next to it in the tab bar.
+
+          pb-0: AccountForm opens with its own pt-10, and the two used to
+          stack into a band of empty space under the title that appeared
+          nowhere else. */}
+      <div className="px-5 pt-10">
+        <h1 className="page-title">{t('account.title')}</h1>
       </div>
       <AccountForm
         name={official.name}
