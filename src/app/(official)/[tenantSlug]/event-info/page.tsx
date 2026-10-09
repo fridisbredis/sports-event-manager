@@ -177,11 +177,10 @@ export default async function EventInfoPage({ params }: Props) {
         )}
       </div>
 
-      {/* Facilities are a plain dot-separated line, not a map or a panel, so
-          the boxed empty state used elsewhere on this screen oversold them:
-          a framed card with a map pin led officials to expect a location view
-          once facilities existed. A single muted line in the same slot the
-          list occupies says the same thing without promising more. */}
+      {/* The empty state is a muted line, not the boxed card used elsewhere on
+          this screen: a framed card with a map pin led officials to expect a
+          location view once facilities existed. A single line in the same slot
+          the chips occupy says the same thing without promising more. */}
       <div className="mb-8">
         <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
         {facilityList.length > 0 ? (
