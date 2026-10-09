@@ -198,14 +198,31 @@ export default function AccountForm({
           {!isDesktop && <SaveStatus status={status} t={t} className="mt-1.5 h-5" />}
         </div>
 
-        {/* Phone field. Grey rather than white: it is the one field on the
-            screen that cannot be typed in, and the flat grey says so before
-            the "(read-only)" in the label has to. */}
+        {/* Phone field. A real Input rather than a hand-rolled label over a
+            div: as two separate elements its label took Tailwind's `text-sm`
+            while the name field's took HeroUI's `text-small`, which the iOS
+            zoom fix raises on touch devices — so the two labels matched on
+            desktop and differed by 2px on a phone. Going through the shared
+            wrapper means there is one label style here, not two.
+
+            Grey rather than white: it is the one field on the screen that
+            cannot be typed in, and the flat grey says so before the
+            "(read-only)" in the label has to. isReadOnly (not isDisabled)
+            keeps it focusable and readable by assistive tech — the number is
+            information the official may well want to select and copy, and a
+            disabled field is skipped in the tab order and announced as
+            unavailable. */}
         <div className="mb-8">
-          <label className="mb-1.5 block text-sm text-ink-soft">{t('account.phoneLabel')}</label>
-          <div className="w-full select-none rounded-control border-1 border-edge bg-surface px-3.5 py-2.5 text-[15px] text-ink-muted">
-            {formatPhoneForDisplay(phone)}
-          </div>
+          <Input
+            label={t('account.phoneLabel')}
+            value={formatPhoneForDisplay(phone)}
+            labelPlacement="outside"
+            isReadOnly
+            classNames={{
+              inputWrapper: '!bg-surface !border-edge',
+              input: 'cursor-default !text-ink-muted',
+            }}
+          />
         </div>
 
         {/* Notifications section */}
