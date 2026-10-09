@@ -100,13 +100,13 @@ export function AvatarPicker({
           src={avatarUrl}
           initials={initials}
           alt={name}
-          className="h-20 w-20 bg-status-neutral-bg"
-          initialsClassName="text-2xl font-semibold text-ink-soft"
+          className="h-28 w-28 bg-status-neutral-bg"
+          initialsClassName="text-3xl font-semibold text-ink-soft"
         />
         {/* The camera badge is what makes the avatar read as a control rather
             than decoration — without it the click target is invisible. */}
-        <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-tenant-primary text-white transition-transform group-hover:scale-105">
-          <Camera className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+        <span className="absolute bottom-0.5 right-0.5 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-tenant-primary text-white transition-transform group-hover:scale-105">
+          <Camera className="size-4" strokeWidth={2.2} aria-hidden="true" />
         </span>
         {isUploading && (
           <span className="absolute inset-0 flex items-center justify-center rounded-full bg-white/70 text-xs font-semibold text-ink-soft">

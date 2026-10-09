@@ -149,7 +149,7 @@ export default function AccountForm({
   return (
     <>
       {isDesktop && (
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="page-title">{t('account.title')}</h1>
           <SaveStatus status={status} t={t} />
         </div>
@@ -158,10 +158,20 @@ export default function AccountForm({
           the mobile screen is the tab bar itself. The layout already reserves
           that with pb-16; pb-8 here is the screen's own breathing room below
           the log-out button, not a clearance. */}
-      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-8'}>
+      {/* pt-6 on mobile, not the pt-10 the other official screens open with:
+          those start straight into content, whereas this one sits under a
+          title that already carries the screen's top spacing. Stacking both
+          put an empty band under the heading that appeared nowhere else. */}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-6 pb-8'}>
         {/* Avatar — clickable, opens a file picker and uploads on pick.
-            AvatarPicker centres itself. */}
-        <div className={isDesktop ? 'mb-8' : 'mb-6'}>
+            AvatarPicker centres itself.
+
+            The gap below is wider than a plain stack gap because the circle is
+            112px and centred while everything under it is a full-width,
+            left-aligned field: with less air the avatar's lower edge crowded
+            the "Name" label, and the two read as one block rather than a mark
+            above a form. */}
+        <div className={isDesktop ? 'mb-14' : 'mb-12'}>
           <AvatarPicker
             avatarUrl={avatarUrl}
             name={name}
@@ -176,7 +186,14 @@ export default function AccountForm({
             field / label / field rhythm with the phone row below unbroken.
             It is a hint, not a control: the input is always editable, so it
             carries aria-hidden and no press target of its own. */}
-        <div className={isDesktop ? 'mb-7' : 'mb-6'}>
+        {/* The gap to the phone field below has to clear HeroUI's own: an
+            outside label is positioned absolutely and the field is pushed down
+            by `mt-[calc(fontSize.small + 10px)]` — about 24px — so anything
+            near that makes the distance BETWEEN the two fields match the
+            distance between a label and its own field, and the pair reads as
+            one crowded clump. This is comfortably larger, so each label
+            visibly belongs to the field under it. */}
+        <div className={isDesktop ? 'mb-10' : 'mb-8'}>
           <Input
             label={t('account.nameLabel')}
             value={name}
@@ -212,7 +229,7 @@ export default function AccountForm({
             information the official may well want to select and copy, and a
             disabled field is skipped in the tab order and announced as
             unavailable. */}
-        <div className={isDesktop ? 'mb-12' : 'mb-8'}>
+        <div className={isDesktop ? 'mb-10' : 'mb-8'}>
           <Input
             label={t('account.phoneLabel')}
             value={formatPhoneForDisplay(phone)}
@@ -245,7 +262,7 @@ export default function AccountForm({
             wider gap separates two sections. On mobile it is the last card
             and the only thing after it is the log-out button, which needs
             less air than a section break. */}
-        <AppCard className={isDesktop ? 'mb-12' : 'mb-9'} bodyClassName="px-4 py-4">
+        <AppCard className={isDesktop ? 'mb-10' : 'mb-8'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.smsUpdatesLabel')}</p>
@@ -272,7 +289,7 @@ export default function AccountForm({
         <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
           {tCommon('language.label')}
         </p>
-        <AppCard className={isDesktop ? 'mb-12' : 'mb-9'} bodyClassName="px-4 py-4">
+        <AppCard className={isDesktop ? 'mb-10' : 'mb-8'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.languageLabel')}</p>
@@ -299,7 +316,7 @@ export default function AccountForm({
             <Link
               href={`/${tenantSlug}/schedule`}
               className={`flex items-center gap-4 ${CARD_SURFACE} ${
-                isDesktop ? 'mb-12' : 'mb-8'
+                isDesktop ? 'mb-10' : 'mb-8'
               } px-4 py-4 transition-colors hover:bg-surface`}
             >
               {/* A calendar, since the row leads to the schedule — the
