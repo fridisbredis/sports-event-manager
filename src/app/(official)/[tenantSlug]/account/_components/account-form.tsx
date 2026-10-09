@@ -149,7 +149,7 @@ export default function AccountForm({
   return (
     <>
       {isDesktop && (
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between">
           <h1 className="page-title">{t('account.title')}</h1>
           <SaveStatus status={status} t={t} />
         </div>
@@ -158,10 +158,20 @@ export default function AccountForm({
           the mobile screen is the tab bar itself. The layout already reserves
           that with pb-16; pb-8 here is the screen's own breathing room below
           the log-out button, not a clearance. */}
-      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-10 pb-8'}>
+      {/* pt-6 on mobile, not the pt-10 the other official screens open with:
+          those start straight into content, whereas this one sits under a
+          title that already carries the screen's top spacing. Stacking both
+          put an empty band under the heading that appeared nowhere else. */}
+      <div className={isDesktop ? 'max-w-lg' : 'px-5 pt-6 pb-8'}>
         {/* Avatar — clickable, opens a file picker and uploads on pick.
-            AvatarPicker centres itself. */}
-        <div className="mb-6">
+            AvatarPicker centres itself.
+
+            The gap below is wider than a plain stack gap because the circle is
+            112px and centred while everything under it is a full-width,
+            left-aligned field: with less air the avatar's lower edge crowded
+            the "Name" label, and the two read as one block rather than a mark
+            above a form. */}
+        <div className={isDesktop ? 'mb-14' : 'mb-12'}>
           <AvatarPicker
             avatarUrl={avatarUrl}
             name={name}
@@ -176,7 +186,14 @@ export default function AccountForm({
             field / label / field rhythm with the phone row below unbroken.
             It is a hint, not a control: the input is always editable, so it
             carries aria-hidden and no press target of its own. */}
-        <div className="mb-5">
+        {/* The gap to the phone field below has to clear HeroUI's own: an
+            outside label is positioned absolutely and the field is pushed down
+            by `mt-[calc(fontSize.small + 10px)]` — about 24px — so anything
+            near that makes the distance BETWEEN the two fields match the
+            distance between a label and its own field, and the pair reads as
+            one crowded clump. This is comfortably larger, so each label
+            visibly belongs to the field under it. */}
+        <div className={isDesktop ? 'mb-10' : 'mb-8'}>
           <Input
             label={t('account.nameLabel')}
             value={name}
@@ -198,23 +215,54 @@ export default function AccountForm({
           {!isDesktop && <SaveStatus status={status} t={t} className="mt-1.5 h-5" />}
         </div>
 
-        {/* Phone field. Grey rather than white: it is the one field on the
-            screen that cannot be typed in, and the flat grey says so before
-            the "(read-only)" in the label has to. */}
-        <div className="mb-8">
-          <label className="mb-1.5 block text-sm text-ink-soft">{t('account.phoneLabel')}</label>
-          <div className="w-full select-none rounded-control border-1 border-edge bg-surface px-3.5 py-2.5 text-[15px] text-ink-muted">
-            {formatPhoneForDisplay(phone)}
-          </div>
+        {/* Phone field. A real Input rather than a hand-rolled label over a
+            div: as two separate elements its label took Tailwind's `text-sm`
+            while the name field's took HeroUI's `text-small`, which the iOS
+            zoom fix raises on touch devices — so the two labels matched on
+            desktop and differed by 2px on a phone. Going through the shared
+            wrapper means there is one label style here, not two.
+
+            Grey rather than white: it is the one field on the screen that
+            cannot be typed in, and the flat grey says so before the
+            "(read-only)" in the label has to. isReadOnly (not isDisabled)
+            keeps it focusable and readable by assistive tech — the number is
+            information the official may well want to select and copy, and a
+            disabled field is skipped in the tab order and announced as
+            unavailable. */}
+        <div className={isDesktop ? 'mb-10' : 'mb-8'}>
+          <Input
+            label={t('account.phoneLabel')}
+            value={formatPhoneForDisplay(phone)}
+            labelPlacement="outside"
+            isReadOnly
+            classNames={{
+              inputWrapper: '!bg-surface !border-edge',
+              input: 'cursor-default !text-ink-muted',
+            }}
+          />
         </div>
 
-        {/* Notifications section */}
-        <p className="section-label mb-3">{t('account.notificationsHeading')}</p>
+        {/* Section rhythm, and the reason these numbers are not
+            interchangeable: a label sits close to the card it names, and the
+            card that ends a section sits much further from the next label.
+            Every gap used to be mb-3 / mb-6 (mobile) and mb-3 / mb-8
+            (desktop), which left the gap WITHIN a section almost the same as
+            the gap BETWEEN two — so each heading read as floating between the
+            card above and the card below rather than belonging to the one
+            under it. The grouping has to come from the spacing here; nothing
+            else on the screen marks where a section starts.
+
+            Desktop is not simply mobile plus a constant. Its cards run to
+            max-w-lg, and at that width the same gap reads tighter, so the
+            ratio is kept but both ends are scaled up. */}
+        <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+          {t('account.notificationsHeading')}
+        </p>
         {/* On desktop this card is followed by the Schedule section, and the
             wider gap separates two sections. On mobile it is the last card
             and the only thing after it is the log-out button, which needs
             less air than a section break. */}
-        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
+        <AppCard className={isDesktop ? 'mb-10' : 'mb-8'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.smsUpdatesLabel')}</p>
@@ -238,8 +286,10 @@ export default function AccountForm({
             everywhere. Switching it re-renders the page, which would
             discard an unsaved name edit — so it is deliberately a separate
             section, not another row in the card above. */}
-        <p className="section-label mb-3">{tCommon('language.label')}</p>
-        <AppCard className={isDesktop ? 'mb-8' : 'mb-6'} bodyClassName="px-4 py-4">
+        <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+          {tCommon('language.label')}
+        </p>
+        <AppCard className={isDesktop ? 'mb-10' : 'mb-8'} bodyClassName="px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[15px] font-semibold text-ink">{t('account.languageLabel')}</p>
@@ -260,10 +310,14 @@ export default function AccountForm({
             no shifts still needs to be able to look and see that. */}
         {isDesktop && (
           <>
-            <p className="section-label mb-3">{t('account.scheduleHeading')}</p>
+            <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+              {t('account.scheduleHeading')}
+            </p>
             <Link
               href={`/${tenantSlug}/schedule`}
-              className={`flex items-center gap-4 ${CARD_SURFACE} mb-8 px-4 py-4 transition-colors hover:bg-surface`}
+              className={`flex items-center gap-4 ${CARD_SURFACE} ${
+                isDesktop ? 'mb-10' : 'mb-8'
+              } px-4 py-4 transition-colors hover:bg-surface`}
             >
               {/* A calendar, since the row leads to the schedule — the
                   empty square it replaced read as an unchecked checkbox. */}

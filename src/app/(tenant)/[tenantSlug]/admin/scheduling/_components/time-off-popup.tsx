@@ -57,10 +57,10 @@ function formatSpan(period: UnavailabilityPeriod, language?: string): string {
  *
  * The ownership rule (Peter, 2026-10-07) is that whoever declared a period
  * owns it. An official's own declaration is therefore shown but not
- * removable — with the reason said plainly rather than by a greyed-out button
- * with no explanation, since "why can't I delete this" is exactly the question
- * an admin would otherwise be left with. The RLS policy refuses it regardless
- * of what this popup offers.
+ * removable — said plainly in the row's own footer rather than by a
+ * greyed-out button with no explanation, since "why can't I delete this" is
+ * exactly the question an admin would otherwise be left with. The RLS policy
+ * refuses it regardless of what this popup offers.
  */
 export function TimeOffPopup({ cell, onRemove, removingId }: TimeOffPopupProps) {
   const { t } = useTranslation('admin')
@@ -91,9 +91,6 @@ export function TimeOffPopup({ cell, onRemove, removingId }: TimeOffPopupProps) 
           return (
             <li key={period.id} className="px-3 py-2.5">
               <p className="text-sm text-ink">{formatSpan(period, language)}</p>
-              {period.reason ? (
-                <p className="mt-0.5 truncate text-xs text-ink-soft">{period.reason}</p>
-              ) : null}
               <p className="mt-1 text-[11px] text-ink-faint">
                 {isAdminSet ? t('scheduling.timeOffSetBy') : t('scheduling.timeOffDeclared')}
               </p>

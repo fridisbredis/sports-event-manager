@@ -9,7 +9,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Input, DateRangePicker, TimeInput } from '@/components/ui/form-fields'
+import { DateRangePicker, TimeInput } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 import { useLanguage } from '@/components/i18n-provider'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -160,7 +160,6 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
   // block Save.
   const [startTime, setStartTime] = useState<Time | null>(new Time(9, 0))
   const [endTime, setEndTime] = useState<Time | null>(new Time(17, 0))
-  const [reason, setReason] = useState('')
 
   // `deletingId` is per-row rather than a single boolean so withdrawing one
   // period does not grey out every other row's button.
@@ -170,7 +169,6 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
     setRange(null)
     setStartTime(new Time(9, 0))
     setEndTime(new Time(17, 0))
-    setReason('')
     setAllDay(true)
   }
 
@@ -191,7 +189,6 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
         // reads as "the whole day" — so this needs no separate all-day flag.
         startTime: allDay ? undefined : toTimeString(startTime),
         endTime: allDay ? undefined : toTimeString(endTime),
-        reason: reason.trim() || undefined,
       })
 
       if (result.error) {
@@ -296,9 +293,12 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
                       <p className="text-sm font-semibold text-ink">
                         {formatPeriodDates(period, language)}
                       </p>
+                      {/* Always the period's time now. It used to be the
+                          reason when one was given, which meant the row that
+                          explained itself was the one that stopped saying
+                          when it applied. */}
                       <p className="mt-0.5 truncate text-xs text-ink-soft">
-                        {period.reason ??
-                          formatPeriodTime(period, t('availability.allDay'), language)}
+                        {formatPeriodTime(period, t('availability.allDay'), language)}
                       </p>
                     </div>
                     {/* The bin and the lock share this trailing column: both
@@ -407,14 +407,6 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
                 />
               </div>
             )}
-
-            <Input
-              label={t('availability.reasonLabel')}
-              placeholder={t('availability.reasonPlaceholder')}
-              value={reason}
-              onValueChange={setReason}
-              maxLength={200}
-            />
 
             <div className="flex gap-2 pt-1">
               <Button

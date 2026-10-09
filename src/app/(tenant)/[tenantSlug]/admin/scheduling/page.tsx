@@ -57,7 +57,7 @@ export async function fetchUnavailabilityForDay(
   // midnight belongs to the previous day and must not shade this one.
   const { data, error } = await supabase
     .from('official_unavailability')
-    .select('id, official_id, starts_at, ends_at, reason, created_by_role')
+    .select('id, official_id, starts_at, ends_at, created_by_role')
     .eq('tenant_id', tenantId)
     .lt('starts_at', dayEnd.toISOString())
     .gt('ends_at', dayStart.toISOString())

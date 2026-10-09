@@ -22,22 +22,29 @@ vi.mock('@/components/ui/app-card', () => ({
   AppCard: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }))
 
+// Stands in for the shared wrapper. It forwards isReadOnly, because both
+// fields on this screen now go through Input and the read-only one must stay
+// a real, focusable input — the mock would otherwise make a regression to a
+// plain div or a disabled field invisible here.
 vi.mock('@/components/ui/form-fields', () => ({
   Input: ({
     label,
     value,
     onValueChange,
     onBlur,
+    isReadOnly,
   }: {
     label?: string
     value?: string
     onValueChange?: (v: string) => void
     onBlur?: () => void
+    isReadOnly?: boolean
   }) => (
     <label>
       {label}
       <input
         value={value ?? ''}
+        readOnly={isReadOnly}
         onChange={(e) => onValueChange?.(e.target.value)}
         onBlur={onBlur}
       />
@@ -84,6 +91,26 @@ const baseProps = {
   i18nNamespace: 'official' as const,
   language: 'en' as const,
 }
+
+describe('AccountForm phone field', () => {
+  // The phone used to be a hand-rolled <label> over a <div>, which gave this
+  // screen two different label styles — they matched on desktop and differed
+  // by 2px on a phone, where the iOS zoom fix raises HeroUI's label token.
+  // Both fields go through the shared Input now, so this asserts the phone is
+  // a real labelled field rather than text in a box.
+  it('renders the phone as a labelled, read-only field', () => {
+    render(<AccountForm {...baseProps} />)
+
+    const phone = screen.getByLabelText('account.phoneLabel') as HTMLInputElement
+
+    expect(phone.tagName).toBe('INPUT')
+    expect(phone.readOnly).toBe(true)
+    // Read-only, not disabled: the number stays selectable and in the tab
+    // order so it can be copied and is announced by assistive tech.
+    expect(phone.disabled).toBe(false)
+    expect(phone.value).toContain('70 990 00 02')
+  })
+})
 
 describe('AccountForm log out', () => {
   beforeEach(() => {

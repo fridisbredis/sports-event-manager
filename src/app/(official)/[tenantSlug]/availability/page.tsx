@@ -50,7 +50,7 @@ export default async function AvailabilityPage({ params }: Props) {
   // hiding rows that still exist reads as data loss.
   const { data, error } = await supabase
     .from('official_unavailability')
-    .select('id, official_id, starts_at, ends_at, reason, created_by_role')
+    .select('id, official_id, starts_at, ends_at, created_by_role')
     .eq('official_id', officialId)
     .eq('tenant_id', tenant.id)
     .order('starts_at', { ascending: true })

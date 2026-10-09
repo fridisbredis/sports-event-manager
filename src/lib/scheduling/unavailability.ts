@@ -22,7 +22,15 @@ export interface UnavailabilityPeriod {
   official_id: string
   starts_at: string
   ends_at: string
-  reason: string | null
+  /**
+   * Optional because no screen selects it any more: the reason was removed
+   * from the UI, so nothing reads it back. It stays in the type (and in the
+   * column) because rows written before that still carry text, and
+   * mergeAdjacentPeriods below still refuses to merge two periods that gave
+   * different reasons — folding those into one line would restate stored
+   * history as something the official never said.
+   */
+  reason?: string | null
   /**
    * Defaults to 'official' when absent so a caller that selects the narrower
    * column set still type-checks — the column itself is NOT NULL with that

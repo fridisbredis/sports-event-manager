@@ -25,34 +25,67 @@ export interface PeriodBounds {
 }
 
 /**
- * Turns the form's dates and optional times into a half-open UTC instant pair.
+ * Turns the form's dates and optional times into the half-open UTC instant
+ * pairs to store — one per period, so the result is always a list.
  *
  * Wall-clock UTC per the project convention: `2026-10-10` + `09:00` is
  * 09:00 UTC, not 09:00 in the viewer's zone. Every schedule surface already
  * renders with `timeZone: 'UTC'`, so a period declared as "09:00" must line up
  * with the slot labelled 09:00 on the grid.
  *
- * With no times, the period runs midnight to midnight and the end date is
- * INCLUSIVE — "Saturday to Sunday" means both days in full, so the exclusive
- * upper bound is the start of Monday.
+ * Two shapes, because the form's two modes mean genuinely different things:
+ *
+ * - **Whole day**, no times: ONE period running midnight to midnight, with the
+ *   end date INCLUSIVE — "Saturday to Sunday" means both days in full, so the
+ *   exclusive upper bound is the start of Monday. A multi-day absence really is
+ *   one unbroken stretch, nights included, so it stays one row.
+ *
+ * - **A time range**, over one or more days: ONE PERIOD PER DAY, each carrying
+ *   that same clock range. "10:00–11:00, Mon to Wed" is three one-hour
+ *   absences, not a 49-hour one from Monday morning to Wednesday mid-morning.
+ *   The latter is what this used to produce, and it quietly made the official
+ *   unschedulable through both intervening nights and all of Tuesday — a
+ *   conflict warning on a Tuesday afternoon shift they never said no to. The
+ *   error leaned toward making people LESS available than they declared, which
+ *   is the direction that actually costs the event staff.
+ *
+ *   A range whose end reads as earlier than its start (22:00–06:00) is left
+ *   alone rather than rolled into the next morning: the action rejects it and
+ *   the DB CHECK refuses it, and silently reinterpreting it would turn a
+ *   typo into a stored overnight absence nobody typed. To be away overnight,
+ *   declare the whole day.
  */
-export function toPeriodBounds(input: PeriodFormInput): PeriodBounds {
+export function toPeriodBounds(input: PeriodFormInput): PeriodBounds[] {
   const { startDate, endDate, startTime, endTime } = input
 
   if (startTime && endTime) {
-    return {
-      startsAt: new Date(`${startDate}T${startTime}:00.000Z`).toISOString(),
-      endsAt: new Date(`${endDate}T${endTime}:00.000Z`).toISOString(),
+    const periods: PeriodBounds[] = []
+    const last = new Date(`${endDate}T00:00:00.000Z`)
+
+    for (
+      const day = new Date(`${startDate}T00:00:00.000Z`);
+      day.getTime() <= last.getTime();
+      day.setUTCDate(day.getUTCDate() + 1)
+    ) {
+      const date = day.toISOString().slice(0, 10)
+      periods.push({
+        startsAt: new Date(`${date}T${startTime}:00.000Z`).toISOString(),
+        endsAt: new Date(`${date}T${endTime}:00.000Z`).toISOString(),
+      })
     }
+
+    return periods
   }
 
   const end = new Date(`${endDate}T00:00:00.000Z`)
   end.setUTCDate(end.getUTCDate() + 1)
 
-  return {
-    startsAt: new Date(`${startDate}T00:00:00.000Z`).toISOString(),
-    endsAt: end.toISOString(),
-  }
+  return [
+    {
+      startsAt: new Date(`${startDate}T00:00:00.000Z`).toISOString(),
+      endsAt: end.toISOString(),
+    },
+  ]
 }
 
 /** The shape of an event stage this module needs — a subset of `event_stages`. */
