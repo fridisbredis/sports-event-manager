@@ -43,7 +43,19 @@ const WHITE_FIELD = [
 
 // Applied to every field's label so it takes the theme colour on focus,
 // matching the border.
-const FIELD_LABEL = 'group-data-[focus=true]:!text-tenant-primary-tint-text'
+//
+// The explicit `text-sm` pins the label at the handoff's 14px. HeroUI sizes
+// its labels with `text-small`, the same token the iOS zoom fix in globals.css
+// raises to 16px under `@media (pointer: coarse)` — but that fix exists only
+// to stop WebKit zooming when a field is focused, and WebKit only reads the
+// font-size of the editable text, never the label's. So the label was being
+// enlarged on touch devices for no reason, and any label written as a plain
+// `<label className="text-sm">` beside a HeroUI field sat 2px smaller than it
+// on a phone while matching exactly on desktop.
+//
+// `!` is required: HeroUI's own `text-small` lands on the same element at
+// equal specificity and would otherwise win on source order.
+const FIELD_LABEL = '!text-sm group-data-[focus=true]:!text-tenant-primary-tint-text'
 
 // Listbox rows in any popover — a Select's options, a Dropdown's menu.
 // HeroUI highlights both hover and the selected row with its grey
