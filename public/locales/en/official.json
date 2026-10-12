@@ -110,8 +110,6 @@
   },
   "availability": {
     "pageTitle": "Availability",
-    "title": "Time off",
-    "description": "Tell the organisers when you are not available to be scheduled.",
     "blockingNote": "The organisers cannot schedule you during a period you have declared. A shift already in your schedule stays — you will see a warning on it, so talk to the organisers.",
     "emptyTitle": "No time off declared",
     "emptyDescription": "Add a period and the organisers will see it when they build the schedule.",

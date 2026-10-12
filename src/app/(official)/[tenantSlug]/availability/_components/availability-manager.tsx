@@ -221,31 +221,6 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
 
   return (
     <div className="space-y-4">
-      <AppCard bodyClassName="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-ink">{t('availability.title')}</h2>
-            <p className="mt-1 text-sm text-ink-soft">{t('availability.description')}</p>
-          </div>
-        </div>
-
-        {/* What a declaration actually does, which changed on 2026-10-07:
-            Peter asked for a hard block, so the scheduling action now refuses
-            to write an assignment onto a declared period. This note said the
-            opposite — "a heads-up, not a block" — and leaving it would have
-            had officials ringing organisers about a conflict the system
-            already prevents.
-
-            It still names the one case that survives: an assignment made
-            BEFORE the declaration is never cleared (Frida, same day), because
-            that clash is the thing the two of them need to discuss. The shift
-            carries its own warning on the schedule, and this says so rather
-            than implying the declaration silently won. */}
-        <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-ink-soft">
-          {t('availability.blockingNote')}
-        </p>
-      </AppCard>
-
       {periods.length === 0 && !formOpen ? (
         <AppCard bodyClassName="p-5">
           <EmptyState
@@ -407,6 +382,26 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
                 />
               </div>
             )}
+
+            {/* What a declaration actually does, which changed on 2026-10-07:
+                Peter asked for a hard block, so the scheduling action now
+                refuses to write an assignment onto a declared period. This
+                note said the opposite — "a heads-up, not a block" — and
+                leaving it would have had officials ringing organisers about a
+                conflict the system already prevents.
+
+                It still names the one case that survives: an assignment made
+                BEFORE the declaration is never cleared (Frida, same day),
+                because that clash is the thing the two of them need to
+                discuss. The shift carries its own warning on the schedule,
+                and this says so rather than implying the declaration silently
+                won.
+
+                Inside the form rather than above the list: it is a caveat
+                about declaring, so it belongs where someone is declaring —
+                not between the page's heading and the periods they came to
+                read. */}
+            <p className="text-xs text-ink-faint">{t('availability.blockingNote')}</p>
 
             <div className="flex gap-2 pt-1">
               <Button

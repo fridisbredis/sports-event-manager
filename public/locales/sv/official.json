@@ -110,8 +110,6 @@
   },
   "availability": {
     "pageTitle": "Tillgänglighet",
-    "title": "Frånvaro",
-    "description": "Berätta för arrangörerna när du inte kan bli schemalagd.",
     "blockingNote": "Arrangörerna kan inte schemalägga dig under en period du har angett. Ett pass som redan ligger i ditt schema står kvar – du ser en varning på det, så hör av dig till arrangörerna.",
     "emptyTitle": "Ingen frånvaro angiven",
     "emptyDescription": "Lägg till en period så ser arrangörerna den när de lägger schemat.",

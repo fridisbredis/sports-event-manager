@@ -6,8 +6,6 @@ vi.mock('@/lib/i18n/client', () => ({
   useTranslation: () => ({
     t: (key: string) =>
       ({
-        'availability.title': 'Time off',
-        'availability.description': 'Tell us when you cannot work.',
         'availability.addButton': 'Add time off',
         'availability.periodLabel': 'Period',
         'availability.allDayLabel': 'All day',
