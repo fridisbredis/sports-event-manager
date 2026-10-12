@@ -5,7 +5,8 @@
     "eventInfo": "Event info",
     "announcements": "Announcements",
     "account": "Account",
-    "adminView": "Admin view"
+    "adminView": "Admin view",
+    "loading": "Loading"
   },
   "home": {
     "title": "Official Home",

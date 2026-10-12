@@ -5,7 +5,8 @@
     "eventInfo": "Evenemangsinfo",
     "announcements": "Meddelanden",
     "account": "Konto",
-    "adminView": "Adminvy"
+    "adminView": "Adminvy",
+    "loading": "Hämtar"
   },
   "home": {
     "title": "Funktionärsstart",
