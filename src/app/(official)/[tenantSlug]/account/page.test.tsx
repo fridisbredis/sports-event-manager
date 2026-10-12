@@ -39,6 +39,8 @@ function chain(result: unknown) {
   builder.eq = vi.fn(() => builder)
   builder.order = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
+  builder.not = vi.fn(() => builder)
+  builder.range = vi.fn(() => builder)
   builder.single = vi.fn(() => Promise.resolve(result))
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
@@ -63,6 +65,15 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+
+/**
+ * An ISO instant at `hhmm` today. Derived rather than written as a literal:
+ * `countShifts` groups by UTC day, so a hardcoded date would start failing
+ * the moment the clock passed it.
+ */
+function slot(hhmm: string): string {
+  return `${new Date().toISOString().slice(0, 10)}T${hhmm}:00.000Z`
+}
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
@@ -119,7 +130,7 @@ describe('OfficialAccountPage', () => {
       data: { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: false },
     })
     const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(chain({ count: 2 }))
+    fromMock.mockReturnValueOnce(officialsBuilder).mockReturnValueOnce(chain({ data: [] }))
     mockUser('user-1', fromMock)
 
     await OfficialAccountPage({ params: PARAMS })
@@ -128,11 +139,23 @@ describe('OfficialAccountPage', () => {
     expect(officialsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
   })
 
-  it('renders AccountForm with the official row and assignment count', async () => {
+  it('renders AccountForm with the official row and shift count', async () => {
     mockResolvedTenant()
     const official = { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: true }
     const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(chain({ count: 5 }))
+    fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(
+      // Four hourly slots: three back-to-back at one work area, one later at
+      // another. Two shifts — the number MYSCH-01 draws two cards for, and
+      // the regression this screen's head count got wrong by reporting 4.
+      chain({
+        data: [
+          { timeslot_start: slot('11:00'), timeslot_end: slot('12:00'), workstation_id: 'ws-1' },
+          { timeslot_start: slot('12:00'), timeslot_end: slot('13:00'), workstation_id: 'ws-1' },
+          { timeslot_start: slot('13:00'), timeslot_end: slot('14:00'), workstation_id: 'ws-1' },
+          { timeslot_start: slot('16:00'), timeslot_end: slot('17:00'), workstation_id: 'ws-2' },
+        ],
+      })
+    )
     mockUser('user-1', fromMock)
 
     const result = await OfficialAccountPage({ params: PARAMS })
@@ -145,25 +168,27 @@ describe('OfficialAccountPage', () => {
       smsOptOut: true,
       tenantId: TENANT_ID,
       tenantSlug: 'viadal',
-      assignmentCount: 5,
+      shiftCount: 2,
       i18nNamespace: 'official',
       language: 'en',
       avatarUrl: undefined,
     })
   })
 
-  it('defaults assignmentCount to 0 when the count is null', async () => {
+  it('shows 0 shifts when the count read fails', async () => {
     mockResolvedTenant()
     const official = { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: false }
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(chain({ data: official }))
-      .mockReturnValueOnce(chain({ count: null }))
+      // Degraded rather than fatal: the summary line is not worth failing the
+      // whole account screen over.
+      .mockReturnValueOnce(chain({ data: null, error: { message: 'boom' } }))
     mockUser('user-1', fromMock)
 
     const result = await OfficialAccountPage({ params: PARAMS })
 
     const form = findByType(result, AccountForm)
-    expect(form!.props.assignmentCount).toBe(0)
+    expect(form!.props.shiftCount).toBe(0)
   })
 })

@@ -36,6 +36,8 @@ function chain(result: unknown) {
   builder.eq = vi.fn(() => builder)
   builder.order = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
+  builder.not = vi.fn(() => builder)
+  builder.range = vi.fn(() => builder)
   builder.single = vi.fn(() => Promise.resolve(result))
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
@@ -60,6 +62,15 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+/**
+ * An ISO instant at `hhmm` today. Derived rather than written as a literal:
+ * `countShifts` groups by UTC day, so a hardcoded date would start failing
+ * the moment the clock passed it.
+ */
+function slot(hhmm: string): string {
+  return `${new Date().toISOString().slice(0, 10)}T${hhmm}:00.000Z`
+}
+
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 // `tenant` carries both outcomes getAdminTenant can produce: a row when the
@@ -111,12 +122,22 @@ describe('AdminAccountPage', () => {
     await expect(AdminAccountPage({ params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
   })
 
-  it('renders AccountForm with the official row and assignment count when it exists', async () => {
+  it('renders AccountForm with the official row and shift count when it exists', async () => {
     const official = { id: 'off-1', name: 'Peter', phone: '0701234567', sms_opt_out: false }
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(chain({ data: official })) // officials
-      .mockReturnValueOnce(chain({ count: 3 })) // assignments count
+      // Three back-to-back hourly slots at one work area: one shift, not 3.
+      // The head count this replaced reported hours.
+      .mockReturnValueOnce(
+        chain({
+          data: [
+            { timeslot_start: slot('09:00'), timeslot_end: slot('10:00'), workstation_id: 'ws-1' },
+            { timeslot_start: slot('10:00'), timeslot_end: slot('11:00'), workstation_id: 'ws-1' },
+            { timeslot_start: slot('11:00'), timeslot_end: slot('12:00'), workstation_id: 'ws-1' },
+          ],
+        })
+      ) // assignment slots
     mockUser('user-1', {}, fromMock)
 
     const result = await AdminAccountPage({ params: PARAMS })
@@ -129,7 +150,7 @@ describe('AdminAccountPage', () => {
       smsOptOut: false,
       tenantId: TENANT_ID,
       tenantSlug: 'viadal',
-      assignmentCount: 3,
+      shiftCount: 1,
       i18nNamespace: 'admin',
       language: 'en',
       layout: 'desktop',
@@ -143,7 +164,7 @@ describe('AdminAccountPage', () => {
   it('delegates the access decision to getAdminTenant', async () => {
     const official = { id: 'off-1', name: 'Sys', phone: '0701234567', sms_opt_out: false }
     const fromMock = vi.fn()
-    fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(chain({ count: 0 }))
+    fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(chain({ data: [] }))
     mockUser('user-1', { name: 'Sys' }, fromMock)
 
     const result = await AdminAccountPage({ params: PARAMS })

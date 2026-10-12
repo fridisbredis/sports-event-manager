@@ -23,7 +23,7 @@ interface AccountFormProps {
   smsOptOut: boolean
   tenantId: string
   tenantSlug: string
-  assignmentCount: number
+  shiftCount: number
   i18nNamespace: 'official' | 'admin'
   language: Locale
   layout?: 'mobile' | 'desktop'
@@ -36,7 +36,7 @@ export default function AccountForm({
   smsOptOut: initialSmsOptOut,
   tenantId,
   tenantSlug,
-  assignmentCount,
+  shiftCount,
   i18nNamespace,
   language,
   layout = 'mobile',
@@ -328,7 +328,7 @@ export default function AccountForm({
               />
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-semibold text-ink">
-                  {t('account.assignmentCount', { count: assignmentCount })}
+                  {t('account.shiftCount', { count: shiftCount })}
                 </p>
                 <p className="mt-0.5 text-sm text-ink-muted">{t('account.viewSchedule')}</p>
               </div>
