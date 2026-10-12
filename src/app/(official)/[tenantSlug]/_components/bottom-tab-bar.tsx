@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useOptimistic, useTransition } from 'react'
 import { Bell, Calendar, House, Info, User } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 
@@ -14,7 +15,22 @@ interface Props {
 
 export function BottomTabBar({ tenantSlug, showAccount }: Props) {
   const pathname = usePathname()
+  const router = useRouter()
   const { t } = useTranslation('official')
+  const [, startTransition] = useTransition()
+
+  // The tab the bar paints as current, which runs ahead of the committed URL.
+  //
+  // `usePathname` only updates once the navigation commits, so a tap left the
+  // previous tab lit while the next route's skeleton was already on screen —
+  // the page had visibly moved on and the bar had not. Moving the highlight on
+  // the tap keeps the two telling the same story.
+  //
+  // useOptimistic rather than useState: it reverts to `pathname` on its own
+  // when the transition settles, so a navigation that lands somewhere else
+  // than asked — a redirect, a notFound, the back button — cannot leave the
+  // bar lit on a tab the user is not on.
+  const [shownPath, setShownPath] = useOptimistic(pathname)
 
   const tabs = [
     { href: `/${tenantSlug}/home`, label: t('nav.home'), Icon: House },
@@ -36,12 +52,25 @@ export function BottomTabBar({ tenantSlug, showAccount }: Props) {
     <nav className="fixed bottom-0 inset-x-0 z-40 h-16 border-t border-edge bg-white">
       <div className="flex h-full">
         {tabs.map(({ href, label, Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
+          const active = shownPath === href || shownPath.startsWith(href + '/')
+          // aria-current follows the committed path, not the optimistic one:
+          // announcing the new tab while the previous page is still mounted
+          // would misreport where the user is.
+          const committed = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
               key={href}
               href={href}
-              aria-current={active ? 'page' : undefined}
+              aria-current={committed ? 'page' : undefined}
+              onClick={(e) => {
+                // Modified clicks (new tab, new window) belong to the browser.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                e.preventDefault()
+                startTransition(() => {
+                  setShownPath(href)
+                  router.push(href)
+                })
+              }}
               className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
                 active ? 'text-tenant-primary' : 'text-ink-faint hover:text-ink-soft'
               }`}
