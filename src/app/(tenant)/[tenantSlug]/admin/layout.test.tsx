@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import TenantLayout from './layout'
+import TenantLayout, { SidebarChrome } from './layout'
 import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from './_components/sidebar-nav'
@@ -93,7 +93,13 @@ describe('TenantLayout', () => {
 
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
 
-    const nav = findByType(result, SidebarNav)
+    // SidebarNav is rendered by the suspended SidebarChrome, which the gate
+    // above does not depend on — so the layout's own tree holds the chrome
+    // element, and the nav is one await deeper.
+    const chrome = findByType(result, SidebarChrome)
+    expect(chrome).not.toBeNull()
+
+    const nav = findByType(await SidebarChrome(chrome!.props as never), SidebarNav)
     expect(nav).not.toBeNull()
     expect(nav!.props.tenantSlug).toBe('viadal')
 
@@ -113,12 +119,14 @@ describe('TenantLayout', () => {
       is_active: true,
     })
 
+    const chromeProps = { tenantSlug: 'viadal', adminLabel: 'Admin' }
+
     vi.mocked(hasAccountScreen).mockResolvedValue(false)
-    let nav = findByType(await TenantLayout({ children: 'C', params: PARAMS }), SidebarNav)
+    let nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
     expect(nav!.props.showAccount).toBe(false)
 
     vi.mocked(hasAccountScreen).mockResolvedValue(true)
-    nav = findByType(await TenantLayout({ children: 'C', params: PARAMS }), SidebarNav)
+    nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
     expect(nav!.props.showAccount).toBe(true)
   })
 })

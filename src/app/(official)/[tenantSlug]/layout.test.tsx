@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import OfficialLayout from './layout'
+import OfficialLayout, { AdminLinkChrome } from './layout'
 import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
@@ -145,7 +145,13 @@ describe('OfficialLayout', () => {
 
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
-    const link = findByType(result, AdminViewLink)
+    // AdminViewLink is rendered by the suspended AdminLinkChrome, which the
+    // gate above does not depend on — so the layout's tree holds the chrome
+    // element and the link is one await deeper.
+    const chrome = findByType(result, AdminLinkChrome)
+    expect(chrome).not.toBeNull()
+
+    const link = findByType(await AdminLinkChrome(chrome!.props as never), AdminViewLink)
     expect(link).not.toBeNull()
     expect(link!.props).toEqual({ tenantSlug: 'viadal' })
   })

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 import { AdminViewLink } from './_components/admin-view-link'
@@ -7,6 +8,17 @@ import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 interface Props {
   children: React.ReactNode
   params: Promise<{ tenantSlug: string }>
+}
+
+// The cross-surface link, which the gate below does not need.
+//
+// An admin who is also on the roster gets a way back to their own surface.
+// No route's reachability depends on this answer, so suspending it costs no
+// guarantee — unlike the access check itself, which stays in the layout body.
+export async function AdminLinkChrome({ tenantSlug }: { tenantSlug: string }) {
+  const showAdminLink = await hasAdminScreens(tenantSlug)
+
+  return showAdminLink ? <AdminViewLink tenantSlug={tenantSlug} /> : null
 }
 
 export default async function OfficialLayout({ children, params }: Props) {
@@ -20,6 +32,14 @@ export default async function OfficialLayout({ children, params }: Props) {
   // tenant through the same guarded helper, so the check runs on both — but
   // it is memoised per render pass (F-PERF-07), so it costs one GoTrue round
   // trip and one access-context lookup for the whole render, not two.
+  //
+  // This await is deliberately in the layout body and must stay there, even
+  // though it costs the instant navigation a loading.tsx would otherwise buy.
+  // notFound() terminates the segment it is thrown in: once a Suspense shell
+  // has started streaming, the 200 is already on the wire and an unauthorised
+  // caller gets a 404 body under a 200 status. The e2e access-control suite
+  // asserts the status, and is right to — that is the part a client or a
+  // crawler acts on. Reachability is not a thing to trade for a skeleton.
   const tenant = await getOfficialTenant(tenantSlug)
 
   if (!tenant) notFound()
@@ -30,16 +50,16 @@ export default async function OfficialLayout({ children, params }: Props) {
   // than asking again (F-PERF-07).
   const showAccount = tenant.officialId != null
 
-  // An admin reaching an official screen gets a way back to their own
-  // surface. Costs one admin-access check here (nothing above has resolved
-  // it on this route) and is memoised per render pass like the rest.
-  const showAdminLink = await hasAdminScreens(tenantSlug)
-
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette} />
       <div className="flex flex-col min-h-screen bg-white">
-        {showAdminLink && <AdminViewLink tenantSlug={tenantSlug} />}
+        {/* Suspended because it is chrome, not a gate: no fallback, since the
+            link appearing a moment late is better than a grey bar where it
+            will be. */}
+        <Suspense>
+          <AdminLinkChrome tenantSlug={tenantSlug} />
+        </Suspense>
         <div className="flex-1 pb-16">{children}</div>
         <BottomTabBar tenantSlug={tenantSlug} showAccount={showAccount} />
       </div>

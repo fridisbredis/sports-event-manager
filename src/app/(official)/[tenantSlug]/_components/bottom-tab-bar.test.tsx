@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { BottomTabBar } from './bottom-tab-bar'
 
@@ -7,9 +7,17 @@ import { BottomTabBar } from './bottom-tab-bar'
 // the one thing the bar has to get right — had no coverage. These tests render
 // it for real against a given pathname.
 
-const { mockPathname } = vi.hoisted(() => ({ mockPathname: vi.fn() }))
+const { mockPathname, mockPush } = vi.hoisted(() => ({
+  mockPathname: vi.fn(),
+  mockPush: vi.fn(),
+}))
 
-vi.mock('next/navigation', () => ({ usePathname: mockPathname }))
+// The bar navigates through the router now, so it needs one mounted — the
+// tap has to move the highlight before the pathname catches up.
+vi.mock('next/navigation', () => ({
+  usePathname: mockPathname,
+  useRouter: () => ({ push: mockPush, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+}))
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children?: ReactNode; href: string }) => (
@@ -28,6 +36,12 @@ function renderBar(pathname: string, showAccount = true) {
   return render(<BottomTabBar tenantSlug="seed-klubben" showAccount={showAccount} />)
 }
 
+// Selected by href like the assertions above: the labels come from i18n,
+// which these tests deliberately leave unmocked.
+function tabLink(href: string) {
+  return screen.getAllByRole('link').find((el) => el.getAttribute('href') === href)!
+}
+
 function activeHrefs() {
   return screen
     .getAllByRole('link')
@@ -36,6 +50,8 @@ function activeHrefs() {
 }
 
 describe('BottomTabBar', () => {
+  beforeEach(() => mockPush.mockClear())
+
   it('renders one link per tab', () => {
     renderBar('/seed-klubben/home')
 
@@ -77,6 +93,35 @@ describe('BottomTabBar', () => {
     renderBar('/seed-klubben/schedule-archive')
 
     expect(activeHrefs()).toEqual([])
+  })
+
+  // Tapping a tab starts a navigation that the pathname only reflects once it
+  // commits. These cover the gap in between.
+  it('navigates through the router rather than a full page load', () => {
+    renderBar('/seed-klubben/home')
+
+    fireEvent.click(tabLink('/seed-klubben/schedule'))
+
+    expect(mockPush).toHaveBeenCalledWith('/seed-klubben/schedule')
+  })
+
+  it('leaves modified clicks to the browser so a tab can be opened', () => {
+    renderBar('/seed-klubben/home')
+
+    fireEvent.click(tabLink('/seed-klubben/schedule'), { metaKey: true })
+
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  // aria-current trails the visual highlight on purpose: announcing the new
+  // tab while the previous page is still mounted would misreport where the
+  // user is.
+  it('keeps aria-current on the tab actually rendered', () => {
+    renderBar('/seed-klubben/home')
+
+    fireEvent.click(tabLink('/seed-klubben/schedule'))
+
+    expect(activeHrefs()).toEqual(['/seed-klubben/home'])
   })
 
   it('distinguishes the active tab by more than colour alone', () => {

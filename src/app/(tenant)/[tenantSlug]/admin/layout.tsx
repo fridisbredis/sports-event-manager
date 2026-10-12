@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { SidebarNav } from './_components/sidebar-nav'
@@ -10,36 +11,60 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
+// The sidebar's own data, which the gate above does not need.
+//
+// Only hasAccountScreen lives here. It decides whether the sidebar shows an
+// Account link and nothing else — no route's reachability depends on it, so
+// suspending it costs no guarantee. The access check itself stays in the
+// layout body below.
+export async function SidebarChrome({
+  tenantSlug,
+  adminLabel,
+}: {
+  tenantSlug: string
+  adminLabel: string
+}) {
+  // ACCT-01 is backed by an `officials` row, which an admin who reaches this
+  // tenant by role alone does not have — see hasAccountScreen.
+  const showAccount = await hasAccountScreen(tenantSlug)
+
+  return <SidebarNav tenantSlug={tenantSlug} adminLabel={adminLabel} showAccount={showAccount} />
+}
+
 export default async function TenantLayout({ children, params }: Props) {
   const { tenantSlug } = await params
-  const language = await getUserLanguage()
-  const t = await getServerTranslation(language, 'admin')
+  const t = await getServerTranslation(await getUserLanguage(), 'admin')
 
   const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  // Resolves the tenant only once the caller has passed the admin access check
-  // for it, so this layout still gates every page beneath it. Memoised per
+  // Resolves the tenant only once the caller has passed the admin access
+  // check, so this layout still gates every page beneath it. Memoised per
   // render pass (F-PERF-07), so the pages below reuse this result instead of
   // repeating the GoTrue round trip and the two access-context queries.
+  //
+  // This await is deliberately in the layout body and must stay there, even
+  // though it costs the instant navigation a loading.tsx would otherwise buy.
+  // notFound() terminates the segment it is thrown in: once a Suspense shell
+  // has started streaming, the 200 is already on the wire and an unauthorised
+  // caller gets a 404 body under a 200 status. The e2e access-control suite
+  // asserts the status, and is right to — that is the part a client or a
+  // crawler acts on. Reachability is not a thing to trade for a skeleton.
   const tenant = await getAdminTenant(tenantSlug)
 
   if (!tenant) notFound()
-
-  // ACCT-01 is backed by an `officials` row, which an admin who reaches this
-  // tenant by role alone does not have — see hasAccountScreen.
-  const showAccount = await hasAccountScreen(tenantSlug)
 
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette ?? 'blue'} />
       <div className="app-surface flex min-h-screen">
-        <SidebarNav
-          tenantSlug={tenantSlug}
-          adminLabel={t('navigation.adminLabel')}
-          showAccount={showAccount}
-        />
+        {/* Suspended because it is chrome, not a gate: no fallback, since a
+            grey unclickable rail reads worse than the real one arriving a
+            moment later. */}
+        <Suspense>
+          <SidebarChrome tenantSlug={tenantSlug} adminLabel={t('navigation.adminLabel')} />
+        </Suspense>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </>

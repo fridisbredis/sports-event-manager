@@ -4,6 +4,14 @@ import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import { buildTimeline, ScheduleView, type AssignmentRow } from './schedule-view'
 import { I18nProvider } from '@/components/i18n-provider'
 
+// The day tabs navigate through the router rather than a bare link, so the
+// component needs one mounted. Captured so the navigation assertions below can
+// read what was pushed.
+const push = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+}))
+
 const STRINGS = {
   title: 'My schedule',
   scheduleOwner: 'Set by organisers',
@@ -399,7 +407,10 @@ describe('ScheduleView view toggle', () => {
 // view formats times without dates on purpose. A single-day schedule used to
 // render no day row at all, which left those spans dateless.
 describe('ScheduleView day label', () => {
-  beforeEach(() => localStorage.clear())
+  beforeEach(() => {
+    localStorage.clear()
+    push.mockClear()
+  })
 
   const ONE_DAY = () => [
     slot('a', '2026-08-12T10:00:00.000Z', '2026-08-12T11:00:00.000Z', SOCIAL_MEDIA),
@@ -471,6 +482,40 @@ describe('ScheduleView day label', () => {
     // time-off link is a link too, and counting it here would make this test
     // break on an unrelated addition rather than on a day-tab regression.
     expect(within(dayNav).getAllByRole('link')).toHaveLength(2)
+  })
+
+  // Switching day is a server round trip. These cover the feedback that round
+  // trip needs, not the fetch itself.
+  it('navigates through the router rather than a full page load', () => {
+    renderDays('work-area', ['2026-08-12', '2026-08-13'], '2026-08-12')
+
+    fireEvent.click(screen.getByRole('link', { name: 'tors 13 aug.' }))
+
+    expect(push).toHaveBeenCalledWith('/testklubben/schedule?day=2026-08-13', { scroll: false })
+  })
+
+  it('leaves modified clicks to the browser so a tab can be opened', () => {
+    renderDays('work-area', ['2026-08-12', '2026-08-13'], '2026-08-12')
+
+    fireEvent.click(screen.getByRole('link', { name: 'tors 13 aug.' }), { metaKey: true })
+
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  // aria-current trails the optimistic highlight on purpose: announcing the
+  // new day while the old one is still rendered below would misreport what is
+  // on screen.
+  it('keeps aria-current on the day actually rendered', () => {
+    renderDays('work-area', ['2026-08-12', '2026-08-13'], '2026-08-12')
+
+    fireEvent.click(screen.getByRole('link', { name: 'tors 13 aug.' }))
+
+    expect(screen.getByRole('link', { name: 'ons 12 aug.' }).getAttribute('aria-current')).toBe(
+      'page'
+    )
+    expect(
+      screen.getByRole('link', { name: 'tors 13 aug.' }).getAttribute('aria-current')
+    ).toBeNull()
   })
 
   it('leaves the date to the tabs on the time view across several days', () => {
