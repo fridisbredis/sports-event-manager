@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
+import { countOfficialShifts } from '@/lib/scheduling/shift-count'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -46,10 +47,12 @@ export default async function AdminAccountPage({ params }: Props) {
   // which omit the link entirely (hasAccountScreen).
   if (!official) notFound()
 
-  const { count: assignmentCount } = await supabase
-    .from('assignments')
-    .select('id', { count: 'exact', head: true })
-    .eq('official_id', official.id)
+  // Shifts, not slots: one `assignments` row is one grid slot, and the head
+  // count this used to do reported hours. See `countOfficialShifts`.
+  const shiftCount = await countOfficialShifts(supabase, {
+    tenantId: tenant.id,
+    officialId: official.id,
+  })
 
   return (
     <div className="px-8 py-8">
@@ -60,7 +63,7 @@ export default async function AdminAccountPage({ params }: Props) {
         smsOptOut={official.sms_opt_out}
         tenantId={tenant.id}
         tenantSlug={tenantSlug}
-        assignmentCount={assignmentCount ?? 0}
+        shiftCount={shiftCount}
         i18nNamespace="admin"
         language={language}
         layout="desktop"

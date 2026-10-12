@@ -194,3 +194,38 @@ export function daysSpanned(startsAt: string, endsAt: string): string[] {
 
   return days
 }
+
+/**
+ * How many shifts a set of slots adds up to.
+ *
+ * ACCT-01 used to report `assignments`'s row count, but one row is one grid
+ * slot, so an official working 11:00–14:00 at a 1h granularity was told they
+ * had "3 assignments" while MYSCH-01 — which collapses runs into cards —
+ * showed one. This counts what that screen shows, so the two agree.
+ *
+ * A shift is a run of back-to-back slots at the same work area, and runs are
+ * counted per day: `groupIntoWorkAreaRuns` already breaks on a gap and on a
+ * change of work area, and the per-day split keeps a slot ending at midnight
+ * and one starting there from merging across the day boundary the way
+ * MYSCH-01's day grouping does.
+ *
+ * Input must be ascending by `timeslot_start`; callers' queries `.order` it.
+ */
+export function countShifts<T extends { timeslot_start: string; timeslot_end: string }>(
+  slots: T[],
+  workAreaIdOf: (slot: T) => string | null
+): number {
+  const byDay = new Map<string, T[]>()
+  for (const slot of slots) {
+    const key = dayKey(slot.timeslot_start)
+    const day = byDay.get(key)
+    if (day) day.push(slot)
+    else byDay.set(key, [slot])
+  }
+
+  let total = 0
+  for (const day of byDay.values()) {
+    total += groupIntoWorkAreaRuns(day, workAreaIdOf).length
+  }
+  return total
+}

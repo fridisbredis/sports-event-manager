@@ -7,6 +7,7 @@ import {
   mergeContiguousSlots,
   groupIntoWorkAreaRuns,
   daysSpanned,
+  countShifts,
 } from './day-window'
 
 describe('dayKey', () => {
@@ -317,5 +318,58 @@ describe('daysSpanned', () => {
   it('matches across the timestamp shapes PostgREST can return', () => {
     const offsetShape = `${day(1)}T00:00:00+00:00`
     expect(daysSpanned(offsetShape, `${day(2)}T00:00:00.000Z`)).toEqual([day(1)])
+  })
+})
+
+describe('countShifts', () => {
+  // Derived, never literal: the seed is relative to today.
+  const BASE = new Date()
+  BASE.setUTCHours(0, 0, 0, 0)
+  const day = (offset: number) =>
+    new Date(BASE.getTime() + offset * 86_400_000).toISOString().slice(0, 10)
+  const slot = (offset: number, hour: number, ws: string | null) => ({
+    timeslot_start: `${day(offset)}T${String(hour).padStart(2, '0')}:00:00.000Z`,
+    timeslot_end: `${day(offset)}T${String(hour + 1).padStart(2, '0')}:00:00.000Z`,
+    workstation_id: ws,
+  })
+  const count = (slots: ReturnType<typeof slot>[]) => countShifts(slots, (s) => s.workstation_id)
+
+  it('counts nothing for no slots', () => {
+    expect(count([])).toBe(0)
+  })
+
+  it('counts back-to-back slots at one work area as one shift', () => {
+    // The ACCT-01 bug this exists for: three hourly rows are one 11:00-14:00
+    // shift, and the old head count called it "3 assignments".
+    expect(count([slot(0, 11, 'ws-1'), slot(0, 12, 'ws-1'), slot(0, 13, 'ws-1')])).toBe(1)
+  })
+
+  it('counts a gap at the same work area as two shifts', () => {
+    // Morning and afternoon at one station is two trips to it, and MYSCH-01
+    // draws two cards.
+    expect(count([slot(0, 9, 'ws-1'), slot(0, 14, 'ws-1')])).toBe(2)
+  })
+
+  it('counts touching slots at different work areas as two shifts', () => {
+    // No gap, but a change of place — merging on time alone would claim the
+    // official was in two places at once.
+    expect(count([slot(0, 9, 'ws-1'), slot(0, 10, 'ws-2')])).toBe(2)
+  })
+
+  it('never merges across a day boundary', () => {
+    // 23:00-00:00 and 00:00-01:00 touch as instants, but they are two days
+    // and MYSCH-01 groups by day before it groups into runs.
+    const lateNight = {
+      timeslot_start: `${day(0)}T23:00:00.000Z`,
+      timeslot_end: `${day(1)}T00:00:00.000Z`,
+      workstation_id: 'ws-1',
+    }
+    expect(count([lateNight, slot(1, 0, 'ws-1')])).toBe(2)
+  })
+
+  it('sums runs across several days', () => {
+    expect(
+      count([slot(0, 9, 'ws-1'), slot(0, 10, 'ws-1'), slot(2, 9, 'ws-1'), slot(2, 15, 'ws-2')])
+    ).toBe(3)
   })
 })

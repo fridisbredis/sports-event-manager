@@ -87,7 +87,7 @@ const baseProps = {
   smsOptOut: false,
   tenantId: 't1',
   tenantSlug: 'seed-klubben',
-  assignmentCount: 3,
+  shiftCount: 3,
   i18nNamespace: 'official' as const,
   language: 'en' as const,
 }
@@ -147,9 +147,9 @@ describe('AccountForm layout split', () => {
   it('keeps the schedule row on the admin layout even with no assignments', () => {
     // It is the admin's only way into their own schedule, so it must not
     // disappear precisely when they want to check that they have no shifts.
-    render(<AccountForm {...baseProps} assignmentCount={0} layout="desktop" />)
+    render(<AccountForm {...baseProps} shiftCount={0} layout="desktop" />)
     expect(screen.queryByText('account.scheduleHeading')).toBeTruthy()
-    expect(screen.getByText('account.assignmentCount:{"count":0}')).toBeTruthy()
+    expect(screen.getByText('account.shiftCount:{"count":0}')).toBeTruthy()
   })
 
   it('shows the schedule row only on the admin (desktop) layout', () => {

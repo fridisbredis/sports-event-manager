@@ -213,7 +213,7 @@ test.describe('ACCT-01 official account', () => {
   })
 
   // The schedule section is NOT here. Both halves of this pair used to live in
-  // this file, asserting it appears when assignmentCount > 0 and not when it is
+  // this file, asserting it appears when the shift count was > 0 and not when it is
   // 0 — but account-form.tsx gates the section on `isDesktop` (the layout prop,
   // which only the admin screen passes) and says so: an official already has
   // My schedule in the bottom tab bar, so a second door to the same room is
@@ -227,6 +227,6 @@ test.describe('ACCT-01 official account', () => {
     officialConfirmedPage: page,
   }) => {
     await page.goto(`${base}/account`)
-    await expect(page.getByRole('link', { name: /assignment/ })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /shift/ })).toHaveCount(0)
   })
 })

@@ -241,6 +241,6 @@ test.describe('ACCT-01 admin account', () => {
   }) => {
     await page.goto(`${base}/account`)
 
-    await expect(page.getByRole('link', { name: /assignment/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /shift/ })).toBeVisible()
   })
 })
