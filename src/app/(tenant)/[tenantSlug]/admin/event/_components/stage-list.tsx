@@ -7,7 +7,7 @@ import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from '@gravity-ui/icons'
-import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
 import { useLanguage } from '@/components/i18n-provider'
 
 interface Props {
@@ -57,48 +57,6 @@ function sortStagesByStartTime(stages: StageInput[]): StageInput[] {
       return a.start_time.localeCompare(b.start_time)
     })
     .map((s, i) => ({ ...s, position: i }))
-}
-
-function formatTime(iso: string): string {
-  // datetime-local strings are 'YYYY-MM-DDTHH:mm' — no timezone suffix.
-  // Slicing avoids Date constructor interpreting them as local time.
-  return iso.slice(11, 16)
-}
-
-function weekdayFromDateString(dateStr: string, language?: string): string {
-  // Append T00:00Z so the Date is parsed as UTC midnight, giving the correct weekday.
-  // The weekday alone cannot be ordered by eye — two stages weeks apart can both
-  // read 'Thu', making a correctly sorted list look shuffled. Day and month
-  // disambiguate them; the year is omitted because it is already shown once in
-  // the event's date range, and repeating it per row crowds the name out.
-  return new Date(dateStr + 'T00:00Z').toLocaleDateString(dateLocaleFor(language), {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-}
-
-/**
- * Splits the range into its two endpoints so each can be kept unbreakable.
- * Returned as parts rather than one string because a plain string wraps
- * wherever it runs out of room — typically mid-date ('Thu 3 / Sept 10:00'),
- * which reads as a different date. Returns null when there is nothing to show.
- */
-function stageTimeRangeParts(
-  start: string | null,
-  end: string | null,
-  language?: string
-): { from: string; to: string | null } | null {
-  if (!start) return null
-  const startDate = start.slice(0, 10)
-  const startTime = start.slice(11, 16)
-  const from = `${weekdayFromDateString(startDate, language)} ${startTime}`
-  if (!end) return { from, to: null }
-  const endDate = end.slice(0, 10)
-  const endTime = end.slice(11, 16)
-  if (startDate === endDate) return { from, to: endTime }
-  return { from, to: `${weekdayFromDateString(endDate, language)} ${endTime}` }
 }
 
 export default function StageList({ stages, onChange }: Props) {
@@ -310,7 +268,7 @@ export default function StageList({ stages, onChange }: Props) {
                           </p>
                           <p className="text-[14px] text-ink-soft">
                             {stage.start_time
-                              ? `${formatTime(stage.start_time)}${stage.end_time ? ` / ${formatTime(stage.end_time)}` : ''}`
+                              ? `${formatStageTime(stage.start_time, language)}${stage.end_time ? ` / ${formatStageTime(stage.end_time, language)}` : ''}`
                               : '–'}
                           </p>
                         </div>

@@ -211,6 +211,40 @@ describe('EventInfoPage', () => {
     expect(card).toHaveTextContent('Seed Stadium')
   })
 
+  // The Viadal race runs 2 Aug 12:00 through 8 Aug 12:00. Formatting only the
+  // start's day and then both clock times rendered that as
+  // "Sun, 2 Aug · 12:00 – 12:00", which reads as a zero-length stage.
+  it('shows both dates for a stage that spans several days', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Race',
+            stage_type: 'race',
+            stage_date: null,
+            start_time: '2026-08-02T12:00:00+00:00',
+            end_time: '2026-08-08T12:00:00+00:00',
+            venue: null,
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    const card = screen.getByText('Race').closest('div')?.parentElement as HTMLElement
+    expect(card).toHaveTextContent('Sun, 2 Aug 12:00 – Sat, 8 Aug 12:00')
+    // The start day is carried by the range itself, not repeated beside it.
+    expect(card?.textContent?.match(/2 Aug/g)).toHaveLength(1)
+  })
+
   it('throws when the RPC returns an error', async () => {
     mockResolvedTenant()
     mockUser('user-1')
