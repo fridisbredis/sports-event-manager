@@ -15,6 +15,7 @@ import {
 } from '../actions'
 import { publishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
+import { useLanguage } from '@/components/i18n-provider'
 import { resizeImage } from '@/lib/image/resize-image'
 import { toastError } from '@/lib/toast'
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
@@ -65,6 +66,7 @@ export default function EventConfigForm({
   isPublished,
 }: Props) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   // Leaving with an unsaved palette has to put the theme back. Picking a colour
   // writes the CSS variables straight onto :root for an immediate preview, and
   // unlike every other field here that lives in component state, those survive
@@ -413,7 +415,7 @@ export default function EventConfigForm({
             />
 
             <DatesAndGranularitySection
-              dateRangeLabel={derivedDateRange(stages)}
+              dateRangeLabel={derivedDateRange(stages, language)}
               granularity={granularity}
             />
 
