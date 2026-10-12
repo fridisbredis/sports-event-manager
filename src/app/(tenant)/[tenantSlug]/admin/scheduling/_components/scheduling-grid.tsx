@@ -24,7 +24,8 @@ import { SchedulingPrintStyles, SchedulingPrintHeader } from './scheduling-print
 import { SchedulingToolbar } from './scheduling-toolbar'
 import { ConflictBanners } from './conflict-banners'
 import { PersonDragPicker } from './person-drag-picker'
-import { TimeOffPopup, type TimeOffCell } from './time-off-popup'
+import { TimeOffPopup } from './time-off-popup'
+import { useTimeOffPopup } from './use-time-off-popup'
 import { setUnavailability, clearUnavailability } from '../unavailability-actions'
 import { toastError } from '@/lib/toast'
 import {
@@ -440,35 +441,12 @@ export function SchedulingGrid({
 
   // ─── Time-off cell popup ──────────────────────────────────────────────────
 
-  const [timeOffCell, setTimeOffCell] = useState<TimeOffCell | null>(null)
+  const {
+    cell: timeOffCell,
+    open: handleTimeOffClick,
+    close: closeTimeOffPopup,
+  } = useTimeOffPopup()
   const [removingPeriodId, setRemovingPeriodId] = useState<string | null>(null)
-
-  // Local to this component rather than in the interaction hook: the hook owns
-  // the modes that interact with each other (the three pickers close one
-  // another), and this one is independent of all of them.
-  useEffect(() => {
-    if (!timeOffCell) return
-    function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('[data-time-off-popup]')) setTimeOffCell(null)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [timeOffCell])
-
-  function handleTimeOffClick(
-    officialName: string,
-    periods: UnavailabilityPeriod[],
-    anchor: HTMLElement
-  ) {
-    if (periods.length === 0) return
-    const rect = anchor.getBoundingClientRect()
-    setTimeOffCell({
-      officialName,
-      periods,
-      anchorTop: rect.bottom,
-      anchorLeft: rect.left,
-    })
-  }
 
   async function handleTimeOffRemove(periodId: string) {
     setRemovingPeriodId(periodId)
@@ -479,11 +457,11 @@ export function SchedulingGrid({
       toastError(result.error.startsWith('scheduling.') ? t(result.error) : result.error)
       // A refused delete leaves the period in place, so the popup would be
       // lying if it stayed open showing a row that is still there.
-      if (result.notOwned) setTimeOffCell(null)
+      if (result.notOwned) closeTimeOffPopup()
       return
     }
 
-    setTimeOffCell(null)
+    closeTimeOffPopup()
     router.refresh()
   }
 
