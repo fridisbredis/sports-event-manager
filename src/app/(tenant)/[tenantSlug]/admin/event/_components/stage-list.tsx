@@ -326,7 +326,7 @@ export default function StageList({ stages, onChange }: Props) {
 
       {/* Inline Race stage validation */}
       {raceStageCount === 0 && (
-        <p className="flex items-start gap-1.5 text-xs text-gray-500 mt-2">
+        <p className="flex items-start gap-1.5 text-xs text-gray-500 mt-2 px-4 pb-4">
           <span className="shrink-0 mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-gray-400 text-[10px] font-bold leading-none">
             i
           </span>
