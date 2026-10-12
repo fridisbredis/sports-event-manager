@@ -11,7 +11,7 @@ import { StageCard } from './_components/stage-card'
 import { FacilityChips } from './_components/facility-chips'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
-import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { formatStageDate, stageTimeRangeParts } from '@/lib/i18n/stage-range'
 
 interface EventInfoCached {
   event: {
@@ -38,41 +38,27 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
-// Dates and times render in UTC on purpose. Stage timestamps are stored as
-// wall-clock UTC, so reading them back in the viewer's zone would shift an
-// 08:00 briefing for anyone travelling to the event from another country.
-function formatDate(ts: string | null, language: string): string {
-  if (!ts) return ''
-  return new Date(ts).toLocaleDateString(dateLocaleFor(language), {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-}
-
 // A stage carries either a full start timestamp or just a date (stage_date,
-// set when the admin has pinned the day but not yet the hour). The dates
-// section should show the day in both cases, so fall back rather than
-// leaving the row blank.
-function stageDate(
-  stage: { start_time: string | null; stage_date: string | null },
+// set when the admin has pinned the day but not yet the hour). The card
+// should show the day in both cases, so fall back rather than leaving the
+// row blank.
+//
+// Formatting itself lives in @/lib/i18n/stage-range, shared with the admin
+// stage list (EVT-02): both screens describe the same stage, and when they
+// formatted it separately this screen lost the end date and rendered a
+// six-day stage as "Sun, 2 Aug · 12:00 – 12:00".
+function stageDetails(
+  stage: { start_time: string | null; stage_date: string | null; end_time: string | null },
   language: string
-): string {
-  if (stage.start_time) return formatDate(stage.start_time, language)
+): string[] {
+  const range = stageTimeRangeParts(stage.start_time, stage.end_time, language)
+  // The start's date is already inside `from`, so the range carries the day
+  // itself and no separate date detail is added beside it.
+  if (range) return [range.to ? `${range.from} – ${range.to}` : range.from]
   // stage_date is a bare 'YYYY-MM-DD'; append UTC midnight so it is not
   // parsed as local time and pulled back a day west of Greenwich.
-  if (stage.stage_date) return formatDate(stage.stage_date + 'T00:00:00Z', language)
-  return ''
-}
-
-function formatTime(ts: string | null, language: string): string {
-  if (!ts) return ''
-  return new Date(ts).toLocaleTimeString(dateLocaleFor(language), {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  })
+  if (stage.stage_date) return [formatStageDate(stage.stage_date + 'T00:00:00Z', language)]
+  return []
 }
 
 export default async function EventInfoPage({ params }: Props) {
@@ -151,18 +137,12 @@ export default async function EventInfoPage({ params }: Props) {
               // without new columns and matching EVT-02 fields — tracked
               // separately. Until then the card shows the day and the range
               // that do exist, rather than inventing labels for them.
-              const timeRange = [
-                formatTime(stage.start_time, language),
-                formatTime(stage.end_time, language),
-              ]
-                .filter(Boolean)
-                .join(' – ')
               return (
                 <StageCard
                   key={stage.id}
                   stageNumber={stage.position + 1}
                   name={stage.name}
-                  details={[stageDate(stage, language), timeRange].filter(Boolean)}
+                  details={stageDetails(stage, language)}
                   venue={stage.venue}
                 />
               )
