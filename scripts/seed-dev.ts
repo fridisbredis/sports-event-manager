@@ -123,6 +123,88 @@ async function createConfirmedOfficial(tenantId: string, name: string, phone: st
   return data
 }
 
+// A bulk roster, purely to give SCHED-01 more rows than fit on screen.
+//
+// The five officials above are each shaped for one behaviour the app branches
+// on. These are not: they exist so the by-person grid overflows its
+// `max-h-[70vh]` container and actually scrolls, which is what makes
+// scroll-dependent behaviour (a popup tracking its cell) reproducible by hand.
+// Twenty-five is comfortably past a full screen without making the grid
+// unreadable to look at.
+//
+// No auth user and no user_roles row: a null user_id is allowed (0001), and
+// these are never logged in as, so creating twenty-five auth users — each
+// needing its own [auth.sms.test_otp] entry in config.toml to be reachable at
+// all — would be twenty-five users of pure cost. They are 'confirmed' because
+// only confirmed officials are schedulable, and an unschedulable row would not
+// render the cells this exists to produce.
+//
+// Phone numbers continue the reserved seed block (+4670990xxxx) past the five
+// fixed numbers above. They must be unique per tenant: 0020's partial unique
+// index covers (tenant_id, phone) for every row that is not 'removed'.
+const BULK_ROSTER_SIZE = 25
+
+async function seedRosterBulk(tenantId: string) {
+  const rows = Array.from({ length: BULK_ROSTER_SIZE }, (_, i) => {
+    const n = i + 1
+    return {
+      tenant_id: tenantId,
+      user_id: null,
+      // Padded so the roster sorts the way it reads: without it 'Bulk 10'
+      // lands between 'Bulk 1' and 'Bulk 2' in any name ordering.
+      name: `Seed Bulk Official ${String(n).padStart(2, '0')}`,
+      phone: storedPhone(`+4670991${String(n).padStart(4, '0')}`),
+      invite_status: 'confirmed',
+    }
+  })
+
+  const { data: inserted, error } = await admin.from('officials').insert(rows).select('id, name')
+  if (error) throw error
+  console.log(`  officials (bulk, roster filler, not loggable-in): ${inserted.length}`)
+
+  // Time off on every third row, so the hatched blocks the popup opens from
+  // are spread down the grid rather than clustered at the top — the rows far
+  // enough down to require scrolling are the whole point.
+  //
+  // Alternating created_by_role covers both hatch colours and both popup
+  // footers: 'tenant_admin' periods offer removal, 'official' ones explain why
+  // they cannot be removed. created_by stays null — the column is nullable by
+  // design (it survives the actor being deleted) and no auth user here owns
+  // these.
+  const periods = inserted
+    .filter((_, i) => i % 3 === 0)
+    .map((official, i) => {
+      // Spread across the three seeded days, and deliberately not all
+      // whole-day: formatSpan renders a midnight-to-midnight period as a date
+      // range and anything else as times, so both branches get exercised.
+      const day = SEED_DAYS[i % SEED_DAYS.length]
+      const wholeDay = i % 2 === 0
+      // A whole-day period stores an exclusive end at the *next* midnight, so
+      // the end is derived from the day itself rather than picked out of
+      // SEED_DAYS — on the last seeded day there is no next entry to pick, and
+      // clamping to the same day would produce ends_at = starts_at, which the
+      // period_valid check (ends_at > starts_at) rejects.
+      const nextMidnight = () => {
+        const d = new Date(`${day}T00:00:00Z`)
+        d.setUTCDate(d.getUTCDate() + 1)
+        return `${d.toISOString().slice(0, 10)}T00:00:00Z`
+      }
+      return {
+        tenant_id: tenantId,
+        official_id: official.id,
+        starts_at: wholeDay ? at(day, '00:00') : at(day, '09:00'),
+        ends_at: wholeDay ? nextMidnight() : at(day, '13:00'),
+        reason: wholeDay ? 'Away (seed)' : 'Working (seed)',
+        created_by_role: i % 2 === 0 ? 'tenant_admin' : 'official',
+        created_by: null,
+      }
+    })
+
+  const { error: periodError } = await admin.from('official_unavailability').insert(periods)
+  if (periodError) throw periodError
+  console.log(`  time-off periods (bulk, for the SCHED-01 hatched cells): ${periods.length}`)
+}
+
 async function main() {
   console.log(`Seeding ${SUPABASE_URL} ...`)
 
@@ -447,6 +529,8 @@ async function main() {
 
   await createConfirmedOfficial(tenant.id, 'Seed Official No Shifts', SEED_PHONES.officialNoShifts)
   console.log(`  official (confirmed, no shifts at all): ${SEED_PHONES.officialNoShifts}`)
+
+  await seedRosterBulk(tenant.id)
 
   const { error: participantError } = await admin.from('participants').insert({
     tenant_id: tenant.id,
