@@ -56,7 +56,8 @@
     "withYouOnShift": "With you on this shift",
     "timeOffSetByOrganisers": "Time off set by organisers",
     "timeOffClash": "You said you were away at this time",
-    "timeOffClashAdmin": "The organisers marked you away at this time"
+    "timeOffClashAdmin": "The organisers marked you away at this time",
+    "loadingDay": "Loading schedule"
   },
   "announcements": {
     "title": "Announcements",

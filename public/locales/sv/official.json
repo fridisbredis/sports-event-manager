@@ -56,7 +56,8 @@
     "withYouOnShift": "Med dig på det här passet",
     "timeOffSetByOrganisers": "Frånvaro satt av arrangörerna",
     "timeOffClash": "Du har angett att du är ledig den här tiden",
-    "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden"
+    "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden",
+    "loadingDay": "Hämtar schema"
   },
   "announcements": {
     "title": "Meddelanden",

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { CalendarCheck, CalendarOff, CalendarX, ChevronDown, TriangleAlert } from 'lucide-react'
+import { ScheduleSkeleton } from './schedule-skeleton'
 import { AppCard } from '@/components/ui/app-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useRouter } from 'next/navigation'
@@ -78,6 +79,7 @@ interface Strings {
   withYouOnShift: string
   timeOffClash: string
   timeOffClashAdmin: string
+  loadingDay: string
 }
 // Order matters: it is both the visual order of the two halves and the order
 // the arrow keys step through. `label` keys into Strings so the labels stay
@@ -162,29 +164,23 @@ function groupByDay(assignments: AssignmentRow[], language?: string) {
 function DaySelector({
   days,
   selectedDay,
+  shownDay,
   tenantSlug,
   label,
+  onSelect,
 }: {
   days: string[]
   selectedDay: string | null
+  // The day the tabs paint as chosen, which runs ahead of `selectedDay` while
+  // a day is being fetched. Owned by ScheduleView, because the content below
+  // the tabs has to agree with them about which day is on its way in.
+  shownDay: string | null
   tenantSlug: string
   label: string
+  onSelect: (day: string) => void
 }) {
   // Above the early returns below — hooks cannot be called conditionally.
   const language = useLanguage()
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
-
-  // Fetching a day is a server round trip on a phone on event day, and a plain
-  // link left the old tab lit for the whole of it — the tap read as if nothing
-  // had happened, and people tapped again. This moves the highlight on the tap
-  // and lets the fetched content catch up under it.
-  //
-  // useOptimistic rather than useState: it reverts to `selectedDay` on its own
-  // when the transition settles, so a navigation that lands somewhere else
-  // than asked — a day resolved away, the back button — cannot leave the tabs
-  // lit on a day the page is not showing.
-  const [optimisticDay, setOptimisticDay] = useOptimistic(selectedDay)
 
   // Zero days renders the empty state instead, so there is nothing to label.
   if (days.length === 0) return null
@@ -206,7 +202,7 @@ function DaySelector({
     <nav aria-label={label} className="-mx-5 px-5 pb-1 mb-6 overflow-x-auto scrollbar-none">
       <div className="flex gap-2 w-max">
         {days.map((day) => {
-          const isSelected = day === optimisticDay
+          const isSelected = day === shownDay
           return (
             <Link
               key={day}
@@ -222,19 +218,13 @@ function DaySelector({
                 // the browser untouched.
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
                 e.preventDefault()
-                startTransition(() => {
-                  // Inside the transition, not before it: an optimistic update
-                  // outside one throws, and this is what scopes the revert to
-                  // the navigation below.
-                  setOptimisticDay(day)
-                  router.push(`/${tenantSlug}/schedule?day=${day}`, { scroll: false })
-                })
+                onSelect(day)
               }}
               className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-              } ${isPending && day !== selectedDay ? 'opacity-70' : ''}`}
+              } ${day === shownDay && day !== selectedDay ? 'opacity-70' : ''}`}
             >
               {formatDayTab(day, language)}
             </Link>
@@ -863,6 +853,29 @@ export function ScheduleView({
   const [view, setView] = useState<View>('time')
   const [timeOffOpen, setTimeOffOpen] = useState(false)
   const timeOffPanelRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  // Fetching a day is a server round trip on a phone on event day, and a plain
+  // link left the whole screen untouched for the duration — the tap read as if
+  // nothing had happened, and people tapped again. `shownDay` moves the tab
+  // highlight on the tap and the skeleton below stands in for the shifts until
+  // the real ones arrive.
+  //
+  // useOptimistic rather than useState: it reverts to `selectedDay` on its own
+  // when the transition settles, so a navigation that lands somewhere else
+  // than asked — a day resolved away, the back button — cannot leave the tabs
+  // lit on a day the page is not showing.
+  const [shownDay, setShownDay] = useOptimistic(selectedDay)
+
+  function handleDaySelect(day: string) {
+    startTransition(() => {
+      // Inside the transition, not before it: an optimistic update outside one
+      // throws, and this is what scopes the revert to the navigation below.
+      setShownDay(day)
+      router.push(`/${tenantSlug}/schedule?day=${day}`, { scroll: false })
+    })
+  }
 
   // Move focus into the panel when it opens, and scroll it into view.
   //
@@ -991,8 +1004,10 @@ export function ScheduleView({
       <DaySelector
         days={days}
         selectedDay={selectedDay}
+        shownDay={shownDay}
         tenantSlug={tenantSlug}
         label={strings.dayTabsLabel}
+        onSelect={handleDaySelect}
       />
 
       {/* Above the content, and outside every branch below: a day with time
@@ -1008,8 +1023,21 @@ export function ScheduleView({
         <TimeOffStrip timeOff={timeOff} day={selectedDay} strings={strings} />
       ) : null}
 
-      {/* Content */}
-      {hasNoAssignmentsAtAll ? (
+      {/* Content. The skeleton wins over every branch below while a day is in
+          flight: those branches describe the day being navigated away from,
+          and showing "nothing on this day" over the old day's data for the
+          length of a round trip would be answering about the wrong day.
+
+          This is not the same skeleton the route's loading.tsx renders, even
+          though it draws the same rows. loading.tsx covers the gap before the
+          server responds, replacing the whole page including this component.
+          This branch covers the gap this component can still see afterwards —
+          a transition React has started but not committed — and it keeps the
+          tabs mounted and tappable while it waits, which the route-level
+          fallback cannot do because it has replaced them. */}
+      {isPending ? (
+        <ScheduleSkeleton label={strings.loadingDay} />
+      ) : hasNoAssignmentsAtAll ? (
         <EmptyState
           Icon={CalendarCheck}
           title={strings.noAssignments}
