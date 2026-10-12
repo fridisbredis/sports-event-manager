@@ -6,6 +6,7 @@ import { EmptyStateCard } from '@/components/ui/empty-state'
 import { isWithinWindow, formatSlotLabel, initials } from '@/lib/scheduling/grid-logic'
 import { AvatarImage } from '@/components/ui/avatar-image'
 import { useTranslation } from '@/lib/i18n/client'
+import { useLanguage } from '@/components/i18n-provider'
 import {
   WORK_AREA_COLORS,
   workAreaBorderColor,
@@ -75,6 +76,7 @@ export function ByPersonGrid({
   pendingCells,
 }: ByPersonGridProps) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const { scrollRef, isScrolled } = useHorizontalScrollShadow()
   const stickyEdgeHidden = isScrolled ? '' : STICKY_COL_SHADOW_HIDDEN
 
@@ -154,7 +156,7 @@ export function ByPersonGrid({
                   key={slot.toISOString()}
                   className="sticky top-0 z-20 w-20 border-b border-edge-soft bg-white px-1 py-3 text-center text-[13px] font-semibold text-ink"
                 >
-                  {formatSlotLabel(slot)}
+                  {formatSlotLabel(slot, language)}
                 </th>
               ))}
             </tr>
