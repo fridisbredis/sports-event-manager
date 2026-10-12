@@ -10,62 +10,59 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
-// The parts of the layout that need the user resolved: the tenant's theme
-// colours, the admin link, and which tabs the bottom bar shows.
+// The cross-surface link, which the gate below does not need.
 //
-// Split out of the layout body and suspended, because loading.tsx sits BELOW
-// layout.tsx in the component hierarchy and therefore cannot show a fallback
-// for runtime data the layout itself awaits. With the auth reads inline, a
-// tab change blocked here before any skeleton could render and before the URL
-// changed — the screen simply froze for the length of the round trip, which
-// is what the skeletons were added to fix and did not.
-//
-// This is defense in depth, not the only gate: every page below runs the same
-// resolution and answers redirect/notFound itself, so suspending this does
-// not widen what an unauthorised caller can reach. It only stops the chrome
-// from holding the whole navigation hostage.
-export async function OfficialChrome({ tenantSlug }: { tenantSlug: string }) {
+// An admin who is also on the roster gets a way back to their own surface.
+// No route's reachability depends on this answer, so suspending it costs no
+// guarantee — unlike the access check itself, which stays in the layout body.
+export async function AdminLinkChrome({ tenantSlug }: { tenantSlug: string }) {
+  const showAdminLink = await hasAdminScreens(tenantSlug)
+
+  return showAdminLink ? <AdminViewLink tenantSlug={tenantSlug} /> : null
+}
+
+export default async function OfficialLayout({ children, params }: Props) {
+  const { tenantSlug } = await params
+
   const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  // Memoised per render pass (F-PERF-07), so the pages below share this one
-  // GoTrue round trip and access-context lookup rather than repeating them.
+  // This layout gates every screen beneath it. The pages also resolve the
+  // tenant through the same guarded helper, so the check runs on both — but
+  // it is memoised per render pass (F-PERF-07), so it costs one GoTrue round
+  // trip and one access-context lookup for the whole render, not two.
+  //
+  // This await is deliberately in the layout body and must stay there, even
+  // though it costs the instant navigation a loading.tsx would otherwise buy.
+  // notFound() terminates the segment it is thrown in: once a Suspense shell
+  // has started streaming, the 200 is already on the wire and an unauthorised
+  // caller gets a 404 body under a 200 status. The e2e access-control suite
+  // asserts the status, and is right to — that is the part a client or a
+  // crawler acts on. Reachability is not a thing to trade for a skeleton.
   const tenant = await getOfficialTenant(tenantSlug)
 
   if (!tenant) notFound()
 
   // ACCT-01 is backed by an `officials` row. An admin who reaches this tenant
   // by role alone has none, and the account page below answers notFound() for
-  // them — so the tab would lead nowhere.
+  // them — so the tab would lead nowhere. Reuses the resolution above rather
+  // than asking again (F-PERF-07).
   const showAccount = tenant.officialId != null
-
-  // An admin reaching an official screen gets a way back to their own
-  // surface. Costs one admin-access check here and is memoised like the rest.
-  const showAdminLink = await hasAdminScreens(tenantSlug)
 
   return (
     <>
       <TenantThemeStyle colorPalette={tenant.color_palette} />
-      {showAdminLink && <AdminViewLink tenantSlug={tenantSlug} />}
-      <BottomTabBar tenantSlug={tenantSlug} showAccount={showAccount} />
+      <div className="flex flex-col min-h-screen bg-white">
+        {/* Suspended because it is chrome, not a gate: no fallback, since the
+            link appearing a moment late is better than a grey bar where it
+            will be. */}
+        <Suspense>
+          <AdminLinkChrome tenantSlug={tenantSlug} />
+        </Suspense>
+        <div className="flex-1 pb-16">{children}</div>
+        <BottomTabBar tenantSlug={tenantSlug} showAccount={showAccount} />
+      </div>
     </>
-  )
-}
-
-export default async function OfficialLayout({ children, params }: Props) {
-  const { tenantSlug } = await params
-
-  return (
-    <div className="flex flex-col min-h-screen bg-white">
-      {/* No fallback: the bar and the admin link are chrome, and a grey
-          placeholder bar that cannot be tapped is worse than the real one
-          arriving a moment later. On a tab change it is already on screen
-          and stays there — only the first load has nothing to show here. */}
-      <Suspense>
-        <OfficialChrome tenantSlug={tenantSlug} />
-      </Suspense>
-      <div className="flex-1 pb-16">{children}</div>
-    </div>
   )
 }

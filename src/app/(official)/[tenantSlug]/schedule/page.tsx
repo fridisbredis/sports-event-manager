@@ -446,7 +446,6 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     withYouOnShift: t('mySchedule.withYouOnShift'),
     timeOffClash: t('mySchedule.timeOffClash'),
     timeOffClashAdmin: t('mySchedule.timeOffClashAdmin'),
-    loadingDay: t('mySchedule.loadingDay'),
   }
 
   // Passed as raw templates, not interpolated here: this object crosses into

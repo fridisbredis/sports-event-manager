@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import OfficialLayout, { OfficialChrome } from './layout'
+import OfficialLayout, { AdminLinkChrome } from './layout'
 import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
@@ -66,46 +66,13 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-// The layout itself must stay non-blocking: loading.tsx sits below it in the
-// hierarchy, so anything the layout awaits happens before a skeleton can show
-// and before the URL changes. These assert the split that keeps it that way.
-describe('OfficialLayout shell', () => {
-  it('renders children without resolving the user', async () => {
-    mockUser('user-1', {
-      id: TENANT_ID,
-      slug: 'viadal',
-      color_palette: 'blue',
-      is_active: true,
-      officialId: 'off-1',
-    })
-
-    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
-
-    expect(JSON.stringify(result)).toContain('CHILD_CONTENT')
-    // The auth reads belong to the suspended chrome, not to the shell. If
-    // they creep back into the layout body, navigation blocks on them again
-    // and every skeleton in this route group stops showing.
-    expect(getCurrentUser).not.toHaveBeenCalled()
-    expect(getOfficialTenant).not.toHaveBeenCalled()
-  })
-
-  it('renders even when the caller is unauthenticated', async () => {
-    mockUser(null, null)
-
-    // No throw: the redirect belongs to the suspended chrome and to the pages
-    // below, each of which runs the same check itself.
-    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
-
-    expect(JSON.stringify(result)).toContain('CHILD_CONTENT')
-    expect(redirect).not.toHaveBeenCalled()
-  })
-})
-
-describe('OfficialChrome', () => {
+describe('OfficialLayout', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     mockUser(null, null)
 
-    await expect(OfficialChrome({ tenantSlug: 'viadal' })).rejects.toThrow('NEXT_REDIRECT')
+    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
+      'NEXT_REDIRECT'
+    )
     expect(redirect).toHaveBeenCalledWith('/login')
     expect(getOfficialTenant).not.toHaveBeenCalled()
   })
@@ -116,7 +83,9 @@ describe('OfficialChrome', () => {
   it('calls notFound when getOfficialTenant denies access or the tenant is missing', async () => {
     mockUser('user-1', null)
 
-    await expect(OfficialChrome({ tenantSlug: 'viadal' })).rejects.toThrow('NEXT_NOT_FOUND')
+    await expect(OfficialLayout({ children: null, params: PARAMS })).rejects.toThrow(
+      'NEXT_NOT_FOUND'
+    )
     expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
   })
 
@@ -129,13 +98,16 @@ describe('OfficialChrome', () => {
       officialId: 'off-1',
     })
 
-    const result = await OfficialChrome({ tenantSlug: 'viadal' })
+    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
     expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
 
     const tabBar = findByType(result, BottomTabBar)
     expect(tabBar).not.toBeNull()
     expect(tabBar!.props).toEqual({ tenantSlug: 'viadal', showAccount: true })
+
+    const flat = JSON.stringify(result)
+    expect(flat).toContain('CHILD_CONTENT')
   })
 
   // The access check allows an admin into official surfaces without a roster
@@ -151,7 +123,7 @@ describe('OfficialChrome', () => {
       officialId: null,
     })
 
-    const result = await OfficialChrome({ tenantSlug: 'viadal' })
+    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
     expect(findByType(result, BottomTabBar)!.props.showAccount).toBe(false)
   })
@@ -171,9 +143,15 @@ describe('OfficialChrome', () => {
       true
     )
 
-    const result = await OfficialChrome({ tenantSlug: 'viadal' })
+    const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
-    const link = findByType(result, AdminViewLink)
+    // AdminViewLink is rendered by the suspended AdminLinkChrome, which the
+    // gate above does not depend on — so the layout's tree holds the chrome
+    // element and the link is one await deeper.
+    const chrome = findByType(result, AdminLinkChrome)
+    expect(chrome).not.toBeNull()
+
+    const link = findByType(await AdminLinkChrome(chrome!.props as never), AdminViewLink)
     expect(link).not.toBeNull()
     expect(link!.props).toEqual({ tenantSlug: 'viadal' })
   })

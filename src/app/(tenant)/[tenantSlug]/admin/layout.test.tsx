@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import TenantLayout, { AdminChrome } from './layout'
+import TenantLayout, { SidebarChrome } from './layout'
 import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from './_components/sidebar-nav'
@@ -57,38 +57,11 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-// The layout itself must stay non-blocking: loading.tsx sits below it in the
-// hierarchy, so anything the layout awaits happens before a skeleton can show
-// and before the URL changes. These assert the split that keeps it that way.
-describe('TenantLayout shell', () => {
-  it('renders children without resolving the user', async () => {
-    const result = await TenantLayout({ children: 'CHILD_CONTENT', params: PARAMS })
-
-    expect(JSON.stringify(result)).toContain('CHILD_CONTENT')
-    // The auth reads belong to the suspended chrome, not to the shell. If
-    // they creep back into the layout body, navigation blocks on them again
-    // and every skeleton under /admin stops showing.
-    expect(getCurrentUser).not.toHaveBeenCalled()
-    expect(getAdminTenant).not.toHaveBeenCalled()
-  })
-
-  it('renders even when the caller is unauthenticated', async () => {
-    vi.mocked(getCurrentUser).mockResolvedValue(null)
-
-    // No throw: the redirect belongs to the suspended chrome and to the pages
-    // below, each of which runs the same check itself.
-    const result = await TenantLayout({ children: 'CHILD_CONTENT', params: PARAMS })
-
-    expect(JSON.stringify(result)).toContain('CHILD_CONTENT')
-    expect(redirect).not.toHaveBeenCalled()
-  })
-})
-
-describe('AdminChrome', () => {
+describe('TenantLayout', () => {
   it('redirects to /login when there is no authenticated user', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null)
 
-    await expect(AdminChrome({ tenantSlug: 'viadal' })).rejects.toThrow('NEXT_REDIRECT')
+    await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_REDIRECT')
     expect(redirect).toHaveBeenCalledWith('/login')
     // No point resolving a tenant for a caller we already know is anonymous.
     expect(getAdminTenant).not.toHaveBeenCalled()
@@ -102,7 +75,7 @@ describe('AdminChrome', () => {
     vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
     vi.mocked(getAdminTenant).mockResolvedValue(null)
 
-    await expect(AdminChrome({ tenantSlug: 'viadal' })).rejects.toThrow('NEXT_NOT_FOUND')
+    await expect(TenantLayout({ children: null, params: PARAMS })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
   })
 
@@ -116,13 +89,22 @@ describe('AdminChrome', () => {
       is_active: true,
     })
 
-    const result = await AdminChrome({ tenantSlug: 'viadal' })
+    const result = await TenantLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
 
-    const nav = findByType(result, SidebarNav)
+    // SidebarNav is rendered by the suspended SidebarChrome, which the gate
+    // above does not depend on — so the layout's own tree holds the chrome
+    // element, and the nav is one await deeper.
+    const chrome = findByType(result, SidebarChrome)
+    expect(chrome).not.toBeNull()
+
+    const nav = findByType(await SidebarChrome(chrome!.props as never), SidebarNav)
     expect(nav).not.toBeNull()
     expect(nav!.props.tenantSlug).toBe('viadal')
+
+    const flat = JSON.stringify(result)
+    expect(flat).toContain('CHILD_CONTENT')
   })
 
   // ACCT-01 is backed by an `officials` row, so the sidebar hides its link for
@@ -137,12 +119,14 @@ describe('AdminChrome', () => {
       is_active: true,
     })
 
+    const chromeProps = { tenantSlug: 'viadal', adminLabel: 'Admin' }
+
     vi.mocked(hasAccountScreen).mockResolvedValue(false)
-    let nav = findByType(await AdminChrome({ tenantSlug: 'viadal' }), SidebarNav)
+    let nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
     expect(nav!.props.showAccount).toBe(false)
 
     vi.mocked(hasAccountScreen).mockResolvedValue(true)
-    nav = findByType(await AdminChrome({ tenantSlug: 'viadal' }), SidebarNav)
+    nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
     expect(nav!.props.showAccount).toBe(true)
   })
 })

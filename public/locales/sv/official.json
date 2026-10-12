@@ -5,8 +5,7 @@
     "eventInfo": "Evenemangsinfo",
     "announcements": "Meddelanden",
     "account": "Konto",
-    "adminView": "Adminvy",
-    "loading": "Hämtar"
+    "adminView": "Adminvy"
   },
   "home": {
     "title": "Funktionärsstart",
@@ -57,8 +56,7 @@
     "withYouOnShift": "Med dig på det här passet",
     "timeOffSetByOrganisers": "Frånvaro satt av arrangörerna",
     "timeOffClash": "Du har angett att du är ledig den här tiden",
-    "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden",
-    "loadingDay": "Hämtar schema"
+    "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden"
   },
   "announcements": {
     "title": "Meddelanden",

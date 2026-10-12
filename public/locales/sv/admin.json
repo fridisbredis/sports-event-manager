@@ -9,8 +9,7 @@
     "communication": "Kommunikation",
     "account": "Konto",
     "officialView": "Funktionärsvy",
-    "logOut": "Logga ut",
-    "loading": "Hämtar"
+    "logOut": "Logga ut"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",

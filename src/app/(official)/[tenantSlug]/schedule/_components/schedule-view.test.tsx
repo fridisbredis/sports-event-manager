@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 import { buildTimeline, ScheduleView, type AssignmentRow } from './schedule-view'
-import { ScheduleSkeleton } from './schedule-skeleton'
 import { I18nProvider } from '@/components/i18n-provider'
 
 // The day tabs navigate through the router rather than a bare link, so the
@@ -32,7 +31,6 @@ const STRINGS = {
   withYouOnShift: 'With you on this shift',
   timeOffClash: 'You said you were away at this time',
   timeOffClashAdmin: 'The organisers marked you away at this time',
-  loadingDay: 'Loading schedule',
 }
 
 function slot(id: string, start: string, end: string, ws: AssignmentRow['workstations']) {
@@ -408,24 +406,6 @@ describe('ScheduleView view toggle', () => {
 // The day row is the only place the work-area view can learn its date: that
 // view formats times without dates on purpose. A single-day schedule used to
 // render no day row at all, which left those spans dateless.
-describe('ScheduleSkeleton', () => {
-  it('announces loading to a screen reader', () => {
-    render(<ScheduleSkeleton label="Hämtar schema" />)
-
-    expect(screen.getByRole('status')).toHaveTextContent('Hämtar schema')
-  })
-
-  // The placeholder rows are decoration. A screen reader hearing nine empty
-  // boxes instead of "loading" would be worse than hearing nothing at all.
-  it('hides the placeholder rows from the accessibility tree', () => {
-    const { container } = render(<ScheduleSkeleton label="Hämtar schema" />)
-
-    const rows = container.querySelector('[aria-hidden="true"]')
-    expect(rows).toBeTruthy()
-    expect(screen.getByRole('status').getAttribute('aria-hidden')).toBeNull()
-  })
-})
-
 describe('ScheduleView day label', () => {
   beforeEach(() => {
     localStorage.clear()
