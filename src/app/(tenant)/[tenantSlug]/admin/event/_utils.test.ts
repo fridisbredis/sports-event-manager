@@ -53,4 +53,18 @@ describe('derivedDateRange', () => {
     const stages = [nonRaceStage('2026-01-01T08:00'), raceStage('2026-08-10T08:00')]
     expect(derivedDateRange(stages)).toBe('10–10 aug. 2026')
   })
+
+  // The month name follows the user's language, not the regional default: an
+  // English reader saw '2–8 aug. 2026' because the form dropped the argument.
+  it('uses the English month name for an English reader', () => {
+    expect(derivedDateRange([raceStage('2026-08-02T08:00', '2026-08-08T08:00')], 'en')).toBe(
+      '2–8 Aug 2026'
+    )
+  })
+
+  it('uses the Swedish month name for a Swedish reader', () => {
+    expect(derivedDateRange([raceStage('2026-08-02T08:00', '2026-08-08T08:00')], 'sv')).toBe(
+      '2–8 aug. 2026'
+    )
+  })
 })

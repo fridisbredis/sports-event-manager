@@ -1,5 +1,6 @@
 import { formatDayLabel } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { useLanguage } from '@/components/i18n-provider'
 
 // Print rules live next to the print-only header they govern. `.no-print`
 // hides the interactive chrome, the scroll container is unclipped so long
@@ -33,12 +34,13 @@ export function SchedulingPrintHeader({
   selectedDay: string
 }) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   return (
     <div className="print-only mb-4">
       <h1 className="page-title">{t('scheduling.title')}</h1>
       <p className="text-sm text-gray-600">
         {stageName}
-        {selectedDay ? ` — ${formatDayLabel(selectedDay)}` : ''}
+        {selectedDay ? ` — ${formatDayLabel(selectedDay, language)}` : ''}
       </p>
     </div>
   )
