@@ -188,7 +188,8 @@ export function computeOverCapacityDetails(
   overCapacityCells: Set<string>,
   activeAssignments: AssignmentLike[],
   stageWorkstations: (WorkstationLike & WorkstationCapacity)[],
-  officials: OfficialLike[]
+  officials: OfficialLike[],
+  language?: string
 ): OverCapacityDetail[] {
   const details: OverCapacityDetail[] = []
   for (const key of overCapacityCells) {
@@ -203,7 +204,7 @@ export function computeOverCapacityDetails(
     )
     details.push({
       workAreaName: ws.name,
-      time: formatSlotDateTimeLabel(new Date(timeslotStart)),
+      time: formatSlotDateTimeLabel(new Date(timeslotStart), language),
       count: cellAssignments.length,
       ceiling: ws.capacity_ceiling,
       officialNames,
@@ -241,7 +242,8 @@ export function computeDoubleBookedDetails(
   doubleBookedOfficials: Set<string>,
   assignments: AssignmentLike[],
   officials: OfficialLike[],
-  workstations: WorkstationLike[]
+  workstations: WorkstationLike[],
+  language?: string
 ): DoubleBookedDetail[] {
   const details: DoubleBookedDetail[] = []
   for (const key of doubleBookedOfficials) {
@@ -256,7 +258,7 @@ export function computeDoubleBookedDetails(
       .filter((n, i, arr) => arr.indexOf(n) === i)
     details.push({
       officialName: official.name,
-      time: formatSlotDateTimeLabel(new Date(timeslotStart)),
+      time: formatSlotDateTimeLabel(new Date(timeslotStart), language),
       workAreaNames,
     })
   }

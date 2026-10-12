@@ -16,6 +16,7 @@ import {
   formatSlotLabel,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { useLanguage } from '@/components/i18n-provider'
 import { getAssignmentsForCell, buildPickerCandidates } from './grid-helpers'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SetupEmptyState } from './setup-empty-state'
@@ -84,6 +85,7 @@ export function SchedulingGrid({
   initialSelectedStageId,
 }: Props) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const router = useRouter()
   // The server already resolved the right stage (honoring a `?stage=` param
   // if one named a real stage of this event, falling back to
@@ -230,9 +232,9 @@ export function SchedulingGrid({
     const nameById = new Map(officials.map((o) => [o.id, o.name]))
     return unavailableConflicts.map((a) => ({
       officialName: nameById.get(a.official_id) ?? '—',
-      time: formatSlotLabel(new Date(a.timeslot_start)),
+      time: formatSlotLabel(new Date(a.timeslot_start), language),
     }))
-  }, [unavailableConflicts, officials])
+  }, [unavailableConflicts, officials, language])
 
   const overCapacityCount = useMemo(
     () => uniqueIdsFromCellKeys(overCapacityCells),
@@ -245,8 +247,15 @@ export function SchedulingGrid({
   )
 
   const doubleBookedDetails = useMemo(
-    () => computeDoubleBookedDetails(doubleBookedOfficials, assignments, officials, workstations),
-    [doubleBookedOfficials, assignments, officials, workstations]
+    () =>
+      computeDoubleBookedDetails(
+        doubleBookedOfficials,
+        assignments,
+        officials,
+        workstations,
+        language
+      ),
+    [doubleBookedOfficials, assignments, officials, workstations, language]
   )
 
   const overCapacityDetails = useMemo(
@@ -255,9 +264,10 @@ export function SchedulingGrid({
         overCapacityCells,
         activeAssignments,
         stageWorkstations,
-        officials
+        officials,
+        language
       ),
-    [overCapacityCells, activeAssignments, stageWorkstations, officials]
+    [overCapacityCells, activeAssignments, stageWorkstations, officials, language]
   )
 
   const handleWsExpandedSlotClick = useCallback(
@@ -692,10 +702,10 @@ export function SchedulingGrid({
           title={t('scheduling.slotModalTitle', {
             index: wsSlotModal.slotIndex,
             ws: wsSlotModal.wsName,
-            time: formatSlotLabel(new Date(wsSlotModal.slotStart)),
+            time: formatSlotLabel(new Date(wsSlotModal.slotStart), language),
           })}
           listLabel={t('scheduling.slotModalAvailable', {
-            time: formatSlotLabel(new Date(wsSlotModal.slotStart)),
+            time: formatSlotLabel(new Date(wsSlotModal.slotStart), language),
           })}
           candidates={pickerCandidates}
           search={wsSlotModalSearch}
@@ -720,9 +730,10 @@ export function SchedulingGrid({
           })}
           listLabel={t('scheduling.dragPaintRange', {
             ws: dragOfficialPicker.wsName,
-            from: formatSlotLabel(new Date(dragOfficialPicker.cellStarts[0]!)),
+            from: formatSlotLabel(new Date(dragOfficialPicker.cellStarts[0]!), language),
             to: formatSlotLabel(
-              new Date(dragOfficialPicker.cellStarts[dragOfficialPicker.cellStarts.length - 1]!)
+              new Date(dragOfficialPicker.cellStarts[dragOfficialPicker.cellStarts.length - 1]!),
+              language
             ),
           })}
           candidates={pickerCandidates}

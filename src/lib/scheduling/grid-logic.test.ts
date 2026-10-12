@@ -124,6 +124,27 @@ describe('computeOverCapacityDetails', () => {
   })
 })
 
+describe('computeOverCapacityDetails — locale', () => {
+  it("formats the over-capacity time in the reader's locale", () => {
+    const workstations = [{ id: 'ws-1', name: 'Start line', capacity_ceiling: 1 }]
+    const officials = [
+      { id: 'o1', name: 'Frida' },
+      { id: 'o2', name: 'Mikael Saras' },
+    ]
+    const assignments = [
+      { official_id: 'o1', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+      { official_id: 'o2', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+    ]
+    const cells = computeOverCapacityCells(assignments, workstations)
+
+    const en = computeOverCapacityDetails(cells, assignments, workstations, officials, 'en')
+    const sv = computeOverCapacityDetails(cells, assignments, workstations, officials, 'sv')
+
+    expect(en[0].time).toBe('6 Aug 12:00')
+    expect(sv[0].time).toBe('6 aug. 12:00')
+  })
+})
+
 describe('computeDoubleBookedOfficials (by-person)', () => {
   it('flags an official assigned to two different work areas at the same time', () => {
     const assignments = [
@@ -182,6 +203,27 @@ describe('computeDoubleBookedDetails', () => {
     expect(details).toHaveLength(1)
     expect(details[0].officialName).toBe('Anna Andersson')
     expect(details[0].workAreaNames.sort()).toEqual(['Start', 'Vätska'])
+  })
+
+  // The conflict time carries a date as well as a clock, so it follows the
+  // reader's language — unlike a bare HH:mm, which both locales agree on.
+  it("formats the conflict time in the English reader's locale", () => {
+    const assignments = [
+      { official_id: 'o1', workstation_id: 'ws-1', timeslot_start: '2026-08-10T08:00:00.000Z' },
+      { official_id: 'o1', workstation_id: 'ws-2', timeslot_start: '2026-08-10T08:00:00.000Z' },
+    ]
+    const officials = [{ id: 'o1', name: 'Anna Andersson' }]
+    const workstations = [
+      { id: 'ws-1', name: 'Start' },
+      { id: 'ws-2', name: 'Vätska' },
+    ]
+    const doubleBooked = computeDoubleBookedOfficials(assignments)
+
+    const en = computeDoubleBookedDetails(doubleBooked, assignments, officials, workstations, 'en')
+    const sv = computeDoubleBookedDetails(doubleBooked, assignments, officials, workstations, 'sv')
+
+    expect(en[0].time).toBe('10 Aug 08:00')
+    expect(sv[0].time).toBe('10 aug. 08:00')
   })
 })
 
