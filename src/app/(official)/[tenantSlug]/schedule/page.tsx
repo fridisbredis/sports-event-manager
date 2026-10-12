@@ -6,6 +6,7 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { ScheduleView, type AssignmentRow, type CheckMap } from './_components/schedule-view'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
 import { logger } from '@/lib/logger'
+import type { PostgrestError } from '@supabase/supabase-js'
 import {
   distinctDays,
   dayWindow,
@@ -35,6 +36,52 @@ interface Props {
 // drops the furthest-future shifts and keeps the soonest.
 const SCHEDULE_CEILING = 500
 
+// Event bounds for the time-off panel's date picker, mirroring the standalone
+// availability page. Decorative: a failure here leaves the picker unbounded
+// rather than blocking the schedule.
+//
+// Lifted out of the page body so it can be kicked off alongside the shift
+// reads rather than after them. Neither of its two round trips depends on the
+// selected day, yet both used to run on every day change, in sequence, behind
+// everything else.
+async function loadEventDates(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string
+): Promise<{ min: string; max: string } | null> {
+  const { data: event, error: eventError } = await supabase
+    .from('events')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+
+  // Logged rather than swallowed (F-REL-10). Not fatal: losing this only
+  // leaves the time-off panel's date picker unbounded, and failing the whole
+  // schedule over a decorative read would be the worse trade.
+  if (eventError) {
+    logger.error('Official schedule: event lookup failed', eventError, {
+      tenantId,
+    })
+  }
+
+  if (!event) return null
+
+  const { data: stageRows, error: stagesError } = await supabase
+    .from('event_stages')
+    .select('stage_date, start_time, end_time')
+    .eq('event_id', event.id)
+    .eq('tenant_id', tenantId)
+
+  if (stagesError) {
+    logger.error('Official schedule: stage dates failed to load', stagesError, {
+      tenantId,
+      eventId: event.id,
+    })
+    return null
+  }
+
+  return getEventDateRange((stageRows ?? []) as StageDates[])
+}
+
 export default async function SchedulePage({ params, searchParams }: Props) {
   const { tenantSlug } = await params
   const { day: requestedDay } = await searchParams
@@ -55,6 +102,22 @@ export default async function SchedulePage({ params, searchParams }: Props) {
   // dedup): it already ran this exact lookup under the service client to
   // decide access, so the page doesn't repeat it with the RLS client.
   const officialId = tenant.officialId
+
+  // Started here, awaited at the end: nothing between depends on it, so it
+  // overlaps the shift reads instead of queueing behind them.
+  //
+  // The `.catch` guards the gap rather than the read: loadEventDates already
+  // logs and degrades its own failures, but the reads between this line and
+  // the await at the bottom can throw, and a rejection nobody has awaited yet
+  // would become an unhandled rejection instead of the intended 500.
+  const eventDatesPromise = officialId
+    ? loadEventDates(supabase, tenant.id).catch((cause: unknown) => {
+        logger.error('Official schedule: event dates failed to load', cause, {
+          tenantId: tenant.id,
+        })
+        return null
+      })
+    : null
 
   let assignments: AssignmentRow[] = []
   let days: string[] = []
@@ -82,15 +145,30 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     // than the stale-content case Group 2 was written for: an admin adds a
     // shift on a new day, the cached list has no tab for it, and the official
     // never learns the day exists. A missed shift, silently.
-    const { data: dayRows, error: daysError } = await supabase
-      .from('assignments')
-      .select('timeslot_start')
-      .eq('official_id', officialId)
-      .eq('tenant_id', tenant.id)
-      .eq('status', 'assigned')
-      .not('workstation_id', 'is', null)
-      .order('timeslot_start')
-      .range(0, SCHEDULE_CEILING)
+    // Issued together, not in sequence. Neither read depends on the other's
+    // result and both feed the same tab list, so awaiting them one at a time
+    // spent two round trips where one does — the cost that shows up on every
+    // day change, since neither answer varies by the day selected.
+    const [dayResult, timeOffResult] = await Promise.all([
+      supabase
+        .from('assignments')
+        .select('timeslot_start')
+        .eq('official_id', officialId)
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'assigned')
+        .not('workstation_id', 'is', null)
+        .order('timeslot_start')
+        .range(0, SCHEDULE_CEILING),
+      supabase
+        .from('official_unavailability')
+        .select('id, official_id, starts_at, ends_at, created_by_role')
+        .eq('official_id', officialId)
+        .eq('tenant_id', tenant.id)
+        .order('starts_at')
+        .range(0, SCHEDULE_CEILING),
+    ])
+
+    const { data: dayRows, error: daysError } = dayResult
 
     // An official seeing "no assignments" must mean they have none, not that
     // the query failed — this is the screen they open on event day.
@@ -103,20 +181,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       context: { tenantId: tenant.id, officialId },
     })
 
-    // Declared time off, read here rather than after the day is chosen because
-    // it feeds the tab list below. Own rows only — the RLS policy allows
-    // nothing else, and the explicit filter states that at the call site too.
-    //
-    // Unscoped by day on purpose: a person declares a handful of periods for
-    // an event, so this is a small read, and knowing all of them is what lets
-    // a day with time off and no shifts get a tab at all.
-    const { data: timeOffRows, error: timeOffError } = await supabase
-      .from('official_unavailability')
-      .select('id, official_id, starts_at, ends_at, created_by_role')
-      .eq('official_id', officialId)
-      .eq('tenant_id', tenant.id)
-      .order('starts_at')
-      .range(0, SCHEDULE_CEILING)
+    const { data: timeOffRows, error: timeOffError } = timeOffResult
 
     // Not fatal, unlike the assignment read above: this screen's job on event
     // day is to show the shifts, and losing the time-off strip must not take
@@ -204,86 +269,35 @@ export default async function SchedulePage({ params, searchParams }: Props) {
   // into a roster dump.
   const shiftPeers = new Map<string, string[]>()
 
-  if (officialId && selectedDay && assignments.length > 0) {
-    const { start, end } = dayWindow(selectedDay)
-
-    const { data: peerRows, error: peersError } = await supabase
-      .from('assignments')
-      .select('workstation_id, timeslot_start, officials ( id, name )')
-      .eq('tenant_id', tenant.id)
-      .eq('status', 'assigned')
-      .not('workstation_id', 'is', null)
-      .gte('timeslot_start', start)
-      .lt('timeslot_start', end)
-      .range(0, SCHEDULE_CEILING)
-
-    // Not fatal: losing the peer list degrades a shift card to what it showed
-    // before this feature existed, whereas failing the page would take the
-    // schedule with it. Logged rather than swallowed (F-REL-10).
-    if (peersError) {
-      logger.error('Official schedule: shift peers failed to load', peersError, {
-        tenantId: tenant.id,
-        officialId,
-        day: selectedDay,
-      })
-    } else {
-      for (const row of peerRows ?? []) {
-        const peer = row.officials as { id: string; name: string } | null
-        // Skip the viewer themselves — "with you on this shift" lists the
-        // others, and the policy returns the caller's own rows too.
-        if (!peer || peer.id === officialId) continue
-        // Keyed on the pair that defines a shift, matching how the RLS policy
-        // decides visibility and how the grid groups cells.
-        const key = `${row.workstation_id}|${new Date(row.timeslot_start).toISOString()}`
-        const list = shiftPeers.get(key)
-        if (list) {
-          if (!list.includes(peer.name)) list.push(peer.name)
-        } else {
-          shiftPeers.set(key, [peer.name])
-        }
-      }
-      for (const names of shiftPeers.values()) names.sort((a, b) => a.localeCompare(b))
-    }
-  }
-
-  // Event bounds for the time-off panel's date picker, mirroring the standalone
-  // availability page. Decorative: a failure here leaves the picker unbounded
-  // rather than blocking the schedule.
-  let eventDates: { min: string; max: string } | null = null
-
-  if (officialId) {
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id')
-      .eq('tenant_id', tenant.id)
-      .maybeSingle()
-
-    // Logged rather than swallowed (F-REL-10). Not fatal: losing this only
-    // leaves the time-off panel's date picker unbounded, and failing the whole
-    // schedule over a decorative read would be the worse trade.
-    if (eventError) {
-      logger.error('Official schedule: event lookup failed', eventError, {
-        tenantId: tenant.id,
-      })
-    }
-
-    if (event) {
-      const { data: stageRows, error: stagesError } = await supabase
-        .from('event_stages')
-        .select('stage_date, start_time, end_time')
-        .eq('event_id', event.id)
-        .eq('tenant_id', tenant.id)
-
-      if (stagesError) {
-        logger.error('Official schedule: stage dates failed to load', stagesError, {
-          tenantId: tenant.id,
-          eventId: event.id,
-        })
-      } else {
-        eventDates = getEventDateRange((stageRows ?? []) as StageDates[])
-      }
-    }
-  }
+  // Issued here, consumed below the checklist read. Both depend only on the
+  // day's assignments and neither on the other, so they overlap rather than
+  // queue — two of the four reads a day change actually has to make.
+  //
+  // `.then()` is what sends it. A PostgrestBuilder is lazy: holding the
+  // builder in a variable and awaiting it later would run it later too, in
+  // sequence, which is the opposite of what this split is for.
+  //
+  // The `.catch` is not error handling — the consumer below still inspects
+  // `error` and logs it. It is here because the checklist read between this
+  // line and that one can throw, and a rejected promise nobody has awaited yet
+  // would surface as an unhandled rejection that takes the server down rather
+  // than as the 500 the throw intends.
+  const peersPromise =
+    officialId && selectedDay && assignments.length > 0
+      ? supabase
+          .from('assignments')
+          .select('workstation_id, timeslot_start, officials ( id, name )')
+          .eq('tenant_id', tenant.id)
+          .eq('status', 'assigned')
+          .not('workstation_id', 'is', null)
+          .gte('timeslot_start', dayWindow(selectedDay).start)
+          .lt('timeslot_start', dayWindow(selectedDay).end)
+          .range(0, SCHEDULE_CEILING)
+          .then(
+            (result) => result,
+            (cause: unknown) => ({ data: null, error: cause as PostgrestError })
+          )
+      : null
 
   // The periods overlapping the day on screen. Filtered in memory rather than
   // re-queried: the full set is already here for the tab list, and it is small.
@@ -378,6 +392,40 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       }
     }
   }
+
+  if (peersPromise) {
+    const { data: peerRows, error: peersError } = await peersPromise
+
+    // Not fatal: losing the peer list degrades a shift card to what it showed
+    // before this feature existed, whereas failing the page would take the
+    // schedule with it. Logged rather than swallowed (F-REL-10).
+    if (peersError) {
+      logger.error('Official schedule: shift peers failed to load', peersError, {
+        tenantId: tenant.id,
+        officialId,
+        day: selectedDay,
+      })
+    } else {
+      for (const row of peerRows ?? []) {
+        const peer = row.officials as { id: string; name: string } | null
+        // Skip the viewer themselves — "with you on this shift" lists the
+        // others, and the policy returns the caller's own rows too.
+        if (!peer || peer.id === officialId) continue
+        // Keyed on the pair that defines a shift, matching how the RLS policy
+        // decides visibility and how the grid groups cells.
+        const key = `${row.workstation_id}|${new Date(row.timeslot_start).toISOString()}`
+        const list = shiftPeers.get(key)
+        if (list) {
+          if (!list.includes(peer.name)) list.push(peer.name)
+        } else {
+          shiftPeers.set(key, [peer.name])
+        }
+      }
+      for (const names of shiftPeers.values()) names.sort((a, b) => a.localeCompare(b))
+    }
+  }
+
+  const eventDates = eventDatesPromise ? await eventDatesPromise : null
 
   const strings = {
     title: t('mySchedule.title'),
