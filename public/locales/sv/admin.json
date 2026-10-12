@@ -414,7 +414,7 @@
     "standard": "Standard",
     "premium": "Premium",
     "professional": "Professional",
-    "tierHint": "Exakt en nivå är aktiv per kund i v1. Att välja en rensar de andra."
+    "tierHint": "Exakt en nivå är aktiv per kund i nuvarande version. Att välja en rensar de andra."
   },
   "health": {
     "backToTenants": "Kunder",

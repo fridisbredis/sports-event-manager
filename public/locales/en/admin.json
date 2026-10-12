@@ -414,7 +414,7 @@
     "standard": "Standard",
     "premium": "Premium",
     "professional": "Professional",
-    "tierHint": "Exactly one tier is active per tenant in v1. Selecting one clears the others."
+    "tierHint": "Exactly one tier is active per tenant in the current version. Selecting one clears the others."
   },
   "health": {
     "backToTenants": "Tenants",
