@@ -511,9 +511,14 @@ function TimeView({
                 const palette = paletteFor(period)
 
                 return (
-                  <div key={period.id} className="flex items-start gap-3">
+                  <div key={period.id} className="flex items-center gap-3">
+                    {/* Centred against the card rather than padded to its first
+                        baseline. The gutter is two lines (a stacked range, or
+                        "All day" wrapping in this column) against a card that
+                        is usually one, so no top padding lines the two up —
+                        they only agree on their middle. */}
                     <span
-                      className={`w-14 shrink-0 pt-3 text-sm font-medium leading-tight ${palette.gutter}`}
+                      className={`w-14 shrink-0 text-sm font-medium leading-5 ${palette.gutter}`}
                     >
                       {coversWholeDay ? (
                         strings.timeOffAllDay
