@@ -70,7 +70,7 @@
     "scheduleSetup": "Schedule & Setup",
     "datesDuration": "Dates / duration",
     "schedulingGranularity": "Scheduling granularity",
-    "granularityLockedNote": "Dates are derived from the Race stage times. Scheduling granularity is fixed at 60 minutes in v1.",
+    "granularityLockedNote": "Dates are derived from the Race stage times. Scheduling granularity is fixed at 60 min in current version.",
     "facilities": "Facilities",
     "facilitiesPlaceholder": "Parking, Officials lounge, First aid",
     "stagesLabel": "Stages",

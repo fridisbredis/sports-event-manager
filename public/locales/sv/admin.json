@@ -70,7 +70,7 @@
     "scheduleSetup": "Schema och upplägg",
     "datesDuration": "Datum / längd",
     "schedulingGranularity": "Schemaintervall",
-    "granularityLockedNote": "Datumen hämtas från tävlingsetappens tider. Schemaintervallet är låst till 60 minuter i v1.",
+    "granularityLockedNote": "Datumen hämtas från tävlingsetappens tider. Schemaintervallet är låst till 60 min i nuvarande version.",
     "facilities": "Faciliteter",
     "facilitiesPlaceholder": "Parkering, funktionärslounge, första hjälpen",
     "stagesLabel": "Etapper",
