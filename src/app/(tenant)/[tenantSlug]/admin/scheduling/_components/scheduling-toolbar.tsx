@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { LISTBOX_ITEM } from '@/components/ui/form-fields'
 import { formatDayLabel } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
+import { useLanguage } from '@/components/i18n-provider'
 import type { Stage } from './scheduling-types'
 
 export function SchedulingToolbar({
@@ -26,6 +27,7 @@ export function SchedulingToolbar({
   dragSaving: boolean
 }) {
   const { t } = useTranslation('admin')
+  const language = useLanguage()
   const dayIndex = availableDays.indexOf(selectedDay)
 
   return (
@@ -71,8 +73,8 @@ export function SchedulingToolbar({
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="text-sm text-gray-600 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center capitalize">
-            {selectedDay ? formatDayLabel(selectedDay) : ''}
+          <span className="text-sm text-gray-600 border border-gray-200 rounded-md px-3 py-1.5 bg-white min-w-[200px] text-center">
+            {selectedDay ? formatDayLabel(selectedDay, language) : ''}
           </span>
           <Button
             isIconOnly

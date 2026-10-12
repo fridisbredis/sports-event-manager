@@ -7,6 +7,7 @@ import {
   generateSlotsForDay,
   isWithinWindow,
   getCurrentStage,
+  formatDayLabel,
 } from './grid-logic'
 
 // These two functions back the warning badges in SCHED-01:
@@ -328,5 +329,22 @@ describe('getCurrentStage', () => {
     }
 
     expect(getCurrentStage([past])).toBeUndefined()
+  })
+})
+
+describe('formatDayLabel', () => {
+  // The day selector showed Swedish names to English readers because the
+  // call site dropped the language, and a CSS `capitalize` then title-cased
+  // every word of the Swedish label.
+  it('uses English names with a short weekday for an English reader', () => {
+    expect(formatDayLabel('2026-07-12', 'en')).toBe('Sun, 12 Jul')
+  })
+
+  it('uses Swedish names with a long, lower-case weekday for a Swedish reader', () => {
+    expect(formatDayLabel('2026-08-02', 'sv')).toBe('söndag 2 aug.')
+  })
+
+  it('falls back to the regional default when the language is unknown', () => {
+    expect(formatDayLabel('2026-08-02')).toBe('söndag 2 aug.')
   })
 })

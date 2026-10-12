@@ -110,10 +110,20 @@ export function isWithinWindow(slot: Date, granMin: number, windows: OperatingWi
 // the weekday and month names they produce have to match the surrounding text.
 // Omitting it falls back to the regional default rather than the browser's
 // locale, so a missed call site degrades to Swedish names, never to 10/8/2026.
+// The weekday width is a per-locale convention, not a global preference. The
+// selector is a fixed-width control, and English spells its weekdays out long
+// enough that "Wednesday, 12 Aug" crowds it, while Swedish abbreviates to a
+// bare "ons" that reads as a stub next to the full month. So English takes the
+// locale's short weekday ("Sun, 12 Jul") and Swedish its long one
+// ("söndag 2 aug."), which is what Peter asked for on both sides.
+const DAY_LABEL_WEEKDAY: Record<string, 'short' | 'long'> = {
+  en: 'short',
+}
+
 export function formatDayLabel(day: string, language?: string): string {
   const date = new Date(`${day}T12:00:00.000Z`)
   return date.toLocaleDateString(dateLocaleFor(language), {
-    weekday: 'long',
+    weekday: DAY_LABEL_WEEKDAY[language ?? ''] ?? 'long',
     day: 'numeric',
     month: 'short',
     timeZone: 'UTC',
