@@ -440,7 +440,12 @@ export default function EventConfigForm({
                 markDirty()
               }}
             />
-            {errors.stages && <p className="text-xs text-red-500 px-6 pb-4">{errors.stages}</p>}
+            {/* px-4, matching the card's header and stage rows — this sits in
+                the same p-0 card and was indented a step further than
+                everything above it. No top margin: StageList's own hint fires
+                on the same condition and already carries the gap below the
+                rows when both are showing. */}
+            {errors.stages && <p className="text-xs text-red-500 px-4 pb-4">{errors.stages}</p>}
           </AppCard>
         </section>
       </div>
