@@ -97,7 +97,7 @@ test.describe('SYS-02 tenant detail', () => {
 
     await expect(
       page.getByText(
-        'Exactly one tier is active per tenant in v1. Selecting one clears the others.'
+        'Exactly one tier is active per tenant in the current version. Selecting one clears the others.'
       )
     ).toBeVisible()
   })
