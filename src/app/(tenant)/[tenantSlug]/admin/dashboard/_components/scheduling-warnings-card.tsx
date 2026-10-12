@@ -36,7 +36,7 @@ export function SchedulingWarningsCard({
   const totalWarnings = overCapacity + doubleBooked + timeOffClash
 
   return (
-    <AppCard className="card-accent-secondary">
+    <AppCard className="card-accent-primary">
       <div className="flex items-start justify-between mb-4">
         <h2 className="section-label">{title}</h2>
         {/* All-clear reads as a positive confirmation (green outline + check),
