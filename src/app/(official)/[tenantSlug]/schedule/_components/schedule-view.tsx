@@ -4,7 +4,15 @@ import Link from 'next/link'
 import { CalendarCheck, CalendarOff, CalendarX, ChevronDown, TriangleAlert } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from 'react'
 import {
   dayKey,
   mergeContiguousSlots,
@@ -154,13 +162,20 @@ function groupByDay(assignments: AssignmentRow[], language?: string) {
 function DaySelector({
   days,
   selectedDay,
+  shownDay,
   tenantSlug,
   label,
+  onSelect,
 }: {
   days: string[]
   selectedDay: string | null
+  // The day the tabs paint as chosen, which runs ahead of `selectedDay` while
+  // a day is being fetched. Owned by ScheduleView, because the content below
+  // the tabs has to agree with them about which day is on its way in.
+  shownDay: string | null
   tenantSlug: string
   label: string
+  onSelect: (day: string) => void
 }) {
   // Above the early returns below — hooks cannot be called conditionally.
   const language = useLanguage()
@@ -185,18 +200,29 @@ function DaySelector({
     <nav aria-label={label} className="-mx-5 px-5 pb-1 mb-6 overflow-x-auto scrollbar-none">
       <div className="flex gap-2 w-max">
         {days.map((day) => {
-          const isSelected = day === selectedDay
+          const isSelected = day === shownDay
           return (
             <Link
               key={day}
               href={`/${tenantSlug}/schedule?day=${day}`}
-              aria-current={isSelected ? 'page' : undefined}
+              // aria-current follows the day actually rendered, not the
+              // optimistic one: a screen reader announcing the new day while
+              // the old one is still below it would be a lie. The visual
+              // highlight can run ahead; the announcement waits.
+              aria-current={day === selectedDay ? 'page' : undefined}
               scroll={false}
+              onClick={(e) => {
+                // Let modified clicks (new tab, new window) fall through to
+                // the browser untouched.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                e.preventDefault()
+                onSelect(day)
+              }}
               className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-              }`}
+              } ${day === shownDay && day !== selectedDay ? 'opacity-70' : ''}`}
             >
               {formatDayTab(day, language)}
             </Link>
@@ -825,6 +851,29 @@ export function ScheduleView({
   const [view, setView] = useState<View>('time')
   const [timeOffOpen, setTimeOffOpen] = useState(false)
   const timeOffPanelRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const [, startTransition] = useTransition()
+
+  // Fetching a day is a server round trip on a phone on event day, and a plain
+  // link left the whole screen untouched for the duration — the tap read as if
+  // nothing had happened, and people tapped again. `shownDay` moves the tab
+  // highlight on the tap and the skeleton below stands in for the shifts until
+  // the real ones arrive.
+  //
+  // useOptimistic rather than useState: it reverts to `selectedDay` on its own
+  // when the transition settles, so a navigation that lands somewhere else
+  // than asked — a day resolved away, the back button — cannot leave the tabs
+  // lit on a day the page is not showing.
+  const [shownDay, setShownDay] = useOptimistic(selectedDay)
+
+  function handleDaySelect(day: string) {
+    startTransition(() => {
+      // Inside the transition, not before it: an optimistic update outside one
+      // throws, and this is what scopes the revert to the navigation below.
+      setShownDay(day)
+      router.push(`/${tenantSlug}/schedule?day=${day}`, { scroll: false })
+    })
+  }
 
   // Move focus into the panel when it opens, and scroll it into view.
   //
@@ -953,8 +1002,10 @@ export function ScheduleView({
       <DaySelector
         days={days}
         selectedDay={selectedDay}
+        shownDay={shownDay}
         tenantSlug={tenantSlug}
         label={strings.dayTabsLabel}
+        onSelect={handleDaySelect}
       />
 
       {/* Above the content, and outside every branch below: a day with time
