@@ -10,7 +10,9 @@ import {
   fetchTwilioStatus,
   fetchSentryStatus,
   fetchGitHubActionsStatus,
+  fetchAzureStatus,
   FAILED_CONCLUSIONS,
+  AZURE_RUNNING_STATUS_OK,
 } from './_lib/fetch-status'
 import { relativeTime } from './_lib/relative-time'
 import {
@@ -32,11 +34,12 @@ export default async function SystemHealthPage() {
     unknown: t('health.status.unknown'),
   }
 
-  const [supabase, twilio, sentry, githubActions] = await Promise.all([
+  const [supabase, twilio, sentry, githubActions, azure] = await Promise.all([
     fetchSupabaseStatus(),
     fetchTwilioStatus(),
     fetchSentryStatus(),
     fetchGitHubActionsStatus(),
+    fetchAzureStatus(),
   ])
   const supabaseProjectRef = currentSupabaseProjectRef()
   const isLocalSupabase = supabaseProjectRef === 'local (Docker)'
@@ -166,6 +169,18 @@ export default async function SystemHealthPage() {
 
         <StatusCard
           title={t('health.azure.title')}
+          status={azure.status}
+          statusLabels={statusLabels}
+          facts={azure.environments?.map((env) => ({
+            label: t(env.environment === 'prod' ? 'health.azure.prod' : 'health.azure.dev'),
+            value: `${env.runningStatus} · ${env.revision}`,
+            href: env.url,
+            tone:
+              env.runningStatus === AZURE_RUNNING_STATUS_OK
+                ? ('default' as const)
+                : ('error' as const),
+          }))}
+          note={azure.status === 'unknown' ? t('health.azure.noteUnknown') : t('health.azure.note')}
           links={[
             {
               label: t('health.azure.devPortal'),
@@ -176,7 +191,6 @@ export default async function SystemHealthPage() {
               href: azurePortalResourceGroupUrl(AZURE_PROD_RESOURCE_GROUP),
             },
           ]}
-          note={t('health.azure.note')}
         />
 
         <StatusCard
