@@ -53,6 +53,7 @@ interface EventInfoCached {
     start_time: string | null
     end_time: string | null
     venue: string | null
+    results_url: string | null
     position: number
   }>
   facilities: Array<{ id: string; label: string; position: number }>
@@ -80,6 +81,7 @@ async function seedTenantEvent(
     start_time: '2026-09-01T08:00:00Z',
     end_time: '2026-09-01T12:00:00Z',
     venue: 'Main venue',
+    results_url: 'https://results.example.com/shape-test',
   })
   if (stageError) throw stageError
 
@@ -127,6 +129,7 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
         start_time: '2026-09-01T08:00:00+00:00',
         end_time: '2026-09-01T12:00:00+00:00',
         venue: 'Main venue',
+        results_url: 'https://results.example.com/shape-test',
         position: 0,
       },
     ])

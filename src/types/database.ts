@@ -421,6 +421,7 @@ export type Database = {
           name: string
           position: number
           race_type: string
+          results_url: string | null
           stage_date: string | null
           stage_type: string
           start_time: string | null
@@ -435,6 +436,7 @@ export type Database = {
           name: string
           position?: number
           race_type?: string
+          results_url?: string | null
           stage_date?: string | null
           stage_type?: string
           start_time?: string | null
@@ -449,6 +451,7 @@ export type Database = {
           name?: string
           position?: number
           race_type?: string
+          results_url?: string | null
           stage_date?: string | null
           stage_type?: string
           start_time?: string | null

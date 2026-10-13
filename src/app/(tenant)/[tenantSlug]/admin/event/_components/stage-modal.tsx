@@ -8,6 +8,7 @@ import { CalendarDateTime, type DateValue } from '@internationalized/date'
 import type { RangeValue } from '@react-types/shared'
 import type { StageInput } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
+import { normalizeResultsUrl } from '../_utils'
 
 // start_time/end_time are stored as 'YYYY-MM-DDTHH:mm' wall-clock strings with
 // no timezone attached, so they're parsed into CalendarDateTime (not
@@ -32,6 +33,12 @@ function toLocalString(value: DateValue): string {
   return `${y}-${m}-${d}T${h}:${min}`
 }
 
+interface StageErrors {
+  name?: string
+  end_time?: string
+  results_url?: string
+}
+
 interface Props {
   stage: StageInput | null
   onSave: (stage: StageInput) => void
@@ -45,6 +52,7 @@ const emptyStage = (): StageInput => ({
   start_time: null,
   end_time: null,
   venue: '',
+  results_url: null,
   position: 0,
   distances: [],
 })
@@ -57,20 +65,33 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
   const [distancesText, setDistancesText] = useState(
     isAdd ? '' : stage.distances.map((d) => d.label).join(', ')
   )
-  const [errors, setErrors] = useState<{ name?: string; end_time?: string }>({})
+  const [errors, setErrors] = useState<StageErrors>({})
 
-  function validate(): boolean {
-    const errs: { name?: string; end_time?: string } = {}
+  // The link is held as raw text while editing so a half-typed URL isn't
+  // normalised out from under the cursor; it is parsed once on save.
+  const [resultsUrlText, setResultsUrlText] = useState(stage?.results_url ?? '')
+
+  function validate(): { ok: false } | { ok: true; resultsUrl: string | null } {
+    const errs: StageErrors = {}
     if (!form.name.trim()) errs.name = t('eventConfig.stageNameRequired')
     if (form.start_time && form.end_time && form.end_time < form.start_time) {
       errs.end_time = t('eventConfig.stageEndTimeError')
     }
+
+    // Only validated for a Race stage — the field isn't shown for non_race, so
+    // a leftover value there (type switched after typing a link) must not
+    // block the save. It is dropped instead, matching what the RPC stores.
+    const checked = form.stage_type === 'race' ? normalizeResultsUrl(resultsUrlText) : null
+    if (checked && !checked.ok) errs.results_url = t('eventConfig.stageResultsUrlError')
+
     setErrors(errs)
-    return Object.keys(errs).length === 0
+    if (Object.keys(errs).length > 0) return { ok: false }
+    return { ok: true, resultsUrl: checked?.ok ? checked.value : null }
   }
 
   function handleSave() {
-    if (!validate()) return
+    const result = validate()
+    if (!result.ok) return
     const distances = distancesText
       .split(',')
       .map((s) => s.trim())
@@ -80,6 +101,7 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
       ...form,
       name: form.name.trim(),
       venue: form.venue.trim(),
+      results_url: result.resultsUrl,
       distances: form.stage_type === 'race' ? distances : [],
     }
     onSave(cleaned)
@@ -208,6 +230,28 @@ export default function StageModal({ stage, onSave, onClose }: Props) {
                         ? t('eventConfig.distancesPlaceholder')
                         : t('eventConfig.timesPlaceholder')
                     }
+                  />
+
+                  {/* Results link — Race stages only, since a Setup or
+                      Teardown stage has no results to publish. One plain
+                      link per stage: the typed multi-link model
+                      (PROPOSED-external-links) stays a draft, and this field
+                      is deliberately the simple version of it. */}
+                  <Input
+                    type="url"
+                    inputMode="url"
+                    label={t('eventConfig.stageResultsUrlLabel')}
+                    value={resultsUrlText}
+                    onValueChange={(v) => {
+                      setResultsUrlText(v)
+                      // Clear the error as soon as they start fixing it,
+                      // rather than leaving it red until the next save.
+                      setErrors((p) => (p.results_url ? { ...p, results_url: undefined } : p))
+                    }}
+                    placeholder={t('eventConfig.stageResultsUrlPlaceholder')}
+                    description={t('eventConfig.stageResultsUrlHint')}
+                    isInvalid={!!errors.results_url}
+                    errorMessage={errors.results_url}
                   />
                 </div>
               ) : (

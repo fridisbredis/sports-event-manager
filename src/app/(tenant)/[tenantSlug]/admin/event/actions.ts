@@ -17,6 +17,7 @@ import {
   adminDashboardCacheTag,
 } from '@/lib/cache/tags'
 import { translateActionError as tError } from '@/lib/actions/action-error'
+import { normalizeResultsUrl } from './_utils'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -28,6 +29,7 @@ export interface StageInput {
   start_time: string | null
   end_time: string | null
   venue: string
+  results_url: string | null
   position: number
   distances: LabelInput[]
 }
@@ -142,6 +144,16 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
       start_time: s.start_time || null,
       end_time: s.end_time || null,
       venue: s.venue,
+      // Re-validated server-side, not trusted from the client: the modal
+      // already rejects a non-http(s) link, but this action is callable
+      // directly. A value that fails here is dropped to null rather than
+      // failing the save — the link is an optional extra, and losing a whole
+      // event edit over it would be the worse outcome. The RPC additionally
+      // nulls it for non_race stages.
+      results_url: (() => {
+        const checked = normalizeResultsUrl(s.results_url ?? '')
+        return checked.ok ? checked.value : null
+      })(),
       position: i,
       distances: s.distances
         .filter((d) => d.label.trim())
