@@ -51,6 +51,7 @@ interface AdminEventCached {
     start_time: string | null
     end_time: string | null
     venue: string | null
+    results_url: string | null
     position: number
   }>
   distances: Array<{ label: string; position: number; stage_id: string | null }>
@@ -145,6 +146,7 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
         start_time: null,
         end_time: null,
         venue: null,
+        results_url: null,
         position: 0,
       },
     ])
