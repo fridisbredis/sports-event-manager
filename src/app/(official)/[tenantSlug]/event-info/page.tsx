@@ -29,6 +29,7 @@ interface EventInfoCached {
     start_time: string | null
     end_time: string | null
     venue: string | null
+    results_url: string | null
     position: number
   }>
   facilities: Array<{ id: string; label: string; position: number }>
@@ -144,6 +145,8 @@ export default async function EventInfoPage({ params }: Props) {
                   name={stage.name}
                   details={stageDetails(stage, language)}
                   venue={stage.venue}
+                  resultsUrl={stage.results_url}
+                  resultsLabel={t('eventInfo.raceResults')}
                 />
               )
             })}

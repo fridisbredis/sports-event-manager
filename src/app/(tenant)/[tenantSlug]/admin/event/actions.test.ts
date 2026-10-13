@@ -73,6 +73,7 @@ const RACE_STAGE = {
   start_time: '2026-06-01T08:00:00Z',
   end_time: '2026-06-01T10:00:00Z',
   venue: 'Start line',
+  results_url: null,
   position: 0,
   distances: [],
 }

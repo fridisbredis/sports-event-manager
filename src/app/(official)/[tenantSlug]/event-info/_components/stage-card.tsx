@@ -1,6 +1,6 @@
 'use client'
 
-import { MapPin } from 'lucide-react'
+import { ExternalLink, MapPin } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
@@ -8,9 +8,11 @@ interface Props {
   name: string
   details: string[]
   venue: string | null
+  resultsUrl: string | null
+  resultsLabel: string
 }
 
-export function StageCard({ stageNumber, name, details, venue }: Props) {
+export function StageCard({ stageNumber, name, details, venue, resultsUrl, resultsLabel }: Props) {
   // The schedule facts run as one dot-separated line that wraps, rather than
   // one line per fact. They are read as a sequence ("briefing, then start,
   // then podium"), and stacking them made a three-fact stage card twice as
@@ -51,6 +53,30 @@ export function StageCard({ stageNumber, name, details, venue }: Props) {
               aria-hidden="true"
             />
             <span className="min-w-0">{venue}</span>
+          </p>
+        ) : null}
+        {/* Unlike the venue pin above, this one IS a link, so it gets the
+            affordance the venue deliberately doesn't: underline, the tenant
+            accent, and an external-link glyph. target=_blank because an
+            official following a results link mid-event should come back to
+            their schedule with the back gesture, not lose this screen;
+            rel="noopener noreferrer" is the matching safety for an
+            admin-entered URL we don't control.
+
+            The label is passed in rather than translated here: this is a
+            client component and the page already holds the server-side `t`,
+            so translating here would mean a second i18n hook for one string. */}
+        {resultsUrl ? (
+          <p className="mt-1.5">
+            <a
+              href={resultsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[15px] font-medium leading-relaxed text-tenant-primary underline underline-offset-2"
+            >
+              <ExternalLink className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              <span className="min-w-0">{resultsLabel}</span>
+            </a>
           </p>
         ) : null}
       </div>

@@ -28,6 +28,7 @@ interface AdminEventCached {
     start_time: string | null
     end_time: string | null
     venue: string | null
+    results_url: string | null
     position: number
   }>
   distances: Array<{ label: string; position: number; stage_id: string | null }>
@@ -107,6 +108,7 @@ export default async function EventConfigPage({ params }: Props) {
           start_time: s.start_time ? s.start_time.slice(0, 16) : null,
           end_time: s.end_time ? s.end_time.slice(0, 16) : null,
           venue: s.venue ?? '',
+          results_url: s.results_url ?? null,
           position: s.position,
           distances: distancesByStageId[s.id] ?? [],
         }))}

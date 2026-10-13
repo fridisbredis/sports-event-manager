@@ -211,6 +211,73 @@ describe('EventInfoPage', () => {
     expect(card).toHaveTextContent('Seed Stadium')
   })
 
+  // The results link is the one thing on this card that is tappable, so it
+  // is asserted as a link with its href — a regression that rendered it as
+  // plain text would still contain the label and pass a text-only check.
+  it('shows a stage results link as a real link', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Day 1',
+            stage_type: 'race',
+            stage_date: null,
+            start_time: '2026-06-12T07:00:00Z',
+            end_time: '2026-06-12T22:00:00Z',
+            venue: null,
+            results_url: 'https://results.example.com/viadal',
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    // getServerTranslation is mocked as identity above, so the label the
+    // card renders is the key itself.
+    const link = screen.getByRole('link', { name: 'eventInfo.raceResults' })
+    expect(link).toHaveAttribute('href', 'https://results.example.com/viadal')
+    // Opens away from the app, so the official keeps this screen behind it.
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('shows no results link for a stage that has none', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Setup',
+            stage_type: 'non_race',
+            stage_date: null,
+            start_time: '2026-06-11T07:00:00Z',
+            end_time: null,
+            venue: null,
+            results_url: null,
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    expect(screen.queryByRole('link', { name: 'eventInfo.raceResults' })).toBeNull()
+  })
+
   // The Viadal race runs 2 Aug 12:00 through 8 Aug 12:00. Formatting only the
   // start's day and then both clock times rendered that as
   // "Sun, 2 Aug · 12:00 – 12:00", which reads as a zero-length stage.
