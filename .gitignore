@@ -63,3 +63,7 @@ reviewerfindings.json*
 # Cached sign-in cookies, one file per role. Real session tokens for the local
 # stack — regenerated on demand, never committed.
 /tests/e2e/.auth/
+
+# Ad-hoc dumps taken before destructive prod changes, so a delete stays
+# recoverable. Real production data — never committed.
+/.backups/
