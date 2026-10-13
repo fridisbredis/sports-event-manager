@@ -438,6 +438,15 @@ describe('fetchAzureStatus', () => {
     }
   }
 
+  // Compares the actual host rather than searching the URL for a substring:
+  // 'management.azure.com' appearing *somewhere* in a string would also match
+  // an attacker-controlled host like evil.com/?x=management.azure.com, which
+  // is what CodeQL's incomplete-url-substring-sanitization rule objects to.
+  // Parsing makes the assertion mean what it says.
+  function calledHost(call: unknown[]) {
+    return new URL(String(call[0])).hostname
+  }
+
   beforeEach(() => {
     process.env = { ...ENV }
     process.env.AZURE_HEALTH_TENANT_ID = 'tenant-id'
@@ -488,8 +497,8 @@ describe('fetchAzureStatus', () => {
 
     await fetchAzureStatus()
 
-    const tokenCalls = fetchMock.mock.calls.filter((call) =>
-      String(call[0]).includes('login.microsoftonline.com')
+    const tokenCalls = fetchMock.mock.calls.filter(
+      (call) => calledHost(call) === 'login.microsoftonline.com'
     )
     expect(tokenCalls).toHaveLength(1)
   })
@@ -503,9 +512,7 @@ describe('fetchAzureStatus', () => {
 
     await fetchAzureStatus()
 
-    const armCall = fetchMock.mock.calls.find((call) =>
-      String(call[0]).includes('management.azure.com')
-    )
+    const armCall = fetchMock.mock.calls.find((call) => calledHost(call) === 'management.azure.com')
     expect(armCall?.[1].headers.Authorization).toBe('Bearer arm-token')
   })
 
@@ -545,8 +552,8 @@ describe('fetchAzureStatus', () => {
 
     await fetchAzureStatus()
 
-    const armCalls = fetchMock.mock.calls.filter((call) =>
-      String(call[0]).includes('management.azure.com')
+    const armCalls = fetchMock.mock.calls.filter(
+      (call) => calledHost(call) === 'management.azure.com'
     )
     expect(armCalls).toHaveLength(0)
   })
