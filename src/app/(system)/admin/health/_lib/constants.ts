@@ -32,3 +32,17 @@ export const AZURE_TENANT_DOMAIN = 'extrapreneur.se'
 export function azurePortalResourceGroupUrl(resourceGroup: string) {
   return `https://portal.azure.com/#@${AZURE_TENANT_DOMAIN}/resource/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${resourceGroup}/overview`
 }
+
+// The Container App resource names, needed both for the ARM status probe and
+// to deep-link the portal at the app itself rather than its resource group.
+// Verified against `az containerapp list` on 2026-10-13.
+//
+// Note that sports-event-manager-perf also lives in the dev resource group;
+// it is deliberately not surfaced here, since the health page reports on the
+// two environments that serve users, not the throwaway perf rig.
+export const AZURE_DEV_CONTAINER_APP = 'sports-event-manager-dev'
+export const AZURE_PROD_CONTAINER_APP = 'sports-event-manager-prod'
+
+export function azurePortalContainerAppUrl(resourceGroup: string, containerApp: string) {
+  return `https://portal.azure.com/#@${AZURE_TENANT_DOMAIN}/resource/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${resourceGroup}/providers/Microsoft.App/containerApps/${containerApp}/overview`
+}

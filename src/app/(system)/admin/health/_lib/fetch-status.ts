@@ -1,5 +1,13 @@
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import {
+  AZURE_SUBSCRIPTION_ID,
+  AZURE_DEV_RESOURCE_GROUP,
+  AZURE_PROD_RESOURCE_GROUP,
+  AZURE_DEV_CONTAINER_APP,
+  AZURE_PROD_CONTAINER_APP,
+  azurePortalContainerAppUrl,
+} from './constants'
 
 // Shared with the Twilio probe below so the two budgets can't drift apart.
 const PROBE_TIMEOUT_MS = 3000
@@ -304,6 +312,148 @@ export async function fetchGitHubActionsStatus(): Promise<GitHubActionsStatus> {
     return { status: hasFailure ? 'error' : 'ok', runs: found }
   } catch (error) {
     logger.warn('Health dashboard: GitHub workflow runs request threw', { error })
+    return { status: 'unknown' }
+  }
+}
+
+export interface AzureEnvironmentStatus {
+  /** 'dev' | 'prod' — echoed back so the caller can tell the two apart
+   *  without relying on array order, same as WorkflowRun.workflow. */
+  environment: 'dev' | 'prod'
+  /** Azure's own runningStatus, e.g. 'Running' | 'Stopped' | 'Degraded'.
+   *  Passed through verbatim rather than mapped to our ok/error vocabulary:
+   *  the card shows the real word Azure uses, so it matches the portal. */
+  runningStatus: string
+  /** The revision actually serving traffic. Container Apps run in Single
+   *  revision mode here (CLAUDE.md), so this is the deployed build. */
+  revision: string
+  /** Deep link to the app in the portal, so a bad row is one click away. */
+  url: string
+}
+
+export interface AzureStatus {
+  status: 'ok' | 'error' | 'unknown'
+  environments?: AzureEnvironmentStatus[]
+}
+
+// Azure is the one probe on this page that can't authenticate with a static
+// token: ARM wants an OAuth2 bearer from Entra ID, so every probe starts with
+// a client-credentials exchange. The token is cached for 60s alongside the
+// ARM reads via Next's fetch cache, which keeps a page view to one exchange
+// rather than one per environment.
+//
+// The credential is a dedicated Reader-only service principal
+// (health-reader-sports-event-manager, created 2026-10-13), scoped to the dev
+// and prod resource groups and nothing else — deliberately NOT the
+// Contributor AZURE_CREDENTIALS the deploy workflows use, which could write.
+// Same separation as the two Sentry tokens: a read-only surface gets a
+// read-only credential.
+//
+// Missing env vars mean 'unknown', not 'error' — locally these are never set
+// and an unconfigured probe is an expected state, matching Twilio/Sentry.
+export const AZURE_RUNNING_STATUS_OK = 'Running'
+const ARM_API_VERSION = '2024-03-01'
+
+async function fetchArmToken(
+  tenantId: string,
+  clientId: string,
+  clientSecret: string
+): Promise<string | null> {
+  const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'client_credentials',
+      scope: 'https://management.azure.com/.default',
+    }),
+    next: { revalidate: 60 },
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+  })
+
+  if (!response.ok) {
+    logger.warn('Health dashboard: Azure token request failed', {
+      error: new Error(`status ${response.status}`),
+    })
+    return null
+  }
+
+  const data = (await response.json()) as { access_token?: string }
+  return data.access_token ?? null
+}
+
+export async function fetchAzureStatus(): Promise<AzureStatus> {
+  const tenantId = process.env.AZURE_HEALTH_TENANT_ID
+  const clientId = process.env.AZURE_HEALTH_CLIENT_ID
+  const clientSecret = process.env.AZURE_HEALTH_CLIENT_SECRET
+
+  if (!tenantId || !clientId || !clientSecret) {
+    return { status: 'unknown' }
+  }
+
+  try {
+    const token = await fetchArmToken(tenantId, clientId, clientSecret)
+    if (!token) return { status: 'unknown' }
+
+    const targets = [
+      {
+        environment: 'dev' as const,
+        resourceGroup: AZURE_DEV_RESOURCE_GROUP,
+        containerApp: AZURE_DEV_CONTAINER_APP,
+      },
+      {
+        environment: 'prod' as const,
+        resourceGroup: AZURE_PROD_RESOURCE_GROUP,
+        containerApp: AZURE_PROD_CONTAINER_APP,
+      },
+    ]
+
+    const results = await Promise.all(
+      targets.map(async (target): Promise<AzureEnvironmentStatus | null> => {
+        const response = await fetch(
+          `https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}` +
+            `/resourceGroups/${target.resourceGroup}` +
+            `/providers/Microsoft.App/containerApps/${target.containerApp}` +
+            `?api-version=${ARM_API_VERSION}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            next: { revalidate: 60 },
+            signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+          }
+        )
+
+        if (!response.ok) {
+          logger.warn('Health dashboard: Azure Container App request failed', {
+            error: new Error(`status ${response.status} for ${target.containerApp}`),
+          })
+          return null
+        }
+
+        const data = (await response.json()) as {
+          properties?: { runningStatus?: string; latestReadyRevisionName?: string }
+        }
+
+        return {
+          environment: target.environment,
+          runningStatus: data.properties?.runningStatus ?? 'Unknown',
+          revision: data.properties?.latestReadyRevisionName ?? '—',
+          url: azurePortalContainerAppUrl(target.resourceGroup, target.containerApp),
+        }
+      })
+    )
+
+    const found = results.filter((r): r is AzureEnvironmentStatus => r !== null)
+
+    // A partial answer still carries real information — if dev replied and
+    // prod didn't, the dev row is worth showing. Only a total blank is
+    // 'unknown', matching the GitHub Actions probe.
+    if (found.length === 0) return { status: 'unknown' }
+
+    const hasProblem = found.some((env) => env.runningStatus !== AZURE_RUNNING_STATUS_OK)
+    return { status: hasProblem ? 'error' : 'ok', environments: found }
+  } catch (error) {
+    logger.warn('Health dashboard: Azure probe timed out or threw', { error })
     return { status: 'unknown' }
   }
 }

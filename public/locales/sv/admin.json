@@ -460,9 +460,12 @@
     },
     "azure": {
       "title": "Azure Container Apps",
+      "dev": "Dev",
+      "prod": "Prod",
       "devPortal": "Dev — Azure Portal",
       "prodPortal": "Prod — Azure Portal",
-      "note": "Det finns ännu ingen Azure-SDK eller behörighet i appen — status hämtas via länk tills vidare."
+      "note": "Körstatus och aktiv revision per miljö.",
+      "noteUnknown": "Kunde inte hämta livedata just nu — kolla Azure Portal för aktuell status."
     },
     "githubActions": {
       "title": "GitHub Actions",

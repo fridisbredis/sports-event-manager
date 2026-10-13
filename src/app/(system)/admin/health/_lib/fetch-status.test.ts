@@ -4,6 +4,7 @@ import {
   fetchTwilioStatus,
   fetchSentryStatus,
   fetchGitHubActionsStatus,
+  fetchAzureStatus,
 } from './fetch-status'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 
@@ -417,5 +418,166 @@ describe('fetchGitHubActionsStatus', () => {
     expect((init as { headers: Record<string, string> }).headers.Authorization).toBe(
       'Bearer ghp_test'
     )
+  })
+})
+
+describe('fetchAzureStatus', () => {
+  const ENV = process.env
+
+  function tokenResponse() {
+    return { ok: true, json: () => Promise.resolve({ access_token: 'arm-token' }) }
+  }
+
+  function appResponse(runningStatus: string, revision = 'app--0000063') {
+    return {
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          properties: { runningStatus, latestReadyRevisionName: revision },
+        }),
+    }
+  }
+
+  beforeEach(() => {
+    process.env = { ...ENV }
+    process.env.AZURE_HEALTH_TENANT_ID = 'tenant-id'
+    process.env.AZURE_HEALTH_CLIENT_ID = 'client-id'
+    process.env.AZURE_HEALTH_CLIENT_SECRET = 'secret'
+  })
+
+  afterEach(() => {
+    process.env = ENV
+    vi.unstubAllGlobals()
+  })
+
+  it('reports ok with one row per environment when both are running', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValue(appResponse('Running'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchAzureStatus()
+
+    expect(result.status).toBe('ok')
+    expect(result.environments).toHaveLength(2)
+    expect(result.environments?.map((e) => e.environment)).toEqual(['dev', 'prod'])
+    expect(result.environments?.[0].revision).toBe('app--0000063')
+  })
+
+  it('reports error when an environment is not running', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(appResponse('Running'))
+      .mockResolvedValueOnce(appResponse('Stopped'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchAzureStatus()
+
+    expect(result.status).toBe('error')
+    expect(result.environments?.[1].runningStatus).toBe('Stopped')
+  })
+
+  it('exchanges the client credentials for a token exactly once per probe', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValue(appResponse('Running'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchAzureStatus()
+
+    const tokenCalls = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).includes('login.microsoftonline.com')
+    )
+    expect(tokenCalls).toHaveLength(1)
+  })
+
+  it('sends the bearer token on the ARM reads', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValue(appResponse('Running'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchAzureStatus()
+
+    const armCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes('management.azure.com')
+    )
+    expect(armCall?.[1].headers.Authorization).toBe('Bearer arm-token')
+  })
+
+  it('still reports the environment that answered when the other one fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(appResponse('Running'))
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchAzureStatus()
+
+    expect(result.status).toBe('ok')
+    expect(result.environments).toHaveLength(1)
+    expect(result.environments?.[0].environment).toBe('dev')
+  })
+
+  it('returns unknown when the credentials are missing (e.g. local dev)', async () => {
+    delete process.env.AZURE_HEALTH_CLIENT_SECRET
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchAzureStatus()).toEqual({ status: 'unknown' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns unknown when the token exchange is rejected', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+
+    expect(await fetchAzureStatus()).toEqual({ status: 'unknown' })
+  })
+
+  it('does not call ARM when no token came back', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchAzureStatus()
+
+    const armCalls = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).includes('management.azure.com')
+    )
+    expect(armCalls).toHaveLength(0)
+  })
+
+  it('returns unknown when neither environment answers', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValue({ ok: false, status: 403 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchAzureStatus()).toEqual({ status: 'unknown' })
+  })
+
+  it('returns unknown when the probe throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')))
+
+    expect(await fetchAzureStatus()).toEqual({ status: 'unknown' })
+  })
+
+  it('falls back rather than crashing when ARM omits the fields', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchAzureStatus()
+
+    expect(result.status).toBe('error')
+    expect(result.environments?.[0].runningStatus).toBe('Unknown')
+    expect(result.environments?.[0].revision).toBe('—')
   })
 })

@@ -460,9 +460,12 @@
     },
     "azure": {
       "title": "Azure Container Apps",
+      "dev": "Dev",
+      "prod": "Prod",
       "devPortal": "Dev — Azure Portal",
       "prodPortal": "Prod — Azure Portal",
-      "note": "No Azure SDK/credential exists in the app yet — status is fetched via link for now."
+      "note": "Running status and serving revision per environment.",
+      "noteUnknown": "Couldn't fetch live data right now — check the Azure Portal for current status."
     },
     "githubActions": {
       "title": "GitHub Actions",
