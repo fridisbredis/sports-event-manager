@@ -65,10 +65,20 @@ interface Props {
   timeslotEnd: string
   /** The viewer, to tell "you checked this" from "a colleague did". */
   currentUserId: string | null
+  /**
+   * True when the station is worked more than one stretch that day, so two
+   * rows of the same item sit on the card. The shift's time is then part of
+   * the row's accessible name — sighted users get that from the time heading
+   * the rows are grouped under, which a screen reader reaching the checkbox
+   * does not carry with it.
+   */
+  labelWithTime?: boolean
   strings: ChecklistStrings
 }
 
-function formatCheckedAt(ts: string, language?: string): string {
+/** Wall-clock time of an ISO timestamp — used both for "checked at" and for
+ *  the shift bounds in the accessible name. */
+function formatTimeOfDay(ts: string, language?: string): string {
   return new Date(ts).toLocaleTimeString(dateLocaleFor(language), {
     hour: '2-digit',
     minute: '2-digit',
@@ -96,6 +106,7 @@ export function ChecklistItemRow({
   timeslotStart,
   timeslotEnd,
   currentUserId,
+  labelWithTime = false,
   strings,
 }: Props) {
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -159,7 +170,14 @@ export function ChecklistItemRow({
         checked={isChecked}
         disabled={isPending}
         onChange={(e) => handleChange(e.target.checked)}
-        aria-label={`${strings.toggleLabel}: ${todo.instruction_text}`}
+        aria-label={
+          labelWithTime
+            ? `${strings.toggleLabel}: ${todo.instruction_text}, ${formatTimeOfDay(
+                timeslotStart,
+                language
+              )}\u2013${formatTimeOfDay(timeslotEnd, language)}`
+            : `${strings.toggleLabel}: ${todo.instruction_text}`
+        }
         className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-wait disabled:opacity-50"
       />
       <span className="min-w-0 flex-1">
@@ -175,7 +193,7 @@ export function ChecklistItemRow({
           <span className="mt-0.5 block text-xs text-gray-400">
             {fill(strings.checkedBy, {
               name: actorName,
-              time: formatCheckedAt(check.checked_at, language),
+              time: formatTimeOfDay(check.checked_at, language),
             })}
           </span>
         ) : null}
