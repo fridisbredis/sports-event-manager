@@ -93,13 +93,24 @@ test.describe('SYS-02 tenant detail', () => {
 
     await expect(page.locator('input[type="radio"][name="tier"]')).toHaveCount(3)
     await expect(page.locator('input[type="radio"][name="tier"]:checked')).toHaveCount(1)
-    await expect(page.getByRole('radio', { name: 'Standard' })).toBeChecked()
+    // Exact match: each radio's accessible name now carries its tier label AND
+    // the list of features that tier unlocks, so a substring match for
+    // "Standard" would be ambiguous.
+    await expect(page.locator('input[type="radio"][name="tier"][value="standard"]')).toBeChecked()
 
     await expect(
-      page.getByText(
-        'Exactly one tier is active per tenant in the current version. Selecting one clears the others.'
-      )
+      page.getByText('A tenant has exactly one tier. Selecting a tier replaces the current one.')
     ).toBeVisible()
+  })
+
+  // The per-tier feature lists are generated from TIER_FEATURES, so this also
+  // guards against the register and the UI drifting apart: standard unlocks
+  // nothing tier-specific, and the colour theme appears from premium up.
+  test('each tier lists the features it unlocks', async ({ systemAdminPage: page }) => {
+    await gotoSeedTenant(page)
+
+    await expect(page.getByText('No tier-specific features.')).toBeVisible()
+    await expect(page.getByText('Includes: Event colour theme')).toHaveCount(2)
   })
 
   // Against its own throwaway tenant, not the seed one. Deactivating a tenant

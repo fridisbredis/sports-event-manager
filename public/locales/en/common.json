@@ -29,7 +29,8 @@
     "signOutFailed": "Could not sign out. Please try again.",
     "slotTaken": "Someone else just took that slot. Please reload the schedule and try again.",
     "batchTooLarge": "Too many assignments in one save. Split the change into smaller saves.",
-    "assignmentOnTimeOff": "That official has time off then and cannot be scheduled."
+    "assignmentOnTimeOff": "That official has time off then and cannot be scheduled.",
+    "colorThemeNotInTier": "The colour theme is not included in this tenant's feature tier."
   },
   "notFoundPage": {
     "eyebrow": "No result",

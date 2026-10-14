@@ -1,11 +1,16 @@
 import { useTranslation } from '@/lib/i18n/client'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
+import { TIER_FEATURES } from '@/lib/tiers/features'
 
 interface Props {
   colorPalette: string
   isSavingPalette: boolean
   paletteError: string | undefined
   onSelect: (key: TenantPaletteKey) => void
+  // Tenant's tier does not include the colour theme (SYS-02). The swatches
+  // still render — showing what the feature offers is the point of the upsell
+  // — but none of them can be chosen.
+  isLocked?: boolean
 }
 
 export function ColorPalettePicker({
@@ -13,8 +18,10 @@ export function ColorPalettePicker({
   isSavingPalette,
   paletteError,
   onSelect,
+  isLocked = false,
 }: Props) {
   const { t } = useTranslation('admin')
+  const isDisabled = isSavingPalette || isLocked
 
   return (
     <div>
@@ -33,12 +40,12 @@ export function ColorPalettePicker({
               key={key}
               type="button"
               onClick={() => onSelect(key)}
-              disabled={isSavingPalette}
+              disabled={isDisabled}
               aria-pressed={isSelected}
               aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
               className={`group flex flex-col items-center gap-1.5 rounded-lg border-2 px-3 py-2.5 transition-colors ${
-                isSelected ? '' : 'border-gray-200 hover:border-gray-300'
-              } ${isSavingPalette ? 'opacity-60' : ''}`}
+                isSelected ? '' : `border-gray-200 ${isLocked ? '' : 'hover:border-gray-300'}`
+              } ${isDisabled ? 'opacity-60' : ''} ${isLocked ? 'cursor-not-allowed' : ''}`}
               // The selected swatch is outlined and filled in its OWN palette,
               // so the option previews the theme rather than reading as a
               // neutral "selected" box. primaryTint is the palette's own
@@ -71,13 +78,22 @@ export function ColorPalettePicker({
                   style={{ backgroundColor: `hsl(${palette.accent})`, ...ringStyle }}
                 />
               </div>
-              <span className="text-xs text-gray-500 group-hover:text-gray-700">
+              <span
+                className={`text-xs text-gray-500 ${isLocked ? '' : 'group-hover:text-gray-700'}`}
+              >
                 {t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
               </span>
             </button>
           )
         })}
       </div>
+      {isLocked && (
+        <p className="mt-1.5 text-xs text-gray-500">
+          {t('eventConfig.colorThemeLocked', {
+            tier: t(`systemAdmin.${TIER_FEATURES.colorTheme}`),
+          })}
+        </p>
+      )}
       {paletteError && <p className="mt-1.5 text-xs text-red-500">{paletteError}</p>}
     </div>
   )

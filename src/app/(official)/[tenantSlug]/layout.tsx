@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 import { AdminViewLink } from './_components/admin-view-link'
 import { BottomTabBar } from './_components/bottom-tab-bar'
-import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
+import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
   children: React.ReactNode
@@ -52,7 +52,7 @@ export default async function OfficialLayout({ children, params }: Props) {
 
   return (
     <>
-      <TenantThemeStyle colorPalette={tenant.color_palette} />
+      <TenantThemeStyle colorPalette={effectivePalette(tenant)} />
       <div className="flex flex-col min-h-screen bg-white">
         {/* Suspended because it is chrome, not a gate: no fallback, since the
             link appearing a moment late is better than a grey bar where it

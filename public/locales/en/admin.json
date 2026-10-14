@@ -114,7 +114,8 @@
     "cannotRemoveLastRaceStage": "Cannot remove the last Race stage from a published event.",
     "stageTimesInvalid": "A stage's end time must be after its start time.",
     "publishPreconditionFailed": "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again.",
-    "logoUploadError": "Something went wrong while uploading the logo. Please try again."
+    "logoUploadError": "Something went wrong while uploading the logo. Please try again.",
+    "colorThemeLocked": "Available on {{tier}} and above."
   },
   "workstations": {
     "title": "Work areas",
@@ -418,7 +419,10 @@
     "standard": "Standard",
     "premium": "Premium",
     "professional": "Professional",
-    "tierHint": "Exactly one tier is active per tenant in the current version. Selecting one clears the others."
+    "tierHint": "A tenant has exactly one tier. Selecting a tier replaces the current one.",
+    "tierIncludesNothing": "No tier-specific features.",
+    "tierIncludes": "Includes:",
+    "featureColorTheme": "Event colour theme"
   },
   "health": {
     "backToTenants": "Tenants",

@@ -4,16 +4,13 @@ import { useState } from 'react'
 import { setTenantActive, setTenantTier } from '../../actions'
 import { toastError } from '@/lib/toast'
 import { useTranslation } from '@/lib/i18n/client'
-
-type Tier = 'standard' | 'premium' | 'professional'
+import { TIER_ORDER, featuresForTier, type Tier } from '@/lib/tiers/features'
 
 interface Props {
   tenantId: string
   isActive: boolean
   tier: Tier
 }
-
-const TIERS: Tier[] = ['standard', 'premium', 'professional']
 
 export function TenantDetail({ tenantId, isActive: initialActive, tier: initialTier }: Props) {
   const { t } = useTranslation('admin')
@@ -81,8 +78,8 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
       <div className="p-6">
         <h2 className="section-label mb-4">{t('systemAdmin.featureTier')}</h2>
         <div className="flex flex-col gap-3">
-          {TIERS.map((tierOption) => (
-            <label key={tierOption} className="flex cursor-pointer items-center gap-3">
+          {TIER_ORDER.map((tierOption) => (
+            <label key={tierOption} className="flex cursor-pointer items-start gap-3">
               <input
                 type="radio"
                 name="tier"
@@ -90,9 +87,26 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
                 checked={tier === tierOption}
                 onChange={() => handleTierChange(tierOption)}
                 disabled={pendingTier}
-                className="size-4 border-edge-field text-ink accent-ink focus:ring-ink"
+                className="mt-0.5 size-4 border-edge-field text-ink accent-ink focus:ring-ink"
               />
-              <span className="text-sm text-ink">{t(`systemAdmin.${tierOption}`)}</span>
+              <span>
+                <span className="block text-sm text-ink">{t(`systemAdmin.${tierOption}`)}</span>
+                {/* Generated from TIER_FEATURES rather than written out per
+                    tier, so the list cannot claim something the gate does not
+                    actually grant. A tier with nothing tier-specific says so
+                    instead of rendering an empty "Includes:". */}
+                <span className="mt-0.5 block text-xs text-ink-label">
+                  {featuresForTier(tierOption).length === 0
+                    ? t('systemAdmin.tierIncludesNothing')
+                    : `${t('systemAdmin.tierIncludes')} ${featuresForTier(tierOption)
+                        .map((feature) =>
+                          t(
+                            `systemAdmin.feature${feature.charAt(0).toUpperCase()}${feature.slice(1)}`
+                          )
+                        )
+                        .join(', ')}`}
+                </span>
+              </span>
             </label>
           ))}
         </div>

@@ -3,6 +3,8 @@ import TenantLayout, { SidebarChrome } from './layout'
 import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from './_components/sidebar-nav'
+import { DEFAULT_TENANT_PALETTE } from '@/lib/theme/tenant-colors'
+import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
 // getAdminTenant resolves the tenant only after the admin access check passes,
 // so a null return means either "no such tenant" or "not authorized" — the
@@ -30,7 +32,11 @@ vi.mock('./_components/sidebar-nav', () => ({
   SidebarNav: vi.fn(() => null),
 }))
 
-vi.mock('@/lib/theme/tenant-theme-style', () => ({
+// TenantThemeStyle is stubbed because it renders a raw <style> tag, but
+// effectivePalette is kept REAL: it is the tier gate this layout depends on,
+// and mocking it away would make the gating tests below assert nothing.
+vi.mock('@/lib/theme/tenant-theme-style', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/theme/tenant-theme-style')>()),
   TenantThemeStyle: vi.fn(() => null),
 }))
 
@@ -86,6 +92,7 @@ describe('TenantLayout', () => {
       id: TENANT_ID,
       slug: 'viadal',
       color_palette: 'blue',
+      tier: 'professional',
       is_active: true,
     })
 
@@ -107,6 +114,43 @@ describe('TenantLayout', () => {
     expect(flat).toContain('CHILD_CONTENT')
   })
 
+  // The colour theme is a tier feature (SYS-02): a tenant below the unlocking
+  // tier renders the DEFAULT palette even though its row still holds another
+  // choice — the stored value is ignored on read, never rewritten.
+  it('paints the default palette for a tenant whose tier excludes the theme', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(hasAccountScreen).mockResolvedValue(true)
+    vi.mocked(getAdminTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'purple',
+      tier: 'standard',
+      is_active: true,
+    })
+
+    const result = await TenantLayout({ children: null, params: PARAMS })
+
+    const style = findByType(result, TenantThemeStyle)
+    expect(style!.props.colorPalette).toBe(DEFAULT_TENANT_PALETTE)
+  })
+
+  it('paints the stored palette once the tier includes the theme', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(hasAccountScreen).mockResolvedValue(true)
+    vi.mocked(getAdminTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'purple',
+      tier: 'premium',
+      is_active: true,
+    })
+
+    const result = await TenantLayout({ children: null, params: PARAMS })
+
+    const style = findByType(result, TenantThemeStyle)
+    expect(style!.props.colorPalette).toBe('purple')
+  })
+
   // ACCT-01 is backed by an `officials` row, so the sidebar hides its link for
   // a caller without one — a global system_admin holds no roster row in any
   // tenant, and the page answers notFound() for them.
@@ -116,6 +160,7 @@ describe('TenantLayout', () => {
       id: TENANT_ID,
       slug: 'viadal',
       color_palette: 'blue',
+      tier: 'professional',
       is_active: true,
     })
 

@@ -31,7 +31,13 @@ vi.mock('./_components/admin-view-link', () => ({
   AdminViewLink: vi.fn(() => null),
 }))
 
-vi.mock('@/lib/theme/tenant-theme-style', () => ({
+// TenantThemeStyle is stubbed because it renders a raw <style> tag, but
+// effectivePalette is kept REAL: it is the tier gate this layout depends on.
+import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
+import { DEFAULT_TENANT_PALETTE } from '@/lib/theme/tenant-colors'
+
+vi.mock('@/lib/theme/tenant-theme-style', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/theme/tenant-theme-style')>()),
   TenantThemeStyle: vi.fn(() => null),
 }))
 
@@ -67,6 +73,40 @@ beforeEach(() => {
 })
 
 describe('OfficialLayout', () => {
+  // Officials see the tenant's theme too, so the tier gate has to hold on this
+  // surface as well as the admin one.
+  it('paints the default palette for a tenant whose tier excludes the theme', async () => {
+    mockUser('user-1', {
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'purple',
+      tier: 'standard',
+      is_active: true,
+      officialId: 'official-1',
+    })
+
+    const result = await OfficialLayout({ children: null, params: PARAMS })
+
+    const style = findByType(result, TenantThemeStyle)
+    expect(style!.props.colorPalette).toBe(DEFAULT_TENANT_PALETTE)
+  })
+
+  it('paints the stored palette once the tier includes the theme', async () => {
+    mockUser('user-1', {
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'purple',
+      tier: 'professional',
+      is_active: true,
+      officialId: 'official-1',
+    })
+
+    const result = await OfficialLayout({ children: null, params: PARAMS })
+
+    const style = findByType(result, TenantThemeStyle)
+    expect(style!.props.colorPalette).toBe('purple')
+  })
+
   it('redirects to /login when there is no authenticated user', async () => {
     mockUser(null, null)
 

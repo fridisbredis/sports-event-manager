@@ -38,6 +38,7 @@ function chain(result: unknown) {
     builder[method] = vi.fn(() => builder)
   }
   builder.single = vi.fn(() => Promise.resolve(result))
+  builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
   return builder
@@ -605,11 +606,19 @@ describe('updateTenantColorPalette', () => {
   // Resolved by the real i18n layer, same as the saveEvent cases above.
   const NOT_AUTHORIZED = 'Not authorized'
 
+  // The action makes TWO `from('tenants')` calls: first the tier lookup that
+  // gates the feature, then the update itself. They are handed out in order so
+  // a test can fail either one independently.
   function paletteClient(
     updateBuilder?: ReturnType<typeof chain>,
-    user: unknown = { id: 'user-1' }
+    user: unknown = { id: 'user-1' },
+    tierBuilder: ReturnType<typeof chain> = chain({
+      data: { tier: 'professional' },
+      error: null,
+    })
   ) {
-    const fromMock = vi.fn(() => updateBuilder)
+    let call = 0
+    const fromMock = vi.fn(() => (call++ === 0 ? tierBuilder : updateBuilder))
     vi.mocked(createSupabaseServerClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
       from: fromMock,
@@ -668,6 +677,60 @@ describe('updateTenantColorPalette', () => {
     expect(result).toEqual({ error: 'Unknown color palette' })
     expect(fromMock).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  // The colour theme is a tier feature (SYS-02). The read path already paints
+  // the default palette below the unlocking tier; this guard is the write half
+  // of the same rule, so a locked tenant cannot store a choice that would
+  // spring to life on a later upgrade.
+  it('refuses to write a palette when the tier does not include the theme', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const updateBuilder = chain({ data: [{ id: TENANT_ID }], error: null })
+    const fromMock = paletteClient(
+      updateBuilder,
+      { id: 'user-1' },
+      chain({ data: { tier: 'standard' }, error: null })
+    )
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'purple')
+
+    expect(result).toEqual({
+      error: "The colour theme is not included in this tenant's feature tier.",
+    })
+    // The tier lookup happened; the update did not.
+    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(updateBuilder.update).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('writes the palette when the tier includes the theme', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const updateBuilder = chain({ data: [{ id: TENANT_ID }], error: null })
+    paletteClient(
+      updateBuilder,
+      { id: 'user-1' },
+      chain({ data: { tier: 'premium' }, error: null })
+    )
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'purple')
+
+    expect(result.error).toBeUndefined()
+    expect(updateBuilder.update).toHaveBeenCalledWith({ color_palette: 'purple' })
+  })
+
+  // A tenant row that vanished between the access check and the lookup must
+  // fail closed rather than be treated as unlocked.
+  it('refuses the write when the tenant row cannot be read', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const updateBuilder = chain({ data: [{ id: TENANT_ID }], error: null })
+    paletteClient(updateBuilder, { id: 'user-1' }, chain({ data: null, error: null }))
+
+    const result = await updateTenantColorPalette('viadal', TENANT_ID, 'purple')
+
+    expect(result).toEqual({
+      error: "The colour theme is not included in this tenant's feature tier.",
+    })
+    expect(updateBuilder.update).not.toHaveBeenCalled()
   })
 
   it('translates the db error from the tenants update and skips revalidation', async () => {

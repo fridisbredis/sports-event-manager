@@ -29,7 +29,8 @@
     "signOutFailed": "Kunde inte logga ut. Försök igen.",
     "slotTaken": "Någon annan hann före på den tidsluckan. Ladda om schemat och försök igen.",
     "batchTooLarge": "För många inplaneringar i en sparning. Dela upp ändringen i mindre delar.",
-    "assignmentOnTimeOff": "Funktionären har frånvaro då och kan inte schemaläggas."
+    "assignmentOnTimeOff": "Funktionären har frånvaro då och kan inte schemaläggas.",
+    "colorThemeNotInTier": "Färgtemat ingår inte i kundens funktionsnivå."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

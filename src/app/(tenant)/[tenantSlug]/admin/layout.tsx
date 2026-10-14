@@ -4,7 +4,7 @@ import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/ten
 import { SidebarNav } from './_components/sidebar-nav'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
+import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
   children: React.ReactNode
@@ -57,7 +57,7 @@ export default async function TenantLayout({ children, params }: Props) {
 
   return (
     <>
-      <TenantThemeStyle colorPalette={tenant.color_palette ?? 'blue'} />
+      <TenantThemeStyle colorPalette={effectivePalette(tenant)} />
       <div className="app-surface flex min-h-screen">
         {/* Suspended because it is chrome, not a gate: no fallback, since a
             grey unclickable rail reads worse than the real one arriving a

@@ -3,6 +3,8 @@ import { unstable_cache } from 'next/cache'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { adminEventCacheTag } from '@/lib/cache/tags'
+import { hasFeature } from '@/lib/tiers/features'
+import { effectivePalette } from '@/lib/theme/tenant-theme-style'
 import EventConfigForm from './_components/event-config-form'
 
 interface Props {
@@ -98,7 +100,11 @@ export default async function EventConfigPage({ params }: Props) {
         initialDescription={event.description ?? ''}
         initialLocation={event.location ?? ''}
         initialLogoUrl={event.logo_url ?? ''}
-        initialColorPalette={tenant.color_palette}
+        // The EFFECTIVE palette, not the stored one: below the unlocking tier
+        // the page renders the default, and the picker must agree with what is
+        // on screen rather than advertise a theme that is not in use.
+        initialColorPalette={effectivePalette(tenant)}
+        canChooseColorTheme={hasFeature(tenant.tier, 'colorTheme')}
         initialGranularity={event.scheduling_granularity_min}
         initialStages={stages.map((s) => ({
           id: s.id,

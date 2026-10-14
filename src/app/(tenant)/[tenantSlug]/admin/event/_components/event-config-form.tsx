@@ -39,6 +39,7 @@ interface Props {
   initialLocation: string
   initialLogoUrl: string
   initialColorPalette: string
+  canChooseColorTheme: boolean
   initialGranularity: number
   initialStages: StageInput[]
   initialFacilities: LabelInput[]
@@ -60,6 +61,7 @@ export default function EventConfigForm({
   initialLocation,
   initialLogoUrl,
   initialColorPalette,
+  canChooseColorTheme,
   initialGranularity,
   initialStages,
   initialFacilities,
@@ -374,6 +376,7 @@ export default function EventConfigForm({
               isSavingPalette={isSaving}
               paletteError={paletteError}
               onSelect={handleColorPaletteSelect}
+              isLocked={!canChooseColorTheme}
             />
 
             <Input

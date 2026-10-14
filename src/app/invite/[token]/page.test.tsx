@@ -3,6 +3,8 @@ import InvitePage from './page'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import InviteForm from './_components/invite-form'
+import { TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
+import { DEFAULT_TENANT_PALETTE } from '@/lib/theme/tenant-colors'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
@@ -16,6 +18,13 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('./_components/invite-form', () => ({
   default: vi.fn(() => null),
+}))
+
+// TenantThemeStyle renders a raw <style> tag; effectivePalette stays real
+// because the tier gate is what these tests assert on.
+vi.mock('@/lib/theme/tenant-theme-style', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/theme/tenant-theme-style')>()),
+  TenantThemeStyle: vi.fn(() => null),
 }))
 
 function chain(result: unknown) {
@@ -121,6 +130,73 @@ describe('InvitePage', () => {
 
     const form = findByType(result, InviteForm)
     expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null })
+  })
+
+  // This page reads the palette straight off the joined tenant row rather than
+  // through ResolvedTenant, so it needs its own tier gating — without it an
+  // invite into a locked tenant would paint a theme the tenant may not use.
+  it('paints the default palette when the tenant tier excludes the theme', async () => {
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(
+        chain({
+          data: {
+            phone: '0701234567',
+            name: 'Anna',
+            invite_status: 'invited',
+            invite_token_expires_at: new Date(Date.now() + 100000).toISOString(),
+            tenants: { color_palette: 'purple', tier: 'standard' },
+          },
+        })
+      ),
+    } as never)
+
+    const result = await InvitePage({ params: PARAMS })
+
+    const style = findByType(result, TenantThemeStyle)
+    expect(style!.props.colorPalette).toBe(DEFAULT_TENANT_PALETTE)
+  })
+
+  it('paints the stored palette when the tenant tier includes the theme', async () => {
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(
+        chain({
+          data: {
+            phone: '0701234567',
+            name: 'Anna',
+            invite_status: 'invited',
+            invite_token_expires_at: new Date(Date.now() + 100000).toISOString(),
+            tenants: { color_palette: 'purple', tier: 'premium' },
+          },
+        })
+      ),
+    } as never)
+
+    const result = await InvitePage({ params: PARAMS })
+
+    const style = findByType(result, TenantThemeStyle)
+    expect(style!.props.colorPalette).toBe('purple')
+  })
+
+  // An expired or unknown token must stay unthemed: the colour would reveal
+  // which organisation the link belonged to.
+  it('renders no theme at all for an invalid invite', async () => {
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(
+        chain({
+          data: {
+            phone: '0701234567',
+            name: 'Anna',
+            invite_status: 'invited',
+            invite_token_expires_at: new Date(Date.now() - 100000).toISOString(),
+            tenants: { color_palette: 'purple', tier: 'premium' },
+          },
+        })
+      ),
+    } as never)
+
+    const result = await InvitePage({ params: PARAMS })
+
+    expect(findByType(result, TenantThemeStyle)).toBeNull()
   })
 
   it('renders InviteForm with the phone/name when the invite is valid and unexpired', async () => {
