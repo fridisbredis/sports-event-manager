@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { TENANT_PALETTES, type TenantPaletteKey } from '@/lib/theme/tenant-colors'
+import { hasFeature } from '@/lib/tiers/features'
 import { logger } from '@/lib/logger'
 import { translateDbError, translateStorageError } from '@/lib/actions/db-error-message'
 import { getServerTranslation } from '@/lib/i18n/server'
@@ -304,6 +305,33 @@ export async function updateTenantColorPalette(
 
   if (!(colorPalette in TENANT_PALETTES))
     return { error: await tError('actionErrors.unknownColorPalette') }
+
+  // Choosing a theme is a tier feature (SYS-02). The read path already renders
+  // the default palette below the unlocking tier, so this guard is the second
+  // half of the same rule: without it a tenant under that tier could still
+  // store a choice that never appears, and the stored value would spring to
+  // life on some future upgrade nobody connected to this action.
+  //
+  // The tier is read here rather than taken from the caller: it governs
+  // access, so it cannot come from the client.
+  const { data: tierRow, error: tierError } = await supabase
+    .from('tenants')
+    .select('tier')
+    .eq('id', parsedTenantId.data)
+    .maybeSingle()
+
+  if (tierError)
+    return {
+      error: await translateDbError('updateTenantColorPalette: tier lookup failed', tierError),
+    }
+
+  if (!tierRow || !hasFeature(tierRow.tier, 'colorTheme')) {
+    logger.warn('updateTenantColorPalette: tier does not include the colour theme', {
+      tenantId: parsedTenantId.data,
+      tier: tierRow?.tier,
+    })
+    return { error: await tError('actionErrors.colorThemeNotInTier') }
+  }
 
   // `select()` so the row count comes back: an UPDATE whose rows are all
   // filtered out by RLS is not an error in Postgres — it reports success
