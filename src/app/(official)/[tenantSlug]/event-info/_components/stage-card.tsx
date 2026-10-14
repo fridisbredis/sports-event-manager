@@ -1,6 +1,7 @@
 'use client'
 
-import { ExternalLink, MapPin } from 'lucide-react'
+import { Check, Copy, ExternalLink, MapPin } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { AppCard } from '@/components/ui/app-card'
 
 interface Props {
@@ -10,9 +11,48 @@ interface Props {
   venue: string | null
   resultsUrl: string | null
   resultsLabel: string
+  copyResultsLabel: string
+  resultsCopiedLabel: string
 }
 
-export function StageCard({ stageNumber, name, details, venue, resultsUrl, resultsLabel }: Props) {
+export function StageCard({
+  stageNumber,
+  name,
+  details,
+  venue,
+  resultsUrl,
+  resultsLabel,
+  copyResultsLabel,
+  resultsCopiedLabel,
+}: Props) {
+  // The copied state is a two-second acknowledgement, not a mode: the icon
+  // swaps to a check and the accessible name changes, then it reverts. The
+  // timer is held in a ref and cleared on unmount so a stage card that
+  // scrolls away mid-acknowledgement doesn't set state on an unmounted tree.
+  const [copied, setCopied] = useState(false)
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current)
+    }
+  }, [])
+
+  async function copyResultsUrl() {
+    if (!resultsUrl) return
+    // navigator.clipboard is unavailable on insecure origins and can reject
+    // if the user denies permission. A failed copy leaves the button silent
+    // rather than claiming success — the link itself is still right there.
+    try {
+      await navigator.clipboard.writeText(resultsUrl)
+    } catch {
+      return
+    }
+    setCopied(true)
+    if (resetTimer.current) clearTimeout(resetTimer.current)
+    resetTimer.current = setTimeout(() => setCopied(false), 2000)
+  }
+
   // The schedule facts run as one dot-separated line that wraps, rather than
   // one line per fact. They are read as a sequence ("briefing, then start,
   // then podium"), and stacking them made a three-fact stage card twice as
@@ -67,16 +107,46 @@ export function StageCard({ stageNumber, name, details, venue, resultsUrl, resul
             client component and the page already holds the server-side `t`,
             so translating here would mean a second i18n hook for one string. */}
         {resultsUrl ? (
-          <p className="mt-1.5">
+          /* The copy button sits beside the link rather than replacing any of
+             it: an official on site often needs to hand the results URL to
+             someone else (a team captain, a group chat) instead of opening it
+             themselves, and selecting a URL by hand on a phone is fiddly.
+
+             It is an icon-only button, so its name lives in aria-label, which
+             doubles as the tooltip via title. The check state is announced
+             through that same name rather than a visible string, keeping the
+             button from resizing — a row that reflows under the thumb is
+             easy to mis-tap. role="status" on the glyph wrapper lets a
+             screen reader pick up the change without moving focus. */
+          <p className="mt-1.5 flex items-center gap-1">
             <a
               href={resultsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[15px] font-medium leading-relaxed text-tenant-primary underline underline-offset-2"
+              className="inline-flex min-w-0 items-center gap-1.5 text-[15px] font-medium leading-relaxed text-tenant-primary underline underline-offset-2"
             >
               <ExternalLink className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
               <span className="min-w-0">{resultsLabel}</span>
             </a>
+            <button
+              type="button"
+              onClick={copyResultsUrl}
+              aria-label={copied ? resultsCopiedLabel : copyResultsLabel}
+              title={copied ? resultsCopiedLabel : copyResultsLabel}
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors hover:bg-black/5 hover:text-tenant-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tenant-primary active:bg-black/10"
+            >
+              <span role="status">
+                {copied ? (
+                  <Check
+                    className="size-4 text-tenant-primary"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Copy className="size-4" strokeWidth={1.8} aria-hidden="true" />
+                )}
+              </span>
+            </button>
           </p>
         ) : null}
       </div>
