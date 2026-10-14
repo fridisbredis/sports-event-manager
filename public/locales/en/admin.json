@@ -428,7 +428,7 @@
   "health": {
     "backToTenants": "Tenants",
     "title": "System status",
-    "subtitle": "Quick overview of dev/prod operations. Some metrics are live, others link out to the service's own console.",
+    "subtitle": "Live status across the services this platform runs on. Each card links out to the service's own console for full detail.",
     "status": {
       "ok": "Up",
       "error": "Down",

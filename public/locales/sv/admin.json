@@ -428,7 +428,7 @@
   "health": {
     "backToTenants": "Kunder",
     "title": "Systemstatus",
-    "subtitle": "Snabb överblick över drift i dev/prod. Vissa mätvärden är live, andra länkar vidare till tjänstens egen konsol.",
+    "subtitle": "Live-status för tjänsterna plattformen körs på. Varje kort länkar vidare till tjänstens egen konsol för fullständig information.",
     "status": {
       "ok": "Uppe",
       "error": "Nere",
