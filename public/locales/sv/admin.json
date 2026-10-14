@@ -114,7 +114,8 @@
     "cannotRemoveLastRaceStage": "Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.",
     "stageTimesInvalid": "En etapps sluttid måste vara efter dess starttid.",
     "publishPreconditionFailed": "Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.",
-    "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen."
+    "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen.",
+    "colorThemeLocked": "Tillgängligt från {{tier}} och uppåt."
   },
   "workstations": {
     "title": "Arbetsområden",
@@ -418,7 +419,10 @@
     "standard": "Standard",
     "premium": "Premium",
     "professional": "Professional",
-    "tierHint": "Exakt en nivå är aktiv per kund i nuvarande version. Att välja en rensar de andra."
+    "tierHint": "En kund har exakt en funktionsnivå. Att välja en ersätter den nuvarande.",
+    "tierIncludesNothing": "Inga nivåspecifika funktioner.",
+    "tierIncludes": "Innehåller:",
+    "featureColorTheme": "Färgtema för evenemang"
   },
   "health": {
     "backToTenants": "Kunder",
