@@ -57,16 +57,13 @@ export type PersonDragPicker = {
   officialId: string
   officialName: string
   cellStarts: string[]
-  anchorTop: number
-  anchorLeft: number
 } | null
 
 export type DragOfficialPicker = {
   workstationId: string
+  wsName: string
   slotIndex: number
   cellStarts: string[]
-  anchorTop: number
-  anchorLeft: number
 } | null
 
 // The nine interaction-mode states for the scheduling grid, plus the
@@ -161,11 +158,21 @@ export function useSchedulingGridInteraction() {
     (data: NonNullable<DragOfficialPicker>) => setDragOfficialPicker(data),
     []
   )
-  const closeDragOfficialPicker = useCallback(() => setDragOfficialPicker(null), [])
+  const [dragPickerSearch, setDragPickerSearch] = useState('')
+  const closeDragOfficialPicker = useCallback(() => {
+    setDragOfficialPicker(null)
+    setDragPickerSearch('')
+  }, [])
 
   const [dragSaving, setDragSaving] = useState(false)
 
-  // Close popups when clicking outside
+  // Close the anchored popups when clicking outside them.
+  //
+  // The two drag pickers are deliberately absent: they are modals now, and a
+  // modal dismisses itself through its own overlay. Matching them here by a
+  // `data-` attribute their markup no longer carries made every mousedown
+  // count as "outside" — including the one on a row inside them, which closed
+  // the picker before its click could land.
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (pickerCell && !(e.target as HTMLElement).closest('[data-picker-cell]')) {
@@ -174,18 +181,12 @@ export function useSchedulingGridInteraction() {
       if (cellActionCell && !(e.target as HTMLElement).closest('[data-cell-action]')) {
         setCellActionCell(null)
       }
-      if (dragOfficialPicker && !(e.target as HTMLElement).closest('[data-drag-official-picker]')) {
-        setDragOfficialPicker(null)
-      }
-      if (personDragPicker && !(e.target as HTMLElement).closest('[data-person-drag-picker]')) {
-        setPersonDragPicker(null)
-      }
     }
-    if (pickerCell || cellActionCell || dragOfficialPicker || personDragPicker) {
+    if (pickerCell || cellActionCell) {
       document.addEventListener('mousedown', handleClick)
     }
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [pickerCell, cellActionCell, dragOfficialPicker, personDragPicker])
+  }, [pickerCell, cellActionCell])
 
   return {
     pickerCell,
@@ -227,6 +228,9 @@ export function useSchedulingGridInteraction() {
     dragOfficialPicker,
     openDragOfficialPicker,
     closeDragOfficialPicker,
+
+    dragPickerSearch,
+    setDragPickerSearch,
 
     dragSaving,
     setDragSaving,

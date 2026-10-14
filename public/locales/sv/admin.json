@@ -283,6 +283,7 @@
     "slotModalEmpty": "Alla funktionärer är redan inplanerade vid den här tiden.",
     "dragPaintPickPerson_one": "Planera in på {{count}} tidslucka",
     "dragPaintPickPerson_other": "Planera in på {{count}} tidsluckor",
+    "dragPaintRange": "{{ws}} · {{from}}–{{to}}",
     "dragPaintSaving": "Sparar…",
     "slotModalSearchPlaceholder": "Sök på namn…",
     "slotModalNoResults": "Inga funktionärer matchar din sökning.",
@@ -310,6 +311,10 @@
     "timeOffBlockedCell": "Frånvaro – kan inte schemaläggas",
     "legendTimeOffAdmin": "Frånvaro satt av arrangörerna",
     "dragPaintPickArea": "{{name}} · {{count}} pass",
+    "dragPaintPickAreaTitle_one": "Planera in {{name}} på {{count}} tidslucka",
+    "dragPaintPickAreaTitle_other": "Planera in {{name}} på {{count}} tidsluckor",
+    "dragPaintPickAreaLabel": "Arbetsområden som är öppna dessa tider",
+    "dragPaintNoOpenAreas": "Inget arbetsområde är öppet under alla dessa tidsluckor.",
     "dragPaintTimeOff": "Markera som frånvaro",
     "timeOffOnlyOwnerRemoves": "Bara funktionären kan ta bort den här."
   },

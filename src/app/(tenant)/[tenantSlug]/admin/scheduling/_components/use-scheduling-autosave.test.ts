@@ -318,10 +318,9 @@ describe('useSchedulingAutosave', () => {
         await result.current.handleDragOfficialPick(
           {
             workstationId: 'ws1',
+            wsName: 'Start line',
             slotIndex: 1,
             cellStarts: ['2026-08-31T09:00:00.000Z', '2026-08-31T09:15:00.000Z'],
-            anchorTop: 0,
-            anchorLeft: 0,
           },
           'o4'
         )

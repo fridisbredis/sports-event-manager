@@ -51,3 +51,19 @@ export interface LocalAssignment {
 }
 
 export type SchedulingView = 'by-person' | 'by-work-area'
+
+/**
+ * Why an official is or is not a pick for a slot or a painted run of slots.
+ *
+ * Shared by both picking surfaces — the slot modal opened from a single cell
+ * and the one opened by a drag-paint gesture — so the two can never drift
+ * apart on what counts as unpickable. Ordered by how much it discourages
+ * picking, which is also the order the list sorts in: free first, then the
+ * ones that cannot be picked at all.
+ */
+export type PickerStatus = 'available' | 'timeOff' | 'timeOffAdmin' | 'assigned'
+
+export interface PickerCandidate {
+  official: OfficialData
+  status: PickerStatus
+}

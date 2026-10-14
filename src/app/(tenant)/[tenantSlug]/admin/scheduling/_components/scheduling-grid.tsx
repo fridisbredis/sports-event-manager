@@ -16,7 +16,7 @@ import {
   formatSlotLabel,
 } from '@/lib/scheduling/grid-logic'
 import { useTranslation } from '@/lib/i18n/client'
-import { getAssignmentsForCell } from './grid-helpers'
+import { getAssignmentsForCell, buildPickerCandidates } from './grid-helpers'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SetupEmptyState } from './setup-empty-state'
 import { SchedulingLegend } from './scheduling-legend'
@@ -39,7 +39,6 @@ import { ByWorkAreaGrid } from './by-work-area-grid'
 import { useSchedulingGridInteraction } from './use-scheduling-grid-interaction'
 import { useSchedulingAutosave } from './use-scheduling-autosave'
 import { CellActionPopup } from './cell-action-popup'
-import { DragOfficialPicker } from './drag-official-picker'
 import { WsSlotModal } from './ws-slot-modal'
 import type {
   Stage,
@@ -47,6 +46,7 @@ import type {
   OfficialData,
   AssignmentData,
   LocalAssignment,
+  PickerCandidate,
   SchedulingView,
 } from './scheduling-types'
 
@@ -145,6 +145,8 @@ export function SchedulingGrid({
     dragOfficialPicker,
     openDragOfficialPicker,
     closeDragOfficialPicker,
+    dragPickerSearch,
+    setDragPickerSearch,
     dragSaving,
     setDragSaving,
   } = useSchedulingGridInteraction()
@@ -283,7 +285,7 @@ export function SchedulingGrid({
   useEffect(() => {
     if (!wsDrag) return
 
-    function handleUp(e: PointerEvent) {
+    function handleUp() {
       if (!wsDrag) return
       const { workstationId, wsName, slotIndex, startIdx, currentIdx } = wsDrag
       const lo = Math.min(startIdx, currentIdx)
@@ -317,10 +319,9 @@ export function SchedulingGrid({
       if (validCells.length > 0) {
         openDragOfficialPicker({
           workstationId,
+          wsName,
           slotIndex,
           cellStarts: validCells,
-          anchorTop: e.clientY,
-          anchorLeft: e.clientX,
         })
       }
     }
@@ -338,15 +339,22 @@ export function SchedulingGrid({
     openDragOfficialPicker,
   ])
 
-  const dragAvailableOfficials = useMemo(() => {
-    if (!dragOfficialPicker) return []
-    const busy = new Set(
-      activeAssignments
-        .filter((a) => dragOfficialPicker.cellStarts.includes(a.timeslot_start))
-        .map((a) => a.official_id)
-    )
-    return officials.filter((o) => !busy.has(o.id))
-  }, [dragOfficialPicker, activeAssignments, officials])
+  // Slots the open picking surface applies to: one for a single-cell click,
+  // the painted run for a drag gesture. Whichever is open feeds the same
+  // candidate builder, so the two surfaces agree on who is pickable.
+  const pickerCellStarts = useMemo(() => {
+    if (dragOfficialPicker) return dragOfficialPicker.cellStarts
+    if (wsSlotModal) return [wsSlotModal.slotStart]
+    return []
+  }, [dragOfficialPicker, wsSlotModal])
+
+  const pickerCandidates = useMemo<PickerCandidate[]>(
+    () =>
+      pickerCellStarts.length > 0
+        ? buildPickerCandidates(officials, pickerCellStarts, activeAssignments, periodsByCell)
+        : [],
+    [pickerCellStarts, officials, activeAssignments, periodsByCell]
+  )
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -503,7 +511,7 @@ export function SchedulingGrid({
   useEffect(() => {
     if (!personDrag) return
 
-    function handleUp(e: PointerEvent) {
+    function handleUp() {
       const drag = personDrag
       if (!drag) return
       endPersonDrag()
@@ -517,8 +525,6 @@ export function SchedulingGrid({
         officialId: drag.officialId,
         officialName: drag.officialName,
         cellStarts,
-        anchorTop: e.clientY,
-        anchorLeft: e.clientX,
       })
     }
 
@@ -626,6 +632,14 @@ export function SchedulingGrid({
           unavailableSlots={unavailableSlots}
           periodsByCell={periodsByCell}
           personDrag={personDrag}
+          pendingPaint={
+            personDragPicker
+              ? {
+                  officialId: personDragPicker.officialId,
+                  cellStarts: new Set(personDragPicker.cellStarts),
+                }
+              : null
+          }
           onPersonDragStart={handlePersonDragStart}
           onPersonDragEnter={handlePersonDragEnter}
           onTimeOffClick={handleTimeOffClick}
@@ -662,15 +676,6 @@ export function SchedulingGrid({
         />
       )}
 
-      {/* One-time official picker after a by-work-area drag-to-paint gesture */}
-      {dragOfficialPicker && (
-        <DragOfficialPicker
-          dragOfficialPicker={dragOfficialPicker}
-          availableOfficials={dragAvailableOfficials}
-          onPick={handleDragOfficialPick}
-        />
-      )}
-
       {timeOffCell && (
         <TimeOffPopup
           cell={timeOffCell}
@@ -702,22 +707,62 @@ export function SchedulingGrid({
           }
           onPickWorkstation={handlePersonDragPickWorkstation}
           onPickTimeOff={handlePersonDragPickTimeOff}
+          onClose={closePersonDragPicker}
         />
       )}
 
-      {/* Slot modal for by-work-area expanded rows */}
+      {/* One picking surface for both gestures: a single-cell click on a
+          by-work-area expanded row, and a drag-painted run of cells. */}
       {wsSlotModal && (
         <WsSlotModal
-          wsSlotModal={wsSlotModal}
-          wsSlotModalSearch={wsSlotModalSearch}
+          title={t('scheduling.slotModalTitle', {
+            index: wsSlotModal.slotIndex,
+            ws: wsSlotModal.wsName,
+            time: formatSlotLabel(new Date(wsSlotModal.slotStart)),
+          })}
+          listLabel={t('scheduling.slotModalAvailable', {
+            time: formatSlotLabel(new Date(wsSlotModal.slotStart)),
+          })}
+          candidates={pickerCandidates}
+          search={wsSlotModalSearch}
           onSearchChange={setWsSlotModalSearch}
-          activeAssignments={activeAssignments}
+          assignedInSlot={activeAssignments.filter(
+            (a) =>
+              a.workstation_id === wsSlotModal.workstationId &&
+              a.timeslot_start === wsSlotModal.slotStart &&
+              a.slot_index === wsSlotModal.slotIndex
+          )}
           officials={officials}
-          unavailableSlots={unavailableSlots}
-          periodsByCell={periodsByCell}
           onRemove={handleWsSlotRemove}
           onAdd={handleWsSlotAdd}
           onClose={closeWsSlotModal}
+        />
+      )}
+
+      {dragOfficialPicker && (
+        <WsSlotModal
+          title={t('scheduling.dragPaintPickPerson', {
+            count: dragOfficialPicker.cellStarts.length,
+          })}
+          listLabel={t('scheduling.dragPaintRange', {
+            ws: dragOfficialPicker.wsName,
+            from: formatSlotLabel(new Date(dragOfficialPicker.cellStarts[0]!)),
+            to: formatSlotLabel(
+              new Date(dragOfficialPicker.cellStarts[dragOfficialPicker.cellStarts.length - 1]!)
+            ),
+          })}
+          candidates={pickerCandidates}
+          search={dragPickerSearch}
+          onSearchChange={setDragPickerSearch}
+          // A painted run only covers cells that were empty, so there is
+          // never anything to offer removal for here.
+          assignedInSlot={[]}
+          officials={officials}
+          onAdd={handleDragOfficialPick}
+          onClose={closeDragOfficialPicker}
+          // Opened from the drag's own `pointerup`, so the release that ends
+          // the drag must not choose the row it lands on.
+          openedMidGesture
         />
       )}
 
