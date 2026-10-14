@@ -492,6 +492,11 @@ export type ResolvedTenant = {
   id: string
   slug: string
   color_palette: string
+  // Governs which tier-gated features this tenant may use (see
+  // `@/lib/tiers/features`). Carried on the resolved tenant rather than
+  // resolved away here, so a caller needing more than a yes/no — a limit, a
+  // tier label to display — has it without a second query.
+  tier: string
   is_active: boolean
 }
 
@@ -505,7 +510,7 @@ async function resolveTenantBySlug(tenantSlug: string): Promise<ResolvedTenant |
   const service = createSupabaseServiceClient()
   const { data, error } = await service
     .from('tenants')
-    .select('id, slug, color_palette, is_active')
+    .select('id, slug, color_palette, tier, is_active')
     .eq('slug', tenantSlug)
     .maybeSingle()
 

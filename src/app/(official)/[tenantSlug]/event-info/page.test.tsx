@@ -50,6 +50,7 @@ function mockResolvedTenant() {
     id: TENANT_ID,
     slug: 'viadal',
     color_palette: 'default',
+    tier: 'professional',
     is_active: true,
     officialId: null,
   })
