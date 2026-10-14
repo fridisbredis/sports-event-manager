@@ -775,28 +775,44 @@ function WorkAreaView({
                 {checkableTodos.length > 0 ? (
                   <>
                     <p className="section-label mb-2">{todoLabel}</p>
-                    <ul className="flex flex-col gap-2">
-                      {checkableTodos.map((todo) =>
-                        // One row per contiguous run, not per item: a station
-                        // worked morning and afternoon gets an independent
-                        // tick for each, matching how the state is keyed in
-                        // the database.
-                        spans.map((span) => (
-                          <ChecklistItemRow
-                            key={`${todo.id}-${span.start}`}
-                            todo={todo}
-                            check={checks.get(`${todo.id}|${span.start}`) ?? null}
-                            color={color}
-                            tenantSlug={tenantSlug}
-                            workstationId={ws.id}
-                            timeslotStart={span.start}
-                            timeslotEnd={span.end}
-                            currentUserId={currentUserId}
-                            strings={checklistStrings}
-                          />
-                        ))
-                      )}
-                    </ul>
+                    {/* Span-first, not item-first. Every checkable item gets
+                        one independent tick per contiguous run, matching how
+                        the state is keyed in the database — but two runs of
+                        the same item are identical rows, so a flat list read
+                        as duplicated data rather than as one tick per shift.
+                        Grouping under the shift's own time is what names the
+                        difference.
+
+                        The heading is omitted when the station is worked a
+                        single stretch: there is nothing to tell apart then,
+                        and the card already states that time above. */}
+                    {spans.map((span) => (
+                      <div key={span.start} className={spans.length > 1 ? 'mb-3 last:mb-0' : ''}>
+                        {spans.length > 1 ? (
+                          <p className="mb-1.5 text-xs font-medium text-gray-500">
+                            {formatTime(span.start, language)}&ndash;
+                            {formatTime(span.end, language)}
+                          </p>
+                        ) : null}
+                        <ul className="flex flex-col gap-2">
+                          {checkableTodos.map((todo) => (
+                            <ChecklistItemRow
+                              key={`${todo.id}-${span.start}`}
+                              todo={todo}
+                              check={checks.get(`${todo.id}|${span.start}`) ?? null}
+                              color={color}
+                              tenantSlug={tenantSlug}
+                              workstationId={ws.id}
+                              timeslotStart={span.start}
+                              timeslotEnd={span.end}
+                              currentUserId={currentUserId}
+                              labelWithTime={spans.length > 1}
+                              strings={checklistStrings}
+                            />
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
                   </>
                 ) : null}
                 {infoTodos.length > 0 ? (

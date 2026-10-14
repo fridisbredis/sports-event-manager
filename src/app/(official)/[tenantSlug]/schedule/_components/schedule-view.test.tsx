@@ -575,6 +575,57 @@ describe('ScheduleView checklist grouping', () => {
     expect(screen.queryByText('To do')).not.toBeInTheDocument()
     expect(screen.getByText('Good to know')).toBeInTheDocument()
   })
+
+  // A station worked two separate stretches gets an independent tick per
+  // stretch, so the same item appears twice. Without the shift's time around
+  // them the two rows are indistinguishable, and the card reads as if the
+  // admin had entered the item twice.
+  it('groups the ticks under each shift when a station is worked twice', () => {
+    renderWorkAreaView([
+      slot('a1', '2026-08-12T08:00:00Z', '2026-08-12T09:00:00Z', MIXED_TODOS),
+      slot('a2', '2026-08-12T13:00:00Z', '2026-08-12T14:00:00Z', MIXED_TODOS),
+    ])
+
+    // One heading per stretch, inside the checklist as well as above the card.
+    expect(screen.getAllByText('08:00–09:00')).toHaveLength(2)
+    expect(screen.getAllByText('13:00–14:00')).toHaveLength(2)
+
+    // Shift-first ordering: both of the morning's items precede the
+    // afternoon's, rather than each item listing its two times.
+    const checkables = screen.getAllByRole('checkbox').map((el) => el.getAttribute('aria-label'))
+    expect(checkables).toEqual([
+      'Check off: Collect timing chips, 08:00–09:00',
+      'Check off: Hand out medals, 08:00–09:00',
+      'Check off: Collect timing chips, 13:00–14:00',
+      'Check off: Hand out medals, 13:00–14:00',
+    ])
+  })
+
+  // An info item says the same thing whenever it is read, so a second shift
+  // must not duplicate it the way a checkable item is duplicated.
+  it('still renders an informational item once across two shifts', () => {
+    renderWorkAreaView([
+      slot('a1', '2026-08-12T08:00:00Z', '2026-08-12T09:00:00Z', MIXED_TODOS),
+      slot('a2', '2026-08-12T13:00:00Z', '2026-08-12T14:00:00Z', MIXED_TODOS),
+    ])
+
+    expect(screen.getAllByText('Radio channel 3')).toHaveLength(1)
+    expect(screen.getAllByText('Cups are by the table')).toHaveLength(1)
+  })
+
+  // Contiguous slots merge into one stretch, so a station worked straight
+  // through is a single shift and must stay on the unlabelled layout.
+  it('keeps one unlabelled group when back-to-back slots merge', () => {
+    renderWorkAreaView([
+      slot('a1', '2026-08-12T08:00:00Z', '2026-08-12T09:00:00Z', MIXED_TODOS),
+      slot('a2', '2026-08-12T09:00:00Z', '2026-08-12T10:00:00Z', MIXED_TODOS),
+    ])
+
+    const checkables = screen.getAllByRole('checkbox').map((el) => el.getAttribute('aria-label'))
+    expect(checkables).toEqual(['Check off: Collect timing chips', 'Check off: Hand out medals'])
+    // The card's own time line, and no second copy from a checklist heading.
+    expect(screen.getAllByText('08:00–10:00')).toHaveLength(1)
+  })
 })
 
 describe('ScheduleView declared time off', () => {
