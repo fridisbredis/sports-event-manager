@@ -147,6 +147,8 @@ export default async function EventInfoPage({ params }: Props) {
                   venue={stage.venue}
                   resultsUrl={stage.results_url}
                   resultsLabel={t('eventInfo.raceResults')}
+                  copyResultsLabel={t('eventInfo.copyResultsLink')}
+                  resultsCopiedLabel={t('eventInfo.resultsLinkCopied')}
                 />
               )
             })}

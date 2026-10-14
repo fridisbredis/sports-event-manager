@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import EventInfoPage from './page'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
@@ -250,6 +250,93 @@ describe('EventInfoPage', () => {
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
 
+  it('copies the results URL to the clipboard from the button beside the link', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    // jsdom ships no clipboard implementation, so the button needs one to
+    // call. Defined rather than assigned: navigator.clipboard is read-only.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Day 1',
+            stage_type: 'race',
+            stage_date: null,
+            start_time: '2026-06-12T07:00:00Z',
+            end_time: null,
+            venue: null,
+            results_url: 'https://results.example.com/viadal',
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'eventInfo.copyResultsLink' }))
+
+    // The URL itself is copied, not the visible label.
+    expect(writeText).toHaveBeenCalledWith('https://results.example.com/viadal')
+
+    // The acknowledgement rides on the accessible name, so the icon-only
+    // button confirms the copy without the row reflowing under the thumb.
+    expect(
+      await screen.findByRole('button', { name: 'eventInfo.resultsLinkCopied' })
+    ).toBeInTheDocument()
+  })
+
+  it('leaves the copy button unacknowledged when the clipboard write is refused', async () => {
+    // Insecure origins and denied permissions both reject here. A failed copy
+    // must not claim success — the official would paste stale content.
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [
+          {
+            id: 'stage-1',
+            name: 'Day 1',
+            stage_type: 'race',
+            stage_date: null,
+            start_time: '2026-06-12T07:00:00Z',
+            end_time: null,
+            venue: null,
+            results_url: 'https://results.example.com/viadal',
+            position: 0,
+          },
+        ],
+        facilities: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'eventInfo.copyResultsLink' }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'eventInfo.resultsLinkCopied' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'eventInfo.copyResultsLink' })).toBeInTheDocument()
+  })
+
   it('shows no results link for a stage that has none', async () => {
     mockResolvedTenant()
     mockUser('user-1')
@@ -277,6 +364,8 @@ describe('EventInfoPage', () => {
     render(await EventInfoPage({ params: PARAMS }))
 
     expect(screen.queryByRole('link', { name: 'eventInfo.raceResults' })).toBeNull()
+    // Nothing to copy, so the button goes with the link.
+    expect(screen.queryByRole('button', { name: 'eventInfo.copyResultsLink' })).toBeNull()
   })
 
   // The Viadal race runs 2 Aug 12:00 through 8 Aug 12:00. Formatting only the

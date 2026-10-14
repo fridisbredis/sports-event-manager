@@ -32,6 +32,8 @@
     "facilities": "Facilities",
     "programme": "Event programme by stage",
     "raceResults": "Race Results",
+    "copyResultsLink": "Copy results link",
+    "resultsLinkCopied": "Link copied",
     "noProgramme": "No programme yet",
     "noProgrammeDescription": "Event details will appear here once published.",
     "noFacilities": "No facilities listed yet."

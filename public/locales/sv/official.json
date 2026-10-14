@@ -32,6 +32,8 @@
     "facilities": "Faciliteter",
     "programme": "Evenemangsprogram per etapp",
     "raceResults": "Race Results",
+    "copyResultsLink": "Kopiera resultatlänk",
+    "resultsLinkCopied": "Länk kopierad",
     "noProgramme": "Inget program än",
     "noProgrammeDescription": "Detaljer om evenemanget visas här när det publicerats.",
     "noFacilities": "Inga faciliteter angivna än."
