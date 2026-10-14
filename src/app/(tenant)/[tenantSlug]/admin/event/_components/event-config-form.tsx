@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, KeyboardEvent } from 'react'
+import { useState, useTransition, useRef, useEffect, KeyboardEvent } from 'react'
 import { Chip } from '@heroui/react'
 import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
@@ -86,16 +86,44 @@ export default function EventConfigForm({
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
 
+  // The logo is staged, not written, until Save — the same contract as every
+  // other field on this form. Two pieces of pending intent, deliberately
+  // distinct from the displayed `logoUrl`:
+  //
+  //   pendingLogoFile    a chosen file not yet uploaded
+  //   pendingLogoRemoval the admin pressed Remove on the stored logo
+  //
+  // Nothing reaches Storage or the events row until handleSave runs them, so
+  // abandoning the page leaves the bucket and the row exactly as they were.
+  // This is what keeps a forgotten Save from stranding a file in the bucket
+  // with no row pointing at it — the failure mode that made the logo vanish
+  // from INFO-01 in the first place.
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
+  const [pendingLogoRemoval, setPendingLogoRemoval] = useState(false)
+
+  // Revoked whenever it is replaced or cleared: an object URL pins its blob
+  // in memory until the document goes away otherwise.
+  const previewUrlRef = useRef<string | null>(null)
+  function setPreview(url: string | null) {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    previewUrlRef.current = url
+  }
+  useEffect(() => () => setPreview(null), [])
+
   // Re-seeded from the server payload for the same reason as the palette
   // below: useState keeps its mount-time value, so after a revalidate of this
   // route the form would keep showing — and sending back — whatever logo it
-  // was built with. Now that upload and remove write the column themselves,
-  // the server is the authority on this field and the form follows it.
+  // was built with.
   const [renderedLogoUrl, setRenderedLogoUrl] = useState(initialLogoUrl)
   if (renderedLogoUrl !== initialLogoUrl) {
     setRenderedLogoUrl(initialLogoUrl)
-    setLogoUrl(initialLogoUrl)
-    setLogoError(false)
+    // A staged pick or removal outranks the server value: it is the admin's
+    // unsaved intent, and a revalidate triggered by something else on the
+    // page must not silently discard it.
+    if (!pendingLogoFile && !pendingLogoRemoval) {
+      setLogoUrl(initialLogoUrl)
+      setLogoError(false)
+    }
   }
   const [colorPalette, setColorPalette] = useState(initialColorPalette)
 
@@ -147,56 +175,89 @@ export default function EventConfigForm({
     }
 
     setUploadError(undefined)
-    setIsUploading(true)
 
-    // Downscale before upload, the same way the profile picture does. The
-    // logo renders at 72px, so a full-resolution file is bytes nobody sees —
-    // and a Server Action body is capped at 1 MB, which a photo-sized logo
-    // blows past before the action's own size check can report anything
+    // Downscale on pick rather than on Save. The work is the same either way,
+    // but doing it here means the preview shows the image that will actually
+    // be uploaded, and Save stays a short operation.
+    //
+    // The logo renders at 72px, so a full-resolution file is bytes nobody
+    // sees — and a Server Action body is capped at 1 MB, which a photo-sized
+    // logo blows past before the action's own size check can report anything
     // useful. Shrinking first means a large source file just works instead of
     // being rejected for its size.
-    const { file: upload } = await resizeImage(file, 'logo')
+    const { file: resized } = await resizeImage(file, 'logo')
 
-    const formData = new FormData()
-    formData.append('file', upload)
-    formData.append('tenantId', tenantId)
-    formData.append('eventId', eventId)
-    formData.append('tenantSlug', tenantSlug)
-    formData.append('oldLogoUrl', logoUrl)
-
-    const result = await uploadEventLogo(formData)
-    setIsUploading(false)
-
-    if (result.error) {
-      setUploadError(result.error)
-      toastError(result.error)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    } else if (result.publicUrl) {
-      // No markDirty: the action has already written the column, so there is
-      // nothing unsaved about the logo and the leave-guard must not claim
-      // otherwise. Keeping the local value avoids a flash of the old image
-      // while the revalidated payload arrives — it resolves to the same URL.
-      setLogoUrl(result.publicUrl)
-      setLogoError(false)
-    }
+    const preview = URL.createObjectURL(resized)
+    setPreview(preview)
+    setPendingLogoFile(resized)
+    // Picking a file supersedes a pending removal — the admin replaced the
+    // logo rather than clearing it.
+    setPendingLogoRemoval(false)
+    setLogoUrl(preview)
+    setLogoError(false)
+    setSaveSuccess(false)
+    markDirty()
   }
 
-  // Removing the logo is a write of its own, matching the upload: both own
-  // the column now, so neither depends on the admin pressing Save afterwards.
-  async function handleLogoRemove() {
-    const previous = logoUrl
-    // Optimistic: the plate should empty on the press, not after the round
-    // trip. Restored below if the server refuses.
+  // Staged like the file above: the row and the bucket are left alone until
+  // Save. Choosing Remove and then leaving the page therefore keeps the logo,
+  // which is why the leave-guard has to know about this.
+  function handleLogoRemove() {
+    setPreview(null)
+    setPendingLogoFile(null)
+    setPendingLogoRemoval(true)
     setLogoUrl('')
     setLogoError(false)
     setUploadError(undefined)
+    setSaveSuccess(false)
+    markDirty()
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
-    const result = await removeEventLogo(tenantSlug, tenantId, eventId)
-    if (result.error) {
-      setLogoUrl(previous)
-      setUploadError(result.error)
-      toastError(result.error)
+  // Runs as the first step of Save, before the events row is written, so a
+  // failed upload aborts the whole save rather than leaving the form claiming
+  // success over a logo that never landed. Returns the URL to persist, or
+  // `undefined` to leave the column as it is.
+  async function commitPendingLogo(): Promise<
+    { ok: true; logoUrl?: string | null } | { ok: false }
+  > {
+    if (pendingLogoFile) {
+      setIsUploading(true)
+      const formData = new FormData()
+      formData.append('file', pendingLogoFile)
+      formData.append('tenantId', tenantId)
+      formData.append('eventId', eventId)
+      formData.append('tenantSlug', tenantSlug)
+      formData.append('oldLogoUrl', initialLogoUrl)
+
+      const result = await uploadEventLogo(formData)
+      setIsUploading(false)
+
+      if (result.error || !result.publicUrl) {
+        const message = result.error ?? t('eventConfig.logoUploadError')
+        setUploadError(message)
+        toastError(message)
+        return { ok: false }
+      }
+
+      setPreview(null)
+      setPendingLogoFile(null)
+      setLogoUrl(result.publicUrl)
+      return { ok: true, logoUrl: result.publicUrl }
     }
+
+    if (pendingLogoRemoval) {
+      const result = await removeEventLogo(tenantSlug, tenantId, eventId)
+      if (result.error) {
+        setUploadError(result.error)
+        toastError(result.error)
+        return { ok: false }
+      }
+      setPendingLogoRemoval(false)
+      return { ok: true, logoUrl: null }
+    }
+
+    return { ok: true }
   }
 
   // Repaint the theme straight onto :root. TenantThemeStyle is a server
@@ -241,7 +302,10 @@ export default function EventConfigForm({
     markDirty()
   }
 
-  function buildInput(): SaveEventInput {
+  // `logoUrl` is whatever is on screen, which during a pending change is a
+  // blob: preview URL — never something to persist. The logo the save should
+  // write is decided by commitPendingLogo and passed in here instead.
+  function buildInput(resolvedLogoUrl: string | null | undefined): SaveEventInput {
     return {
       tenantSlug,
       tenantId,
@@ -250,7 +314,9 @@ export default function EventConfigForm({
       event_type: eventType,
       description,
       location,
-      logo_url: logoUrl,
+      // undefined -> '' leaves the column alone (saveEvent skips an empty
+      // value); a removal has already cleared it via removeEventLogo.
+      logo_url: resolvedLogoUrl ?? '',
       scheduling_granularity_min: granularity,
       stages,
       facilities: facilities.map((f, i) => ({ label: f.label, position: i })),
@@ -266,7 +332,13 @@ export default function EventConfigForm({
     markDirty()
     setErrors({})
     startSave(async () => {
-      const result = await saveEvent(buildInput())
+      // The logo first: it is the only part of this form that writes to
+      // Storage, and a failure there must stop the save rather than report
+      // success over a logo that never landed.
+      const logo = await commitPendingLogo()
+      if (!logo.ok) return
+
+      const result = await saveEvent(buildInput(logo.logoUrl))
       if (result.error) {
         toastError(result.error)
         return
@@ -394,6 +466,7 @@ export default function EventConfigForm({
               logoError={logoError}
               isUploading={isUploading}
               uploadError={uploadError}
+              isPending={pendingLogoFile !== null || pendingLogoRemoval}
               fileInputRef={fileInputRef}
               onFileChange={handleLogoFileChange}
               onImageError={() => setLogoError(true)}

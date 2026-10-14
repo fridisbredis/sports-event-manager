@@ -7,6 +7,8 @@ interface Props {
   logoError: boolean
   isUploading: boolean
   uploadError: string | undefined
+  /** A pick or a removal is staged and will be applied on Save. */
+  isPending: boolean
   fileInputRef: RefObject<HTMLInputElement | null>
   onFileChange: (e: ChangeEvent<HTMLInputElement>) => void
   onImageError: () => void
@@ -18,6 +20,7 @@ export function LogoUploadField({
   logoError,
   isUploading,
   uploadError,
+  isPending,
   fileInputRef,
   onFileChange,
   onImageError,
@@ -86,6 +89,12 @@ export function LogoUploadField({
             </Button>
           )}
         </div>
+        {/* The logo is applied on Save like every other field here, so a
+            staged pick or removal has to say so — the plate already shows the
+            new state, which on its own reads as already stored. */}
+        {isPending && !uploadError && (
+          <p className="mt-1.5 text-xs text-ink-label">{t('eventConfig.logoPendingSave')}</p>
+        )}
         {uploadError && <p className="mt-1.5 text-xs text-red-500">{uploadError}</p>}
       </div>
     </div>
