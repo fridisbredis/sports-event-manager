@@ -52,6 +52,7 @@
     "logoChange": "Change image",
     "logoUploading": "Uploading…",
     "logoRemove": "Remove",
+    "logoPendingSave": "Applied when you save",
     "logoInvalidType": "Please choose an image file (JPG, PNG, SVG, etc.)",
     "logoAlt": "Event logo",
     "colorTheme": "Color theme",
