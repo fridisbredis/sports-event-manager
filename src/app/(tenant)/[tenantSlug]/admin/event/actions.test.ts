@@ -206,6 +206,36 @@ describe('saveEvent', () => {
     expect(eventUpdateBuilder.update).not.toHaveBeenCalled()
   })
 
+  // The regression this pair guards: an empty logo_url used to be coerced to
+  // null and wipe the column, so a form that had gone stale destroyed the
+  // event's logo on an unrelated save. The file stayed in the bucket while
+  // the row went null, and INFO-01 fell back to its placeholder.
+  it('leaves logo_url untouched when the input carries an empty one', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const statusBuilder = statusBuilderFor('draft')
+    const eventsBuilder = chain({ error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    mockClient(fromMock)
+
+    await saveEvent({ ...BASE_INPUT, logo_url: '' })
+
+    const patch = vi.mocked(eventsBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(patch).not.toHaveProperty('logo_url')
+  })
+
+  it('writes logo_url when the input carries one', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const statusBuilder = statusBuilderFor('draft')
+    const eventsBuilder = chain({ error: null })
+    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
+    mockClient(fromMock)
+
+    await saveEvent({ ...BASE_INPUT, logo_url: 'https://cdn.example.test/logo.webp' })
+
+    const patch = vi.mocked(eventsBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(patch).toMatchObject({ logo_url: 'https://cdn.example.test/logo.webp' })
+  })
+
   it('translates the db error and skips sync_event_stages when the events update fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
@@ -351,40 +381,53 @@ function mockStorageClient({
   removeError = null,
   publicUrl = 'https://cdn.example.test/storage/v1/object/public/logos/new.webp',
   user = { id: 'user-1' } as { id: string } | null,
+  updateError = null,
 }: {
   uploadError?: { message: string } | null
   removeError?: { message: string } | null
   publicUrl?: string
   user?: { id: string } | null
+  updateError?: { message: string } | null
 } = {}) {
   const upload = vi.fn().mockResolvedValue({ error: uploadError })
   const remove = vi.fn().mockResolvedValue({ error: removeError })
   const getPublicUrl = vi.fn(() => ({ data: { publicUrl } }))
   const from = vi.fn(() => ({ upload, remove, getPublicUrl }))
 
+  // uploadEventLogo writes events.logo_url itself, so the client needs the
+  // table half too — the upload is only half the action now.
+  const eq2 = vi.fn().mockResolvedValue({ error: updateError })
+  const eq1 = vi.fn(() => ({ eq: eq2 }))
+  const update = vi.fn(() => ({ eq: eq1 }))
+  const tableFrom = vi.fn(() => ({ update }))
+
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
     storage: { from },
+    from: tableFrom,
   } as never)
 
-  return { from, upload, remove, getPublicUrl }
+  return { from, upload, remove, getPublicUrl, tableFrom, update }
 }
 
 function logoFormData({
   file = new File(['x'], 'logo.webp', { type: 'image/webp' }) as unknown,
   tenantId = TENANT_ID,
   eventId = EVENT_ID,
+  tenantSlug = 'viadal',
   oldLogoUrl,
 }: {
   file?: unknown
   tenantId?: string | null
   eventId?: string | null
+  tenantSlug?: string | null
   oldLogoUrl?: string
 } = {}) {
   const fd = new FormData()
   if (file !== undefined && file !== null) fd.append('file', file as string | Blob)
   if (tenantId !== null) fd.append('tenantId', tenantId)
   if (eventId !== null) fd.append('eventId', eventId)
+  if (tenantSlug !== null) fd.append('tenantSlug', tenantSlug)
   if (oldLogoUrl !== undefined) fd.append('oldLogoUrl', oldLogoUrl)
   return fd
 }
@@ -524,6 +567,37 @@ describe('uploadEventLogo', () => {
     expect(storage.upload.mock.calls[0][0]).toMatch(
       new RegExp(`^${TENANT_ID}/${EVENT_ID}/\\d+\\.jpg$`)
     )
+  })
+
+  // The core of the fix: the upload owns the column. Before this, the action
+  // only returned a URL and left persistence to a later saveEvent, so an
+  // admin who uploaded and then navigated away kept the file but not the row.
+  it('writes the public URL to events.logo_url', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient()
+
+    const result = await uploadEventLogo(logoFormData())
+
+    expect(result.publicUrl).toBe(
+      'https://cdn.example.test/storage/v1/object/public/logos/new.webp'
+    )
+    expect(storage.tableFrom).toHaveBeenCalledWith('events')
+    expect(storage.update).toHaveBeenCalledWith({
+      logo_url: 'https://cdn.example.test/storage/v1/object/public/logos/new.webp',
+    })
+  })
+
+  // An object in the bucket that no row points at is pure litter, and
+  // returning a URL the form would display as saved would be a lie.
+  it('deletes the just-uploaded object and errors when the row update fails', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const storage = mockStorageClient({ updateError: { message: 'update failed' } })
+
+    const result = await uploadEventLogo(logoFormData())
+
+    expect(result.publicUrl).toBeUndefined()
+    expect(result.error).toBeDefined()
+    expect(storage.remove).toHaveBeenCalledTimes(1)
   })
 
   it('removes the old logo path on success', async () => {

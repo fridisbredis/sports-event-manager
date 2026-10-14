@@ -8,6 +8,7 @@ import { Input, Textarea } from '@/components/ui/form-fields'
 import {
   saveEvent,
   uploadEventLogo,
+  removeEventLogo,
   updateTenantColorPalette,
   type StageInput,
   type LabelInput,
@@ -84,6 +85,18 @@ export default function EventConfigForm({
   const location = initialLocation
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl)
   const [logoError, setLogoError] = useState(false)
+
+  // Re-seeded from the server payload for the same reason as the palette
+  // below: useState keeps its mount-time value, so after a revalidate of this
+  // route the form would keep showing — and sending back — whatever logo it
+  // was built with. Now that upload and remove write the column themselves,
+  // the server is the authority on this field and the form follows it.
+  const [renderedLogoUrl, setRenderedLogoUrl] = useState(initialLogoUrl)
+  if (renderedLogoUrl !== initialLogoUrl) {
+    setRenderedLogoUrl(initialLogoUrl)
+    setLogoUrl(initialLogoUrl)
+    setLogoError(false)
+  }
   const [colorPalette, setColorPalette] = useState(initialColorPalette)
 
   // The palette saves on click and the server then revalidates this route, so
@@ -148,6 +161,7 @@ export default function EventConfigForm({
     formData.append('file', upload)
     formData.append('tenantId', tenantId)
     formData.append('eventId', eventId)
+    formData.append('tenantSlug', tenantSlug)
     formData.append('oldLogoUrl', logoUrl)
 
     const result = await uploadEventLogo(formData)
@@ -158,10 +172,30 @@ export default function EventConfigForm({
       toastError(result.error)
       if (fileInputRef.current) fileInputRef.current.value = ''
     } else if (result.publicUrl) {
+      // No markDirty: the action has already written the column, so there is
+      // nothing unsaved about the logo and the leave-guard must not claim
+      // otherwise. Keeping the local value avoids a flash of the old image
+      // while the revalidated payload arrives — it resolves to the same URL.
       setLogoUrl(result.publicUrl)
       setLogoError(false)
-      setSaveSuccess(false)
-      markDirty()
+    }
+  }
+
+  // Removing the logo is a write of its own, matching the upload: both own
+  // the column now, so neither depends on the admin pressing Save afterwards.
+  async function handleLogoRemove() {
+    const previous = logoUrl
+    // Optimistic: the plate should empty on the press, not after the round
+    // trip. Restored below if the server refuses.
+    setLogoUrl('')
+    setLogoError(false)
+    setUploadError(undefined)
+
+    const result = await removeEventLogo(tenantSlug, tenantId, eventId)
+    if (result.error) {
+      setLogoUrl(previous)
+      setUploadError(result.error)
+      toastError(result.error)
     }
   }
 
@@ -363,12 +397,7 @@ export default function EventConfigForm({
               fileInputRef={fileInputRef}
               onFileChange={handleLogoFileChange}
               onImageError={() => setLogoError(true)}
-              onRemove={() => {
-                setLogoUrl('')
-                setLogoError(false)
-                setSaveSuccess(false)
-                markDirty()
-              }}
+              onRemove={handleLogoRemove}
             />
 
             <ColorPalettePicker

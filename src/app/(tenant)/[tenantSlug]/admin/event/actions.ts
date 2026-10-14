@@ -21,6 +21,7 @@ import { translateActionError as tError } from '@/lib/actions/action-error'
 import { normalizeResultsUrl } from './_utils'
 
 const tenantIdSchema = z.string().uuid()
+const eventIdSchema = z.string().uuid()
 
 export interface StageInput {
   id?: string
@@ -124,7 +125,16 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
       end_date: derivedEndDate,
       description: input.description || null,
       location: input.location || null,
-      logo_url: input.logo_url || null,
+      // Deliberately NOT `input.logo_url || null`, unlike the two fields
+      // above. The logo is owned by uploadEventLogo and removeEventLogo,
+      // which write the column themselves; this form field only ever carries
+      // a copy of it. Coercing an empty copy to null meant any client-side
+      // staleness silently destroyed the row's logo — the file stayed in the
+      // bucket while events.logo_url went null, and the official-facing
+      // screen fell back to its placeholder. An empty value here now means
+      // "this save has nothing to say about the logo", so the column is left
+      // alone; clearing it is an explicit action, not a side effect.
+      ...(input.logo_url ? { logo_url: input.logo_url } : {}),
       scheduling_granularity_min: input.scheduling_granularity_min,
     })
     .eq('id', input.eventId)
@@ -239,13 +249,15 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
   const file = formData.get('file')
   const tenantId = formData.get('tenantId') as string
   const eventId = formData.get('eventId') as string
+  const tenantSlug = formData.get('tenantSlug') as string
   const oldLogoUrl = (formData.get('oldLogoUrl') as string) || ''
 
   if (!(file instanceof File)) return { error: await tError('actionErrors.noFileProvided') }
   if (!file.type.startsWith('image/'))
     return { error: await tError('actionErrors.chooseImageFile') }
   if (file.size > MAX_LOGO_BYTES) return { error: await tError('actionErrors.imageTooLarge') }
-  if (!tenantId || !eventId) return { error: await tError('actionErrors.missingTenantOrEvent') }
+  if (!tenantId || !eventId || !tenantSlug)
+    return { error: await tError('actionErrors.missingTenantOrEvent') }
 
   const parsedTenantId = tenantIdSchema.safeParse(tenantId)
   if (!parsedTenantId.success) {
@@ -253,11 +265,19 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
     return { error: await tError('actionErrors.missingTenantOrEvent') }
   }
 
+  // Validated now that it reaches an .eq() filter and the storage path, not
+  // just the path as before.
+  const parsedEventId = eventIdSchema.safeParse(eventId)
+  if (!parsedEventId.success) {
+    logger.warn('uploadEventLogo: invalid eventId', { eventId })
+    return { error: await tError('actionErrors.missingTenantOrEvent') }
+  }
+
   if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
     return { error: await tError('actionErrors.notAuthorized') }
 
   const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
-  const path = `${parsedTenantId.data}/${eventId}/${Date.now()}.${ext}`
+  const path = `${parsedTenantId.data}/${parsedEventId.data}/${Date.now()}.${ext}`
 
   const { error: uploadError } = await supabase.storage
     .from('logos')
@@ -268,13 +288,45 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
       error: await translateStorageError('uploadEventLogo: storage upload failed', uploadError),
     }
 
-  // Best-effort cleanup of old logo — ignore errors
+  const { data } = supabase.storage.from('logos').getPublicUrl(path)
+
+  // Write the column here rather than leaving it to the next saveEvent. An
+  // upload is a completed action from the admin's point of view — the new
+  // logo is on screen the moment it finishes — so the row has to agree with
+  // what they can see, even if they never press Save, navigate away, or the
+  // tab crashes. Leaving it to Save also made the file and the column drift
+  // apart in prod: the object existed in the bucket while events.logo_url
+  // was still null, and the official-facing screen rendered its placeholder.
+  const { error: persistError } = await supabase
+    .from('events')
+    .update({ logo_url: data.publicUrl })
+    .eq('id', parsedEventId.data)
+    .eq('tenant_id', parsedTenantId.data)
+
+  if (persistError) {
+    // The object is already in the bucket but the row does not point at it.
+    // Remove the orphan so a retry does not pile up unreferenced files, and
+    // report the failure instead of handing back a URL the form would show
+    // as saved.
+    await supabase.storage.from('logos').remove([path])
+    return { error: await translateDbError('uploadEventLogo: events update failed', persistError) }
+  }
+
+  // Best-effort cleanup of old logo — ignore errors. Only after the row
+  // points at the new file: deleting first would leave the event with a
+  // dangling logo_url if the update above failed.
   const oldPath = extractStoragePath(oldLogoUrl, 'logos')
-  if (oldPath) {
+  if (oldPath && oldPath !== path) {
     await supabase.storage.from('logos').remove([oldPath])
   }
 
-  const { data } = supabase.storage.from('logos').getPublicUrl(path)
+  // The new logo is live for every screen that reads it, not just this form.
+  revalidatePath(`/${tenantSlug}/admin/event`)
+  revalidatePath(`/${tenantSlug}/admin/dashboard`)
+  updateTag(eventInfoCacheTag(parsedTenantId.data))
+  updateTag(adminEventCacheTag(parsedTenantId.data))
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
+
   return { publicUrl: data.publicUrl }
 }
 
@@ -355,6 +407,76 @@ export async function updateTenantColorPalette(
   }
 
   revalidatePath(`/${tenantSlug}`, 'layout')
+
+  return {}
+}
+
+export interface RemoveLogoResult {
+  error?: string
+}
+
+// The explicit counterpart to uploadEventLogo. Clearing the logo used to be a
+// client-state change that saveEvent happened to persist by coercing an empty
+// string to null — the same coercion that let a stale form silently wipe the
+// column. Now that saveEvent leaves logo_url alone, removal needs its own
+// action, which also makes it symmetric with upload: both write the row and
+// both keep the bucket in step with it.
+export async function removeEventLogo(
+  tenantSlug: string,
+  tenantId: string,
+  eventId: string
+): Promise<RemoveLogoResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const parsedTenantId = tenantIdSchema.safeParse(tenantId)
+  const parsedEventId = eventIdSchema.safeParse(eventId)
+  if (!parsedTenantId.success || !parsedEventId.success) {
+    logger.warn('removeEventLogo: invalid ids', { tenantId, eventId })
+    return { error: await tError('actionErrors.missingTenantOrEvent') }
+  }
+
+  if (!(await hasAdminAccessToTenant(user.id, parsedTenantId.data)))
+    return { error: await tError('actionErrors.notAuthorized') }
+
+  // Read the current value rather than trusting one sent from the client:
+  // the path to delete has to come from what the row actually holds, or a
+  // stale client could point the removal at another event's file.
+  const { data: current, error: readError } = await supabase
+    .from('events')
+    .select('logo_url')
+    .eq('id', parsedEventId.data)
+    .eq('tenant_id', parsedTenantId.data)
+    .single()
+
+  if (readError)
+    return { error: await translateDbError('removeEventLogo: event lookup failed', readError) }
+
+  const { error: updateError } = await supabase
+    .from('events')
+    .update({ logo_url: null })
+    .eq('id', parsedEventId.data)
+    .eq('tenant_id', parsedTenantId.data)
+
+  if (updateError)
+    return { error: await translateDbError('removeEventLogo: events update failed', updateError) }
+
+  // Row first, file second: an orphaned object is harmless, a dangling
+  // logo_url is a broken image on every screen that reads it.
+  const path = extractStoragePath(current.logo_url ?? '', 'logos')
+  if (path) {
+    await supabase.storage.from('logos').remove([path])
+  }
+
+  revalidatePath(`/${tenantSlug}/admin/event`)
+  revalidatePath(`/${tenantSlug}/admin/dashboard`)
+  updateTag(eventInfoCacheTag(parsedTenantId.data))
+  updateTag(adminEventCacheTag(parsedTenantId.data))
+  updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return {}
 }
