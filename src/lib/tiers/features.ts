@@ -24,6 +24,26 @@ export const TIER_FEATURES = {
 
 export type TierFeature = keyof typeof TIER_FEATURES
 
+// N20: the maximum number of tenant_admins a tenant may have, by tier.
+//
+// Separate from TIER_FEATURES because this is a limit, not a capability:
+// hasFeature's "premium and up" cumulative rule is meaningless for a number,
+// and reading a count through a boolean gate would mean one lookup per
+// possible value. A tenant on an unrecognised tier gets the lowest cap rather
+// than no cap at all — failing closed, matching hasFeature's reasoning, but
+// without locking an existing admin out of a tenant whose tier was renamed.
+export const MAX_TENANT_ADMINS: Record<Tier, number> = {
+  standard: 1,
+  premium: 3,
+  professional: 10,
+}
+
+export function maxTenantAdmins(tier: string): number {
+  if (!isTier(tier)) return MAX_TENANT_ADMINS[TIER_ORDER[0]]
+
+  return MAX_TENANT_ADMINS[tier]
+}
+
 export function isTier(value: string): value is Tier {
   return (TIER_ORDER as readonly string[]).includes(value)
 }

@@ -105,6 +105,12 @@ export type AuditAction =
   | 'tenant_tier_changed'
   | 'official_invited'
   | 'announcement_published'
+  // N20 (migration 20261015122735): SYS-02 admin management. Distinct from
+  // 'role_revoked', which is the officials-removal path — keeping them apart
+  // is what makes "who was made an admin, and by whom" answerable from the
+  // log alone.
+  | 'tenant_admin_granted'
+  | 'tenant_admin_revoked'
 export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement'
 // Match migration 0038's CHECK constraint (SEC-07-rest). Separate from
 // AuditAction/audit_events — see docs/adr/0001 category 5.

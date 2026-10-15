@@ -7,6 +7,7 @@ import { logAuthEvent } from '@/lib/audit/log-auth-event'
 import { adminDashboardCacheTag, officialHomeCacheTag } from '@/lib/cache/tags'
 import { logger } from '@/lib/logger'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
+import { isAdminWithinCap } from '@/lib/auth/tenant-admins'
 import type { User } from '@supabase/supabase-js'
 
 const tenantIdSchema = z.string().uuid()
@@ -243,7 +244,7 @@ type AuthFailure = { error: NextResponse }
 
 type RoleRow = { role: TenantRole; tenant_id: string | null }
 
-type AccessContext = { roleRows: RoleRow[]; tenantIsActive: boolean }
+type AccessContext = { roleRows: RoleRow[]; tenantIsActive: boolean; tenantTier: string | null }
 
 // Loads everything an authorization decision for a single tenant needs: every
 // role row the caller holds (across all tenants, so the global system_admin
@@ -256,7 +257,7 @@ async function fetchAccessContext(userId: string, tenantId: string): Promise<Acc
 
   const [roleResult, tenantResult] = await Promise.all([
     service.from('user_roles').select('role, tenant_id').eq('user_id', userId),
-    service.from('tenants').select('is_active').eq('id', tenantId).maybeSingle(),
+    service.from('tenants').select('is_active, tier').eq('id', tenantId).maybeSingle(),
   ])
 
   if (roleResult.error) {
@@ -272,6 +273,7 @@ async function fetchAccessContext(userId: string, tenantId: string): Promise<Acc
   return {
     roleRows: (roleResult.data ?? []) as RoleRow[],
     tenantIsActive: tenantResult.data?.is_active ?? false,
+    tenantTier: tenantResult.data?.tier ?? null,
   }
 }
 
@@ -299,7 +301,23 @@ export async function hasAdminAccessToTenant(userId: string, tenantId: string): 
   if (isGlobalSystemAdmin(context.roleRows)) return true
   if (!context.tenantIsActive) return false
 
-  return hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])
+  if (!hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])) return false
+
+  // N20: the per-tier admin cap. A tenant_admin row past the tenant's cap —
+  // which only happens after a tier downgrade — keeps existing but stops
+  // granting access, so the tenant is brought within its tier without anyone
+  // having to pick who to delete.
+  //
+  // Checked last, after the cheap in-memory checks, because it costs two more
+  // queries. A global system_admin never reaches it: they return above, so
+  // support access survives a downgrade and the tenant can always be fixed.
+  //
+  // A tenant whose tier could not be read (tenantTier null, meaning the row
+  // vanished between the two queries) fails closed here rather than falling
+  // back to the lowest cap: a missing tenant is not a standard-tier tenant.
+  if (!context.tenantTier) return false
+
+  return isAdminWithinCap(userId, tenantId, context.tenantTier)
 }
 
 // Result of the official-surface access check, carrying the confirmed
@@ -455,7 +473,7 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
   const service = createSupabaseServiceClient()
   const [roleResult, tenantResult] = await Promise.all([
     service.from('user_roles').select('role, tenant_id').eq('user_id', user.id),
-    service.from('tenants').select('is_active').eq('id', tenantId).maybeSingle(),
+    service.from('tenants').select('is_active, tier').eq('id', tenantId).maybeSingle(),
   ])
 
   if (roleResult.error) {
@@ -482,6 +500,17 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
     // No admin role in this active tenant and not a system_admin — could be a
     // malicious cross-tenant attempt, a suspended tenant, or a stale UI.
     // Either way, 403 is correct.
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+
+  // N20: the same per-tier admin cap hasAdminAccessToTenant applies. Enforced
+  // here too rather than only on the page routes: this helper is what the 13
+  // API route handlers gate on, so without it a locked-out admin would keep
+  // full write access through the API while the UI refused them. Same 403 as
+  // any other failed admin check — the caller is a tenant_admin whose row the
+  // cap no longer admits, which is not a distinction worth leaking.
+  const tier = tenantResult.data?.tier
+  if (!tier || !(await isAdminWithinCap(user.id, tenantId, tier))) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
 
