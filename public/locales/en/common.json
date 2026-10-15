@@ -30,7 +30,12 @@
     "slotTaken": "Someone else just took that slot. Please reload the schedule and try again.",
     "batchTooLarge": "Too many assignments in one save. Split the change into smaller saves.",
     "assignmentOnTimeOff": "That official has time off then and cannot be scheduled.",
-    "colorThemeNotInTier": "The colour theme is not included in this tenant's feature tier."
+    "colorThemeNotInTier": "The colour theme is not included in this tenant's feature tier.",
+    "invalidPhone": "Invalid phone number for the selected country",
+    "grantAdminFailed": "Could not add the admin. Try again.",
+    "revokeAdminFailed": "Could not remove the admin. Try again.",
+    "adminCapReached": "This tenant has reached the maximum number of admins for its tier. Raise the tier or remove an admin first.",
+    "lastAdminCannotRemove": "This is the tenant’s last admin. A tenant must keep at least one admin — deactivate the tenant instead."
   },
   "notFoundPage": {
     "eyebrow": "No result",

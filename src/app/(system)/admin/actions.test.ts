@@ -49,10 +49,28 @@ function mockAuthedSystemAdmin(
     from: serverFromMock,
     rpc: rpcMock,
   } as never)
+  // create_tenant_with_defaults became SECURITY DEFINER / service_role-only in
+  // migration 20261015124237, so createTenant calls it through the service
+  // client — which also creates the first admin's auth user. The same rpc mock
+  // backs both clients so a test can assert on one object.
   vi.mocked(createSupabaseServiceClient).mockResolvedValue({
     from: vi.fn().mockReturnValueOnce(chain({ data: { role: 'system_admin' } })),
+    rpc: rpcMock,
+    auth: {
+      admin: {
+        createUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: 'admin-user-1' } }, error: null }),
+        getUserById: vi.fn().mockResolvedValue({ data: { user: { user_metadata: {} } } }),
+        updateUserById: vi.fn().mockResolvedValue({ error: null }),
+      },
+    },
   } as never)
 }
+
+// N20: every tenant is created with its first admin, so the three admin
+// arguments are part of the call now.
+const ADMIN_ARGS = ['Peter Thörn', '709900001', 'SE'] as const
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -66,7 +84,7 @@ describe('assertSystemAdmin gate (shared by all actions)', () => {
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) },
     } as never)
 
-    await expect(createTenant('Viadal 2026')).rejects.toThrow('NEXT_REDIRECT')
+    await expect(createTenant('Viadal 2026', ...ADMIN_ARGS)).rejects.toThrow('NEXT_REDIRECT')
     expect(redirect).toHaveBeenCalledWith('/login')
     expect(createSupabaseServiceClient).not.toHaveBeenCalled()
   })
@@ -80,7 +98,7 @@ describe('assertSystemAdmin gate (shared by all actions)', () => {
     const serviceFromMock = vi.fn().mockReturnValueOnce(chain({ data: null }))
     vi.mocked(createSupabaseServiceClient).mockResolvedValue({ from: serviceFromMock } as never)
 
-    const result = await createTenant('Viadal 2026')
+    const result = await createTenant('Viadal 2026', ...ADMIN_ARGS)
 
     expect(result).toEqual({ error: 'Not authorized' })
     expect(serviceFromMock).toHaveBeenCalledTimes(1)
@@ -93,7 +111,7 @@ describe('createTenant', () => {
     const fromMock = vi.fn()
     mockAuthedSystemAdmin(fromMock)
 
-    const result = await createTenant('   ')
+    const result = await createTenant('   ', ...ADMIN_ARGS)
 
     expect(result).toEqual({ error: 'Invalid name' })
     // assertSystemAdmin's role lookup goes through the service client, not this one.
@@ -115,12 +133,14 @@ describe('createTenant', () => {
     })
     mockAuthedSystemAdmin(fromMock, rpcMock)
 
-    const result = await createTenant('  Viadal 2026  ')
+    const result = await createTenant('  Viadal 2026  ', ...ADMIN_ARGS)
 
     expect(result).toEqual({})
     expect(rpcMock).toHaveBeenCalledWith('create_tenant_with_defaults', {
       p_name: 'Viadal 2026',
       p_slug: 'viadal-2026',
+      p_admin_user_id: 'admin-user-1',
+      p_admin_name: 'Peter Thörn',
     })
     expect(revalidatePath).toHaveBeenCalledWith('/admin')
     // SEC-07
@@ -133,6 +153,88 @@ describe('createTenant', () => {
       targetId: 'tenant-1',
       detail: { name: 'Viadal 2026', slug: 'viadal-2026' },
     })
+    // N20: the first admin is a privilege grant and is logged as one, so the
+    // only record of who can administer a new tenant is not the role row alone.
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      actorUserId: 'admin-1',
+      actorRole: 'system_admin',
+      action: 'tenant_admin_granted',
+      targetType: 'user_role',
+      targetId: 'admin-user-1',
+      detail: { firstAdmin: true },
+    })
+  })
+
+  it('refuses to create a tenant without a first admin', async () => {
+    // The whole point of N20's second half: a tenant with no admin row cannot
+    // be signed in to, which is how two of the three tenants in prod ended up
+    // unreachable. The RPC is never reached.
+    const rpcMock = vi.fn()
+
+    // mockAuthedSystemAdmin's role lookup is mockReturnValueOnce, so it is
+    // re-armed per call rather than shared across the two assertions.
+    mockAuthedSystemAdmin(vi.fn(), rpcMock)
+    expect(await createTenant('Viadal 2026', '', '709900001', 'SE')).toEqual({
+      error: 'Invalid name',
+    })
+
+    mockAuthedSystemAdmin(vi.fn(), rpcMock)
+    expect(await createTenant('Viadal 2026', 'Peter Thörn', '', 'SE')).toEqual({
+      error: 'Invalid name',
+    })
+
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a phone number that is not valid for the chosen country', async () => {
+    const fromMock = vi.fn()
+    const rpcMock = vi.fn()
+    mockAuthedSystemAdmin(fromMock, rpcMock)
+
+    const result = await createTenant('Viadal 2026', 'Peter Thörn', '123', 'SE')
+
+    expect(result).toEqual({ error: 'Invalid phone number for the selected country' })
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('reuses an existing account when the admin phone already has one', async () => {
+    // Promoting someone who is already an official elsewhere is the normal
+    // case; createUser answers phone_exists and the id comes from the lookup.
+    const rpcMock = vi.fn((fn: string) =>
+      fn === 'get_user_id_by_phone'
+        ? Promise.resolve({ data: 'existing-user-1', error: null })
+        : Promise.resolve({
+            data: { tenant_id: 'tenant-1', event_id: 'event-1' },
+            error: null,
+          })
+    )
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'admin-1' } } }) },
+      from: vi.fn(),
+      rpc: rpcMock,
+    } as never)
+    vi.mocked(createSupabaseServiceClient).mockResolvedValue({
+      from: vi.fn().mockReturnValueOnce(chain({ data: { role: 'system_admin' } })),
+      rpc: rpcMock,
+      auth: {
+        admin: {
+          createUser: vi.fn().mockResolvedValue({ data: null, error: { code: 'phone_exists' } }),
+          getUserById: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { user_metadata: { name: 'Peter' } } } }),
+          updateUserById: vi.fn().mockResolvedValue({ error: null }),
+        },
+      },
+    } as never)
+
+    const result = await createTenant('Viadal 2026', 'Peter Thörn', '709900001', 'SE')
+
+    expect(result).toEqual({})
+    expect(rpcMock).toHaveBeenCalledWith(
+      'create_tenant_with_defaults',
+      expect.objectContaining({ p_admin_user_id: 'existing-user-1' })
+    )
   })
 
   it('returns a friendly error on a duplicate tenant name (unique violation)', async () => {
@@ -140,7 +242,7 @@ describe('createTenant', () => {
     const rpcMock = vi.fn().mockResolvedValue({ data: null, error: { code: '23505' } })
     mockAuthedSystemAdmin(fromMock, rpcMock)
 
-    const result = await createTenant('Viadal 2026')
+    const result = await createTenant('Viadal 2026', ...ADMIN_ARGS)
 
     expect(result).toEqual({ error: 'A tenant with that name already exists' })
     expect(revalidatePath).not.toHaveBeenCalled()
