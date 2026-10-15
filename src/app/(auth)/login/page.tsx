@@ -269,7 +269,10 @@ export default function LoginPage() {
           rel="noopener noreferrer"
           className="rounded-md text-sm text-ink-soft underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
-          {t('signIn.privacyLink')}
+          {t('signIn.privacyLink')}{' '}
+          <span className="text-ink-label">
+            {t('privacyPage.opensInNewTabHint', { ns: 'common' })}
+          </span>
         </a>
       </p>
     </main>

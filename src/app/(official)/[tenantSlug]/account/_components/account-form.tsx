@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, ChevronRight, FileText, LogOut } from 'lucide-react'
+import { CalendarDays, ChevronRight, ExternalLink, FileText, LogOut } from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
@@ -365,8 +365,14 @@ export default function AccountForm({
           />
           <p className="min-w-0 flex-1 text-[15px] font-semibold text-ink">
             {t('account.privacyPolicy')}
+            {/* Row is a card with a trailing glyph, so a visible "(opens in
+                a new tab)" would crowd it. Screen readers still get it. */}
+            <span className="sr-only"> {tCommon('privacyPage.opensInNewTab')}</span>
           </p>
-          <ChevronRight
+          {/* Not a chevron: that promises an in-app screen with a way back,
+              and this leaves for a new tab. Matches the results link on
+              INFO-01, which is the other outbound link an official meets. */}
+          <ExternalLink
             aria-hidden="true"
             strokeWidth={1.5}
             className="size-5 shrink-0 text-ink-label"
