@@ -58,7 +58,9 @@
     "retentionHeading": "Hur länge",
     "retentionBody": "Om du slutar logga in anonymiseras ditt konto automatiskt efter 24 månader. Du får ett SMS en månad innan det sker.",
     "back": "Tillbaka till appen",
-    "backToSignIn": "Tillbaka till inloggningen"
+    "backToSignIn": "Tillbaka till inloggningen",
+    "opensInNewTab": "Öppnas i en ny flik",
+    "opensInNewTabHint": "(öppnas i en ny flik)"
   },
   "actions": {
     "save": "Spara",

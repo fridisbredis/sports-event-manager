@@ -19,6 +19,9 @@ const HEADER_BAR = 'h-[59px]'
 export default async function SystemAdminLayout({ children }: Props) {
   const language = await getUserLanguage()
   const t = await getServerTranslation(language, 'admin')
+  // Separate instance: getServerTranslation narrows `ns` to the one passed,
+  // so fallbackNS has no 'common' bundle to reach from the 'admin' one.
+  const tCommon = await getServerTranslation(language, 'common')
 
   return (
     <div className="app-surface flex min-h-screen">
@@ -31,6 +34,7 @@ export default async function SystemAdminLayout({ children }: Props) {
           labels={{
             tenants: t('systemAdmin.tenants'),
             privacyPolicy: t('systemAdmin.privacyPolicy'),
+            privacyPolicyNewTab: tCommon('privacyPage.opensInNewTab'),
             logOut: t('systemAdmin.logOut'),
           }}
         />

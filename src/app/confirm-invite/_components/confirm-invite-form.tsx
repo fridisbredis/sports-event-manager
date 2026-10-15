@@ -154,7 +154,10 @@ export default function ConfirmInviteForm({ invites }: ConfirmInviteFormProps) {
               className="underline hover:text-gray-900"
             >
               {t('confirmation.privacyCheckLinkText')}
-            </a>
+            </a>{' '}
+            <span className="text-gray-500">
+              {t('privacyPage.opensInNewTabHint', { ns: 'common' })}
+            </span>
           </span>
         </div>
       </div>

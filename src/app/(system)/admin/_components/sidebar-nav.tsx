@@ -10,6 +10,7 @@ interface Props {
     tenants: string
     logOut: string
     privacyPolicy: string
+    privacyPolicyNewTab: string
   }
 }
 
@@ -59,6 +60,9 @@ export function SidebarNav({ labels }: Props) {
           <FileText className="size-[18px] shrink-0" strokeWidth={1.5} />
           <span className="truncate" title={labels.privacyPolicy}>
             {labels.privacyPolicy}
+            {/* Visible text is truncated to the sidebar width, so the warning
+                goes to screen readers only rather than squeezing the row. */}
+            <span className="sr-only"> {labels.privacyPolicyNewTab}</span>
           </span>
         </a>
         <LogoutButton className="flex w-full items-center gap-3 px-6 py-2.5 text-left text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink">
