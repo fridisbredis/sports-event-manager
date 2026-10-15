@@ -1031,7 +1031,12 @@ export type Database = {
         Returns: Json
       }
       create_tenant_with_defaults: {
-        Args: { p_name: string; p_slug: string }
+        Args: {
+          p_admin_name?: string
+          p_admin_user_id?: string
+          p_name: string
+          p_slug: string
+        }
         Returns: Json
       }
       create_workstation: {
