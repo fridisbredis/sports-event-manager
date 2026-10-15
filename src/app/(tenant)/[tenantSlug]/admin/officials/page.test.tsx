@@ -42,6 +42,8 @@ function chain(result: unknown) {
   builder.select = vi.fn(() => builder)
   builder.eq = vi.fn(() => builder)
   builder.neq = vi.fn(() => builder)
+  // N17's shift read filters out work-area-less rows before ordering.
+  builder.not = vi.fn(() => builder)
   builder.order = vi.fn(() => builder)
   // The officials read now ends at range, not order (PERF-06).
   builder.range = vi.fn(() => Promise.resolve(result))
@@ -71,6 +73,13 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 function mockServerClient(userId: string | null, tenant: unknown, officialsResult?: unknown) {
   const fromMock = vi.fn((table: string) => {
     if (table === 'officials') return chain(officialsResult ?? { data: null })
+    // N17 reads these two per official for the expanded row. They are not
+    // what these tests are about — the roster's own ceiling is — so they
+    // return empty rather than being asserted on here. Their own behaviour
+    // is covered in official-detail.test.ts.
+    if (table === 'assignments' || table === 'official_unavailability') {
+      return chain({ data: [] })
+    }
     return chain({ data: tenant })
   })
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
@@ -130,6 +139,10 @@ describe('OfficialsPage', () => {
       tenantId: TENANT_ID,
       officials,
       currentUserId: 'user-1',
+      // One entry per visible official, each empty because the mocked
+      // assignment and unavailability reads return no rows (N17).
+      details: { 'off-1': { shifts: [], timeOff: [] } },
+      language: 'en',
     })
   })
 

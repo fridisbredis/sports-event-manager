@@ -1,6 +1,6 @@
 'use client'
 
-import { Users } from 'lucide-react'
+import { Users, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import {
   Chip,
@@ -35,12 +35,18 @@ import {
   formatPhoneForDisplay,
 } from '@/lib/phone'
 import type { OfficialListItem } from '@/types/app'
+import type { OfficialDetail } from '@/lib/scheduling/official-detail'
+import { formatStageDate, formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
 
 interface Props {
   tenantSlug: string
   tenantId: string
   officials: OfficialListItem[]
   currentUserId: string
+  /** N17: shifts and time off per official id, read server-side. */
+  details: Record<string, OfficialDetail>
+  /** Drives date and time formatting, which follows the locale setting (B7). */
+  language: string
 }
 
 /**
@@ -59,9 +65,14 @@ export default function OfficialsList({
   tenantId,
   officials: initialOfficials,
   currentUserId,
+  details,
+  language,
 }: Props) {
   const { t } = useTranslation('admin')
   const [officials, setOfficials] = useState<OfficialListItem[]>(initialOfficials)
+  // N17: which rows are expanded. A set rather than a single id — comparing
+  // two officials' shifts means having both open at once.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<OfficialListItem | null>(null)
   const [resendTarget, setResendTarget] = useState<OfficialListItem | null>(null)
@@ -197,6 +208,15 @@ export default function OfficialsList({
   // someone never repaints the avatars of the people who remain.
   const avatarColors = useMemo(() => workAreaColorMap(officials.map((o) => o.id)), [officials])
 
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   function closeAddModal() {
     setAddModalOpen(false)
     setName('')
@@ -252,14 +272,37 @@ export default function OfficialsList({
             <TableColumn width={260}>{t('officials.actions')}</TableColumn>
           </TableHeader>
           <TableBody>
-            {visibleOfficials.map((official) => {
+            {visibleOfficials.flatMap((official) => {
               const isCurrentUser = official.user_id === currentUserId
               const isResending = resendingId === official.id
+              const isExpanded = expanded.has(official.id)
 
-              return (
+              // Two rows per official: the roster row, and the detail panel
+              // beneath it when open. Returned as an array rather than a
+              // fragment because HeroUI's TableBody reads its children as a
+              // collection, and a fragment would hide the second row from it.
+              return [
                 <TableRow key={official.id}>
                   <TableCell className="text-[15px] font-medium text-ink">
-                    <span className="flex items-center gap-3">
+                    {/* The whole name cell is the disclosure control, so the
+                        target is the full-width name rather than a chevron
+                        the thumb has to find. The row itself stays inert:
+                        making the <tr> clickable would swallow clicks meant
+                        for Remove and Re-send invite in the last column. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(official.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`official-detail-${official.id}`}
+                      className="flex w-full items-center gap-3 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tenant-primary"
+                    >
+                      <ChevronRight
+                        className={`size-4 shrink-0 text-ink-faint transition-transform ${
+                          isExpanded ? 'rotate-90' : ''
+                        }`}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
                       <AvatarImage
                         src={official.avatar_url}
                         initials={initialsOf(official.name)}
@@ -274,7 +317,7 @@ export default function OfficialsList({
                       {isCurrentUser
                         ? `${official.name} — ${t('officials.youLabel')}`
                         : official.name}
-                    </span>
+                    </button>
                   </TableCell>
                   <TableCell className="text-[15px] text-ink-soft">
                     {formatPhoneForDisplay(official.phone)}
@@ -321,8 +364,38 @@ export default function OfficialsList({
                       </div>
                     )}
                   </TableCell>
-                </TableRow>
-              )
+                </TableRow>,
+                // Rendered only when open. An always-present hidden row would
+                // put every official's shifts into the accessibility tree and
+                // into Cmd+F, where a collapsed row implies they are not there.
+                ...(isExpanded
+                  ? [
+                      <TableRow key={`${official.id}-detail`}>
+                        {/* One cell spanning the table: the panel is about the
+                            official as a whole, not about any one column.
+
+                            colSpan is what makes this a legal row rather than
+                            cosmetic. React Stately builds the collection by
+                            summing `colSpan ?? 1` over a row's cells and
+                            throwing unless the total equals the column count,
+                            so this single cell must declare all four — and
+                            must be the row's ONLY cell. Padding it out with
+                            empty cells as well sums to seven and throws. */}
+                        <TableCell
+                          colSpan={4}
+                          id={`official-detail-${official.id}`}
+                          className="bg-status-neutral-bg/40 p-0"
+                        >
+                          <OfficialDetailPanel
+                            detail={details[official.id]}
+                            language={language}
+                            t={t}
+                          />
+                        </TableCell>
+                      </TableRow>,
+                    ]
+                  : []),
+              ]
             })}
           </TableBody>
         </Table>
@@ -415,6 +488,99 @@ export default function OfficialsList({
         onCancel={() => setResendTarget(null)}
         onConfirm={() => resendTarget && handleResend(resendTarget)}
       />
+    </div>
+  )
+}
+
+/**
+ * N17's expanded row: what this official is scheduled for, and when they said
+ * they cannot work.
+ *
+ * Read-only by design — the card asks for a view, and every field here is
+ * edited somewhere that already owns it (shifts on SCHED-01, time off on the
+ * availability screen). Offering an edit affordance here would be a second
+ * door onto the same data with none of those screens' conflict handling.
+ *
+ * Shifts come pre-folded into runs by `fetchOfficialDetail`, so one line is
+ * one continuous stretch at one work area rather than one grid slot.
+ */
+function OfficialDetailPanel({
+  detail,
+  language,
+  t,
+}: {
+  detail: OfficialDetail | undefined
+  language: string
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  const shifts = detail?.shifts ?? []
+  const timeOff = detail?.timeOff ?? []
+
+  return (
+    <div className="grid gap-6 px-4 pb-5 pt-1 sm:grid-cols-2">
+      <section>
+        <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+          {t('officials.detailShifts', { count: shifts.length })}
+        </h3>
+        {shifts.length === 0 ? (
+          <p className="text-[14px] text-ink-soft">{t('officials.detailNoShifts')}</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {shifts.map((s) => (
+              // Start timestamps are unique per official per work area run, so
+              // they key the list without an id round trip.
+              <li key={`${s.start}-${s.workAreaName ?? ''}`} className="text-[14px] text-ink">
+                <span className="text-ink-soft">
+                  {formatStageDate(s.start, language)}{' '}
+                  <span className="tabular-nums">
+                    {formatStageTime(s.start, language)}–{formatStageTime(s.end, language)}
+                  </span>
+                </span>{' '}
+                {/* An em dash where the work area is missing: the filter in
+                    fetchOfficialDetail excludes those rows, so this is a
+                    belt-and-braces render rather than an expected state. */}
+                <span className="font-medium">{s.workAreaName ?? '—'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+          {t('officials.detailTimeOff', { count: timeOff.length })}
+        </h3>
+        {timeOff.length === 0 ? (
+          <p className="text-[14px] text-ink-soft">{t('officials.detailNoTimeOff')}</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {timeOff.map((p) => {
+              // stageTimeRangeParts carries the end's own date only when the
+              // period crosses midnight, which is what makes a multi-day
+              // absence read correctly instead of as a zero-length one (B3).
+              const parts = stageTimeRangeParts(p.startsAt, p.endsAt, language)
+
+              return (
+                <li key={p.id} className="text-[14px] text-ink">
+                  <span className="text-ink-soft tabular-nums">
+                    {parts ? `${parts.from}${parts.to ? ` – ${parts.to}` : ''}` : '—'}
+                  </span>
+                  {p.reason ? <span> · {p.reason}</span> : null}{' '}
+                  {/* Who entered it matters to an admin reading the roster: an
+                      official's own declaration is a statement of availability,
+                      an admin's record is a scheduling decision already made. */}
+                  <span className="text-ink-faint">
+                    ·{' '}
+                    {p.createdByRole === 'official'
+                      ? t('officials.detailTimeOffSelfDeclared')
+                      : t('officials.detailTimeOffByAdmin')}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }
