@@ -79,7 +79,22 @@ vi.mock('@heroui/react', () => {
   const TableColumn = ({ children }: { children?: ReactNode }) => <th>{children}</th>
   const TableBody = ({ children }: { children?: ReactNode }) => <tbody>{children}</tbody>
   const TableRow = ({ children }: { children?: ReactNode }) => <tr>{children}</tr>
-  const TableCell = ({ children }: { children?: ReactNode }) => <td>{children}</td>
+  // colSpan and id are passed through: N17's detail row is one spanning cell
+  // whose id is the aria-controls target of the row's disclosure button, so a
+  // stub that dropped them would hide exactly what those tests assert.
+  const TableCell = ({
+    children,
+    colSpan,
+    id,
+  }: {
+    children?: ReactNode
+    colSpan?: number
+    id?: string
+  }) => (
+    <td colSpan={colSpan} id={id}>
+      {children}
+    </td>
+  )
 
   const Modal = ({ isOpen, children }: { isOpen?: boolean; children?: ReactNode }) =>
     isOpen ? <div>{children}</div> : null
@@ -232,6 +247,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -250,6 +267,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -268,6 +287,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -292,6 +313,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -310,6 +333,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -332,6 +357,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -358,6 +385,8 @@ describe('OfficialsList — handleAdd error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -403,6 +432,8 @@ describe('OfficialsList — handleAdd success', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -427,6 +458,8 @@ describe('OfficialsList — handleAdd success', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -459,6 +492,8 @@ describe('OfficialsList — handleRemove', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -484,6 +519,8 @@ describe('OfficialsList — handleRemove', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
 
@@ -502,6 +539,8 @@ describe('OfficialsList — handleResend error branches', () => {
         tenantId="tenant-1"
         officials={officials}
         currentUserId={currentUserId}
+        details={{}}
+        language="en"
       />
     )
   }
@@ -593,5 +632,108 @@ describe('OfficialsList — handleResend error branches', () => {
     expect(toastError).not.toHaveBeenCalledWith(
       fakeT('officials.resendError', { name: 'Jane Referee' })
     )
+  })
+})
+
+describe('OfficialsList — N17 expanded row', () => {
+  const details = {
+    'off-1': {
+      shifts: [
+        {
+          start: '2026-08-02T08:00:00Z',
+          end: '2026-08-02T11:00:00Z',
+          workAreaName: 'Finish line',
+        },
+      ],
+      timeOff: [
+        {
+          id: 'p-1',
+          startsAt: '2026-08-01T00:00:00Z',
+          endsAt: '2026-08-02T00:00:00Z',
+          reason: 'Away',
+          createdByRole: 'official',
+        },
+      ],
+    },
+  }
+
+  function renderList() {
+    return render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+        details={details}
+        language="en"
+      />
+    )
+  }
+
+  // The panel is absent, not hidden: a collapsed row must not put the
+  // official's shifts into the accessibility tree or into Cmd+F, where their
+  // presence would imply the row is already open.
+  it('renders no detail panel until the row is expanded', () => {
+    renderList()
+
+    expect(screen.queryByText('Finish line')).not.toBeInTheDocument()
+  })
+
+  it('shows shifts and time off after clicking the name, and hides them again', () => {
+    renderList()
+
+    const toggle = screen.getByRole('button', { name: /Jane Referee/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Finish line')).toBeInTheDocument()
+    expect(screen.getByText(/Away/)).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Finish line')).not.toBeInTheDocument()
+  })
+
+  // Two rows open at once is the point of a Set rather than a single id:
+  // comparing two officials' shifts is the reason an admin opens these.
+  it('keeps several rows open at the same time', () => {
+    renderList()
+
+    fireEvent.click(screen.getByRole('button', { name: /Jane Referee/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Me Admin/ }))
+
+    expect(screen.getByRole('button', { name: /Jane Referee/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: /Me Admin/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+  })
+
+  // An official with nothing scheduled still gets a panel, with wording that
+  // says so — the same copy a failed read falls back to.
+  it('renders empty-state copy for an official with no shifts or time off', () => {
+    renderList()
+
+    fireEvent.click(screen.getByRole('button', { name: /Me Admin/ }))
+
+    expect(screen.getByText('officials.detailNoShifts')).toBeInTheDocument()
+    expect(screen.getByText('officials.detailNoTimeOff')).toBeInTheDocument()
+  })
+
+  // The disclosure button must point at the panel it opens.
+  it('ties the toggle to the panel it controls', () => {
+    renderList()
+
+    const toggle = screen.getByRole('button', { name: /Jane Referee/ })
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-controls', 'official-detail-off-1')
+    expect(document.getElementById('official-detail-off-1')).toBeInTheDocument()
   })
 })

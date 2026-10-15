@@ -3,6 +3,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import OfficialsList from './_components/officials-list'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
+import { fetchOfficialDetail, type OfficialDetail } from '@/lib/scheduling/official-detail'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -49,6 +51,30 @@ export default async function OfficialsPage({ params }: Props) {
     context: { tenantId: tenant.id },
   })
 
+  // N17's expanded row. Read up front for the whole roster rather than on
+  // demand per row, because a confirmed typical tenant runs 10-15 officials
+  // (quality-requirements.md:113) — two small indexed reads each, issued
+  // together, against a roster that size. That keeps the disclosure instant
+  // and avoids a server action per expand.
+  //
+  // If the roster ever grows past that, this is the line to revisit: the
+  // OFFICIALS_CEILING above admits up to 500, and 1000 round trips would be
+  // the wrong shape. The ceiling logs before that point is reached.
+  const visible = rows.filter((o) => o.invite_status !== 'removed')
+  const language = await getUserLanguage()
+
+  const details = new Map<string, OfficialDetail>(
+    await Promise.all(
+      visible.map(
+        async (o) =>
+          [
+            o.id,
+            await fetchOfficialDetail(supabase, { tenantId: tenant.id, officialId: o.id }),
+          ] as const
+      )
+    )
+  )
+
   return (
     <div className="px-8 py-8">
       <OfficialsList
@@ -56,6 +82,8 @@ export default async function OfficialsPage({ params }: Props) {
         tenantId={tenant.id}
         officials={rows}
         currentUserId={user.id}
+        details={Object.fromEntries(details)}
+        language={language}
       />
     </div>
   )
