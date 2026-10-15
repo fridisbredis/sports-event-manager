@@ -66,7 +66,12 @@ export async function ensureSecondTenant(admin: SupabaseClient<Database>) {
       name: 'E2E Invite Klubben',
       slug: SECOND_TENANT_SLUG,
       is_active: true,
-      tier: 'standard',
+      // 'professional' (N20 admin cap 10), not 'standard' (cap 1): this tenant
+      // exists to exercise invite and multi-tenant flows, and those seed more
+      // than one admin into it. On 'standard' the later ones are correctly
+      // locked out by the cap and the specs fail for a reason unrelated to
+      // what they test.
+      tier: 'professional',
     })
     .select('id')
     .single()

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { TenantRole } from '@/lib/auth/tenant'
+import type { Tier } from '@/lib/tiers/features'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!
@@ -12,12 +13,19 @@ export function serviceClient(): SupabaseClient<Database> {
   })
 }
 
-export async function createTenant(name: string) {
+// `tier` defaults to 'professional' (N20's highest admin cap, 10) rather than
+// to the column default of 'standard' (cap 1). A fixture tenant exists to test
+// something other than the tier system, and several suites give one tenant two
+// or more admins to prove cross-tenant isolation — on 'standard' the second
+// admin is correctly locked out by the cap, and the suite then fails for a
+// reason that has nothing to do with what it is testing. A test that wants the
+// cap's behaviour passes the tier explicitly.
+export async function createTenant(name: string, tier: Tier = 'professional') {
   const admin = serviceClient()
   const slug = `${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const { data, error } = await admin
     .from('tenants')
-    .insert({ name, slug, is_active: true })
+    .insert({ name, slug, is_active: true, tier })
     .select()
     .single()
   if (error) throw error

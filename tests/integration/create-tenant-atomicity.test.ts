@@ -94,7 +94,13 @@ describe('createTenant: atomicity across tenants/events/event_stages', () => {
     const admin = serviceClient()
     const slug = `atomicity-fix-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-    const { data, error } = await clientSystemAdmin.rpc('create_tenant_with_defaults', {
+    // Called through the service client, not the signed-in system admin:
+    // migration 20261015124237 made this RPC SECURITY DEFINER and granted it
+    // to service_role only, since it now writes user_roles — a table no RLS
+    // policy lets `authenticated` touch. The system_admin check moved into the
+    // function body. The test below pins that the authenticated role is in
+    // fact refused.
+    const { data, error } = await admin.rpc('create_tenant_with_defaults', {
       p_name: 'Atomicity Fixed Tenant',
       p_slug: slug,
     })
@@ -125,17 +131,17 @@ describe('createTenant: atomicity across tenants/events/event_stages', () => {
     const admin = serviceClient()
     const slug = `atomicity-dup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-    const { data: firstData, error: firstError } = await clientSystemAdmin.rpc(
-      'create_tenant_with_defaults',
-      { p_name: 'First Tenant', p_slug: slug }
-    )
+    const { data: firstData, error: firstError } = await admin.rpc('create_tenant_with_defaults', {
+      p_name: 'First Tenant',
+      p_slug: slug,
+    })
     expect(firstError).toBeNull()
     const { tenant_id: firstTenantId } = firstData as unknown as { tenant_id: string }
     createdTenantIds.push(firstTenantId)
 
     // Reusing the same slug violates tenants' unique constraint on the
     // first insert of the transaction — nothing beyond it should exist.
-    const { data: secondData, error: secondError } = await clientSystemAdmin.rpc(
+    const { data: secondData, error: secondError } = await admin.rpc(
       'create_tenant_with_defaults',
       { p_name: 'Second Tenant', p_slug: slug }
     )
@@ -147,5 +153,53 @@ describe('createTenant: atomicity across tenants/events/event_stages', () => {
     // was left behind by the failed call.
     const { data: events } = await admin.from('events').select('id').eq('name', 'Second Tenant')
     expect(events).toEqual([])
+  })
+
+  // N20 / ADR-0002. The RPC writes user_roles, so it must not be reachable by
+  // the authenticated role even for a genuine system_admin — the app calls it
+  // through the service client after its own assertSystemAdmin() check.
+  it('refuses a signed-in system admin: the function is service_role only', async () => {
+    const { error } = await clientSystemAdmin.rpc('create_tenant_with_defaults', {
+      p_name: 'Should Not Exist',
+      p_slug: `denied-${Date.now()}`,
+    })
+
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe('42501')
+
+    const admin = serviceClient()
+    const { data: tenants } = await admin
+      .from('tenants')
+      .select('id')
+      .eq('name', 'Should Not Exist')
+    expect(tenants).toEqual([])
+  })
+
+  // Regression guard for the PGRST203 defect: 20261015124237 added a
+  // four-argument version and left the two-argument original in place, which
+  // made PostgREST unable to choose between them and broke BOTH call shapes.
+  // 20261015125844 dropped the original. A two-argument call must still work,
+  // since the admin arguments default to null.
+  it('resolves a two-argument call: there is exactly one function, not an overload pair', async () => {
+    const admin = serviceClient()
+    const slug = `single-signature-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+    const { data, error } = await admin.rpc('create_tenant_with_defaults', {
+      p_name: 'Single Signature Tenant',
+      p_slug: slug,
+    })
+
+    expect(error).toBeNull()
+    const { tenant_id: tenantId, admin: adminResult } = data as unknown as {
+      tenant_id: string
+      admin: unknown
+    }
+    createdTenantIds.push(tenantId)
+
+    // No admin argument given, so no admin is granted — the tenant shell the
+    // old two-argument signature produced.
+    expect(adminResult).toBeNull()
+    const { data: roles } = await admin.from('user_roles').select('id').eq('tenant_id', tenantId)
+    expect(roles).toEqual([])
   })
 })
