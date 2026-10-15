@@ -428,7 +428,7 @@ export function AvailabilityManager({ tenantSlug, periods, eventDates }: Props) 
         </AppCard>
       ) : (
         <Button
-          variant="bordered"
+          color="primary"
           className="w-full"
           startContent={<Plus className="size-4" aria-hidden="true" />}
           onPress={() => setFormOpen(true)}
