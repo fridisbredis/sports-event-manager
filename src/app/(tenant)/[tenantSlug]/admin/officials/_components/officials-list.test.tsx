@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { Children, isValidElement } from 'react'
 import type { ReactNode, KeyboardEvent } from 'react'
 import OfficialsList from './officials-list'
 import { toastError } from '@/lib/toast'
@@ -78,7 +79,28 @@ vi.mock('@heroui/react', () => {
   )
   const TableColumn = ({ children }: { children?: ReactNode }) => <th>{children}</th>
   const TableBody = ({ children }: { children?: ReactNode }) => <tbody>{children}</tbody>
-  const TableRow = ({ children }: { children?: ReactNode }) => <tr>{children}</tr>
+
+  // The real table is backed by React Stately, which sums `colSpan ?? 1` over
+  // a row's cells and throws unless the total equals the column count. A stub
+  // that simply rendered its children let a row with four cells AND a
+  // colSpan={4} — seven columns' worth — pass every test here and then throw
+  // in the browser on first open. This reproduces the rule so that cannot
+  // happen again; COLUMN_COUNT tracks the TableHeader above.
+  const COLUMN_COUNT = 4
+  const TableRow = ({ children }: { children?: ReactNode }) => {
+    let columns = 0
+    Children.forEach(children, (node) => {
+      if (!isValidElement(node)) return
+      const { colSpan } = node.props as { colSpan?: number }
+      columns += colSpan ?? 1
+    })
+    if (columns !== COLUMN_COUNT) {
+      throw new Error(
+        `Cell count must match column count. Found ${columns} cells and ${COLUMN_COUNT} columns.`
+      )
+    }
+    return <tr>{children}</tr>
+  }
   // colSpan and id are passed through: N17's detail row is one spanning cell
   // whose id is the aria-controls target of the row's disclosure button, so a
   // stub that dropped them would hide exactly what those tests assert.

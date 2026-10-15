@@ -134,7 +134,59 @@ test.describe('OFF-01 officials roster', () => {
 
     // No action buttons on your own row: an admin cannot resend an invite to
     // themselves or remove themselves from the roster.
-    await expect(adminRow.getByRole('button')).toHaveCount(0)
+    //
+    // Named rather than counted: since N17 every row's name cell is itself a
+    // button, the disclosure that opens the shifts panel. A bare count would
+    // now be 1 on a row that still carries no actions, so it would be
+    // asserting the layout rather than the rule this test is about.
+    await expect(adminRow.getByRole('button', { name: 'Remove' })).toHaveCount(0)
+    await expect(adminRow.getByRole('button', { name: 'Re-send invite' })).toHaveCount(0)
+  })
+
+  // N17. This exercises the real HeroUI table, which is what the component
+  // tests cannot: React Stately validates a row's cell count against the
+  // column count as it builds the collection, and the first version of this
+  // feature threw "Cell count must match column count" on the real table
+  // while every stubbed component test passed.
+  test('expanding an official shows their shifts and time off', async ({
+    tenantAdminPage: page,
+  }) => {
+    const pageErrors: Error[] = []
+    page.on('pageerror', (e) => pageErrors.push(e))
+
+    await page.goto(`${base}/officials`)
+
+    // Seeded with shifts, unlike 'Seed Official No Shifts' below.
+    const toggle = page.getByRole('button', { name: /Seed Official Confirmed/ })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    // The panel is the click's outcome, so clickWhenInteractive can retry
+    // through the hydration race the same way the other HeroUI clicks here do.
+    // Work area names come from the join, so their presence means the whole
+    // read-fold-render path worked, not just that a panel opened.
+    const panel = page.locator('[id^="official-detail-"]')
+    await clickWhenInteractive(toggle, panel.getByText('Finish line').first())
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    // The toggle must name the panel it opens.
+    expect(await toggle.getAttribute('aria-controls')).toBe(await panel.getAttribute('id'))
+
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(panel).toHaveCount(0)
+
+    // A row that renders but throws is still broken; the collection error
+    // surfaced exactly this way.
+    expect(pageErrors).toHaveLength(0)
+  })
+
+  test('an official with no shifts still gets a panel', async ({ tenantAdminPage: page }) => {
+    await page.goto(`${base}/officials`)
+
+    const toggle = page.getByRole('button', { name: /Seed Official No Shifts/ })
+    const panel = page.locator('[id^="official-detail-"]')
+
+    await clickWhenInteractive(toggle, panel.getByText('Not scheduled yet.'))
   })
 
   test('add-official modal validates name and number', async ({ tenantAdminPage: page }) => {

@@ -373,9 +373,14 @@ export default function OfficialsList({
                       <TableRow key={`${official.id}-detail`}>
                         {/* One cell spanning the table: the panel is about the
                             official as a whole, not about any one column.
-                            HeroUI types TableCell's props without colSpan, so
-                            it is passed through — the DOM element is a <td>
-                            and takes it. */}
+
+                            colSpan is what makes this a legal row rather than
+                            cosmetic. React Stately builds the collection by
+                            summing `colSpan ?? 1` over a row's cells and
+                            throwing unless the total equals the column count,
+                            so this single cell must declare all four — and
+                            must be the row's ONLY cell. Padding it out with
+                            empty cells as well sums to seven and throws. */}
                         <TableCell
                           colSpan={4}
                           id={`official-detail-${official.id}`}
@@ -387,12 +392,6 @@ export default function OfficialsList({
                             t={t}
                           />
                         </TableCell>
-                        {/* HeroUI's collection still expects one child per
-                            column; these three are collapsed by the colSpan
-                            above and never paint. */}
-                        <TableCell className="hidden">{null}</TableCell>
-                        <TableCell className="hidden">{null}</TableCell>
-                        <TableCell className="hidden">{null}</TableCell>
                       </TableRow>,
                     ]
                   : []),
