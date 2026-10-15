@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, SelectItem } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { SystemButton } from './system-button'
-import { Input } from '@/components/ui/form-fields'
+import { Input, Select } from '@/components/ui/form-fields'
+import { isValidPhoneForCountry, DEFAULT_PHONE_COUNTRY, PHONE_COUNTRIES } from '@/lib/phone'
 import { createTenant } from '../actions'
 import { toSlug } from '../_utils'
 import { toastError } from '@/lib/toast'
@@ -18,22 +19,42 @@ interface Props {
 export function CreateTenantModal({ open, onClose }: Props) {
   const { t } = useTranslation('admin')
   const [name, setName] = useState('')
+  const [adminName, setAdminName] = useState('')
+  const [adminPhone, setAdminPhone] = useState('')
+  const [adminPhoneCountry, setAdminPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const slug = toSlug(name)
+  const phoneIsValid =
+    adminPhone.trim() !== '' && isValidPhoneForCountry(adminPhone, adminPhoneCountry)
+  const canSubmit = name.trim() !== '' && adminName.trim() !== '' && phoneIsValid
+
+  function reset() {
+    setName('')
+    setAdminName('')
+    setAdminPhone('')
+    setAdminPhoneCountry(DEFAULT_PHONE_COUNTRY)
+    setError(null)
+  }
+
+  function handleClose() {
+    if (pending) return
+    reset()
+    onClose()
+  }
 
   async function handleSubmit() {
-    if (!name.trim() || pending) return
+    if (!canSubmit || pending) return
     setPending(true)
     setError(null)
-    const result = await createTenant(name)
+    const result = await createTenant(name, adminName.trim(), adminPhone.trim(), adminPhoneCountry)
     setPending(false)
     if (result.error) {
       setError(result.error)
       toastError(result.error)
     } else {
-      setName('')
+      reset()
       onClose()
     }
   }
@@ -41,10 +62,11 @@ export function CreateTenantModal({ open, onClose }: Props) {
   return (
     <Modal
       isOpen={open}
-      onOpenChange={(isOpen) => !isOpen && onClose()}
+      onOpenChange={(isOpen) => !isOpen && handleClose()}
       // White card on the handoff's backdrop, with its modal radius and
       // shadow. The grey base this carried before made the dialog read as a
       // panel of the page behind it rather than as a sheet above it.
+      size="lg"
       classNames={{
         base: 'bg-white rounded-card shadow-modal',
         backdrop: 'bg-ink/45',
@@ -75,12 +97,65 @@ export function CreateTenantModal({ open, onClose }: Props) {
               )
             }
           />
+
+          {/* The first admin. Required: a tenant created without one cannot be
+              signed in to at all, which is how two of the three tenants in
+              prod ended up unreachable. */}
+          <div className="mt-2 border-t border-edge-soft pt-4">
+            <h3 className="section-label mb-1">{t('systemAdmin.firstAdminSection')}</h3>
+            <p className="mb-3 text-sm text-ink-label">{t('systemAdmin.firstAdminHint')}</p>
+            <div className="flex flex-col gap-3">
+              <Input
+                label={t('systemAdmin.addAdminName')}
+                placeholder={t('systemAdmin.addAdminNamePlaceholder')}
+                value={adminName}
+                onValueChange={(value) => {
+                  setAdminName(value)
+                  setError(null)
+                }}
+              />
+              <div className="flex gap-2">
+                <Select
+                  label={t('systemAdmin.addAdminCountry')}
+                  className="w-52 shrink-0"
+                  selectedKeys={[adminPhoneCountry]}
+                  onSelectionChange={(keys) => {
+                    const next = Array.from(keys)[0] as string
+                    setAdminPhoneCountry(next as typeof adminPhoneCountry)
+                    setError(null)
+                  }}
+                >
+                  {PHONE_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} textValue={c.label}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </Select>
+                <Input
+                  label={t('systemAdmin.addAdminPhone')}
+                  className="flex-1"
+                  type="tel"
+                  value={adminPhone}
+                  onValueChange={(value) => {
+                    setAdminPhone(value)
+                    setError(null)
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                />
+              </div>
+            </div>
+          </div>
         </ModalBody>
         <ModalFooter>
-          <Button variant="bordered" className="rounded-control border-edge" onPress={onClose}>
+          <Button
+            variant="bordered"
+            className="rounded-control border-edge"
+            onPress={handleClose}
+            isDisabled={pending}
+          >
             {t('systemAdmin.cancel')}
           </Button>
-          <SystemButton isDisabled={!name.trim()} isLoading={pending} onPress={handleSubmit}>
+          <SystemButton isDisabled={!canSubmit} isLoading={pending} onPress={handleSubmit}>
             {t('systemAdmin.create')}
           </SystemButton>
         </ModalFooter>

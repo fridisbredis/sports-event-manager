@@ -7,6 +7,10 @@ import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
+import { TenantAdminsSection } from './_components/tenant-admins-section'
+import { listTenantAdmins } from '@/lib/auth/tenant-admins'
+import { maxTenantAdmins } from '@/lib/tiers/features'
+import { dateLocaleFor, EVENT_TIME_ZONE } from '@/lib/i18n/date-locale'
 
 interface Props {
   params: Promise<{ tenantId: string }>
@@ -18,7 +22,8 @@ export default async function TenantDetailPage({ params }: Props) {
   const auth = await requireSystemAdmin()
   if ('error' in auth) notFound()
 
-  const t = await getServerTranslation(await getUserLanguage(), 'admin')
+  const language = await getUserLanguage()
+  const t = await getServerTranslation(language, 'admin')
   const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')
@@ -27,6 +32,21 @@ export default async function TenantDetailPage({ params }: Props) {
     .maybeSingle()
 
   if (!tenant) notFound()
+
+  const admins = await listTenantAdmins(tenant.id, tenant.tier)
+
+  // Formatted here rather than in the client component so the dates follow the
+  // user's locale setting (B7: locale and text language are separate settings)
+  // and the event's zone, instead of whatever the browser happens to be in.
+  const dateFormatter = new Intl.DateTimeFormat(dateLocaleFor(language), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: EVENT_TIME_ZONE,
+  })
+  const formattedDates = Object.fromEntries(
+    admins.map((admin) => [admin.userId, dateFormatter.format(new Date(admin.createdAt))])
+  )
 
   return (
     <div className="mx-auto max-w-[1240px] px-10 pb-16 pt-8">
@@ -46,6 +66,14 @@ export default async function TenantDetailPage({ params }: Props) {
           isActive={tenant.is_active}
           tier={tenant.tier as 'standard' | 'premium' | 'professional'}
         />
+        <div className="border-t border-edge-soft">
+          <TenantAdminsSection
+            tenantId={tenant.id}
+            admins={admins}
+            cap={maxTenantAdmins(tenant.tier)}
+            formattedDates={formattedDates}
+          />
+        </div>
       </AppCard>
     </div>
   )

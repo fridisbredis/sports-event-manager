@@ -44,6 +44,7 @@ function chain(result: unknown) {
     'order',
     'range',
     'is',
+    'in',
     'update',
     'insert',
   ]) {
@@ -523,8 +524,12 @@ describe('hasAdminAccessToTenant', () => {
 
   it('returns true when the caller has a tenant_admin row for this tenant and it is active', async () => {
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
+      officials: { data: [], error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(true)
@@ -533,7 +538,7 @@ describe('hasAdminAccessToTenant', () => {
   it('returns false when the tenant_admin row is for a different tenant', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'tenant_admin', tenant_id: OTHER_TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
@@ -541,8 +546,11 @@ describe('hasAdminAccessToTenant', () => {
 
   it('denies a tenant_admin when the tenant has been deactivated', async () => {
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: false }, error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
@@ -551,7 +559,7 @@ describe('hasAdminAccessToTenant', () => {
   it('allows a global system_admin even when the tenant has been deactivated', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
-      tenants: { data: { is_active: false }, error: null },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
       officials: { data: null, error: null },
     })
 
@@ -561,7 +569,7 @@ describe('hasAdminAccessToTenant', () => {
   it('returns false when the caller has no role rows at all', async () => {
     mockServiceClientByTable({
       user_roles: { data: [], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
@@ -571,7 +579,7 @@ describe('hasAdminAccessToTenant', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockServiceClientByTable({
       user_roles: { data: null, error: { message: 'boom' } },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
@@ -581,7 +589,10 @@ describe('hasAdminAccessToTenant', () => {
   it('fails closed and logs when the tenant status query errors', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       tenants: { data: null, error: { message: 'boom' } },
     })
 
@@ -605,7 +616,7 @@ describe('canViewOfficialSurfaces', () => {
   it('allows a confirmed official in their own active tenant', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
       officials: { data: { id: 'off-1' }, error: null },
     })
 
@@ -618,7 +629,7 @@ describe('canViewOfficialSurfaces', () => {
   it('denies an official who has not been confirmed yet', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
       officials: { data: null, error: null },
     })
 
@@ -649,7 +660,7 @@ describe('canViewOfficialSurfaces', () => {
   it('denies an official role with no matching officials row', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
       officials: { data: null, error: null },
     })
 
@@ -660,7 +671,7 @@ describe('canViewOfficialSurfaces', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
       officials: { data: null, error: { message: 'boom' } },
     })
 
@@ -670,8 +681,11 @@ describe('canViewOfficialSurfaces', () => {
 
   it('allows a tenant_admin in their own active tenant', async () => {
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
       officials: { data: { id: 'off-admin' }, error: null },
     })
 
@@ -681,7 +695,7 @@ describe('canViewOfficialSurfaces', () => {
   it('denies a participant in their own tenant', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'participant', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
@@ -690,7 +704,7 @@ describe('canViewOfficialSurfaces', () => {
   it('denies an official once the tenant has been deactivated', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'official', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: false }, error: null },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
@@ -699,7 +713,7 @@ describe('canViewOfficialSurfaces', () => {
   it('allows a global system_admin even when the tenant has been deactivated', async () => {
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
-      tenants: { data: { is_active: false }, error: null },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
       officials: { data: null, error: null },
     })
 
@@ -709,7 +723,7 @@ describe('canViewOfficialSurfaces', () => {
   it('returns false when the caller has no role rows at all', async () => {
     mockServiceClientByTable({
       user_roles: { data: [], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
@@ -719,7 +733,7 @@ describe('canViewOfficialSurfaces', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockServiceClientByTable({
       user_roles: { data: null, error: { message: 'boom' } },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     expect(await canViewOfficialSurfaces('user-1', TENANT_ID)).toBe(false)
@@ -835,7 +849,7 @@ describe('requireTenantAdmin', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockServiceClientByTable({
       user_roles: { data: null, error: { message: 'boom' } },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     const result = await requireTenantAdmin(TENANT_ID)
@@ -848,7 +862,10 @@ describe('requireTenantAdmin', () => {
     mockServerClient({ id: 'user-1' })
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       tenants: { data: null, error: { message: 'boom' } },
     })
 
@@ -862,7 +879,7 @@ describe('requireTenantAdmin', () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
       user_roles: { data: [], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     const result = await requireTenantAdmin(TENANT_ID)
@@ -873,8 +890,11 @@ describe('requireTenantAdmin', () => {
   it('returns a 403 error when the tenant_admin row is for this tenant but the tenant is inactive', async () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: false }, error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
     })
 
     const result = await requireTenantAdmin(TENANT_ID)
@@ -885,8 +905,12 @@ describe('requireTenantAdmin', () => {
   it('returns the tenant-specific role when the user is tenant_admin for this active tenant', async () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
-      tenants: { data: { is_active: true }, error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
+      officials: { data: [], error: null },
     })
 
     const result = await requireTenantAdmin(TENANT_ID)
@@ -898,7 +922,7 @@ describe('requireTenantAdmin', () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
       user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
-      tenants: { data: { is_active: false }, error: null },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
     })
 
     const result = await requireTenantAdmin(TENANT_ID)
@@ -925,8 +949,20 @@ describe('resolveTenantForAdmin', () => {
 
   it('returns the tenant row when the caller passes the admin access check', async () => {
     mockServiceClientByTable({
-      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: {
+        data: {
+          id: TENANT_ID,
+          slug: 'viadal',
+          color_palette: 'blue',
+          is_active: true,
+          tier: 'professional',
+        },
+      },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      officials: { data: [], error: null },
     })
 
     expect(await resolveTenantForAdmin('viadal', 'user-1')).toEqual({
@@ -934,6 +970,7 @@ describe('resolveTenantForAdmin', () => {
       slug: 'viadal',
       color_palette: 'blue',
       is_active: true,
+      tier: 'professional',
     })
   })
 })
@@ -976,7 +1013,10 @@ describe('resolveTenantForOfficial', () => {
   it('returns officialId null for a tenant_admin with no officials row, who still passes', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       officials: { data: null, error: null },
     })
 
@@ -1101,7 +1141,10 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
   it('surfaces officialId for a tenant_admin holding a roster row', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       officials: { data: { id: 'off-admin' }, error: null },
     })
 
@@ -1116,7 +1159,10 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
   it('keeps a tenant_admin allowed with a null officialId when no roster row exists', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       officials: { data: null, error: null },
     })
 
@@ -1175,7 +1221,10 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
   it('still denies a tenant_admin in an inactive tenant', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: false } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       officials: { data: { id: 'off-admin' }, error: null },
     })
 
@@ -1187,7 +1236,10 @@ describe('resolveTenantForOfficial — officialId adversarial cases', () => {
   it('keeps a tenant_admin allowed when the officials lookup errors', async () => {
     mockServiceClientByTable({
       tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
       officials: { data: null, error: { message: 'boom' } },
     })
 
@@ -1291,8 +1343,20 @@ describe('getAdminTenant', () => {
   it('returns the tenant row when the caller passes the admin access check', async () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
-      tenants: { data: { id: TENANT_ID, slug: 'viadal', color_palette: 'blue', is_active: true } },
-      user_roles: { data: [{ role: 'tenant_admin', tenant_id: TENANT_ID }], error: null },
+      tenants: {
+        data: {
+          id: TENANT_ID,
+          slug: 'viadal',
+          color_palette: 'blue',
+          is_active: true,
+          tier: 'professional',
+        },
+      },
+      user_roles: {
+        data: [{ role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' }],
+        error: null,
+      },
+      officials: { data: [], error: null },
     })
 
     expect(await getAdminTenant('viadal')).toEqual({
@@ -1300,6 +1364,7 @@ describe('getAdminTenant', () => {
       slug: 'viadal',
       color_palette: 'blue',
       is_active: true,
+      tier: 'professional',
     })
   })
 })

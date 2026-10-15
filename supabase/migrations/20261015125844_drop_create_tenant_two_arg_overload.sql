@@ -1,0 +1,59 @@
+-- ============================================================================
+-- Migration 20261015125844: drop the two-argument create_tenant_with_defaults
+-- ============================================================================
+--
+-- Fixes a defect introduced by 20261015124237. That migration added a
+-- four-argument create_tenant_with_defaults and deliberately left the original
+-- two-argument version in place, reasoning that keeping it made the change
+-- backward-compatible for any caller that had not been updated yet.
+--
+-- That reasoning was wrong, and PostgREST says so plainly:
+--
+--   PGRST203: Could not choose the best candidate function between:
+--     public.create_tenant_with_defaults(p_name => text, p_slug => text),
+--     public.create_tenant_with_defaults(p_name => text, p_slug => text,
+--                                        p_admin_user_id => uuid,
+--                                        p_admin_name => text)
+--
+-- PostgREST resolves an RPC by the names of the arguments in the request body,
+-- not by their count, and a two-argument call body is a valid prefix of both
+-- candidates. So the overload did not preserve the old caller — it broke BOTH,
+-- including the four-argument one the app uses. Caught by
+-- tests/integration/create-tenant-atomicity.test.ts.
+--
+-- The fix is to have exactly one function. The admin arguments already default
+-- to null, so the single remaining four-argument version accepts a
+-- two-argument call unchanged: `rpc('create_tenant_with_defaults', {p_name,
+-- p_slug})` resolves to it and creates a tenant with no admin, exactly as the
+-- old one did. Nothing is lost by dropping the original.
+--
+-- WHY NOT RENAME THE NEW ONE INSTEAD
+-- PGRST203's own hint suggests renaming. That would leave two functions doing
+-- the same job with different names, and the next person would have to know
+-- which is live. One function with optional arguments is the smaller surface.
+--
+-- Forward-fix: replace (drops a function signature)
+--   Rollback: recreate the two-argument version from 20260908130253. Note that
+--             doing so reintroduces this exact ambiguity, so it is only safe
+--             together with dropping the four-argument one — i.e. rolling back
+--             20261015124237 as well. The two migrations are a unit.
+--   Data:     no data loss. Dropping a function does not touch rows, and the
+--             remaining function covers every call the dropped one served.
+--   Blast:    none in the direction that matters: this REMOVES an ambiguity
+--             that currently makes every create_tenant_with_defaults call fail
+--             with PGRST203. Both the old and new call shapes work afterwards.
+--   Window:   compatible — the surviving function accepts the old argument
+--             list, so a deployed caller on either shape keeps working.
+-- ============================================================================
+
+drop function if exists public.create_tenant_with_defaults(text, text);
+
+-- ============================================================================
+-- DONE
+-- ============================================================================
+-- Verify with:
+--   select pg_get_function_identity_arguments(p.oid)
+--   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--   where n.nspname = 'public' and p.proname = 'create_tenant_with_defaults';
+--   -- exactly one row: p_name text, p_slug text, p_admin_user_id uuid,
+--   --                  p_admin_name text

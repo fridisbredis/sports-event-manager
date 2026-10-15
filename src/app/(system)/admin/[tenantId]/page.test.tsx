@@ -23,6 +23,17 @@ vi.mock('./_components/tenant-detail', () => ({
   TenantDetail: vi.fn(() => null),
 }))
 
+// N20: the page now also renders the tenant's admin list. Both the data
+// source and the section are stubbed — this test covers the page's own tenant
+// lookup and wiring, not the admin list, which has its own coverage.
+vi.mock('@/lib/auth/tenant-admins', () => ({
+  listTenantAdmins: vi.fn(() => Promise.resolve([])),
+}))
+
+vi.mock('./_components/tenant-admins-section', () => ({
+  TenantAdminsSection: vi.fn(() => null),
+}))
+
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
   builder.select = vi.fn(() => builder)

@@ -30,7 +30,12 @@
     "slotTaken": "Någon annan hann före på den tidsluckan. Ladda om schemat och försök igen.",
     "batchTooLarge": "För många inplaneringar i en sparning. Dela upp ändringen i mindre delar.",
     "assignmentOnTimeOff": "Funktionären har frånvaro då och kan inte schemaläggas.",
-    "colorThemeNotInTier": "Färgtemat ingår inte i kundens funktionsnivå."
+    "colorThemeNotInTier": "Färgtemat ingår inte i kundens funktionsnivå.",
+    "invalidPhone": "Ogiltigt telefonnummer för valt land",
+    "grantAdminFailed": "Kunde inte lägga till administratören. Försök igen.",
+    "revokeAdminFailed": "Kunde inte ta bort administratören. Försök igen.",
+    "adminCapReached": "Den här tenanten har nått det högsta antalet administratörer för sin nivå. Höj nivån eller ta bort en administratör först.",
+    "lastAdminCannotRemove": "Det här är tenantens sista administratör. En tenant måste ha minst en — inaktivera tenanten i stället."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

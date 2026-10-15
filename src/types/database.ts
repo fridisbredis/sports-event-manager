@@ -816,18 +816,21 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          created_at: string
           id: string
           role: string
           tenant_id: string | null
           user_id: string
         }
         Insert: {
+          created_at?: string
           id?: string
           role: string
           tenant_id?: string | null
           user_id: string
         }
         Update: {
+          created_at?: string
           id?: string
           role?: string
           tenant_id?: string | null
@@ -1067,6 +1070,10 @@ export type Database = {
       }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
+      grant_tenant_admin: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: Json
+      }
       is_on_workstation_shift: {
         Args: {
           p_timeslot_end: string
@@ -1084,6 +1091,10 @@ export type Database = {
       release_rate_limit: { Args: { p_key: string }; Returns: undefined }
       remove_official: {
         Args: { p_official_id: string; p_tenant_id: string }
+        Returns: Json
+      }
+      revoke_tenant_admin: {
+        Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
       }
       save_assignments_batch: {

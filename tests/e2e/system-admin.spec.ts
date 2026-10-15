@@ -39,6 +39,16 @@ test.describe('SYS-01 tenant management', () => {
     // The slug preview replaces the description text as soon as a name exists —
     // this is the operator's only sight of the URL before committing.
     await expect(modal.getByText(/URL slug:/)).toBeVisible()
+
+    // N20: a name alone is no longer enough. A tenant created without an admin
+    // cannot be signed in to by anyone, so the first admin is required here
+    // rather than left to a follow-up visit to SYS-02 that gets forgotten.
+    await expect(create).toBeDisabled()
+
+    await modal.getByLabel('Name', { exact: true }).fill('E2E First Admin')
+    await expect(create).toBeDisabled()
+
+    await modal.getByLabel('Phone number').fill('709900123')
     await expect(create).toBeEnabled()
 
     // Cancel rather than create: a real tenant would persist across runs and
