@@ -456,7 +456,13 @@ export default function EventConfigForm({
           the admin content area is the viewport less a 224px sidebar and 64px
           of padding, so a 480px floor would hold the layout at one column until
           ~1210px even though two fit comfortably well below that. */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] items-start gap-7">
+      {/* min(380px, 100%) rather than a bare 380px floor: auto-fit collapses to
+          one column on a phone, but that single track still carries the 380px
+          minimum, which is wider than a 390px viewport once the page padding
+          is taken off — so the whole form overflowed by ~22px and the page
+          scrolled sideways. The min() lets the lone track shrink to the space
+          there actually is, and changes nothing above 380px. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] items-start gap-7">
         {/* Left: Identity */}
         <section>
           <h2 className="section-label mb-5">{t('eventConfig.identity')}</h2>

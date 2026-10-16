@@ -9,7 +9,9 @@
     "communication": "Communication",
     "account": "Account",
     "officialView": "Official view",
-    "logOut": "Log out"
+    "logOut": "Log out",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "dashboard": {
     "eventName": "Untitled event",

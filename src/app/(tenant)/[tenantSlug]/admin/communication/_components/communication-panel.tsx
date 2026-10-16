@@ -291,7 +291,12 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
             aria-label={t('communication.newAnnouncement')}
             minRows={4}
           />
-          <div className="flex items-center justify-between mt-3">
+          {/* Stacked on a phone, one row from sm up. Side by side, the SMS
+              notice and the button each got about half of a 390px screen, so
+              the notice wrapped to two lines against a button it was already
+              crowding. The button goes full width when stacked rather than
+              floating in the middle of the row. */}
+          <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <span className="text-[13px] text-ink-muted">{t('communication.smsNote')}</span>
             <Button
               type="button"
@@ -299,6 +304,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
               onPress={handlePublish}
               isDisabled={!isDirty}
               isLoading={publishing}
+              className="w-full sm:w-auto"
             >
               {publishing ? t('communication.publishing') : t('communication.publish')}
             </Button>

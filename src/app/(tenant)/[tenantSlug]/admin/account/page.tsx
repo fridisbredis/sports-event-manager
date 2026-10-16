@@ -55,7 +55,7 @@ export default async function AdminAccountPage({ params }: Props) {
   })
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-6 md:px-8 md:py-8">
       <AccountForm
         name={official.name}
         avatarUrl={official.avatar_url}

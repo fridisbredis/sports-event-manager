@@ -170,7 +170,7 @@ function DayTabs({
   return (
     // Negative margin so the row can bleed to the screen edge while its items
     // keep the page's gutter, which is what makes it read as scrollable.
-    <nav aria-label={label} className="-mx-5 overflow-x-auto px-5 scrollbar-none">
+    <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 scrollbar-none">
       <div className="flex w-max gap-2">
         {days.map((day) => {
           const isSelected = day === selectedDay
