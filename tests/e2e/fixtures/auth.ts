@@ -1,4 +1,11 @@
-import { test as base, expect, type Locator, type Page, type Browser } from '@playwright/test'
+import {
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+  type Browser,
+  type ViewportSize,
+} from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { USERS, OTP_CODE, type RoleKey } from './users'
@@ -187,9 +194,20 @@ type RoleFixtures = {
 }
 
 function roleFixture(role: RoleKey) {
-  return async ({ browser }: { browser: Browser }, use: (page: Page) => Promise<void>) => {
+  return async (
+    { browser, viewport }: { browser: Browser; viewport: ViewportSize | null },
+    use: (page: Page) => Promise<void>
+  ) => {
+    // `viewport` is threaded through explicitly because browser.newContext()
+    // does NOT inherit the one a spec sets with test.use({ viewport }) — it
+    // falls back to Playwright's 1280x720 default. Without this, every spec
+    // that declares a phone viewport (official-screens, invite-confirmation,
+    // mobile-schedule) was silently running at desktop width, so a
+    // mobile-only rendering could pass or fail on nothing but which
+    // breakpoint happened to apply.
     const context = await browser.newContext({
       storageState: await storageStateFor(role, browser),
+      viewport,
     })
     const page = await context.newPage()
     await use(page)

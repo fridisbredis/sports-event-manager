@@ -334,7 +334,17 @@
     "dragPaintPickAreaLabel": "Arbetsområden som är öppna dessa tider",
     "dragPaintNoOpenAreas": "Inget arbetsområde är öppet under alla dessa tidsluckor.",
     "dragPaintTimeOff": "Markera som frånvaro",
-    "timeOffOnlyOwnerRemoves": "Bara funktionären kan ta bort den här."
+    "timeOffOnlyOwnerRemoves": "Bara funktionären kan ta bort den här.",
+    "mobileTitle": "Bemanning",
+    "mobileSubtitle": "Skrivskyddad. Använd en större skärm för att redigera schemat.",
+    "mobileDayLabel": "Dag",
+    "mobileUnstaffed": "Ingen tilldelad",
+    "mobileNoWorkAreas": "Inga arbetsytor konfigurerade för den här etappen ännu.",
+    "mobileLoadFailed": "Bemanningen kunde inte läsas in, så den här vyn kan vara ofullständig. Ladda om för att försöka igen.",
+    "mobileShiftCount_one": "{{count}} pass",
+    "mobileShiftCount_other": "{{count}} pass",
+    "mobileUpgradeTitle": "Ingår från Premium",
+    "mobileUpgradeBody": "Mobilschemat ingår i Premium. Öppna Schemaläggning på en större skärm för att se och redigera schemat."
   },
   "communication": {
     "title": "Kommunikation",
@@ -432,6 +442,7 @@
     "tierIncludesNothing": "Inga nivåspecifika funktioner.",
     "tierIncludes": "Innehåller:",
     "featureColorTheme": "Färgtema för evenemang",
+    "featureMobileSchedule": "Mobilt schemaläge",
     "tenantAdmins": "Tenantadministratörer",
     "tenantAdminsHint": "Vilka som kan logga in och administrera den här tenanten. Nivån sätter maxantalet; administratörer behåller åtkomst i den ordning de lades till.",
     "adminsUsedOfCap": "{{count}} av {{cap}} använda",
