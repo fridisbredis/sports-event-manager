@@ -20,6 +20,9 @@ export type Tier = (typeof TIER_ORDER)[number]
 export const TIER_FEATURES = {
   // EVT-01's colour theme picker. Standard tenants render DEFAULT_TENANT_PALETTE.
   colorTheme: 'premium',
+  // N18's read-only mobile schedule, for checking coverage on site. SCHED-01's
+  // editable grid is not gated — this is the phone-shaped companion to it.
+  mobileSchedule: 'premium',
 } as const satisfies Record<string, Tier>
 
 export type TierFeature = keyof typeof TIER_FEATURES

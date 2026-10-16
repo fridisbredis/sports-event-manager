@@ -334,7 +334,17 @@
     "dragPaintPickAreaLabel": "Work areas open at these times",
     "dragPaintNoOpenAreas": "No work area is open across all of these slots.",
     "dragPaintTimeOff": "Mark as time off",
-    "timeOffOnlyOwnerRemoves": "Only the official can remove this."
+    "timeOffOnlyOwnerRemoves": "Only the official can remove this.",
+    "mobileTitle": "Coverage",
+    "mobileSubtitle": "Read-only. Use a larger screen to edit the schedule.",
+    "mobileDayLabel": "Day",
+    "mobileUnstaffed": "Nobody assigned",
+    "mobileNoWorkAreas": "No work areas configured for this stage yet.",
+    "mobileLoadFailed": "Coverage could not be loaded, so this may be incomplete. Reload to try again.",
+    "mobileShiftCount_one": "{{count}} shift",
+    "mobileShiftCount_other": "{{count}} shifts",
+    "mobileUpgradeTitle": "Available from Premium",
+    "mobileUpgradeBody": "The mobile schedule is part of Premium. Open Scheduling on a larger screen to view and edit the schedule."
   },
   "communication": {
     "title": "Communication",
@@ -432,6 +442,7 @@
     "tierIncludesNothing": "No tier-specific features.",
     "tierIncludes": "Includes:",
     "featureColorTheme": "Event colour theme",
+    "featureMobileSchedule": "Mobile schedule view",
     "tenantAdmins": "Tenant admins",
     "tenantAdminsHint": "Who can sign in and administer this tenant. The tier sets the maximum; admins keep access in the order they were added.",
     "adminsUsedOfCap": "{{count}} of {{cap}} used",

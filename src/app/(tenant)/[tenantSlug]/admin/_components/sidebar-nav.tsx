@@ -99,8 +99,14 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
   }
 
   return (
+    // Hidden below md (N18). The rail is a fixed w-64 that does not shrink, so
+    // on a 390px phone it left 94px for the page — enough to render the
+    // content but not to read it, and narrow enough that a truncating heading
+    // computed to zero width. The admin screens are desktop-first by design;
+    // the one built for a phone is the mobile schedule, which needs the whole
+    // width. Giving admin a real mobile nav is its own piece of work.
     <aside
-      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-edge bg-white transition-[width] duration-150 ${
+      className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-edge bg-white transition-[width] duration-150 md:flex ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >

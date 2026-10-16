@@ -5,6 +5,13 @@ import { getCurrentStage } from '@/lib/scheduling/grid-logic'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
 import { logger } from '@/lib/logger'
 import { SchedulingGrid } from './_components/scheduling-grid'
+import { MobileCoverageView } from './_components/mobile-coverage-view'
+import { fetchDayCoverage } from '@/lib/scheduling/coverage'
+import { hasFeature } from '@/lib/tiers/features'
+import { getServerTranslation } from '@/lib/i18n/server'
+import { getUserLanguage } from '@/lib/i18n/user-language'
+import { EmptyStateCard } from '@/components/ui/empty-state'
+import { Monitor } from 'lucide-react'
 import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
 
 interface Props {
@@ -159,21 +166,76 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
       ])
     : [[], []]
 
+  // N18: the phone-shaped read-only view, rendered alongside the grid and
+  // swapped by a CSS breakpoint rather than by sniffing the device — one
+  // route, so a link into scheduling works from either.
+  //
+  // Premium and up. Gated here rather than in the component so a Standard
+  // tenant is not shipped the coverage read at all; there is no mutation
+  // behind this feature, so unlike the colour theme it needs no second gate
+  // on a server action.
+  const showMobileView = hasFeature(tenant.tier, 'mobileSchedule')
+
+  // Only the selected stage's work areas: a work area belongs to a stage
+  // (migration 0039), and listing another stage's areas as "unstaffed" would
+  // invent coverage gaps that do not exist.
+  const stageWorkstations = (workstations ?? []).filter(
+    (ws) => !selectedStage || ws.stage_id === selectedStage.id
+  )
+
+  const coverage =
+    showMobileView && selectedDay
+      ? await fetchDayCoverage(supabase, {
+          tenantId: tenant.id,
+          day: selectedDay,
+          workstations: stageWorkstations.map((ws) => ({
+            id: ws.id,
+            name: ws.name,
+            color: ws.color,
+          })),
+        })
+      : null
+
+  const t = await getServerTranslation(await getUserLanguage(), 'admin')
+
   return (
-    <div className="px-8 py-8">
-      <SchedulingGrid
-        tenantSlug={tenantSlug}
-        tenantId={tenant.id}
-        eventId={event.id}
-        granularityMin={event.scheduling_granularity_min}
-        stages={stages ?? []}
-        workstations={workstations ?? []}
-        officials={officials ?? []}
-        initialAssignments={assignments}
-        unavailability={unavailability}
-        initialSelectedDay={selectedDay ?? ''}
-        initialSelectedStageId={selectedStage?.id ?? ''}
-      />
-    </div>
+    <>
+      {/* Below md only. The grid above it is hidden rather than unmounted at
+          this width: both are server-rendered from the same data, and keeping
+          one route means no second URL to maintain and no device sniffing. */}
+      <div className="px-5 py-6 md:hidden">
+        {coverage ? (
+          <MobileCoverageView
+            tenantSlug={tenantSlug}
+            days={selectedStageDays}
+            selectedDay={selectedDay ?? ''}
+            areas={coverage.areas}
+            ok={coverage.ok}
+          />
+        ) : (
+          <EmptyStateCard
+            Icon={Monitor}
+            title={t('scheduling.mobileUpgradeTitle')}
+            description={t('scheduling.mobileUpgradeBody')}
+          />
+        )}
+      </div>
+
+      <div className="hidden px-8 py-8 md:block">
+        <SchedulingGrid
+          tenantSlug={tenantSlug}
+          tenantId={tenant.id}
+          eventId={event.id}
+          granularityMin={event.scheduling_granularity_min}
+          stages={stages ?? []}
+          workstations={workstations ?? []}
+          officials={officials ?? []}
+          initialAssignments={assignments}
+          unavailability={unavailability}
+          initialSelectedDay={selectedDay ?? ''}
+          initialSelectedStageId={selectedStage?.id ?? ''}
+        />
+      </div>
+    </>
   )
 }
