@@ -98,7 +98,11 @@ test.describe('AUTH-02 via the SMS token link (/invite/[token])', () => {
 
     await page.goto(`/invite/${token}`)
 
-    await expect(page.getByRole('heading', { name: 'Invite confirmation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: "You're invited" })).toBeVisible()
+    // N19: the SMS names the organiser, so the page it links to must too —
+    // this is the orientation the walk-through found missing.
+    await expect(page.getByText(/Seed Klubben has invited you/)).toBeVisible()
+    await expect(page.getByText('Step 1 of 2')).toBeVisible()
     // The phone is shown read-only, straight off the invite row — the invitee
     // never types it, which is what makes the token the proof of identity.
     // Rendered raw rather than through formatPhoneForDisplay, so it appears in
@@ -124,9 +128,17 @@ test.describe('AUTH-02 via the SMS token link (/invite/[token])', () => {
 
     await confirmButton.click()
 
+    // N19: step 2 gets its own heading rather than repeating step 1's, which
+    // read as the form having failed and reloaded.
+    await expect(page.getByRole('heading', { name: 'Verify your number' })).toBeVisible()
+    await expect(page.getByText('Step 2 of 2')).toBeVisible()
+
     await completeInviteOtp(page)
 
     await expect(page.getByText('You are confirmed')).toBeVisible()
+    // Says where the shifts show up, and deliberately promises no notification:
+    // publishing a schedule sends no SMS.
+    await expect(page.getByText(/Your shifts appear under My schedule/)).toBeVisible()
 
     const official = await readOfficialByPhone(admin, INVITE_PHONES.tokenLink, tenantId)
     expect(official?.invite_status).toBe('confirmed')
