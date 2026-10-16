@@ -203,7 +203,7 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
       {/* Below md only. The grid above it is hidden rather than unmounted at
           this width: both are server-rendered from the same data, and keeping
           one route means no second URL to maintain and no device sniffing. */}
-      <div className="px-5 py-6 md:hidden">
+      <div className="px-4 py-6 md:hidden">
         {coverage ? (
           <MobileCoverageView
             tenantSlug={tenantSlug}

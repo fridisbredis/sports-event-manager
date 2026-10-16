@@ -65,7 +65,12 @@ export default async function TenantLayout({ children, params }: Props) {
         <Suspense>
           <SidebarChrome tenantSlug={tenantSlug} adminLabel={t('navigation.adminLabel')} />
         </Suspense>
-        <div className="min-w-0 flex-1">{children}</div>
+        {/* pb-24 on a phone reserves the floating menu button's corner, so the
+            last row of a page can still be read and tapped once scrolled to
+            the bottom — without it the button sat on top of whatever ended
+            the page. Nothing floats on desktop, where the rail carries the
+            navigation instead. */}
+        <div className="min-w-0 flex-1 pb-24 md:pb-0">{children}</div>
       </div>
     </>
   )

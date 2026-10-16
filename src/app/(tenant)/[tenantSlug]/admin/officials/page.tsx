@@ -76,7 +76,7 @@ export default async function OfficialsPage({ params }: Props) {
   )
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-6 md:px-8 md:py-8">
       <OfficialsList
         tenantSlug={tenantSlug}
         tenantId={tenant.id}

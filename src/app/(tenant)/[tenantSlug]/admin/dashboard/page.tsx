@@ -133,7 +133,7 @@ export default async function DashboardPage({ params }: Props) {
   ].join(' · ')
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-6 md:px-8 md:py-8">
       <DashboardHeader
         logoUrl={event?.logo_url ?? null}
         eventName={eventName}
@@ -143,7 +143,11 @@ export default async function DashboardPage({ params }: Props) {
         draftLabel={t('dashboard.draft')}
       />
 
-      <div className="grid grid-cols-[3fr_2fr] gap-5 mb-5">
+      {/* One column on a phone, the handoff's 3:2 split from md up. The fixed
+          two-column rule squeezed both cards to roughly 180px on a 390px
+          screen, which wrapped "Published — visible to officials" onto four
+          lines and clipped the officials counts at the right edge. */}
+      <div className="grid grid-cols-1 gap-5 mb-5 md:grid-cols-[3fr_2fr]">
         <PublishSection
           canPublish={canPublish}
           isPublished={isPublished}

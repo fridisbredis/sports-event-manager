@@ -17,27 +17,41 @@ const url = `/${SEED_TENANT_SLUG}/admin/scheduling`
 const coverage = (page: import('@playwright/test').Page) =>
   page.getByRole('region', { name: 'Coverage' })
 
-// The seed tenant is 'standard' (scripts/seed-dev.ts) and this view is Premium
-// and up, so every test here sets the tier it needs and puts it back
-// afterwards.
-//
-// Per test rather than once per file: the tier-gate test below has to run on
+// This view is Premium and up, so each test sets the tier it needs. Per test
+// rather than once per file: the tier-gate test below has to run on
 // 'standard', so a file-level raise would be fighting it, and a test that
 // depended on having run before or after it would be ordering-sensitive in a
-// way nothing in the file makes visible. Each test owning its own tier costs
-// two extra writes and removes that entirely.
+// way nothing in the file makes visible.
+//
+// The tier is READ before the first change and restored to whatever it was,
+// never to a hardcoded 'standard'. The dev stack these specs run against is
+// also the one being clicked around in by hand, and an afterEach that asserts
+// what the seed ships silently undoes a tier set in the system-admin UI — it
+// did exactly that once, which is why this reads instead of assuming.
 let tenantId: string
+let originalTier: string | null = null
 
 async function setTier(tier: 'standard' | 'premium') {
   const admin = serviceClient()
-  tenantId ??= await tenantIdBySlug(admin, SEED_TENANT_SLUG)
+  if (!tenantId) {
+    tenantId = await tenantIdBySlug(admin, SEED_TENANT_SLUG)
+    const { data, error } = await admin.from('tenants').select('tier').eq('id', tenantId).single()
+    if (error) throw error
+    originalTier = data.tier
+  }
   const { error } = await admin.from('tenants').update({ tier }).eq('id', tenantId)
   if (error) throw error
 }
 
-// Always leave the tenant as the seed built it, whatever a test did.
+// Put back whatever the tenant was on before this file ran, so a stack
+// someone has configured by hand survives a test run.
 test.afterEach(async () => {
-  await setTier('standard')
+  if (!tenantId || originalTier === null) return
+  const { error } = await serviceClient()
+    .from('tenants')
+    .update({ tier: originalTier })
+    .eq('id', tenantId)
+  if (error) throw error
 })
 
 test.describe('N18 mobile coverage view', () => {
@@ -107,13 +121,86 @@ test.describe('N18 tier gate', () => {
   test('a Standard tenant is told where to find the schedule instead', async ({
     tenantAdminPage: page,
   }) => {
-    // No setTier here: 'standard' is what the seed ships, and afterEach puts
-    // it back regardless.
+    // Explicitly, rather than relying on the tenant already being there: the
+    // tier is whatever the stack was left on, and afterEach restores it.
+    await setTier('standard')
     await page.goto(url)
 
     await expect(page.getByText('Available from Premium')).toBeVisible()
     // Nothing from the coverage read may reach a tenant below the tier.
     await expect(coverage(page)).toHaveCount(0)
     await expect(page.getByText('Nobody assigned')).toHaveCount(0)
+  })
+})
+
+// The admin rail is hidden below md, so this drawer is the whole of the admin
+// navigation on a phone. Its own describe rather than a new file: it shares
+// this file's phone viewport, and it exists because N18 hid the rail.
+test.describe('admin navigation on a phone', () => {
+  test('the hamburger opens a drawer with the full admin nav', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.goto(`/${SEED_TENANT_SLUG}/admin/dashboard`)
+
+    // The rail itself must be gone — it is what left 94px of a 390px screen.
+    await expect(page.getByRole('complementary')).toBeHidden()
+
+    await page.getByRole('button', { name: 'Open menu' }).click()
+
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toBeVisible()
+    // Every rail destination, not a reduced set: a phone user who can only
+    // reach half the admin screens is barely better off than one who can
+    // reach none.
+    for (const label of [
+      'Dashboard',
+      'Event configuration',
+      'Work areas',
+      'Officials',
+      'Scheduling',
+      'Communication',
+      'Official view',
+    ]) {
+      await expect(drawer.getByRole('link', { name: label })).toBeVisible()
+    }
+    await expect(drawer.getByRole('button', { name: 'Log out' })).toBeVisible()
+  })
+
+  test('tapping a link navigates and closes the drawer', async ({ tenantAdminPage: page }) => {
+    await page.goto(`/${SEED_TENANT_SLUG}/admin/dashboard`)
+    await page.getByRole('button', { name: 'Open menu' }).click()
+
+    const drawer = page.getByRole('dialog')
+    await drawer.getByRole('link', { name: 'Officials' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/admin/officials`))
+    // Closed explicitly on tap rather than by a route-change effect, so that
+    // tapping the current page's own link cannot leave it open over nothing.
+    await expect(drawer).toBeHidden()
+  })
+
+  test('the drawer marks the page you are on', async ({ tenantAdminPage: page }) => {
+    await page.goto(`/${SEED_TENANT_SLUG}/admin/officials`)
+    await page.getByRole('button', { name: 'Open menu' }).click()
+
+    const drawer = page.getByRole('dialog')
+    await expect(drawer.getByRole('link', { name: 'Officials' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    await expect(drawer.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  test('neither hamburger nor drawer exists on desktop, where the rail is back', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(`/${SEED_TENANT_SLUG}/admin/dashboard`)
+
+    await expect(page.getByRole('complementary')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden()
   })
 })

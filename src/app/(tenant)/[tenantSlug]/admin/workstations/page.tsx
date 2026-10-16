@@ -72,7 +72,7 @@ export default async function WorkstationsPage({ params }: Props) {
   if (!event) notFound()
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 py-6 md:px-8 md:py-8">
       <WorkstationsList tenantSlug={tenantSlug} stages={stages} workstations={workstations} />
     </div>
   )

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
 import {
   LayoutDashboard,
   Trophy,
@@ -15,6 +16,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Menu,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
@@ -34,6 +36,9 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation('admin')
   const [collapsed, setCollapsed] = useState(false)
+  // Drawer state for the phone menu. Separate from `collapsed`, which is the
+  // desktop rail's own width preference and is persisted; this is transient.
+  const menu = useDisclosure()
 
   useEffect(() => {
     // Must run after mount, not during a lazy useState initializer: localStorage
@@ -60,17 +65,28 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
     { segment: 'admin/communication', label: t('navigation.communication'), icon: MessageSquare },
   ]
 
-  const navLink = (segment: string, label: string, Icon: LucideIcon) => {
+  // `isCollapsed` is a parameter rather than the closed-over `collapsed`: the
+  // drawer always shows labels, whatever width the desktop rail is set to.
+  const navLink = (
+    segment: string,
+    label: string,
+    Icon: LucideIcon,
+    { isCollapsed = false, onNavigate }: { isCollapsed?: boolean; onNavigate?: () => void } = {}
+  ) => {
     const href = `/${tenantSlug}/${segment}`
     const isActive = pathname === href || pathname.startsWith(href + '/')
     return (
       <Link
         key={segment}
         href={href}
-        title={collapsed ? label : undefined}
+        title={isCollapsed ? label : undefined}
         aria-current={isActive ? 'page' : undefined}
+        // Closes the drawer on tap. Not left to a route-change effect: tapping
+        // the link you are already on is a no-op navigation, so the drawer
+        // would stay open with nothing happening behind it.
+        onClick={onNavigate}
         className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${
-          collapsed ? 'justify-center px-0' : ''
+          isCollapsed ? 'justify-center px-0' : ''
         } ${isActive ? 'font-semibold' : 'text-ink-soft hover:bg-gray-50 hover:text-ink'}`}
         // The active item takes the tenant's primary tint with a 3px inset bar
         // in the primary colour, per the design handoff. Inline because the
@@ -89,7 +105,7 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
         {/* Widened to w-64 for the Swedish labels; `truncate` with a title
             attribute is the backstop for any locale longer still, so a long
             label clips with a tooltip instead of wrapping the row. */}
-        {!collapsed && (
+        {!isCollapsed && (
           <span className="truncate" title={label}>
             {label}
           </span>
@@ -98,62 +114,106 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
     )
   }
 
+  // One definition of the nav body, rendered twice: once in the desktop rail
+  // and once inside the drawer. Duplicating the list is how the two would
+  // quietly drift — a link added to one and not the other.
+  const navBody = (opts: { isCollapsed?: boolean; onNavigate?: () => void } = {}) => (
+    <div className="flex flex-col flex-1 min-h-0">
+      <nav className="py-2 flex-1 overflow-y-auto">
+        {navItems.map((item) => navLink(item.segment, item.label, item.icon, opts))}
+      </nav>
+      <div className="border-t border-gray-100 py-2">
+        {/* The official surface for this same tenant. Shown to every admin,
+            not gated on showAccount: access there comes from the admin role
+            (see resolveOfficialSurfaceAccess), while an officials row only
+            decides whether their own schedule has anything in it. */}
+        {navLink('home', t('navigation.officialView'), Smartphone, opts)}
+        {showAccount && navLink('admin/account', t('navigation.account'), UserCircle, opts)}
+        <LogoutButton
+          title={opts.isCollapsed ? t('navigation.logOut') : undefined}
+          className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
+            opts.isCollapsed ? 'justify-center px-0' : ''
+          }`}
+        >
+          <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
+          {!opts.isCollapsed && (
+            <span className="truncate" title={t('navigation.logOut')}>
+              {t('navigation.logOut')}
+            </span>
+          )}
+        </LogoutButton>
+      </div>
+    </div>
+  )
+
   return (
-    // Hidden below md (N18). The rail is a fixed w-64 that does not shrink, so
-    // on a 390px phone it left 94px for the page — enough to render the
-    // content but not to read it, and narrow enough that a truncating heading
-    // computed to zero width. The admin screens are desktop-first by design;
-    // the one built for a phone is the mobile schedule, which needs the whole
-    // width. Giving admin a real mobile nav is its own piece of work.
-    <aside
-      className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-edge bg-white transition-[width] duration-150 md:flex ${
-        collapsed ? 'w-16' : 'w-64'
-      }`}
-    >
-      <div
-        className={`flex items-center border-b border-gray-100 px-6 py-5 ${
-          collapsed ? 'justify-center px-0' : 'justify-between'
+    <>
+      {/* Below md only: the rail is hidden there, so this is the whole of the
+          admin navigation on a phone. Floating rather than a fixed top bar —
+          the mobile schedule is a long scrolling list, and a bar would take a
+          permanent slice of a 390px screen to hold one control.
+          Bottom-right, not top: within reach of a thumb, clear of the page
+          actions that live top-right, and clear of the bottom-LEFT corner,
+          which Next.js's dev overlay occupies — that overlay sits above
+          everything and swallowed the taps when this was on the left. */}
+      <button
+        type="button"
+        onClick={menu.onOpen}
+        aria-label={t('navigation.openMenu')}
+        aria-expanded={menu.isOpen}
+        className="fixed bottom-5 right-5 z-40 flex size-12 items-center justify-center rounded-full border border-edge bg-white text-ink shadow-modal transition-colors hover:bg-gray-50 md:hidden"
+      >
+        <Menu className="size-5" strokeWidth={1.75} />
+      </button>
+
+      <Drawer
+        isOpen={menu.isOpen}
+        onOpenChange={menu.onOpenChange}
+        placement="left"
+        size="xs"
+        // The drawer carries the same rail chrome, so it needs the rail's own
+        // surface rather than HeroUI's default modal background.
+        classNames={{ base: 'bg-white' }}
+      >
+        <DrawerContent aria-label={t('navigation.adminLabel')}>
+          <div className="flex h-full flex-col">
+            <div className="flex items-center border-b border-gray-100 px-6 py-5">
+              <span className="section-label">{adminLabel}</span>
+            </div>
+            {navBody({ onNavigate: menu.onClose })}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Hidden below md (N18). The rail is a fixed w-64 that does not shrink, so
+        on a 390px phone it left 94px for the page — enough to render the
+        content but not to read it, and narrow enough that a truncating heading
+        computed to zero width. The drawer above is the phone's navigation. */}
+      <aside
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-edge bg-white transition-[width] duration-150 md:flex ${
+          collapsed ? 'w-16' : 'w-64'
         }`}
       >
-        {!collapsed && <span className="section-label">{adminLabel}</span>}
-        <button
-          onClick={toggleCollapsed}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="text-gray-400 hover:text-gray-700 transition-colors"
+        <div
+          className={`flex items-center border-b border-gray-100 px-6 py-5 ${
+            collapsed ? 'justify-center px-0' : 'justify-between'
+          }`}
         >
-          {collapsed ? (
-            <PanelLeftOpen className="size-4" strokeWidth={2} />
-          ) : (
-            <PanelLeftClose className="size-4" strokeWidth={2} />
-          )}
-        </button>
-      </div>
-      <div className="flex flex-col flex-1 min-h-0">
-        <nav className="py-2 flex-1 overflow-y-auto">
-          {navItems.map((item) => navLink(item.segment, item.label, item.icon))}
-        </nav>
-        <div className="border-t border-gray-100 py-2">
-          {/* The official surface for this same tenant. Shown to every admin,
-              not gated on showAccount: access there comes from the admin role
-              (see resolveOfficialSurfaceAccess), while an officials row only
-              decides whether their own schedule has anything in it. */}
-          {navLink('home', t('navigation.officialView'), Smartphone)}
-          {showAccount && navLink('admin/account', t('navigation.account'), UserCircle)}
-          <LogoutButton
-            title={collapsed ? t('navigation.logOut') : undefined}
-            className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
-              collapsed ? 'justify-center px-0' : ''
-            }`}
+          {!collapsed && <span className="section-label">{adminLabel}</span>}
+          <button
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="text-gray-400 hover:text-gray-700 transition-colors"
           >
-            <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
-            {!collapsed && (
-              <span className="truncate" title={t('navigation.logOut')}>
-                {t('navigation.logOut')}
-              </span>
+            {collapsed ? (
+              <PanelLeftOpen className="size-4" strokeWidth={2} />
+            ) : (
+              <PanelLeftClose className="size-4" strokeWidth={2} />
             )}
-          </LogoutButton>
+          </button>
         </div>
-      </div>
-    </aside>
+        {navBody({ isCollapsed: collapsed })}
+      </aside>
+    </>
   )
 }
