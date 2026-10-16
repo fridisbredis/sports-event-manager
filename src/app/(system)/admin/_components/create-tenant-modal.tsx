@@ -114,10 +114,10 @@ export function CreateTenantModal({ open, onClose }: Props) {
                   setError(null)
                 }}
               />
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Select
                   label={t('systemAdmin.addAdminCountry')}
-                  className="w-52 shrink-0"
+                  className="w-full sm:w-52 sm:shrink-0"
                   selectedKeys={[adminPhoneCountry]}
                   onSelectionChange={(keys) => {
                     const next = Array.from(keys)[0] as string

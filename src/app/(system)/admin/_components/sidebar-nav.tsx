@@ -2,16 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileText, LayoutPanelLeft, LogOut } from 'lucide-react'
+import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
+import { FileText, LayoutPanelLeft, LogOut, Menu } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 
+interface Labels {
+  tenants: string
+  logOut: string
+  privacyPolicy: string
+  privacyPolicyNewTab: string
+  /** Sidebar heading, repeated as the drawer's own heading. */
+  sidebarLabel: string
+  openMenu: string
+}
+
 interface Props {
-  labels: {
-    tenants: string
-    logOut: string
-    privacyPolicy: string
-    privacyPolicyNewTab: string
-  }
+  labels: Labels
 }
 
 // The system-admin sidebar deliberately does NOT use the tenant theme tint the
@@ -24,6 +30,10 @@ const IDLE_ITEM = 'text-ink-soft hover:bg-gray-50 hover:text-ink'
 
 export function SidebarNav({ labels }: Props) {
   const pathname = usePathname()
+  // Drawer state for the phone menu. The rail is hidden below md, so without
+  // this there is no navigation at all on a phone — the same gap the tenant
+  // admin screens had before their own drawer.
+  const menu = useDisclosure()
   // Excludes /admin/health: it's reached via a link from the tenant list
   // (SYS-03), not a sidebar tab, so this is the first admin route where
   // highlighting "Tenants" would be wrong.
@@ -31,12 +41,18 @@ export function SidebarNav({ labels }: Props) {
     pathname === '/admin' ||
     (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/health'))
 
-  return (
+  // One definition, rendered twice: in the desktop rail and inside the
+  // drawer. A second copy of the links is how the two would drift apart.
+  const navBody = (onNavigate?: () => void) => (
     <div className="flex flex-1 flex-col min-h-0">
       <nav className="flex-1 overflow-y-auto py-2">
         <Link
           href="/admin"
           aria-current={isActive ? 'page' : undefined}
+          // Closed on tap rather than by a route-change effect: tapping the
+          // link for the page you are already on is a no-op navigation and
+          // would leave the drawer open over nothing.
+          onClick={onNavigate}
           className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${
             isActive ? ACTIVE_ITEM : IDLE_ITEM
           }`}
@@ -55,6 +71,9 @@ export function SidebarNav({ labels }: Props) {
           href="/privacy"
           target="_blank"
           rel="noopener noreferrer"
+          // Opens a new tab, so the drawer behind it is closed too — coming
+          // back to a still-open drawer over the page would be a surprise.
+          onClick={onNavigate}
           className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${IDLE_ITEM}`}
         >
           <FileText className="size-[18px] shrink-0" strokeWidth={1.5} />
@@ -73,5 +92,48 @@ export function SidebarNav({ labels }: Props) {
         </LogoutButton>
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {/* Below md only. Unlike the tenant admin screens, this layout already
+          has a top bar for the language select, so the trigger belongs in it
+          rather than floating over the page. */}
+      <button
+        type="button"
+        onClick={menu.onOpen}
+        aria-label={labels.openMenu}
+        aria-expanded={menu.isOpen}
+        className="-ml-1 flex size-9 items-center justify-center rounded-control text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink md:hidden"
+      >
+        <Menu className="size-5" strokeWidth={1.75} />
+      </button>
+
+      <Drawer
+        isOpen={menu.isOpen}
+        onOpenChange={menu.onOpenChange}
+        placement="left"
+        size="xs"
+        classNames={{ base: 'bg-white' }}
+      >
+        <DrawerContent aria-label={labels.sidebarLabel}>
+          <div className="flex h-full flex-col">
+            {/* No shield badge here, unlike the rail's header: HeroUI puts the
+                drawer's own close button in this corner, and the two sat on
+                top of each other. The heading alone carries the label; the
+                badge is decoration and the close button is not. pr-12 keeps
+                the text clear of it. */}
+            <div className="flex items-center border-b border-edge-soft py-5 pl-6 pr-12">
+              <span className="section-label">{labels.sidebarLabel}</span>
+            </div>
+            {navBody(menu.onClose)}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* The rail renders the same body, with no close handler — there is
+          nothing to close on desktop. */}
+      <div className="hidden flex-1 flex-col md:flex">{navBody()}</div>
+    </>
   )
 }

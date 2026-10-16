@@ -77,7 +77,10 @@ export function TenantAdminsSection({ tenantId, admins, cap, formattedDates }: P
 
   return (
     <div className="p-6">
-      <div className="mb-1 flex items-center justify-between gap-4">
+      {/* Stacked on a phone. Side by side, the heading and the count each got
+          about half the width, so "0 of 10 used" wrapped to two lines and sat
+          level with a heading it is not part of. */}
+      <div className="mb-1 flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <h2 className="section-label">{t('systemAdmin.tenantAdmins')}</h2>
         <span className="text-sm tabular-nums text-ink-label">
           {t('systemAdmin.adminsUsedOfCap', { count: admins.length, cap })}
@@ -139,8 +142,15 @@ export function TenantAdminsSection({ tenantId, admins, cap, formattedDates }: P
         </ul>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
-        <SystemButton onPress={() => setAddOpen(true)} isDisabled={atCap}>
+      {/* Full width on a phone, inline from sm up. A primary action floating
+          at the left edge of an otherwise full-width card reads as unfinished
+          at this size, and the cap hint beside it had nowhere to go. */}
+      <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <SystemButton
+          onPress={() => setAddOpen(true)}
+          isDisabled={atCap}
+          className="w-full sm:w-auto"
+        >
           {t('systemAdmin.addAdmin')}
         </SystemButton>
         {atCap && <span className="text-sm text-ink-label">{t('systemAdmin.capReachedHint')}</span>}
@@ -160,10 +170,10 @@ export function TenantAdminsSection({ tenantId, admins, cap, formattedDates }: P
               placeholder={t('systemAdmin.addAdminNamePlaceholder')}
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Select
                 label={t('systemAdmin.addAdminCountry')}
-                className="w-52 shrink-0"
+                className="w-full sm:w-52 sm:shrink-0"
                 selectedKeys={[phoneCountry]}
                 onSelectionChange={(keys) => {
                   const next = Array.from(keys)[0] as string
