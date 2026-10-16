@@ -300,6 +300,15 @@ max_frequency = "1s"
 "+46709910003" = "000000"
 "+46709910004" = "000000"
 
+# Frida's own number, for walking the invite flow by hand on a real device.
+# Officials invited through the admin UI get whatever number was typed, and a
+# number missing from this map makes GoTrue attempt a real send — which fails
+# against the dummy credentials above as
+# "Authentication Error - invalid username" (Twilio 20003) and looks like an
+# app bug rather than a missing test number.
+"+46768109304" = "000000"
+
+
 # Configure logged in session timeouts.
 # [auth.sessions]
 # Force log out after the specified duration.

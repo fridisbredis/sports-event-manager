@@ -199,9 +199,13 @@ export default function InviteForm({
           </div>
           <p className="text-base font-semibold text-gray-900">{t('confirmation.successTitle')}</p>
           {/* "You are confirmed" alone left the invitee guessing whether anything
-              else was expected of them. This says who now has their availability
-              and how they will hear about shifts — the two questions the walk-through
-              found people asking after confirming. */}
+              else was expected of them. This names who now has their availability
+              and where their shifts will show up.
+              Deliberately promises no notification: publishing a schedule sends
+              nothing (publish_event only flips events.status), and the only SMS
+              an official ever receives is an announcement an admin writes by
+              hand. Telling them to expect a text would have them waiting for
+              one instead of opening the app. */}
           <p className="mt-2 max-w-xs text-sm text-gray-500 leading-relaxed">
             {tenantName
               ? t('confirmation.successBody', { tenant: tenantName })
