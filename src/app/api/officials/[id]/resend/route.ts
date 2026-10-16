@@ -13,7 +13,6 @@ import {
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { getUserLanguage } from '@/lib/i18n/user-language'
 
 const resendSchema = z.object({
   tenantId: z.string().uuid(),
@@ -182,11 +181,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${updated.invite_token}`
 
-  // Same language rule as the create route: the invitee still has no
-  // user_preferences row of their own — a resend only ever targets an
-  // `invited` official, checked above, which is by definition someone who has
-  // not confirmed yet — so this follows the admin pressing resend.
-  const t = await getServerTranslation(await getUserLanguage(), 'auth')
+  // Same language rule as the create route: pinned to English rather than
+  // following the admin (N19). See the comment there for why.
+  const t = await getServerTranslation('en', 'auth')
   const smsBody = t('confirmation.inviteSms.body', {
     name: official.name,
     tenant: tenant?.name ?? t('confirmation.inviteSms.fallbackTenant'),

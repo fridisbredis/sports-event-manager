@@ -88,7 +88,9 @@ describe('InvitePage', () => {
     const result = await InvitePage({ params: PARAMS })
 
     const form = findByType(result, InviteForm)
-    expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null })
+    // tenantName null as well: an expired or unknown token must not be usable
+    // to probe which organisation the link belonged to.
+    expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null, tenantName: null })
   })
 
   it('renders InviteForm with null phone/name when the invite token has expired', async () => {
@@ -109,7 +111,9 @@ describe('InvitePage', () => {
     const result = await InvitePage({ params: PARAMS })
 
     const form = findByType(result, InviteForm)
-    expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null })
+    // tenantName null as well: an expired or unknown token must not be usable
+    // to probe which organisation the link belonged to.
+    expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null, tenantName: null })
   })
 
   it('renders InviteForm with null phone/name when invite_status is not "invited"', async () => {
@@ -129,7 +133,9 @@ describe('InvitePage', () => {
     const result = await InvitePage({ params: PARAMS })
 
     const form = findByType(result, InviteForm)
-    expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null })
+    // tenantName null as well: an expired or unknown token must not be usable
+    // to probe which organisation the link belonged to.
+    expect(form!.props).toEqual({ token: TOKEN, phone: null, name: null, tenantName: null })
   })
 
   // This page reads the palette straight off the joined tenant row rather than
@@ -199,7 +205,7 @@ describe('InvitePage', () => {
     expect(findByType(result, TenantThemeStyle)).toBeNull()
   })
 
-  it('renders InviteForm with the phone/name when the invite is valid and unexpired', async () => {
+  it('renders InviteForm with the phone/name and organizer when the invite is valid and unexpired', async () => {
     const future = new Date(Date.now() + 100000).toISOString()
     vi.mocked(createSupabaseServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue(
@@ -209,6 +215,7 @@ describe('InvitePage', () => {
             name: 'Anna',
             invite_status: 'invited',
             invite_token_expires_at: future,
+            tenants: { name: 'Viadal 2026', color_palette: 'blue', tier: 'professional' },
           },
         })
       ),
@@ -217,6 +224,43 @@ describe('InvitePage', () => {
     const result = await InvitePage({ params: PARAMS })
 
     const form = findByType(result, InviteForm)
-    expect(form!.props).toEqual({ token: TOKEN, phone: '0701234567', name: 'Anna' })
+    // The name is what lets the landing page say who is inviting (N19) — the
+    // SMS named the organiser and the page did not.
+    expect(form!.props).toEqual({
+      token: TOKEN,
+      phone: '0701234567',
+      name: 'Anna',
+      tenantName: 'Viadal 2026',
+    })
+  })
+
+  // The join can come back without a tenant row (a failed or filtered read).
+  // The form degrades to unnamed copy, so the page must pass null rather than
+  // let `undefined` through and render a gap where the name should be.
+  it('passes a null organizer when the tenant row is missing from the join', async () => {
+    const future = new Date(Date.now() + 100000).toISOString()
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(
+        chain({
+          data: {
+            phone: '0701234567',
+            name: 'Anna',
+            invite_status: 'invited',
+            invite_token_expires_at: future,
+            tenants: null,
+          },
+        })
+      ),
+    } as never)
+
+    const result = await InvitePage({ params: PARAMS })
+
+    const form = findByType(result, InviteForm)
+    expect(form!.props).toEqual({
+      token: TOKEN,
+      phone: '0701234567',
+      name: 'Anna',
+      tenantName: null,
+    })
   })
 })

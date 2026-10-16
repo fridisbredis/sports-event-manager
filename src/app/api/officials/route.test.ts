@@ -192,7 +192,7 @@ describe('POST /api/officials', () => {
 
     expect(messagesCreate).toHaveBeenCalledTimes(1)
     expect(messagesCreate).toHaveBeenCalledWith({
-      body: 'Hi Anna, you have been invited as an official for Viadal 2026. Confirm your availability here: https://app.example.com/invite/tok-abc',
+      body: 'Hi Anna, Viadal 2026 has invited you as an official. Confirm within 7 days: https://app.example.com/invite/tok-abc',
       from: '+15550001111',
       to: '+46701234567',
     })
@@ -231,16 +231,19 @@ describe('POST /api/officials', () => {
 
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Hi Bo, you have been invited as an official for an event. Confirm your availability here: https://app.example.com/invite/tok-xyz',
+        body: 'Hi Bo, an event has invited you as an official. Confirm within 7 days: https://app.example.com/invite/tok-xyz',
       })
     )
   })
 
-  it("sends the invite SMS in the inviting admin's language", async () => {
-    // The invitee has no stored language at this point - user_preferences is
-    // written when they confirm, which is strictly after this send - so the
-    // admin's own language is what the text follows. Overrides the global
-    // 'en' stub from vitest.setup.ts.
+  // N19 reversed #219: the invite SMS no longer follows the inviting admin.
+  // Swedish copy forces the message from GSM-7 to UCS-2, cutting the segment
+  // limit from 160 characters to 70 and silently doubling the cost of every
+  // invite, while the recipient has no stored language either way. The landing
+  // page still offers both languages, one tap later.
+  it('sends the invite SMS in English even when the admin works in Swedish', async () => {
+    // Overrides the global 'en' stub from vitest.setup.ts, so a regression that
+    // reinstated getUserLanguage() here would produce Swedish and fail.
     vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
     asAdmin()
     const official = { id: 'off-1', name: 'Anna', phone: '0701234567', invite_token: 'tok-abc' }
@@ -252,14 +255,15 @@ describe('POST /api/officials', () => {
 
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Hej Anna, du har bjudits in som funktionär för Viadal 2026. Bekräfta din tillgänglighet här: https://app.example.com/invite/tok-abc',
+        body: 'Hi Anna, Viadal 2026 has invited you as an official. Confirm within 7 days: https://app.example.com/invite/tok-abc',
       })
     )
   })
 
-  it('falls back to the Swedish tenant placeholder when the tenant has no name', async () => {
-    // The fallback word is translated too - mixing 'an event' into an
-    // otherwise Swedish sentence is exactly what a hardcoded fallback does.
+  it('keeps the English tenant placeholder for a Swedish admin when the tenant has no name', async () => {
+    // The fallback follows the sentence it sits in. Now that the sentence is
+    // pinned to English, mixing in 'ett evenemang' would be the same defect
+    // the Swedish-fallback test used to guard against, in the other direction.
     vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
     asAdmin()
     const official = { id: 'off-1', name: 'Bo', phone: '0709998877', invite_token: 'tok-xyz' }
@@ -271,7 +275,7 @@ describe('POST /api/officials', () => {
 
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Hej Bo, du har bjudits in som funktionär för ett evenemang. Bekräfta din tillgänglighet här: https://app.example.com/invite/tok-xyz',
+        body: 'Hi Bo, an event has invited you as an official. Confirm within 7 days: https://app.example.com/invite/tok-xyz',
       })
     )
   })

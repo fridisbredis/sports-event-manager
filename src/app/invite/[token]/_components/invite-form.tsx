@@ -25,9 +25,16 @@ interface Props {
   token: string
   phone: string | null
   name: string | null
+  /** Null for an invalid or expired invite — see the comment at the call site. */
+  tenantName: string | null
 }
 
-export default function InviteForm({ token, phone: initialPhone, name: initialName }: Props) {
+export default function InviteForm({
+  token,
+  phone: initialPhone,
+  name: initialName,
+  tenantName,
+}: Props) {
   // i18n, not just t: changing the language is what this component does when
   // the select changes, and only i18n.changeLanguage re-renders the strings.
   // It is the instance from the surrounding provider, never the imported
@@ -191,13 +198,25 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             </svg>
           </div>
           <p className="text-base font-semibold text-gray-900">{t('confirmation.successTitle')}</p>
+          {/* "You are confirmed" alone left the invitee guessing whether anything
+              else was expected of them. This says who now has their availability
+              and how they will hear about shifts — the two questions the walk-through
+              found people asking after confirming. */}
+          <p className="mt-2 max-w-xs text-sm text-gray-500 leading-relaxed">
+            {tenantName
+              ? t('confirmation.successBody', { tenant: tenantName })
+              : t('confirmation.successBodyFallback')}
+          </p>
         </div>
         <div className="pb-8 shrink-0">
           <button
             onClick={() => router.push('/')}
             className="w-full rounded-xl bg-tenant-primary py-4 text-sm font-semibold text-white transition-colors hover:bg-tenant-primary-hover"
           >
-            {t('confirmation.goHome')}
+            {/* The arrow lives here, not in the translated string: it is
+                decoration, it points the wrong way once a locale is RTL, and
+                translators kept carrying it into their own copy. */}
+            {t('confirmation.goHome')} <span aria-hidden="true">→</span>
           </button>
         </div>
       </main>
@@ -213,10 +232,16 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
             second control for the few seconds this step lasts put the same
             setting in two different shapes. */}
         <div className="flex-1 overflow-y-auto pt-6">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
+          {/* Its own heading rather than repeating "You're invited": this step
+              asks for something different, and reusing the title made the OTP
+              screen look like the form had failed and reloaded. */}
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+            {t('confirmation.stepOfTwo', { current: 2 })}
+          </p>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.verifyTitle')}</h1>
           <hr className="border-dashed border-gray-200 mb-8" />
           <p className="text-sm text-gray-500 mb-6">
-            {t('signIn.codeSentTo', { phone: initialPhone })}
+            {t('confirmation.verifyIntro', { phone: initialPhone })}
           </p>
           <div>
             <label htmlFor="invite-otp" className="block text-xs font-semibold text-gray-700 mb-2">
@@ -263,8 +288,20 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
   return (
     <main className="flex h-dvh flex-col max-w-sm mx-auto px-6">
       <div className="flex-1 overflow-y-auto pt-6">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+          {t('confirmation.stepOfTwo', { current: 1 })}
+        </p>
         <h1 className="text-xl font-bold text-gray-900 mb-1">{t('confirmation.title')}</h1>
-        <hr className="border-dashed border-gray-200 mb-8" />
+        {/* The SMS names the organiser but the page did not, so the link landed
+            people on a form with no indication of what they were confirming or
+            for whom. Falls back to the unnamed wording rather than rendering a
+            gap when the tenant row could not be read. */}
+        <p className="text-sm text-gray-500 leading-relaxed">
+          {tenantName
+            ? t('confirmation.introNamed', { tenant: tenantName })
+            : t('confirmation.intro')}
+        </p>
+        <hr className="border-dashed border-gray-200 mt-4 mb-8" />
 
         <div className="space-y-6">
           <div>
@@ -451,6 +488,13 @@ export default function InviteForm({ token, phone: initialPhone, name: initialNa
       </div>
 
       <div className="pb-8 pt-6 shrink-0">
+        {/* Pressing "Confirm availability" sends a second SMS and swaps the form
+            for a code field. Unannounced, that reads as the form having gone
+            wrong — and an SMS arriving right after someone taps a link in an SMS
+            is exactly the shape people are taught to distrust. */}
+        <p className="mb-3 text-center text-xs text-gray-400 leading-relaxed">
+          {t('confirmation.confirmButtonHint')}
+        </p>
         <button
           onClick={handleConfirmAvailability}
           disabled={!available || !privacyAccepted || !name.trim() || loading}
