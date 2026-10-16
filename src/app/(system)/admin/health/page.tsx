@@ -50,7 +50,7 @@ export default async function SystemHealthPage() {
   const sentryProjectName = process.env.SENTRY_PROJECT
 
   return (
-    <div className="mx-auto max-w-[1240px] px-10 pb-16 pt-8">
+    <div className="mx-auto max-w-[1240px] px-4 pb-16 pt-8 md:px-10">
       <Link
         href="/admin"
         className="-ml-1 inline-flex items-center gap-1 text-sm font-medium text-ink-label transition-colors hover:text-ink"

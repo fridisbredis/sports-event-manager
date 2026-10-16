@@ -102,11 +102,11 @@ test.describe('SYS-02 tenant detail', () => {
     await gotoSeedTenant(page)
 
     await expect(page.locator('input[type="radio"][name="tier"]')).toHaveCount(3)
+    // Exactly one, whichever it is. Asserting 'standard' specifically made this
+    // fail the moment someone changed the seed tenant's tier by hand on the
+    // shared dev stack — and the claim this test exists to make is that the
+    // tiers are single-select, not that the seed ships a particular one.
     await expect(page.locator('input[type="radio"][name="tier"]:checked')).toHaveCount(1)
-    // Exact match: each radio's accessible name now carries its tier label AND
-    // the list of features that tier unlocks, so a substring match for
-    // "Standard" would be ambiguous.
-    await expect(page.locator('input[type="radio"][name="tier"][value="standard"]')).toBeChecked()
 
     await expect(
       page.getByText('A tenant has exactly one tier. Selecting a tier replaces the current one.')
@@ -146,5 +146,65 @@ test.describe('SYS-02 tenant detail', () => {
     await gotoTenant(page, TOGGLE_TENANT_SLUG)
     await page.getByRole('switch').click()
     await expect(page.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+  })
+})
+
+// The system-admin rail is a fixed 256px that does not shrink, which left
+// 134px of a 390px phone for the page itself. It is hidden below md and
+// replaced by a drawer opened from the top bar, so these run at a phone.
+test.describe('system admin on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('the rail gives way to a drawer in the top bar', async ({ systemAdminPage: page }) => {
+    await page.goto('/admin')
+
+    await expect(page.getByRole('complementary')).toBeHidden()
+
+    await page.getByRole('button', { name: 'Open menu' }).click()
+
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toBeVisible()
+    // Everything the rail carries, including the footer links — a phone user
+    // who can reach the tenant list but not log out is only half served.
+    await expect(drawer.getByRole('link', { name: 'Tenants' })).toBeVisible()
+    await expect(drawer.getByRole('link', { name: /Privacy policy/ })).toBeVisible()
+    await expect(drawer.getByRole('button', { name: 'Log out' })).toBeVisible()
+  })
+
+  test('the drawer marks the page you are on and closes on navigation', async ({
+    systemAdminPage: page,
+  }) => {
+    await page.goto('/admin')
+    await page.getByRole('button', { name: 'Open menu' }).click()
+
+    const drawer = page.getByRole('dialog')
+    const tenants = drawer.getByRole('link', { name: 'Tenants' })
+    await expect(tenants).toHaveAttribute('aria-current', 'page')
+
+    await tenants.click()
+    await expect(drawer).toBeHidden()
+  })
+
+  // What the whole change is for: the page had 134px to render in, so the
+  // tenant list was a column of clipped text.
+  test('the tenant list gets the full width, with no sideways scroll', async ({
+    systemAdminPage: page,
+  }) => {
+    await page.goto('/admin')
+    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible()
+
+    const { clientWidth, scrollWidth } = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }))
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
+  })
+
+  test('the rail is back on desktop, with no menu button', async ({ systemAdminPage: page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/admin')
+
+    await expect(page.getByRole('complementary')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden()
   })
 })
