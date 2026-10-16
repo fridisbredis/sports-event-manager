@@ -18,7 +18,9 @@ export default async function InvitePage({ params }: Props) {
   // tenant, so no extra lookup is needed to know which palette to use.
   const { data: official } = await service
     .from('officials')
-    .select('phone, name, invite_status, invite_token_expires_at, tenants(color_palette, tier)')
+    .select(
+      'phone, name, invite_status, invite_token_expires_at, tenants(name, color_palette, tier)'
+    )
     .eq('invite_token', token)
     .maybeSingle()
 
@@ -38,16 +40,24 @@ export default async function InvitePage({ params }: Props) {
   // Goes through effectivePalette like every other themed surface: the theme
   // is tier-gated, so an invite into a tenant below the minimum tier must
   // render the default palette rather than the one stored on its row.
-  const tenant = official?.tenants as { color_palette: string | null; tier: string } | null
+  const tenant = official?.tenants as {
+    name: string
+    color_palette: string | null
+    tier: string
+  } | null
   const palette = isValid && tenant ? effectivePalette(tenant) : null
 
   return (
     <>
       {palette && <TenantThemeStyle colorPalette={palette} />}
+      {/* tenantName follows the same rule as the palette above: passed only for
+          a valid invite, so an expired or unknown token cannot be used to probe
+          which organisation a link belonged to. */}
       <InviteForm
         token={token}
         phone={isValid ? official.phone : null}
         name={isValid ? official.name : null}
+        tenantName={isValid ? (tenant?.name ?? null) : null}
       />
     </>
   )

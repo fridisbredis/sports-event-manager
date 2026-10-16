@@ -16,7 +16,6 @@ import {
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
 import { getServerTranslation } from '@/lib/i18n/server'
-import { getUserLanguage } from '@/lib/i18n/user-language'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
@@ -255,13 +254,26 @@ export async function POST(request: NextRequest) {
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${official.invite_token}`
 
-  // The invitee has no language of their own yet: user_preferences is written
-  // when they confirm (api/officials/confirm), which is strictly after this
-  // send. The inviting admin's language is the best available proxy — a
-  // Swedish-speaking admin is inviting Swedish-speaking officials — and it is
-  // what makes this SMS Swedish for Viadal without a tenant-level setting.
-  // Once they confirm, the language they picked on the invite page takes over.
-  const t = await getServerTranslation(await getUserLanguage(), 'auth')
+  // Segment budget, measured 2026-10-16 (N19). The fixed English copy is 61
+  // GSM-7 characters and `/invite/<uuid>` another 44, leaving 55 for the origin
+  // plus the official's name plus the tenant name before this tips from one
+  // 160-character segment into two. That fits a short domain (viadal.se leaves
+  // 38) but not a default Azure Container Apps hostname, which leaves 2 — so on
+  // the current prod URL every invite is two segments no matter how this is
+  // worded. Shortening the copy does not fix that; shortening the invite URL
+  // would, and is its own change. N11 is where this stops being guesswork and
+  // starts being measured per tenant.
+  //
+  // Pinned to English, not the inviting admin's language (N19, decided by
+  // Peter 2026-10-16). This reverses #219, which followed the admin on the
+  // reasoning that a Swedish-speaking admin invites Swedish-speaking
+  // officials. Two things outweigh that: the recipient has no language of
+  // their own yet either way, and Swedish copy forces the message from GSM-7
+  // to UCS-2, which cuts the per-segment limit from 160 characters to 70 and
+  // silently doubles the cost of every invite and resend. The landing page
+  // this links to still offers both languages, so the invitee picks their own
+  // one tap later. Revisit once N11 records SMS cost per tenant.
+  const t = await getServerTranslation('en', 'auth')
   const smsBody = t('confirmation.inviteSms.body', {
     name,
     tenant: tenant?.name ?? t('confirmation.inviteSms.fallbackTenant'),

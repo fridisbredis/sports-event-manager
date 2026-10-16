@@ -44,11 +44,12 @@ const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
 const PHONE = '46701234567'
+const TENANT = 'Viadal 6D 2026'
 const RESEND_COOLDOWN_SECONDS = 30
 
 /** Fills the form to the point where the confirm button sends the OTP. */
 function fillAndSubmit() {
-  render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+  render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
   fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
   fireEvent.click(screen.getByRole('checkbox'))
   fireEvent.click(screen.getByText('confirmation.confirmButton'))
@@ -164,7 +165,7 @@ describe('InviteForm language selection', () => {
     verifyOtp.mockResolvedValue({ data: { session: { access_token: 'tok' } }, error: null })
     fetchMock.mockResolvedValue({ ok: true })
 
-    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
     if (pick !== undefined) {
       fireEvent.change(screen.getByLabelText('confirmation.languageLabel'), {
         target: { value: pick },
@@ -183,7 +184,7 @@ describe('InviteForm language selection', () => {
   }
 
   it('renders each locale in its own language, not translated', () => {
-    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
     const select = screen.getByLabelText('confirmation.languageLabel')
     expect(select).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Svenska' })).toBeInTheDocument()
@@ -204,7 +205,7 @@ describe('InviteForm language selection', () => {
   // itself. Carrying the value in React state alone left the control showing
   // the new language while every string on the page stayed in the old one.
   it('repaints the form in the chosen language', () => {
-    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
     fireEvent.change(screen.getByLabelText('confirmation.languageLabel'), {
       target: { value: 'sv' },
     })
@@ -212,10 +213,83 @@ describe('InviteForm language selection', () => {
   })
 
   it('does not switch language when the value is unchanged', () => {
-    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" />)
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
     fireEvent.change(screen.getByLabelText('confirmation.languageLabel'), {
       target: { value: 'en' },
     })
     expect(changeLanguage).not.toHaveBeenCalled()
+  })
+})
+
+// N19. The SMS names the organiser and promises a one-minute task; the page it
+// linked to said only "Invite confirmation" and then, on a tap, replaced itself
+// with an unexplained code field. These cover the orientation the walk-through
+// found missing — who is asking, where in the flow you are, and what happens
+// next — including the fallbacks, since an unnamed tenant must degrade to
+// generic copy rather than render a gap where the name should be.
+describe('InviteForm orientation', () => {
+  beforeEach(() => {
+    signInWithOtp.mockReset()
+    verifyOtp.mockReset()
+    fetchMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  it('names the inviting organizer on the form', () => {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
+    expect(screen.getByText(`confirmation.introNamed:{"tenant":"${TENANT}"}`)).toBeInTheDocument()
+  })
+
+  it('falls back to unnamed copy when the tenant could not be read', () => {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={null} />)
+    expect(screen.getByText('confirmation.intro')).toBeInTheDocument()
+    expect(screen.queryByText(/introNamed/)).not.toBeInTheDocument()
+  })
+
+  it('warns that a code SMS follows before the button sends one', () => {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
+    expect(screen.getByText('confirmation.confirmButtonHint')).toBeInTheDocument()
+    expect(signInWithOtp).not.toHaveBeenCalled()
+  })
+
+  it('marks the two steps and gives the OTP step its own heading', async () => {
+    signInWithOtp.mockResolvedValue({ error: null })
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
+
+    expect(screen.getByText('confirmation.stepOfTwo:{"current":1}')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByText('confirmation.confirmButton'))
+
+    await screen.findByLabelText('signIn.codeLabel')
+    expect(screen.getByText('confirmation.stepOfTwo:{"current":2}')).toBeInTheDocument()
+    // Its own heading, not a second render of the invite title — repeating it
+    // read as the form having failed and reloaded.
+    expect(screen.getByText('confirmation.verifyTitle')).toBeInTheDocument()
+    expect(screen.queryByText('confirmation.title')).not.toBeInTheDocument()
+  })
+
+  it('says what happens next on the success screen', async () => {
+    signInWithOtp.mockResolvedValue({ error: null })
+    verifyOtp.mockResolvedValue({ data: { session: { access_token: 'tok' } }, error: null })
+    fetchMock.mockResolvedValue({ ok: true })
+
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
+    fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByText('confirmation.confirmButton'))
+
+    await screen.findByLabelText('signIn.codeLabel')
+    fireEvent.change(screen.getByLabelText('signIn.codeLabel'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('signIn.verifyButton'))
+
+    expect(
+      await screen.findByText(`confirmation.successBody:{"tenant":"${TENANT}"}`)
+    ).toBeInTheDocument()
   })
 })

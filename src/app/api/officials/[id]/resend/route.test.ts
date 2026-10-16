@@ -178,16 +178,18 @@ describe('POST /api/officials/[id]/resend', () => {
 
     expect(messagesCreate).toHaveBeenCalledTimes(1)
     expect(messagesCreate).toHaveBeenCalledWith({
-      body: 'Hi Anna, you have been invited as an official for Viadal 2026. Confirm your availability here: https://app.example.com/invite/tok-new',
+      body: 'Hi Anna, Viadal 2026 has invited you as an official. Confirm within 7 days: https://app.example.com/invite/tok-new',
       from: '+15550001111',
       to: '+46701234567',
     })
   })
 
-  it("resends the invite SMS in the resending admin's language", async () => {
-    // A resend only ever targets an `invited` official, so the recipient has
-    // by definition not confirmed and has no stored language of their own.
-    // Overrides the global 'en' stub from vitest.setup.ts.
+  // Mirrors the create route: N19 pinned the invite SMS to English rather than
+  // following the admin who pressed resend. See the comment on the equivalent
+  // test in ../../route.test.ts for why.
+  it('resends the invite SMS in English even when the admin works in Swedish', async () => {
+    // Overrides the global 'en' stub from vitest.setup.ts, so a regression that
+    // reinstated getUserLanguage() here would produce Swedish and fail.
     vi.mocked(getUserLanguage).mockResolvedValueOnce('sv')
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },
@@ -210,7 +212,7 @@ describe('POST /api/officials/[id]/resend', () => {
     expect(res.status).toBe(200)
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Hej Anna, du har bjudits in som funktionär för Viadal 2026. Bekräfta din tillgänglighet här: https://app.example.com/invite/tok-new',
+        body: 'Hi Anna, Viadal 2026 has invited you as an official. Confirm within 7 days: https://app.example.com/invite/tok-new',
       })
     )
   })
