@@ -88,7 +88,14 @@ export function TenantList({ tenants }: Props) {
               <TableColumn>{t('systemAdmin.tenantColumn')}</TableColumn>
               <TableColumn>{t('systemAdmin.statusColumn')}</TableColumn>
               <TableColumn>{t('systemAdmin.tierColumn')}</TableColumn>
-              <TableColumn>{t('systemAdmin.actionsColumn')}</TableColumn>
+              {/* Hidden below md: four columns is one too many for a phone,
+                  and this one is the least useful there — activate/deactivate
+                  is also on the tenant's own page, which the name links to, so
+                  nothing becomes unreachable. The header and the cell carry
+                  the same rule or the two halves of the table misalign. */}
+              <TableColumn className="hidden md:table-cell">
+                {t('systemAdmin.actionsColumn')}
+              </TableColumn>
             </TableHeader>
             <TableBody>
               {tenants.map((tenant) => (
@@ -117,7 +124,7 @@ export function TenantList({ tenants }: Props) {
                     </Chip>
                   </TableCell>
                   <TableCell className="capitalize text-ink-muted">{tenant.tier}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <button
                       type="button"
                       disabled={pending === tenant.id}

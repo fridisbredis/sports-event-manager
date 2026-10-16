@@ -200,6 +200,28 @@ test.describe('system admin on a phone', () => {
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth)
   })
 
+  // Four columns is one too many for a phone. Activate/deactivate also lives
+  // on the tenant's own page, which the name links to, so dropping the column
+  // here makes nothing unreachable.
+  test('the actions column is dropped, and the table still lines up', async ({
+    systemAdminPage: page,
+  }) => {
+    await page.goto('/admin')
+
+    await expect(page.getByRole('columnheader', { name: 'Actions' })).toBeHidden()
+    await expect(page.getByRole('columnheader', { name: 'Tenant' })).toBeVisible()
+
+    // Header and body must hide the same column or the two halves misalign.
+    // HeroUI promotes the first cell of each row to rowheader, so a count of
+    // gridcells alone is one short of the column count by design.
+    const headers = await page.getByRole('columnheader').filter({ visible: true }).count()
+    const row = page.getByRole('row').nth(1)
+    const cells =
+      (await row.getByRole('gridcell').filter({ visible: true }).count()) +
+      (await row.getByRole('rowheader').filter({ visible: true }).count())
+    expect(cells).toBe(headers)
+  })
+
   test('the rail is back on desktop, with no menu button', async ({ systemAdminPage: page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/admin')
