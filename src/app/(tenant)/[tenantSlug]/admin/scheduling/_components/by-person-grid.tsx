@@ -141,7 +141,7 @@ export function ByPersonGrid({
       <SchedulingCellLegend view="by-person" />
       <div
         ref={scrollRef}
-        className="scheduling-scroll-container overflow-x-auto overflow-y-auto max-h-[70vh] relative"
+        className="scheduling-scroll-container scrollbar-gutter-stable overflow-x-auto overflow-y-auto max-h-[70vh] relative"
       >
         <table className="w-full border-collapse text-sm table-fixed">
           <thead>

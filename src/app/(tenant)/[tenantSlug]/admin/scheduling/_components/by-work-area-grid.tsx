@@ -119,7 +119,7 @@ export function ByWorkAreaGrid({
       <SchedulingCellLegend view="by-work-area" />
       <div
         ref={scrollRef}
-        className="scheduling-scroll-container overflow-x-auto overflow-y-auto max-h-[70vh]"
+        className="scheduling-scroll-container scrollbar-gutter-stable overflow-x-auto overflow-y-auto max-h-[70vh]"
       >
         <table className="w-full border-collapse text-sm table-fixed">
           <thead>

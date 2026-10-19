@@ -162,4 +162,17 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  /* Reserve the vertical scrollbar's width even when it is not showing.
+     A `w-full` table inside a `overflow-y-auto` box is sized against the
+     box's border-box, which includes the scrollbar track — so on any platform
+     set to always show scrollbars, the bar is painted over the table's right
+     edge and clips the last column. The scheduling grids hit this: the final
+     timeslot cell sat half under the bar and could not be fully seen or
+     clicked. Reserving the gutter keeps the table's 100% inside the content
+     box instead, and `both-edges` keeps the grid optically centred rather
+     than shifting left when the bar appears. */
+  .scrollbar-gutter-stable {
+    scrollbar-gutter: stable both-edges;
+  }
 }
