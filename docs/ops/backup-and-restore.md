@@ -20,12 +20,12 @@ would still have worked.
 
 ## 1. Status
 
-| Requirement (card N9)               | Today                                                            |
-| ----------------------------------- | ---------------------------------------------------------------- |
-| Backup at least once per day        | **Met** — Supabase Pro, daily, automatic                         |
-| Kept 30 days                        | **Met** — 7 days daily (Supabase) + 4 weekly slots (~28 days)    |
-| System admin can restore one tenant | **Not met** — no UI, no per-tenant restore                       |
-| Restore has been tested             | **Partly** — rehearsed against a local stack, never against prod |
+| Requirement (card N9)               | Today                                                                                                                                                                                                                |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backup at least once per day        | **Met** — Supabase Pro, daily, automatic                                                                                                                                                                             |
+| Kept 30 days                        | **Met** — 7 days daily (Supabase) + 4 weekly slots (~28 days)                                                                                                                                                        |
+| System admin can restore one tenant | **Not met** — no UI, no per-tenant restore                                                                                                                                                                           |
+| Restore has been tested             | **Partly** — snapshot path (Del 5, 2026-09-07) and weekly slot (Del 6, 2026-10-19) both rehearsed against a local stack. The Supabase dashboard restore is still unexercised, and it is the most likely path of all. |
 
 Two layers, with deliberately different shapes:
 
@@ -138,9 +138,23 @@ weekly-slot-3.tar.gz
 ```
 
 The slot is the ISO week number mod 4, so week 42 writes slot 2, week 43 slot
-3, and week 46 overwrites slot 2 again. **There are always exactly four, and
-the oldest is overwritten by the newest** — the retention policy lives in the
-names, so nothing has to delete anything.
+3, and week 46 overwrites slot 2 again. **Once the job has run four times
+there are four, and the oldest is overwritten by the newest** — the retention
+policy lives in the names, so nothing has to delete anything.
+
+Before that there are fewer, and that is not a fault: the job first ran in ISO
+week 43 (2026-10-19), so the full set exists from week 46. **Seeing one or two
+slots does not mean the others were lost.**
+
+**First, the connection string.** Every `az` command in this section needs
+`$BLOB_CONN_STR`. It lives in 1Password, in the **Work** account — not
+Personal:
+
+```
+export BLOB_CONN_STR="$(op read \
+  "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" \
+  --account extrapreneurab.1password.com)"
+```
 
 **Which slot is newest?** Not obvious from the names, by design — they rotate.
 Each blob carries metadata with the ISO week and capture timestamp:

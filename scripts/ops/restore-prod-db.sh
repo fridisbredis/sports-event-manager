@@ -204,10 +204,27 @@ if [[ "${CONFIRMATION}" != "restore" ]]; then
 fi
 
 echo "==> Dropping and recreating the 'public' schema on the target..."
+# The CREATE grant to cache_rpc_reader is not incidental — it is required for
+# the restore to complete at all, and it is this script's own DROP SCHEMA
+# (the fix for collision #1) that destroys it.
+#
+# schema.sql contains five `ALTER FUNCTION ... OWNER TO "cache_rpc_reader"`
+# statements. Since the CVE-2018-1058-era hardening, Postgres requires the
+# RECEIVING role to hold CREATE on the containing schema before it will
+# reassign ownership — reassignment is treated as equivalent to being able to
+# (re)create the object there. Migration 0050 issues this grant for exactly
+# that reason (see its comment), but a dropped schema takes the grant with it,
+# and schema.sql never re-issues it: pg_dump emits object ownership, not the
+# schema-level grants that make the ownership transfer legal.
+#
+# Without this line the restore dies at schema.sql:805 with "permission denied
+# for schema public". Found in the Del 6 rehearsal 2026-10-19; collision #5,
+# in the same family as the four in the header above. USAGE alone is not
+# enough — it must be CREATE.
 psql \
   --single-transaction \
   --variable ON_ERROR_STOP=1 \
-  --command 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;' \
+  --command 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT USAGE, CREATE ON SCHEMA public TO cache_rpc_reader;' \
   --dbname "${TARGET_DB_URL}"
 
 # Migration 0015 INSERTs the "logos" storage bucket row directly (DML in a
