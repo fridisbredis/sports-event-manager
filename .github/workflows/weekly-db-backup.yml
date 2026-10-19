@@ -90,6 +90,44 @@ jobs:
           # outage is the wrong alarm to raise at 03:17 on a Sunday.
           [ -n "$DB_URL" ] || { echo "::error::PROD_DB_URL secret is not set"; exit 1; }
 
+          # Shape checks before the dump. `supabase db dump` answers a
+          # malformed URL with a bare "failed to parse connection string" and
+          # masks the value, so the log says nothing about WHICH part is
+          # wrong — and the secret cannot be printed to find out. These
+          # checks name the fault without ever echoing the string.
+          #
+          # Each has been a real way to get this wrong:
+          case "$DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *)
+              echo "::error::PROD_DB_URL does not start with postgresql:// or postgres:// — it may be a dashboard display string or a psql command rather than a URL"
+              exit 1
+              ;;
+          esac
+
+          # The dashboard shows the string with a literal [YOUR-PASSWORD]
+          # placeholder that has to be substituted by hand. Pasting it as-is
+          # is the single most likely cause of a parse failure here.
+          case "$DB_URL" in
+            *'[YOUR-PASSWORD]'*|*'[your-password]'*|*'<password>'*)
+              echo "::error::PROD_DB_URL still contains the password placeholder from the Supabase dashboard — replace it with the real database password"
+              exit 1
+              ;;
+          esac
+
+          # A newline survives a copy-paste into `gh secret set` and breaks
+          # the parse while being completely invisible wherever it was copied
+          # from.
+          #
+          # `wc -l` rather than a case pattern: command substitution strips
+          # trailing newlines, so `case "$DB_URL" in *"$(printf '\n')"*)`
+          # compares against an empty string and matches everything — it
+          # rejected valid URLs when tested.
+          if [ "$(printf '%s' "$DB_URL" | wc -l)" -gt 0 ]; then
+            echo "::error::PROD_DB_URL contains a newline — re-set it without a trailing line break"
+            exit 1
+          fi
+
           mkdir -p dump
 
           # Three files, matching snapshot-prod-db.sh exactly, so a blob from
