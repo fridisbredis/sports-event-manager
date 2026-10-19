@@ -20,12 +20,12 @@ would still have worked.
 
 ## 1. Status
 
-| Requirement (card N9)               | Today                                                                                                                                                                                                                |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backup at least once per day        | **Met** — Supabase Pro, daily, automatic                                                                                                                                                                             |
-| Kept 30 days                        | **Met** — 7 days daily (Supabase) + 4 weekly slots (~28 days)                                                                                                                                                        |
-| System admin can restore one tenant | **Not met** — no UI, no per-tenant restore                                                                                                                                                                           |
-| Restore has been tested             | **Partly** — snapshot path (Del 5, 2026-09-07) and weekly slot (Del 6, 2026-10-19) both rehearsed against a local stack. The Supabase dashboard restore is still unexercised, and it is the most likely path of all. |
+| Requirement (card N9)               | Today                                                                                                                                                                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Backup at least once per day        | **Met** — Supabase Pro, daily, automatic                                                                                                                                                                                                                                                         |
+| Kept 30 days                        | **Met for the database** — 7 days daily (Supabase) + 4 weekly slots (~28 days). **Not met for Storage files**, which no backup covers at all (§7).                                                                                                                                               |
+| System admin can restore one tenant | **Not met** — no UI, no per-tenant restore                                                                                                                                                                                                                                                       |
+| Restore has been tested             | **Partly** — snapshot path (Del 5, 2026-09-07) and weekly slot (Del 6, 2026-10-19) both rehearsed against a local stack, the latter finding a bug that made the restore script fail outright. The dashboard restore (§4) has been read through but never run: running it means overwriting prod. |
 
 Two layers, with deliberately different shapes:
 
@@ -64,11 +64,22 @@ means.
 - **Where:** Supabase Dashboard → prod project (`rauvaxuypujbeintnnoe`) →
   Database → Backups → Scheduled backups.
   Direct link: https://supabase.com/dashboard/project/rauvaxuypujbeintnnoe/database/backups/scheduled
-- **Frequency:** daily, automatic, run by the platform.
-- **Retention:** 7 days (Pro plan).
-- **Point-in-time recovery:** **off.** It is a paid add-on and was deliberately
-  not enabled on cost grounds — see REL-04 in `docs/quality-requirements.md`.
-  Without it, recovery granularity is one backup per day, not one second.
+- **Frequency:** daily, automatic, run by the platform, around 03:35 UTC
+  (observed 2026-10-19: eight consecutive nights all between 03:34 and 03:40).
+  The dashboard says "around midnight of your project's region"; the project is
+  in `eu-west-1`, so the times you see are those.
+- **Retention:** 7 days (Pro plan) — but **eight** were listed on 2026-10-19
+  (12–19 Oct). Treat 7 as the number you may rely on and anything beyond it as
+  a bonus that may vanish without notice.
+- **Point-in-time recovery:** **off.** Confirmed against the dashboard
+  2026-10-19 — the "Point in time" tab exists for every Pro project whether or
+  not it is bought, so its presence is not evidence that it is on. It is a paid
+  add-on, deliberately not enabled on cost grounds — see REL-04 in
+  `docs/quality-requirements.md`. Without it, recovery granularity is one
+  backup per day, not one second.
+- **Storage objects are NOT included.** The dashboard states this plainly and
+  it is easy to miss: a database backup holds only the _metadata_ rows about
+  files, never the files themselves. See §4, step 6.
 
 The system health page (SYS-03) shows these facts and links to the dashboard.
 It deliberately reports **no status**: this app holds no credential that could
@@ -123,6 +134,47 @@ night's backup exists, open the link and look.
 
 5. **Bring the app back up** and confirm login works end to end — the auth
    schema is part of the restore, so sessions issued before it are invalid.
+
+6. **Check the Storage buckets separately. The restore did not touch them.**
+
+   A database backup contains the `storage.objects` metadata rows, not the
+   files those rows point at. The dashboard says so on the Backups page, and it
+   is the easiest thing on that page to skim past.
+
+   What this means after a restore:
+   - A file **deleted** since the backup point is gone for good. The restore
+     brings back the row describing it, so the app will render a broken image
+     rather than no image — a dangling reference, not a clean absence.
+   - A file **uploaded** since the backup point still exists in Storage, but
+     the row describing it is gone. The file is orphaned: present, paid for,
+     unreachable from the app.
+
+   Two public buckets, both small (verified on prod 2026-10-19):
+
+   | Bucket    | Objects | What breaks if a file is missing            |
+   | --------- | ------- | ------------------------------------------- |
+   | `logos`   | 5       | Event logo on INFO-01 renders broken        |
+   | `avatars` | 2       | Official's avatar on HOME-01 renders broken |
+
+   At this size the practical answer is to **download both buckets before
+   restoring** and re-upload anything the restore orphaned:
+
+   ```
+   supabase storage cp -r ss:///logos ./storage-backup/logos \
+     --project-ref rauvaxuypujbeintnnoe --experimental
+   supabase storage cp -r ss:///avatars ./storage-backup/avatars \
+     --project-ref rauvaxuypujbeintnnoe --experimental
+   ```
+
+   **`--project-ref` is not optional here.** The repo's CLI is linked to the
+   _dev_ project, so without it these commands quietly read the wrong
+   environment's buckets — and during an incident the output would look
+   perfectly plausible.
+
+   Neither bucket holds anything irreplaceable — a logo can be re-uploaded by
+   the tenant admin, an avatar by the official — so this is a cosmetic
+   cleanup, not a data-loss event. It is listed here because discovering it
+   mid-incident looks like the restore failed when it did not.
 
 ## 4b. The weekly slot backups
 
@@ -258,14 +310,21 @@ Building this properly is the open half of card N9.
   repo owner on a failed scheduled workflow by default; that is the only
   signal, and it is worth confirming it actually arrives.
 - **No per-tenant restore.** §6.
-- **Two of the three restore paths have never been exercised.** The snapshot
-  path (§5) _has_ been: `docs/testing/rollback-rehearsal.md` Del 5 ran on
-  2026-09-07 against real prod data restored to a local stack, passed after
-  four script fixes, and verified row counts. What has never been tried is
-  **the Supabase dashboard restore (§4)** — the path a normal data loss would
-  actually use — and **restoring a weekly slot (§4b)**, where the extra
-  difficulty is knowing which of the four is the right one. Del 6 of the
-  rehearsal document plans both; it has not been run yet.
+- **Storage files are not in any backup.** Neither Supabase's scheduled
+  backups nor the weekly slots contain the contents of the `logos` and
+  `avatars` buckets — only the metadata rows describing them (§4, step 6).
+  Nothing backs those files up today. Both buckets are small and their
+  contents are re-uploadable by the people who own them, which is why this is
+  a gap rather than an emergency; it would stop being small if participant
+  photos or documents were ever added.
+- **One restore path has never been exercised: the Supabase dashboard restore
+  (§4)** — and it is the one a normal data loss would actually use. The other
+  two have been: the snapshot path (§5) in `rollback-rehearsal.md` Del 5
+  (2026-09-07), and a weekly slot (§4b) in Del 6 (2026-10-19), which found and
+  fixed a bug that made `restore-prod-db.sh` fail outright. The dashboard
+  restore cannot be rehearsed without overwriting prod, so the realistic
+  substitute is the read-through done on 2026-10-19: confirm the backup list,
+  know which one you would pick, and know what picking it costs.
 - **Nothing alerts on a failed backup.** Supabase does not notify on one, and
   the health page cannot see them (§3). A silent run of failures would only be
   discovered when a restore is attempted.

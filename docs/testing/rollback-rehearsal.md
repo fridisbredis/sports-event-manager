@@ -837,16 +837,43 @@ läser det under en incident och ser en slot drar slutsatsen att tre saknas och
 att något är trasigt. Föreslagen åtgärd: skriv "upp till fyra; färre tills jobbet
 körts fyra gånger".
 
-#### Steg B — Supabase dashboard-backupen: EJ GENOMFÖRD
+#### Steg B — Supabase dashboard-backupen: GENOMFÖRD (läsövning)
 
-Steget kräver att man läser av prod-projektets Backups-sida i Supabase-dashboarden.
-Den går inte att nå från CLI eller API — det finns ingen endpoint för schemalagda
-backuper — och dashboarden är enligt runbookens §3 själv sanningskällan.
+Frida läste av Backups-sidan 2026-10-19. Ingen återställning gjordes — steget är
+med avsikt en läsövning, eftersom en dashboard-restore skriver över hela prod och
+inte går att avbryta.
 
-**Kvarstår att göra manuellt**, och det är fortfarande den mest sannolika
-återställningsvägen av alla. Att läsa av: antal backuper, deras datum, om något
-saknas, och om sidan motsäger §3 (retention 7 dagar, daglig frekvens, PITR av).
-Återställ inte — det skriver över hela prod och går inte att avbryta.
+**Vad sidan visade:**
+
+| Vad            | Dashboarden                            | Runbookens §3 före övningen    |
+| -------------- | -------------------------------------- | ------------------------------ |
+| Antal backuper | 8 (12–19 okt)                          | "Retention: 7 days"            |
+| Tid på dygnet  | 03:34–03:40 UTC, åtta nätter i rad     | "daily, automatic" (ingen tid) |
+| PITR           | Av — bekräftat av Frida                | Av (REL-04)                    |
+| Storage-objekt | **"Storage objects are not included"** | Nämndes inte alls              |
+
+**Svaret på läsövningens fråga** — vilken backup skulle du valt, och vad kostar
+den? Granulariteten är ett dygn: väljer du 19 okt förlorar du allt skrivet efter
+03:36 samma morgon, väljer du 12 okt förlorar du en vecka. Det går att svara utan
+att fråga någon, vilket var hela poängen med steget.
+
+**Fynd 4 (åtgärdat) — Storage-filer finns inte i någon backup.** Databasbackupen
+innehåller `storage.objects`-raderna, inte filerna de pekar på. Efter en
+återställning blir raderade filer dinglande referenser (appen renderar trasig bild
+i stället för ingen bild), och filer uppladdade efter backup-punkten blir
+föräldralösa. Prod har 5 logotyper och 2 avatarer (verifierat 2026-10-19) — litet,
+och allt är återuppladdningsbart av den som äger det, men det ska inte upptäckas
+mitt i en incident där det ser ut som att återställningen misslyckades. Skrivet
+till runbookens §4 steg 6 och §7.
+
+**Fynd 5 (åtgärdat) — PITR-fliken bevisar ingenting.** Fliken "Point in time"
+syns på sidan oavsett om tillägget är köpt. Att se den är alltså inte belägg för
+att PITR är på. Förtydligat i §3 så att nästa person inte drar fel slutsats av
+samma skärm.
+
+**Noterat, ej åtgärdat:** åtta backuper listades där Pro-planen utlovar sju.
+Troligen håller Supabase kvar den äldsta lite extra. §3 säger nu att 7 är det tal
+man får förlita sig på och resten är en bonus som kan försvinna utan förvarning.
 
 #### Steg A, C, D, E — genomförda
 
