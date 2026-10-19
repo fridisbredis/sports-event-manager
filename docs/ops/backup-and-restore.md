@@ -244,10 +244,14 @@ Building this properly is the open half of card N9.
   repo owner on a failed scheduled workflow by default; that is the only
   signal, and it is worth confirming it actually arrives.
 - **No per-tenant restore.** §6.
-- **No restore has ever been performed against prod.** `docs/testing/rollback-rehearsal.md`
-  covers a rehearsal against a local stack, which verifies the script, not the
-  dashboard path in §4 and not prod's actual data volume. The first real
-  restore will be learned during an incident, which is the wrong time.
+- **Two of the three restore paths have never been exercised.** The snapshot
+  path (§5) _has_ been: `docs/testing/rollback-rehearsal.md` Del 5 ran on
+  2026-09-07 against real prod data restored to a local stack, passed after
+  four script fixes, and verified row counts. What has never been tried is
+  **the Supabase dashboard restore (§4)** — the path a normal data loss would
+  actually use — and **restoring a weekly slot (§4b)**, where the extra
+  difficulty is knowing which of the four is the right one. Del 6 of the
+  rehearsal document plans both; it has not been run yet.
 - **Nothing alerts on a failed backup.** Supabase does not notify on one, and
   the health page cannot see them (§3). A silent run of failures would only be
   discovered when a restore is attempted.
