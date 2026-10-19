@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import { logQueryError } from '@/lib/db/query-error'
+import { recordSmsUsage } from '@/lib/sms/usage'
 
 // SEC-09: triggered daily by the gdpr-warning-sms-trigger pg_cron job (migration
 // 0029) via pg_net. Sends the 23-month inactivity warning SMS to officials and
@@ -102,14 +103,30 @@ export async function POST(request: NextRequest) {
       if (!lastSignInAt || new Date(lastSignInAt).getTime() > warningCutoff) continue
 
       try {
-        await client.messages.create({
+        const message = await client.messages.create({
           body: `Hi ${row.name}, you haven't logged in for a while. If you don't log in again, your account will be automatically removed in about a month.`,
           from: fromNumber,
           to: toTwilioE164(row.phone),
         })
+        await recordSmsUsage({
+          service,
+          tenantId: row.tenant_id,
+          kind: 'gdpr_warning',
+          message,
+          status: 'sent',
+          op: 'GET /api/cron/gdpr-warning',
+        })
         sent += 1
       } catch (err) {
         failed += 1
+        await recordSmsUsage({
+          service,
+          tenantId: row.tenant_id,
+          kind: 'gdpr_warning',
+          message: null,
+          status: 'failed',
+          op: 'GET /api/cron/gdpr-warning',
+        })
         // Log the DB-generated id and Twilio's numeric code only — never the raw
         // error, which can echo the phone number back into the logs.
         const code = (err as { code?: unknown } | null)?.code

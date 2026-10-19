@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { recordSmsUsage } from '@/lib/sms/usage'
 import twilio from 'twilio'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -12,6 +13,10 @@ vi.mock('@/lib/supabase/server', () => ({
 const messagesCreate = vi.fn()
 vi.mock('twilio', () => ({
   default: vi.fn(() => ({ messages: { create: messagesCreate } })),
+}))
+
+vi.mock('@/lib/sms/usage', () => ({
+  recordSmsUsage: vi.fn(),
 }))
 
 // The failure paths below assert on the *shape* logQueryError writes
@@ -193,6 +198,72 @@ describe('POST /api/cron/sms-worker', () => {
     expect(queueUpdateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'failed', attempts: 3 })
     )
+  })
+
+  // N11 usage accounting. Announcements are the volume case a spending cap
+  // mainly exists to control, so this is the path whose count has to be right.
+  describe('usage accounting', () => {
+    it("records each sent message against its tenant, with Twilio's segment count", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: [queueRow({ id: 'q1' })], error: null })
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [
+            chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null }),
+            chain({ error: null }),
+          ],
+          smsQueue: [chain({ error: null }), chain({ count: 1, error: null })],
+        }) as never
+      )
+      messagesCreate.mockResolvedValue({ sid: 'SM1', numSegments: '2' })
+
+      await POST(makeRequest(AUTHED))
+
+      expect(recordSmsUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'announcement',
+          status: 'sent',
+          message: expect.objectContaining({ numSegments: '2' }),
+        })
+      )
+    })
+
+    it('does not count a retry — only the final failure', async () => {
+      // This catch runs once per attempt. Counting each one would make a single
+      // undelivered message look like three in the tenant's usage, and a cap
+      // built on that would throttle a tenant for Twilio's flakiness.
+      const rpc = vi.fn().mockResolvedValue({ data: [queueRow({ attempts: 0 })], error: null })
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [chain({ error: null }), chain({ count: 0, error: null })],
+        }) as never
+      )
+      messagesCreate.mockRejectedValue({ code: 21211 })
+
+      await POST(makeRequest(AUTHED))
+
+      expect(recordSmsUsage).not.toHaveBeenCalled()
+    })
+
+    it('counts the failure once the row has exhausted its retries', async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: [queueRow({ attempts: 2 })], error: null })
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [chain({ error: null }), chain({ count: 0, error: null })],
+        }) as never
+      )
+      messagesCreate.mockRejectedValue({ code: 21211 })
+
+      await POST(makeRequest(AUTHED))
+
+      expect(recordSmsUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'announcement', status: 'failed', message: null })
+      )
+    })
   })
 
   // The cases below are the unattended-failure half of this route. The job runs

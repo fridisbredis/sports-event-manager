@@ -760,6 +760,50 @@ export type Database = {
           },
         ]
       }
+      sms_usage: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          message_sid: string | null
+          price: number | null
+          price_unit: string | null
+          segments: number
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          message_sid?: string | null
+          price?: number | null
+          price_unit?: string | null
+          segments?: number
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message_sid?: string | null
+          price?: number | null
+          price_unit?: string | null
+          segments?: number
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sms_usage_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       tenants: {
         Row: {
           color_palette: string

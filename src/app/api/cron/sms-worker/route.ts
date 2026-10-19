@@ -5,6 +5,7 @@ import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import type { SmsQueueItem } from '@/types/app'
 import { logQueryError } from '@/lib/db/query-error'
+import { recordSmsUsage } from '@/lib/sms/usage'
 
 // PERF-04: triggered every minute by the sms-queue-worker-trigger pg_cron job
 // (migration 0030) via pg_net, same pattern as the gdpr-warning cron route.
@@ -94,10 +95,22 @@ export async function POST(request: NextRequest) {
             throw new Error(`no body for announcement ${row.announcement_id}`)
           }
 
-          await client.messages.create({
+          const message = await client.messages.create({
             body,
             from: fromNumber,
             to: toTwilioE164(row.recipient_phone),
+          })
+
+          // N11: counted before the queue row is marked sent, so a message
+          // that Twilio accepted is recorded even if the mark-sent write
+          // below fails. Never throws — see recordSmsUsage.
+          await recordSmsUsage({
+            service,
+            tenantId: row.tenant_id,
+            kind: 'announcement',
+            message,
+            status: 'sent',
+            op: 'POST /api/cron/sms-worker',
           })
 
           // The message is delivered; this write is the only record of that.
@@ -129,6 +142,20 @@ export async function POST(request: NextRequest) {
           // error, which can quote the destination number back in its
           // message (see announcements/route.ts's original send loop).
           const willRetry = attempts < MAX_ATTEMPTS
+
+          // N11: only the final failure is counted, not each retry — this
+          // catch runs once per attempt, and recording all three would make
+          // one undelivered message look like three in the tenant's usage.
+          if (!willRetry) {
+            await recordSmsUsage({
+              service,
+              tenantId: row.tenant_id,
+              kind: 'announcement',
+              message: null,
+              status: 'failed',
+              op: 'POST /api/cron/sms-worker',
+            })
+          }
 
           // Carries the incremented attempt count, so a silent failure here
           // costs the retry budget: the row returns to the pool with its old
