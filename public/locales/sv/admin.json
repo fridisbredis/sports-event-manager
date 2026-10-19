@@ -488,6 +488,16 @@
       "allProjects": "Alla projekt",
       "openInDashboard": "Öppna i Supabase Dashboard"
     },
+    "backups": {
+      "title": "Databasbackuper",
+      "frequency": "Frekvens",
+      "daily": "Dagligen, automatiskt",
+      "retention": "Sparas",
+      "days": "{{count}} dagar",
+      "plan": "Supabase-plan",
+      "viewBackups": "Visa backuper i Supabase",
+      "note": "Tillhandahålls av Supabase-plattformen, inte av appen — därför visas ingen status. Inget här kan bekräfta att nattens backup faktiskt kördes; dashboarden är källan till sanning. Retentionen är kortare än de 30 dagar kravet anger."
+    },
     "twilio": {
       "title": "Twilio",
       "fromNumber": "Avsändarnummer",

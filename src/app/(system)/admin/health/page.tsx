@@ -20,6 +20,9 @@ import {
   AZURE_DEV_RESOURCE_GROUP,
   AZURE_PROD_RESOURCE_GROUP,
   azurePortalResourceGroupUrl,
+  supabaseBackupsUrl,
+  SUPABASE_PLAN,
+  SUPABASE_BACKUP_RETENTION_DAYS,
 } from './_lib/constants'
 
 export default async function SystemHealthPage() {
@@ -100,6 +103,37 @@ export default async function SystemHealthPage() {
                 ]
           }
         />
+
+        {/* Backups (N9). Deliberately 'unknown' rather than 'ok': this app has
+            no credential that can ask Supabase whether last night's backup
+            actually ran, and a green tick asserted from a constant would be a
+            claim nobody verified — the worst possible thing for a card an
+            operator consults during an incident. It states what the plan
+            provides and links to where the real list lives.
+
+            Hidden on a local stack, which has no scheduled backups at all. */}
+        {!isLocalSupabase && (
+          <StatusCard
+            title={t('health.backups.title')}
+            status="unknown"
+            statusLabels={statusLabels}
+            facts={[
+              { label: t('health.backups.frequency'), value: t('health.backups.daily') },
+              {
+                label: t('health.backups.retention'),
+                value: t('health.backups.days', { count: SUPABASE_BACKUP_RETENTION_DAYS }),
+              },
+              { label: t('health.backups.plan'), value: SUPABASE_PLAN },
+            ]}
+            note={t('health.backups.note')}
+            links={[
+              {
+                label: t('health.backups.viewBackups'),
+                href: supabaseBackupsUrl(supabaseProjectRef),
+              },
+            ]}
+          />
+        )}
 
         <StatusCard
           title={t('health.twilio.title')}

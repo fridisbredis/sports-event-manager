@@ -46,3 +46,30 @@ export const AZURE_PROD_CONTAINER_APP = 'sports-event-manager-prod'
 export function azurePortalContainerAppUrl(resourceGroup: string, containerApp: string) {
   return `https://portal.azure.com/#@${AZURE_TENANT_DOMAIN}/resource/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${resourceGroup}/providers/Microsoft.App/containerApps/${containerApp}/overview`
 }
+
+// ─── Database backups (N9) ──────────────────────────────────────────────────
+//
+// The Supabase organisation is on the Pro plan (verified against the
+// Management API, 2026-10-19), which includes daily automated backups with
+// seven days of retention. Nothing in this repo produces those — the platform
+// does, and there is no runtime credential here that could ask it about them.
+//
+// So this is a documented fact with a deep link, not a live probe: the health
+// page states what the plan provides and sends the operator to the dashboard
+// to see the actual list. Inventing an "ok" status from a constant would be
+// worse than saying plainly where the truth lives.
+//
+// Retention is SEVEN days, not the thirty the requirement on card N9 asks
+// for. Closing that gap costs money (the PITR add-on, or running our own
+// nightly dump pipeline) and is Peter's call, tracked on the card.
+//
+// Not to be confused with scripts/ops/snapshot-prod-db.sh: that is a manual
+// pre-migration dump for REL-04, taken before a destructive migration, and it
+// is not a schedule and not a backup policy.
+export const SUPABASE_PLAN = 'pro'
+export const SUPABASE_BACKUP_RETENTION_DAYS = 7
+export const SUPABASE_BACKUP_FREQUENCY = 'daily'
+
+export function supabaseBackupsUrl(projectRef: string) {
+  return `https://supabase.com/dashboard/project/${projectRef}/database/backups/scheduled`
+}

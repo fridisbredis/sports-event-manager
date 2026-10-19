@@ -1,0 +1,194 @@
+name: 'Weekly Prod DB Backup (rotating, 4 weeks)'
+
+# N9. Supabase Pro already takes a daily backup, but keeps it only 7 days.
+# The requirement on card N9 is 30. This closes that gap by keeping four
+# weekly dumps on a rotating set of slots, giving roughly 28 days of extra
+# coverage on top of Supabase's own week.
+#
+# WHY SLOTS RATHER THAN TIMESTAMPED FILENAMES
+# A timestamped name grows forever and needs a separate reaper job to delete
+# old ones — which is a second thing to get right, and a reaper with a bug
+# deletes backups rather than failing to create one. Four fixed slot names,
+# overwritten in rotation, keep the retention policy in the NAME: there are
+# four blobs, always, and the oldest is replaced by the newest. Nothing has
+# to delete anything.
+#
+# The slot is the ISO week number mod 4, so it advances automatically and
+# needs no state anywhere. Week 42 writes slot 2, week 43 writes slot 3, week
+# 46 overwrites slot 2 again.
+#
+# WHAT THIS IS NOT
+# Not a replacement for scripts/ops/snapshot-prod-db.sh, which is the manual
+# pre-migration dump REL-04 requires and is taken immediately before a
+# destructive push. This is a schedule; that is a gate. They write to the same
+# container but never to the same blob names.
+#
+# See docs/ops/backup-and-restore.md for how to restore from one of these.
+
+on:
+  workflow_dispatch: # manual trigger, for a drill or an ad-hoc capture
+  schedule:
+    # 03:17 UTC on Sundays. Off the hour on purpose: GitHub's scheduler is
+    # heavily contended at :00 and delays runs by tens of minutes, and a
+    # backup is not urgent enough to compete for that slot. Sunday night is
+    # the quietest point in an event week.
+    - cron: '17 3 * * 0'
+
+# Two scheduled runs overlapping would have them racing for the same slot
+# blob — one upload could land on top of a half-written other. A backup is
+# never worth queueing: if last week's run is somehow still going, this
+# week's should wait rather than be cancelled, so the slot still gets
+# written.
+concurrency:
+  group: weekly-db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump prod and upload to the week's slot
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Compute this week's rotation slot
+        id: slot
+        run: |
+          # ISO week mod 4. `date -u +%V` is the ISO-8601 week number, which
+          # is stable across year boundaries in a way %U and %W are not —
+          # those restart at 00 mid-week and would make two consecutive runs
+          # land on the same slot at new year.
+          #
+          # 10# forces base-10: week numbers are zero-padded ("05"), and bash
+          # reads a leading-zero literal as octal, so week 08 and 09 would be
+          # a syntax error. This has bitten enough shell scripts to be worth
+          # the three characters.
+          WEEK=$(date -u +%V)
+          SLOT=$(( 10#$WEEK % 4 ))
+          echo "slot=${SLOT}" >> "$GITHUB_OUTPUT"
+          echo "week=${WEEK}" >> "$GITHUB_OUTPUT"
+          echo "ISO week ${WEEK} -> slot ${SLOT}"
+
+      - name: Dump prod database
+        env:
+          # The Session pooler connection string for the prod project. Held
+          # as its own secret rather than derived: this workflow must never
+          # be able to point itself at a database by constructing a URL.
+          DB_URL: ${{ secrets.PROD_DB_URL }}
+        run: |
+          # Fail loudly and distinctly on a missing secret. Without this,
+          # `supabase db dump --db-url ""` fails in a way that reads like the
+          # database is unreachable, and a backup job that looks like an
+          # outage is the wrong alarm to raise at 03:17 on a Sunday.
+          [ -n "$DB_URL" ] || { echo "::error::PROD_DB_URL secret is not set"; exit 1; }
+
+          mkdir -p dump
+
+          # Three files, matching snapshot-prod-db.sh exactly, so a blob from
+          # either source restores through the same path and
+          # restore-prod-db.sh does not need to know which produced it.
+          #
+          # --role-only first: roles must exist before a schema that grants to
+          # them can be replayed.
+          supabase db dump --db-url "$DB_URL" -f dump/roles.sql --role-only
+          supabase db dump --db-url "$DB_URL" -f dump/schema.sql
+          supabase db dump --db-url "$DB_URL" -f dump/data.sql --use-copy --data-only
+
+          # A dump that "succeeded" but produced an empty data file is the
+          # failure mode that matters here: it uploads cleanly, overwrites a
+          # good slot, and is only discovered when someone tries to restore
+          # it. Check the files have real content before anything is
+          # overwritten.
+          for f in roles.sql schema.sql data.sql; do
+            if [ ! -s "dump/$f" ]; then
+              echo "::error::dump/$f is empty — refusing to overwrite the slot with a bad backup"
+              exit 1
+            fi
+          done
+
+          wc -c dump/*.sql
+
+      - name: Compress
+        id: archive
+        run: |
+          SLOT="${{ steps.slot.outputs.slot }}"
+          NAME="weekly-slot-${SLOT}.tar.gz"
+          tar -czf "$NAME" -C dump roles.sql schema.sql data.sql
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          ls -lh "$NAME"
+
+      - name: Upload to Azure Blob Storage
+        env:
+          BLOB_CONN_STR: ${{ secrets.PROD_BLOB_CONNECTION_STRING }}
+          ARCHIVE: ${{ steps.archive.outputs.name }}
+        run: |
+          [ -n "$BLOB_CONN_STR" ] || { echo "::error::PROD_BLOB_CONNECTION_STRING secret is not set"; exit 1; }
+
+          # --overwrite is the rotation: this slot's previous contents are
+          # replaced by this week's. Without it the upload fails once a slot
+          # has been written and the rotation silently stops working after
+          # the first four weeks.
+          az storage blob upload \
+            --connection-string "$BLOB_CONN_STR" \
+            --container-name db-snapshots \
+            --name "$ARCHIVE" \
+            --file "$ARCHIVE" \
+            --overwrite \
+            --only-show-errors
+
+          # Metadata recording which week produced this slot. Without it a
+          # restorer looking at four files called weekly-slot-N.tar.gz cannot
+          # tell which is newest except by upload time, and upload time is
+          # lost if the blob is ever copied.
+          az storage blob metadata update \
+            --connection-string "$BLOB_CONN_STR" \
+            --container-name db-snapshots \
+            --name "$ARCHIVE" \
+            --metadata "isoweek=${{ steps.slot.outputs.week }}" "capturedat=$(date -u +%Y-%m-%dT%H:%M:%SZ)" "source=weekly-db-backup" \
+            --only-show-errors
+
+      - name: Verify the upload exists and is not empty
+        env:
+          BLOB_CONN_STR: ${{ secrets.PROD_BLOB_CONNECTION_STRING }}
+          ARCHIVE: ${{ steps.archive.outputs.name }}
+        run: |
+          # Reading the blob back rather than trusting the upload's exit code.
+          # The point of this job is that a file exists in Storage; anything
+          # short of confirming that is an assumption.
+          SIZE=$(az storage blob show \
+            --connection-string "$BLOB_CONN_STR" \
+            --container-name db-snapshots \
+            --name "$ARCHIVE" \
+            --query "properties.contentLength" \
+            --output tsv)
+
+          echo "Uploaded ${ARCHIVE}: ${SIZE} bytes"
+
+          # 1 KiB is far below any real dump of this schema and well above an
+          # empty gzip header (~20 bytes), so it catches a truncated or
+          # empty-but-valid archive without guessing at the real size.
+          if [ "$SIZE" -lt 1024 ]; then
+            echo "::error::${ARCHIVE} is only ${SIZE} bytes — treat this slot as unusable"
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Weekly prod DB backup"
+            echo ""
+            echo "- ISO week: ${{ steps.slot.outputs.week }}"
+            echo "- Slot: ${{ steps.slot.outputs.slot }} of 0-3"
+            echo "- Blob: \`${{ steps.archive.outputs.name }}\`"
+            echo ""
+            echo "Restore: see \`docs/ops/backup-and-restore.md\` §5."
+          } >> "$GITHUB_STEP_SUMMARY"
