@@ -377,6 +377,99 @@ innan det visades.
 
 ---
 
+## Del 6 — Rehearsal: återställ en riktig veckobackup (N9)
+
+Del 5 övar snapshot-kedjan: `snapshot-prod-db.sh` → Blob → `restore-prod-db.sh`
+→ lokal stack. Den kördes 2026-09-07 och blev PASS. Den här delen övar det Del
+5 **inte** täcker:
+
+| Vad                           | Del 5        | Del 6                         |
+| ----------------------------- | ------------ | ----------------------------- |
+| Vem skapade filen             | du, manuellt | ett schemalagt jobb, obevakat |
+| Hur gammal är den             | sekunder     | upp till sju dagar            |
+| Vet du vilken fil som är rätt | ja, den enda | nej — fyra roterande slottar  |
+| Supabase dashboard-backup     | nej          | ja, steg B                    |
+
+Skillnaden som gör det värt en egen övning: under en incident vet du inte
+vilken av `weekly-slot-0..3.tar.gz` som är rätt, och den frågan går inte att
+öva genom att återställa en fil du nyss skapat själv.
+
+**Samma GDPR-regel som resten av dokumentet.** En veckobackup innehåller prods
+riktiga telefonnummer. Den får återställas till **lokal stack** — aldrig till
+dev-molnet, perf eller någon annan delad miljö, och aldrig tillbaka till prod.
+Radera den lokala kopian när övningen är klar; det är en personuppgifts-
+behandling som inte ska ligga kvar på disk.
+
+**Rytm:** en gång före Viadal 2026, och därefter när backup-kedjan ändras.
+
+### Steg A — hitta rätt slot utan att veta vilken
+
+Poängen är att träna uppslaget, inte att få rätt svar snabbt.
+
+- [ ] Lista slottarna med datum:
+      `az storage blob list --connection-string "$BLOB_CONN_STR" --container-name db-snapshots --prefix weekly-slot --query "[].{name:name, modified:properties.lastModified}" -o table`
+- [ ] Läs metadatan på den du tror är nyast och bekräfta ISO-veckan:
+      `az storage blob metadata show --connection-string "$BLOB_CONN_STR" --container-name db-snapshots --name weekly-slot-N.tar.gz`
+- [ ] **Skriv ner hur lång tid det tog att bli säker.** Om det tog mer än en
+      minut är namngivningen eller runbooken otydlig, och det är ett fynd.
+
+### Steg B — Supabase dashboard-backupen
+
+Aldrig övad. Det är den väg som används vid en vanlig dataförlust inom sju
+dagar, alltså den mest sannolika av alla.
+
+- [ ] Öppna prod-projektets Backups-sida och notera vad som faktiskt finns:
+      hur många, vilka datum, och om något ser ut att saknas.
+- [ ] **Återställ inte.** Supabase restore skriver över hela prod och går inte
+      att avbryta. Den här punkten är en läsövning: kan du, utan att fråga
+      någon, säga vilken backup du skulle valt och vad du förlorar genom att
+      välja den?
+- [ ] Notera om sidan visar något som motsäger `docs/ops/backup-and-restore.md`
+      §3 — retention, frekvens, eller att PITR är av.
+
+### Steg C — återställ veckobackupen mot lokal stack
+
+- [ ] `supabase db reset` för en ren baslinje.
+- [ ] Hämta lokal connection string:
+      `supabase status -o json | python3 -c "import json,sys; print(json.load(sys.stdin)['DB_URL'])"`
+- [ ] Ladda ner och återställ slotten:
+      `scripts/ops/restore-prod-db.sh weekly-slot-N.tar.gz "<lokal-DB_URL>"`
+- [ ] **Förvänta dig samma fyra kollisioner som Del 5 hittade** (reserverade
+      roller, `public`-schemat, `storage.buckets` från migration 0015,
+      `buckets_vectors`-grants). De är fixade i skriptet — men om någon av dem
+      kommer tillbaka är det ett verkligt fynd, inte en känd olägenhet.
+
+### Steg D — verifiera att datan faktiskt kom med
+
+Att kommandot exit-ade 0 betyder ingenting.
+
+- [ ] `select count(*) from tenants;` — förväntat 3 (verifierat 2026-10-15).
+      Del 5 såg 5 i september; en minskning är inte nödvändigtvis fel, men om
+      siffran förvånar dig: kontrollera mot prod innan du antar att backupen
+      är trasig.
+- [ ] `select count(*) from assignments;` och `select max(timeslot_start) from assignments;`
+      — den senare visar hur gammal backupen är i praktiken, vilket är det tal
+      som spelar roll vid en riktig återställning.
+- [ ] Minst en rad med känt innehåll öppnad och läst, inte bara räknad.
+
+### Steg E — städa
+
+- [ ] `supabase db reset` — den lokala kopian av prods persondata ska inte
+      ligga kvar efter övningen.
+- [ ] Radera den nedladdade `.tar.gz`-filen.
+
+### Vad som ska skrivas upp
+
+- Total tid från "något är fel" till "verifierad data i en databas".
+- Vilket steg som tog längst tid, och om det var väntat.
+- Allt i `docs/ops/backup-and-restore.md` som visade sig fel, otydligt eller
+  saknas. Runbooken är skriven av någon som inte hade gjort det här — den
+  här övningen är första gången den möter verkligheten.
+- Om du behövde fråga någon, eller leta i kod, för att komma vidare. Varje
+  sådant tillfälle är något som saknas i runbooken.
+
+---
+
 ## Logg
 
 Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
