@@ -70,19 +70,35 @@ export function generateSlotsForDay<T extends StageWindow>(
   const range = getAllocableRange(stage)
   if (!range) return []
 
-  const dayStart = new Date(`${day}T00:00:00.000Z`)
-  const dayEnd = new Date(`${day}T23:59:59.999Z`)
+  const dayStart = new Date(`${day}T00:00:00.000Z`).getTime()
+  const dayEnd = new Date(`${day}T23:59:59.999Z`).getTime()
 
-  const start = new Date(Math.max(new Date(range.start).getTime(), dayStart.getTime()))
-  const end = new Date(Math.min(new Date(range.end).getTime(), dayEnd.getTime()))
+  const rangeStart = new Date(range.start).getTime()
+  const rangeEnd = new Date(range.end).getTime()
+
+  const end = Math.min(rangeEnd, dayEnd)
+
+  // The slot grid is phased from the START OF THE RANGE, not from midnight.
+  //
+  // Clamping the first slot of each day to dayStart instead would restart the
+  // grid at 00:00 every day, which silently drops every slot between midnight
+  // and the first aligned step on any stage that crosses a day boundary with
+  // an unaligned start time: a stage running 21:07 → 00:37 at 15-minute
+  // granularity would produce 21:07, 21:22 … 23:52 on the first day and then
+  // 00:00, 00:15, 00:30 on the second, so 00:07 and 00:22 — both inside the
+  // allocable range — would have no cell and could not be staffed.
+  //
+  // Stepping forward in whole granularity units from rangeStart keeps one
+  // continuous grid across midnight. See allocable-invariant.test.ts.
+  const stepMs = granularityMin * 60 * 1000
+  const stepsToDay = Math.max(0, Math.ceil((dayStart - rangeStart) / stepMs))
+  const start = rangeStart + stepsToDay * stepMs
 
   if (start >= end) return []
 
   const slots: Date[] = []
-  const cur = new Date(start)
-  while (cur < end) {
-    slots.push(new Date(cur))
-    cur.setMinutes(cur.getMinutes() + granularityMin)
+  for (let t = start; t < end; t += stepMs) {
+    slots.push(new Date(t))
   }
   return slots
 }
