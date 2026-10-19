@@ -771,3 +771,149 @@ curl. Den vägen kringgår både grants-problemet och behovet av en webbläsare.
 `supabase/migrations/`.** Det är med avsikt: en medvetet trasig migration i
 repot riskerar att följa med en commit eller en `db push`. `db reset` städar
 den, och `git status` var ren efteråt.
+
+### Körning 2026-10-19 — Del 6 genomförd, PASS efter ett fynd
+
+Första körningen av Del 6. Återställde `weekly-slot-3.tar.gz` (ISO-vecka 43,
+`capturedat` 2026-10-19T11:33:15Z — backup-jobbets första riktiga körning) mot
+lokal stack.
+
+**Resultat: PASS, men inte vid första försöket.** Skriptet failade reproducerbart
+tills en saknad grant lades till. Se fynd 1.
+
+#### Fynd 1 (åtgärdat) — `restore-prod-db.sh` failar på `permission denied for schema public`
+
+Femte kollisionen i samma familj som de fyra i skriptets header, och orsakad av
+skriptets egen fix för kollision 1.
+
+```
+psql:.../schema.sql:805: ERROR:  permission denied for schema public
+```
+
+Rad 805 är `ALTER FUNCTION "public"."get_admin_dashboard_cached"(...) OWNER TO
+"cache_rpc_reader";` — en av fem `OWNER TO cache_rpc_reader` i schema.sql.
+
+**Orsak.** Sedan CVE-2018-1058-härdningen kräver Postgres att den _mottagande_
+rollen har CREATE på schemat innan `ALTER ... OWNER TO` får flytta ägarskapet.
+Migration 0050 ger den granten av exakt det skälet (och 0051:77 kommenterar att
+den förutsätts finnas). Men skriptets `DROP SCHEMA public CASCADE` — fixen för
+kollision 1 — tar granten med sig, och `schema.sql` återskapar den aldrig:
+`pg_dump` dumpar objektägarskap, inte de schema-grants som gör ägarbytet lagligt.
+
+Verifierat att det är CREATE som krävs, inte USAGE: med enbart USAGE failar
+`ALTER ... OWNER TO` identiskt.
+
+**Åtgärd.** Granten läggs tillbaka i samma transaktion som schemat återskapas:
+
+```sql
+DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;
+GRANT USAGE, CREATE ON SCHEMA public TO cache_rpc_reader;
+```
+
+Efter fixen: exit 0, inga fel, reproducerat två gånger från ren `db reset`.
+
+**Varför Del 5 inte hittade den.** Del 5 kördes 2026-09-07. Migration 0050 (som
+inför `cache_rpc_reader` och grant:en) och 0054 (som lägger till
+`get_admin_dashboard_cached`) fanns då ännu inte i den form som felar. Kollisionen
+uppstod när cache-RPC:erna tillkom — den fanns alltså inte att hitta i september.
+Det är ett argument för att köra om den här övningen när backup-kedjan _eller_
+schemat ändras, inte bara backup-kedjan.
+
+#### Fynd 2 (ej åtgärdat) — `$BLOB_CONN_STR` sägs aldrig var den kommer ifrån
+
+Både Del 6 steg A och runbookens §4b använder `--connection-string "$BLOB_CONN_STR"`
+som om variabeln vore satt. Ingenstans står var man får tag på den. Svaret ligger i
+`restore-prod-db.sh:150`: 1Password, valvet "Viadal Event Manager", kontot
+`extrapreneurab.1password.com` — alltså Work-kontot, inte Personal.
+
+En operatör som följer runbooken ordagrant fastnar direkt. Föreslagen åtgärd: en
+rad i §4b som visar `op read`-kommandot.
+
+#### Fynd 3 (ej åtgärdat) — "There are always exactly four"
+
+Runbookens §4b påstår att det alltid finns exakt fyra slottar. I dag finns **en**.
+Påståendet beskriver steady state efter fyra veckors drift, men en operatör som
+läser det under en incident och ser en slot drar slutsatsen att tre saknas och
+att något är trasigt. Föreslagen åtgärd: skriv "upp till fyra; färre tills jobbet
+körts fyra gånger".
+
+#### Steg B — Supabase dashboard-backupen: GENOMFÖRD (läsövning)
+
+Frida läste av Backups-sidan 2026-10-19. Ingen återställning gjordes — steget är
+med avsikt en läsövning, eftersom en dashboard-restore skriver över hela prod och
+inte går att avbryta.
+
+**Vad sidan visade:**
+
+| Vad            | Dashboarden                            | Runbookens §3 före övningen    |
+| -------------- | -------------------------------------- | ------------------------------ |
+| Antal backuper | 8 (12–19 okt)                          | "Retention: 7 days"            |
+| Tid på dygnet  | 03:34–03:40 UTC, åtta nätter i rad     | "daily, automatic" (ingen tid) |
+| PITR           | Av — bekräftat av Frida                | Av (REL-04)                    |
+| Storage-objekt | **"Storage objects are not included"** | Nämndes inte alls              |
+
+**Svaret på läsövningens fråga** — vilken backup skulle du valt, och vad kostar
+den? Granulariteten är ett dygn: väljer du 19 okt förlorar du allt skrivet efter
+03:36 samma morgon, väljer du 12 okt förlorar du en vecka. Det går att svara utan
+att fråga någon, vilket var hela poängen med steget.
+
+**Fynd 4 (åtgärdat) — Storage-filer finns inte i någon backup.** Databasbackupen
+innehåller `storage.objects`-raderna, inte filerna de pekar på. Efter en
+återställning blir raderade filer dinglande referenser (appen renderar trasig bild
+i stället för ingen bild), och filer uppladdade efter backup-punkten blir
+föräldralösa. Prod har 5 logotyper och 2 avatarer (verifierat 2026-10-19) — litet,
+och allt är återuppladdningsbart av den som äger det, men det ska inte upptäckas
+mitt i en incident där det ser ut som att återställningen misslyckades. Skrivet
+till runbookens §4 steg 6 och §7.
+
+**Åtgärdat samma dag:** veckobackup-jobbet laddar nu ner båda bucketarna via
+Storage-API:t och lägger dem i samma arkiv som SQL:en, så en slot från vecka 44
+är en komplett återställningspunkt. `restore-prod-db.sh` packar upp dem och
+skriver ut upload-kommandona, men laddar medvetet inte upp själv — skriptets
+hela säkerhetsmodell är att det bara skriver dit anroparen pekat det.
+
+Walk-logiken testades mot lokal stack med tre filer i nästlade mappar, och
+**första versionen hade en bugg**: `entries.txt` var en delad fil som skrevs
+över av det rekursiva anropet mitt i att den yttre loopen läste den. Två av tre
+filer försvann, med exit 0. Rättat till en `local`-variabel + here-string.
+Värt att notera som mönster: en backup som tyst tar en delmängd är farligare än
+en som failar.
+
+**Fynd 5 (åtgärdat) — PITR-fliken bevisar ingenting.** Fliken "Point in time"
+syns på sidan oavsett om tillägget är köpt. Att se den är alltså inte belägg för
+att PITR är på. Förtydligat i §3 så att nästa person inte drar fel slutsats av
+samma skärm.
+
+**Noterat, ej åtgärdat:** åtta backuper listades där Pro-planen utlovar sju.
+Troligen håller Supabase kvar den äldsta lite extra. §3 säger nu att 7 är det tal
+man får förlita sig på och resten är en bonus som kan försvinna utan förvarning.
+
+#### Steg A, C, D, E — genomförda
+
+| Steg                | Resultat                                                                                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — hitta rätt slot | 14 s. Metadatan (`isoweek`, `capturedat`, `source`) är entydig. Men uppslaget var inte övat på riktigt: det fanns bara en slot, så frågan "vilken av fyra?" gick inte att öva. Ta om när fyra finns.                                  |
+| C — återställ       | 5–7 s efter fixen. Failade före den.                                                                                                                                                                                                  |
+| D — verifiera       | `tenants=3`, `events=3`, `officials=26`, `assignments=43`. Rader lästa, inte bara räknade: Viadal 2026/professional, Micke testar/premium, Eddo testar/standard — stämmer med N22. `sms_usage` tom, väntat (N11 gick live samma dag). |
+| E — städa           | `db reset` (26 telefonnummer borta), tar.gz och uppackat schema raderade, loggar kontrollerade: inga telefonnummer, ingen connection string.                                                                                          |
+
+#### Det som ska skrivas upp
+
+- **Total tid "något är fel" → verifierad data i en databas: ~7 sekunder** för
+  själva körningen, men det förutsätter att man vet om fynd 1 och fynd 2. Utan
+  dem fastnar man: först på var connection-stringen finns, sedan på en
+  `permission denied` som inte säger något om orsaken.
+- **Längst tid tog felsökningen av fynd 1**, och det var inte väntat. Felmeddelandet
+  pekar på schemat, inte på den roll som saknar rättighet, så det leder fel.
+- **Runbooken mötte verkligheten för första gången** och höll i allt utom de två
+  punkter som står som fynd 2 och 3.
+- **Backupens ålder i praktiken:** senaste `timeslot_start` i assignments är
+  2026-08-07. Det säger inget om backupens färskhet här (Viadal-eventet ligger i
+  augusti), så för den riktiga siffran: `capturedat` i blobbens metadata.
+
+#### Konsekvens för N25
+
+Den här övningen är precis det N25-kortet föreslog att man gör först. Den gav ett
+konkret argument för kortets egen varning: om en per-tenant-restore hade byggts
+innan någon kört Del 6, hade automationen ärvt fynd 1 och failat tyst i samma
+ögonblick som den behövdes.

@@ -204,10 +204,27 @@ if [[ "${CONFIRMATION}" != "restore" ]]; then
 fi
 
 echo "==> Dropping and recreating the 'public' schema on the target..."
+# The CREATE grant to cache_rpc_reader is not incidental — it is required for
+# the restore to complete at all, and it is this script's own DROP SCHEMA
+# (the fix for collision #1) that destroys it.
+#
+# schema.sql contains five `ALTER FUNCTION ... OWNER TO "cache_rpc_reader"`
+# statements. Since the CVE-2018-1058-era hardening, Postgres requires the
+# RECEIVING role to hold CREATE on the containing schema before it will
+# reassign ownership — reassignment is treated as equivalent to being able to
+# (re)create the object there. Migration 0050 issues this grant for exactly
+# that reason (see its comment), but a dropped schema takes the grant with it,
+# and schema.sql never re-issues it: pg_dump emits object ownership, not the
+# schema-level grants that make the ownership transfer legal.
+#
+# Without this line the restore dies at schema.sql:805 with "permission denied
+# for schema public". Found in the Del 6 rehearsal 2026-10-19; collision #5,
+# in the same family as the four in the header above. USAGE alone is not
+# enough — it must be CREATE.
 psql \
   --single-transaction \
   --variable ON_ERROR_STOP=1 \
-  --command 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;' \
+  --command 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT USAGE, CREATE ON SCHEMA public TO cache_rpc_reader;' \
   --dbname "${TARGET_DB_URL}"
 
 # Migration 0015 INSERTs the "logos" storage bucket row directly (DML in a
@@ -260,3 +277,42 @@ echo "==========================================================================
 echo "RESTORE COMPLETE onto: ${TARGET_DB_URL}"
 echo "Verify row counts / spot-check tables before trusting this restore."
 echo "=============================================================================="
+
+# Storage files, if this archive carries them. Weekly slots from ISO week 44
+# onward include a storage/ directory; anything older (and every
+# pre-migration snapshot) does not, so its absence is normal rather than a
+# fault.
+#
+# They are NOT uploaded automatically. This script's whole safety model is
+# that it writes only to a database target the caller named explicitly, and
+# an upload would have to pick a Storage endpoint on its own — exactly the
+# kind of implicit targeting the prod guard above exists to prevent. So the
+# files are extracted and the operator is told where they are.
+if [ -d "${WORKDIR}/storage" ]; then
+  STORAGE_OUT="./restored-storage-$(date -u +%Y%m%dT%H%M%SZ)"
+  cp -R "${WORKDIR}/storage" "${STORAGE_OUT}"
+  FILE_COUNT=$(find "${STORAGE_OUT}" -type f | wc -l | tr -d ' ')
+
+  echo ""
+  echo "Storage: ${FILE_COUNT} file(s) extracted to ${STORAGE_OUT}"
+  echo ""
+  echo "  The database restore above did NOT put these back. storage.objects"
+  echo "  rows now describe files that may no longer exist in the bucket,"
+  echo "  which renders as broken images rather than missing ones."
+  echo ""
+  echo "  To upload them to a target you choose, deliberately:"
+  echo "    supabase storage cp -r ${STORAGE_OUT}/logos ss:///logos \\"
+  echo "      --project-ref <ref> --experimental"
+  echo "    supabase storage cp -r ${STORAGE_OUT}/avatars ss:///avatars \\"
+  echo "      --project-ref <ref> --experimental"
+  echo ""
+  echo "  <ref> is never implied: the repo's CLI is linked to dev, so an"
+  echo "  omitted --project-ref writes to the wrong environment and succeeds."
+  echo ""
+  echo "  These are prod files. Delete ${STORAGE_OUT} when done — see the"
+  echo "  GDPR note in docs/testing/rollback-rehearsal.md."
+else
+  echo ""
+  echo "Storage: no storage/ directory in this archive (normal for slots"
+  echo "captured before ISO week 44, and for pre-migration snapshots)."
+fi

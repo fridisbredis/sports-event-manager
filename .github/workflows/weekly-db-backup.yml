@@ -154,12 +154,114 @@ jobs:
 
           wc -c dump/*.sql
 
+      - name: Download Storage objects
+        env:
+          SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # A database dump contains the storage.objects metadata rows, never
+          # the files they point at — the Backups page in the Supabase
+          # dashboard says so, and it is easy to miss. Without this step a
+          # restore brings back rows describing files that no longer exist,
+          # so the app renders broken images rather than no images: a
+          # dangling reference is worse than a clean absence, because it
+          # looks like the restore itself failed.
+          #
+          # Listed through the Storage API with the service role rather than
+          # read from storage.objects or fetched from the public CDN URLs.
+          # Both buckets happen to be public today, but a backup that stops
+          # working the day someone makes a bucket private is not a backup;
+          # and the API is the only source that sees a file whose metadata
+          # row is missing, which is exactly the inconsistency worth
+          # capturing.
+          [ -n "$SUPABASE_URL" ] || { echo "::error::PROD_SUPABASE_URL secret is not set"; exit 1; }
+          [ -n "$SERVICE_ROLE_KEY" ] || { echo "::error::PROD_SUPABASE_SERVICE_ROLE_KEY secret is not set"; exit 1; }
+
+          mkdir -p dump/storage
+
+          TOTAL=0
+          for BUCKET in logos avatars; do
+            # The list endpoint is POST with a JSON body, and it is NOT
+            # recursive: it returns one directory level, with folders as
+            # entries whose `id` is null. Both buckets store objects as
+            # <tenant_id>/<entity_id>/<filename>, so the listing is walked
+            # three levels deep rather than assumed flat.
+            walk() {
+              local prefix="$1" depth="$2"
+              [ "$depth" -gt 4 ] && return 0
+
+              local body entries
+              body=$(curl -sS -X POST \
+                "${SUPABASE_URL}/storage/v1/object/list/${BUCKET}" \
+                -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "{\"prefix\":\"${prefix}\",\"limit\":1000}")
+
+              # A non-array response is an error object, not an empty folder.
+              # Letting it through would silently produce a backup of nothing.
+              #
+              # Held in a `local` variable, never a shared temp file: this
+              # function recurses, and a file would be overwritten by the
+              # nested call partway through the parent's own loop over it.
+              # That cost two of three objects in testing, and exited 0 while
+              # doing it — a backup that silently keeps a third of the files
+              # is worse than one that fails.
+              entries=$(echo "$body" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          if not isinstance(d,list):
+              sys.stderr.write('Storage API error: %s\n' % json.dumps(d))
+              sys.exit(1)
+          for e in d:
+              print(('F' if e.get('id') else 'D') + '\t' + e['name'])
+          ") || {
+                echo "::error::listing ${BUCKET}/${prefix} failed"
+                exit 1
+              }
+
+              # Fed by here-string rather than a pipe, so the loop body runs
+              # in this shell and TOTAL survives it.
+              while IFS=$'\t' read -r KIND NAME; do
+                [ -z "$NAME" ] && continue
+                local path="${prefix:+${prefix}/}${NAME}"
+                if [ "$KIND" = "D" ]; then
+                  walk "$path" $((depth + 1))
+                else
+                  mkdir -p "dump/storage/${BUCKET}/$(dirname "$path")"
+                  curl -sS -f \
+                    "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}" \
+                    -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+                    -o "dump/storage/${BUCKET}/${path}" || {
+                      echo "::error::failed to download ${BUCKET}/${path}"
+                      exit 1
+                    }
+                  TOTAL=$((TOTAL + 1))
+                fi
+              done <<< "$entries"
+            }
+
+            walk "" 1
+          done
+          echo "Downloaded ${TOTAL} Storage object(s)"
+          find dump/storage -type f | sed 's/^/  /'
+
+          # Zero files is reported, not failed. Empty buckets are a legitimate
+          # state (a fresh tenant has uploaded nothing), and failing the whole
+          # backup over it would lose the database dump too — the far more
+          # valuable half.
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "::warning::no Storage objects found; both buckets appear empty"
+          fi
+
       - name: Compress
         id: archive
         run: |
           SLOT="${{ steps.slot.outputs.slot }}"
           NAME="weekly-slot-${SLOT}.tar.gz"
-          tar -czf "$NAME" -C dump roles.sql schema.sql data.sql
+          # storage/ is included in the same archive as the SQL: one slot is
+          # one recovery point, and a database restored to a week its files do
+          # not match is the problem this step exists to prevent.
+          tar -czf "$NAME" -C dump roles.sql schema.sql data.sql storage
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
           ls -lh "$NAME"
 
