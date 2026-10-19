@@ -66,7 +66,9 @@ export function ByWorkAreaGrid({
 }: ByWorkAreaGridProps) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
-  const { scrollRef, isScrolled } = useHorizontalScrollShadow()
+  // The first slot identifies the day and stage on screen, so the grid scrolls
+  // back to its left edge whenever either changes.
+  const { scrollRef, isScrolled } = useHorizontalScrollShadow(slots[0]?.toISOString())
   const stickyEdgeHidden = isScrolled ? '' : STICKY_COL_SHADOW_HIDDEN
   const { headerRef, headerOffset } = useStickyHeaderOffset()
 
