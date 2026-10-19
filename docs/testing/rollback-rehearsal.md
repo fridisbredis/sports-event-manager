@@ -866,6 +866,19 @@ och allt är återuppladdningsbart av den som äger det, men det ska inte upptä
 mitt i en incident där det ser ut som att återställningen misslyckades. Skrivet
 till runbookens §4 steg 6 och §7.
 
+**Åtgärdat samma dag:** veckobackup-jobbet laddar nu ner båda bucketarna via
+Storage-API:t och lägger dem i samma arkiv som SQL:en, så en slot från vecka 44
+är en komplett återställningspunkt. `restore-prod-db.sh` packar upp dem och
+skriver ut upload-kommandona, men laddar medvetet inte upp själv — skriptets
+hela säkerhetsmodell är att det bara skriver dit anroparen pekat det.
+
+Walk-logiken testades mot lokal stack med tre filer i nästlade mappar, och
+**första versionen hade en bugg**: `entries.txt` var en delad fil som skrevs
+över av det rekursiva anropet mitt i att den yttre loopen läste den. Två av tre
+filer försvann, med exit 0. Rättat till en `local`-variabel + here-string.
+Värt att notera som mönster: en backup som tyst tar en delmängd är farligare än
+en som failar.
+
 **Fynd 5 (åtgärdat) — PITR-fliken bevisar ingenting.** Fliken "Point in time"
 syns på sidan oavsett om tillägget är köpt. Att se den är alltså inte belägg för
 att PITR är på. Förtydligat i §3 så att nästa person inte drar fel slutsats av

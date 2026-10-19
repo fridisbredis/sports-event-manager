@@ -277,3 +277,42 @@ echo "==========================================================================
 echo "RESTORE COMPLETE onto: ${TARGET_DB_URL}"
 echo "Verify row counts / spot-check tables before trusting this restore."
 echo "=============================================================================="
+
+# Storage files, if this archive carries them. Weekly slots from ISO week 44
+# onward include a storage/ directory; anything older (and every
+# pre-migration snapshot) does not, so its absence is normal rather than a
+# fault.
+#
+# They are NOT uploaded automatically. This script's whole safety model is
+# that it writes only to a database target the caller named explicitly, and
+# an upload would have to pick a Storage endpoint on its own — exactly the
+# kind of implicit targeting the prod guard above exists to prevent. So the
+# files are extracted and the operator is told where they are.
+if [ -d "${WORKDIR}/storage" ]; then
+  STORAGE_OUT="./restored-storage-$(date -u +%Y%m%dT%H%M%SZ)"
+  cp -R "${WORKDIR}/storage" "${STORAGE_OUT}"
+  FILE_COUNT=$(find "${STORAGE_OUT}" -type f | wc -l | tr -d ' ')
+
+  echo ""
+  echo "Storage: ${FILE_COUNT} file(s) extracted to ${STORAGE_OUT}"
+  echo ""
+  echo "  The database restore above did NOT put these back. storage.objects"
+  echo "  rows now describe files that may no longer exist in the bucket,"
+  echo "  which renders as broken images rather than missing ones."
+  echo ""
+  echo "  To upload them to a target you choose, deliberately:"
+  echo "    supabase storage cp -r ${STORAGE_OUT}/logos ss:///logos \\"
+  echo "      --project-ref <ref> --experimental"
+  echo "    supabase storage cp -r ${STORAGE_OUT}/avatars ss:///avatars \\"
+  echo "      --project-ref <ref> --experimental"
+  echo ""
+  echo "  <ref> is never implied: the repo's CLI is linked to dev, so an"
+  echo "  omitted --project-ref writes to the wrong environment and succeeds."
+  echo ""
+  echo "  These are prod files. Delete ${STORAGE_OUT} when done — see the"
+  echo "  GDPR note in docs/testing/rollback-rehearsal.md."
+else
+  echo ""
+  echo "Storage: no storage/ directory in this archive (normal for slots"
+  echo "captured before ISO week 44, and for pre-migration snapshots)."
+fi
