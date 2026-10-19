@@ -13,6 +13,7 @@ would still have worked.
 2. Which recovery path — decide this first
 3. Supabase scheduled backups
 4. Restoring from a Supabase backup
+   4b. The weekly slot backups
 5. The pre-migration snapshot path
 6. Restoring a single tenant
 7. Known gaps
@@ -22,18 +23,24 @@ would still have worked.
 | Requirement (card N9)               | Today                                                            |
 | ----------------------------------- | ---------------------------------------------------------------- |
 | Backup at least once per day        | **Met** — Supabase Pro, daily, automatic                         |
-| Kept 30 days                        | **Not met** — retention is 7 days                                |
+| Kept 30 days                        | **Met** — 7 days daily (Supabase) + 4 weekly slots (~28 days)    |
 | System admin can restore one tenant | **Not met** — no UI, no per-tenant restore                       |
 | Restore has been tested             | **Partly** — rehearsed against a local stack, never against prod |
 
-The daily requirement is met by the platform, not by anything in this repo.
-The Supabase organisation (Extrapreneur AB) is on the **Pro** plan, verified
-against the Management API on 2026-10-19, which includes daily automated
-backups with **seven days** of retention.
+Two layers, with deliberately different shapes:
 
-Closing the 7 → 30 day gap costs money — either the PITR add-on or running our
-own nightly dump pipeline — and is Peter's decision. It is tracked on card N9
-and deliberately not decided here.
+**Daily, last 7 days — Supabase Pro.** Run by the platform, not by anything in
+this repo. Fine granularity, short reach. This is what recovers an ordinary
+"we broke something yesterday".
+
+**Weekly, last ~28 days — `.github/workflows/weekly-db-backup.yml`.** Ours.
+Coarse granularity, long reach. This is what recovers a slow corruption nobody
+noticed for a fortnight — the case Supabase's week cannot reach.
+
+Point-in-time recovery would cover both with one mechanism, but it is a paid
+add-on and is deliberately off (REL-04). The weekly job is the cheaper answer
+to the same requirement; if PITR is ever enabled, the weekly job becomes
+redundant and should be deleted rather than left running.
 
 ## 2. Which recovery path — decide this first
 
@@ -41,13 +48,16 @@ and deliberately not decided here.
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | A destructive migration ran against the wrong rows, and you took a snapshot before pushing      | §5 — the pre-migration snapshot. Closest to the damage, smallest loss. |
 | Data loss from something other than a migration (bad write, deletion), discovered within 7 days | §4 — Supabase scheduled backup                                         |
-| Data loss older than 7 days                                                                     | **Nothing to restore from.** See §7.                                   |
+| Data loss between 7 and ~28 days old                                                            | §4b — the weekly slot backups                                          |
+| Data loss older than ~28 days                                                                   | **Nothing to restore from.** See §7.                                   |
 | One tenant's data is wrong, every other tenant is fine                                          | §6 — read it before touching anything                                  |
 
-**The deciding question is when, not what.** Supabase's backups go back seven
-days and no further. If the loss is older than that, no procedure in this
-document recovers it, and the sooner that is known the sooner the conversation
-turns to what can be reconstructed by other means.
+**The deciding question is when, not what.** Within a week, Supabase's daily
+backups give you a choice of days. Beyond that, the weekly slots give you a
+choice of weeks — losing up to seven days of writes is the price of reaching
+back that far. Beyond ~28 days nothing recovers it, and the sooner that is
+known the sooner the conversation turns to what can be reconstructed by other
+means.
 
 ## 3. Supabase scheduled backups
 
@@ -114,6 +124,58 @@ night's backup exists, open the link and look.
 5. **Bring the app back up** and confirm login works end to end — the auth
    schema is part of the restore, so sessions issued before it are invalid.
 
+## 4b. The weekly slot backups
+
+`.github/workflows/weekly-db-backup.yml` dumps prod every Sunday at 03:17 UTC
+and uploads it to Azure Blob Storage, container `db-snapshots`, as one of four
+rotating slots:
+
+```
+weekly-slot-0.tar.gz
+weekly-slot-1.tar.gz
+weekly-slot-2.tar.gz
+weekly-slot-3.tar.gz
+```
+
+The slot is the ISO week number mod 4, so week 42 writes slot 2, week 43 slot
+3, and week 46 overwrites slot 2 again. **There are always exactly four, and
+the oldest is overwritten by the newest** — the retention policy lives in the
+names, so nothing has to delete anything.
+
+**Which slot is newest?** Not obvious from the names, by design — they rotate.
+Each blob carries metadata with the ISO week and capture timestamp:
+
+```
+az storage blob metadata show \
+  --connection-string "$BLOB_CONN_STR" \
+  --container-name db-snapshots --name weekly-slot-2.tar.gz
+```
+
+Or list all four with their upload times:
+
+```
+az storage blob list --connection-string "$BLOB_CONN_STR" \
+  --container-name db-snapshots --prefix weekly-slot \
+  --query "[].{name:name, modified:properties.lastModified}" -o table
+```
+
+**Restoring one** is the same procedure as §5 — same three files, same script:
+
+```
+scripts/ops/restore-prod-db.sh weekly-slot-2.tar.gz <target-db-url>
+```
+
+Remember the granularity: a weekly backup can be up to seven days stale. Check
+its capture timestamp against when the damage started before choosing it over
+a daily one.
+
+**If the job fails**, the slot it was writing keeps last cycle's contents —
+the upload only happens after the dump is verified non-empty, so a failed run
+leaves a four-week-old backup in place rather than an empty file. That is the
+intended failure mode, but it means a silently failing job degrades coverage
+without any slot looking wrong. Check the workflow's run history if the dates
+on the slots look stale.
+
 ## 5. The pre-migration snapshot path
 
 `scripts/ops/snapshot-prod-db.sh` takes a full roles + schema + data dump to
@@ -173,10 +235,14 @@ Building this properly is the open half of card N9.
 
 ## 7. Known gaps
 
-- **Retention is 7 days, not 30.** Anything older is unrecoverable. Cost
-  decision, on card N9, Peter's call.
-- **No PITR.** Granularity is one backup per day. A loss at 23:00 costs a full
-  day of writes, not a few minutes.
+- **Coverage ends at ~28 days.** Anything older is unrecoverable.
+- **No PITR.** Granularity is one backup per day within the first week, and one
+  per week beyond it. A loss at 23:00 costs a full day of writes, not a few
+  minutes — and reaching back three weeks costs up to seven days.
+- **Nothing alerts on a failed weekly job.** A failing run leaves the previous
+  cycle's blob in that slot, so coverage degrades quietly. GitHub emails the
+  repo owner on a failed scheduled workflow by default; that is the only
+  signal, and it is worth confirming it actually arrives.
 - **No per-tenant restore.** §6.
 - **No restore has ever been performed against prod.** `docs/testing/rollback-rehearsal.md`
   covers a rehearsal against a local stack, which verifies the script, not the
