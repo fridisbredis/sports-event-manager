@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { stripE164Plus, toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
@@ -12,6 +12,7 @@ import {
   type RateLimitResult,
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
+import { recordSmsUsage } from '@/lib/sms/usage'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 const resendSchema = z.object({
@@ -203,12 +204,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // Only the send is inside this try. The client and the sender number were resolved
   // above, so nothing that reaches the catch below is a fault of our own configuration.
   try {
-    await client.messages.create({
+    const message = await client.messages.create({
       body: smsBody,
       from: fromNumber,
       to: toTwilioE164(official.phone),
     })
+    // N11 usage accounting. sms_usage is revoked from `authenticated`, so this
+    // needs the service client even though the rest of the route is RLS-scoped
+    // — the tenant was already authorised by requireTenantAdmin above.
+    await recordSmsUsage({
+      service: createSupabaseServiceClient(),
+      tenantId: parsed.data.tenantId,
+      kind: 'invite_resend',
+      message,
+      status: 'sent',
+      op: 'POST /api/officials/[id]/resend',
+    })
   } catch (err) {
+    await recordSmsUsage({
+      service: createSupabaseServiceClient(),
+      tenantId: parsed.data.tenantId,
+      kind: 'invite_resend',
+      message: null,
+      status: 'failed',
+      op: 'POST /api/officials/[id]/resend',
+    })
     // Log the DB-generated id and Twilio's numeric code only - never the raw error,
     // which can echo the submitted phone number back into the logs.
     //

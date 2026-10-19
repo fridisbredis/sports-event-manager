@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
 import twilio from 'twilio'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { recordSmsUsage } from '@/lib/sms/usage'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -13,6 +14,14 @@ vi.mock('@/lib/auth/tenant', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  // N11 usage accounting writes with the service client: sms_usage is revoked
+  // from `authenticated`, so this route needs one even though the rest of it
+  // is RLS-scoped.
+  createSupabaseServiceClient: vi.fn(() => ({})),
+}))
+
+vi.mock('@/lib/sms/usage', () => ({
+  recordSmsUsage: vi.fn(),
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -182,6 +191,69 @@ describe('POST /api/officials/[id]/resend', () => {
       from: '+15550001111',
       to: '+46701234567',
     })
+  })
+
+  // N11: a resend costs the tenant money, so it has to reach the usage ledger.
+  // An uncounted send path is invisible until the SEK total disagrees with the
+  // Twilio invoice and nobody can say which route is missing.
+  it('records the resend against the tenant, with the segment count Twilio reported', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+        })
+      )
+      .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+    messagesCreate.mockResolvedValueOnce({ sid: 'SM1', numSegments: '2' })
+
+    await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(recordSmsUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        kind: 'invite_resend',
+        status: 'sent',
+        message: expect.objectContaining({ numSegments: '2' }),
+      })
+    )
+  })
+
+  it('records a failed resend, which the cap must see as an attempt', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+        })
+      )
+      .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+    messagesCreate.mockRejectedValueOnce(Object.assign(new Error('nope'), { code: 21211 }))
+
+    await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(recordSmsUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        kind: 'invite_resend',
+        status: 'failed',
+        message: null,
+      })
+    )
   })
 
   // Mirrors the create route: N19 pinned the invite SMS to English rather than

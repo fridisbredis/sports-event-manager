@@ -15,6 +15,7 @@ import {
   type RateLimitResult,
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
+import { recordSmsUsage } from '@/lib/sms/usage'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
@@ -290,13 +291,29 @@ export async function POST(request: NextRequest) {
   let smsSent = true
   try {
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-    await client.messages.create({
+    const message = await client.messages.create({
       body: smsBody,
       from: process.env.TWILIO_PHONE_NUMBER!,
       to: toTwilioE164(phone),
     })
+    await recordSmsUsage({
+      service,
+      tenantId,
+      kind: 'invite',
+      message,
+      status: 'sent',
+      op: 'POST /api/officials',
+    })
   } catch (err) {
     smsSent = false
+    await recordSmsUsage({
+      service,
+      tenantId,
+      kind: 'invite',
+      message: null,
+      status: 'failed',
+      op: 'POST /api/officials',
+    })
     await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     // Log the DB-generated id and Twilio's numeric code only — never the raw error,
     // which can echo the submitted phone number back into the logs.
