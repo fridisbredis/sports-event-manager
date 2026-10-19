@@ -111,12 +111,46 @@ export function slotEndTime(slot: Date, granularityMin: number): Date {
 
 export function isWithinWindow(slot: Date, granMin: number, windows: OperatingWindow[]): boolean {
   if (windows.length === 0) return true
-  const slotEnd = slotEndTime(slot, granMin)
-  return windows.some((w) => {
-    const wStart = new Date(w.window_start)
-    const wEnd = new Date(w.window_end)
-    return slot >= wStart && slotEnd <= wEnd
-  })
+
+  const slotStartMs = slot.getTime()
+  const slotEndMs = slotEndTime(slot, granMin).getTime()
+
+  // Covered by the windows TOGETHER, not by any single one.
+  //
+  // A round-the-clock work area is stored as one window per calendar day
+  // (expandWindows in admin/workstations/_utils.ts builds them that way), so
+  // its windows meet exactly at midnight: 16th 00:00→17th 00:00, 17th
+  // 00:00→18th 00:00. A slot that straddles that seam — 23:15→00:15 at
+  // 60-minute granularity — fits inside NEITHER window, and asking "does any
+  // one window contain it" hatched it as closed even though the area is open
+  // continuously on both sides of it.
+  //
+  // So: sort the windows, walk them merging any that touch or overlap, and
+  // ask whether one merged run covers the slot end to end. Windows that do
+  // not meet still leave a real gap, and a slot falling in one is still
+  // closed — which is the case this check exists for.
+  const sorted = [...windows]
+    .map((w) => ({
+      start: new Date(w.window_start).getTime(),
+      end: new Date(w.window_end).getTime(),
+    }))
+    .sort((a, b) => a.start - b.start)
+
+  let runStart = sorted[0].start
+  let runEnd = sorted[0].end
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].start <= runEnd) {
+      // Touches or overlaps the run in progress — extend it.
+      runEnd = Math.max(runEnd, sorted[i].end)
+      continue
+    }
+    if (slotStartMs >= runStart && slotEndMs <= runEnd) return true
+    runStart = sorted[i].start
+    runEnd = sorted[i].end
+  }
+
+  return slotStartMs >= runStart && slotEndMs <= runEnd
 }
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
