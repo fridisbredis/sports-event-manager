@@ -299,6 +299,55 @@ describe('isWithinWindow', () => {
   it('allows any slot when no operating windows are configured', () => {
     expect(isWithinWindow(new Date('2026-08-10T23:00:00.000Z'), 30, [])).toBe(true)
   })
+
+  // A round-the-clock work area is stored as one window per calendar day
+  // (expandWindows in admin/workstations/_utils.ts), so its windows meet
+  // exactly at midnight rather than forming one long span. A slot straddling
+  // that seam fits inside neither window on its own.
+  describe('across adjacent windows', () => {
+    const roundTheClock = [
+      { window_start: '2026-10-16T00:00:00.000Z', window_end: '2026-10-17T00:00:00.000Z' },
+      { window_start: '2026-10-17T00:00:00.000Z', window_end: '2026-10-18T00:00:00.000Z' },
+    ]
+
+    it('allows a slot straddling the seam between two touching windows', () => {
+      // 23:15 + 60min = 00:15 — past the first window's end, before the
+      // second's start. The area is open continuously; the cell must not be
+      // hatched as closed.
+      expect(isWithinWindow(new Date('2026-10-16T23:15:00.000Z'), 60, roundTheClock)).toBe(true)
+    })
+
+    it('allows a slot that lands exactly on the seam', () => {
+      expect(isWithinWindow(new Date('2026-10-17T00:00:00.000Z'), 60, roundTheClock)).toBe(true)
+    })
+
+    it('still blocks a slot straddling a real gap between windows', () => {
+      // The check's actual purpose: a genuine closure between two shifts.
+      const withGap = [
+        { window_start: '2026-10-16T08:00:00.000Z', window_end: '2026-10-16T12:00:00.000Z' },
+        { window_start: '2026-10-16T13:00:00.000Z', window_end: '2026-10-16T17:00:00.000Z' },
+      ]
+      expect(isWithinWindow(new Date('2026-10-16T11:30:00.000Z'), 60, withGap)).toBe(false)
+      expect(isWithinWindow(new Date('2026-10-16T12:00:00.000Z'), 60, withGap)).toBe(false)
+    })
+
+    it('merges overlapping windows as well as touching ones', () => {
+      const overlapping = [
+        { window_start: '2026-10-16T08:00:00.000Z', window_end: '2026-10-16T12:00:00.000Z' },
+        { window_start: '2026-10-16T11:00:00.000Z', window_end: '2026-10-16T16:00:00.000Z' },
+      ]
+      expect(isWithinWindow(new Date('2026-10-16T11:30:00.000Z'), 60, overlapping)).toBe(true)
+    })
+
+    it('does not depend on the windows arriving in chronological order', () => {
+      const reversed = [...roundTheClock].reverse()
+      expect(isWithinWindow(new Date('2026-10-16T23:15:00.000Z'), 60, reversed)).toBe(true)
+    })
+
+    it('still blocks a slot outside every window', () => {
+      expect(isWithinWindow(new Date('2026-10-18T00:30:00.000Z'), 60, roundTheClock)).toBe(false)
+    })
+  })
 })
 
 describe('getCurrentStage', () => {
