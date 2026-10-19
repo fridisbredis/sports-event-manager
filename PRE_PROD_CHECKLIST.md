@@ -93,8 +93,10 @@ Living document. Tick items as they're completed. Last updated: 2026-08-06.
 
 ### Backup and disaster recovery
 
-- [ ] Verify Supabase plan is Pro (has Point-in-Time Recovery) before launch
-- [ ] Document restore procedure from Supabase backup
+- [x] Verify Supabase plan is Pro before launch — **confirmed 2026-10-19** (Extrapreneur AB org, Management API). Note the parenthetical this line used to carry was wrong: Pro does **not** include Point-in-Time Recovery. PITR is a paid add-on and is deliberately off (REL-04). Pro gives daily automated backups with **7 days** retention, not the 30 days card N9 asks for — closing that gap costs money and is Peter's call.
+- [x] Document restore procedure from Supabase backup — `docs/ops/backup-and-restore.md`. Surfaced in SYS-03, which states the facts and links to the dashboard rather than asserting a status it cannot verify.
+- [ ] Perform a restore against prod at least once, or accept that the first one happens during an incident (gap §7 of the runbook)
+- [ ] Decide the 7 → 30 day retention question (card N9): PITR add-on, own nightly pipeline, or accept 7 days
 - [ ] Document rollback procedure for bad deployments (re-deploy previous Docker tag)
 
 ---

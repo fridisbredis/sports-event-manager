@@ -488,6 +488,16 @@
       "allProjects": "All projects",
       "openInDashboard": "Open in Supabase Dashboard"
     },
+    "backups": {
+      "title": "Database backups",
+      "frequency": "Frequency",
+      "daily": "Daily, automatic",
+      "retention": "Retention",
+      "days": "{{count}} days",
+      "plan": "Supabase plan",
+      "viewBackups": "View backups in Supabase",
+      "note": "Provided by the Supabase platform, not by this app — which is why no status is shown. Nothing here can confirm last night's backup ran; the dashboard is the source of truth. Retention is shorter than the 30 days the requirement asks for."
+    },
     "twilio": {
       "title": "Twilio",
       "fromNumber": "Sender number",

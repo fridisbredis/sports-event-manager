@@ -91,6 +91,51 @@ describe('SystemHealthPage', () => {
     expect((sentryCard?.props as { status?: string })?.status).toBe('ok')
   })
 
+  // N9. The backup card reports facts about the platform's own schedule, not a
+  // probe — this app has no credential that could check last night's run.
+  describe('database backups card', () => {
+    it('reports no status rather than asserting an unverified ok', async () => {
+      const result = await SystemHealthPage()
+
+      const card = findByTitle(result, 'Database backups')
+      // 'unknown' is the point: a green tick built from a constant would be a
+      // claim nobody checked, on a page an operator reads during an incident.
+      expect((card?.props as { status?: string })?.status).toBe('unknown')
+    })
+
+    it('states the retention the plan actually gives', async () => {
+      const result = await SystemHealthPage()
+
+      const card = findByTitle(result, 'Database backups')
+      const facts = (card?.props as { facts?: { label: string; value: string }[] })?.facts
+
+      // Seven days, not the thirty the requirement asks for. If this ever
+      // silently became "30 days" without the plan changing, the page would be
+      // telling an operator they have three weeks of recovery they do not have.
+      expect(facts).toContainEqual({ label: 'Retention', value: '7 days' })
+    })
+
+    it("links to the project's own backup list", async () => {
+      const result = await SystemHealthPage()
+
+      const card = findByTitle(result, 'Database backups')
+      const links = (card?.props as { links?: { href: string }[] })?.links
+
+      // Scoped to the project the app is pointed at, not a hardcoded prod ref:
+      // the health page must describe whichever environment it is running in.
+      expect(links?.[0].href).toContain('test-project')
+      expect(links?.[0].href).toContain('/database/backups')
+    })
+
+    it('is hidden on a local stack, which has no scheduled backups', async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321'
+
+      const result = await SystemHealthPage()
+
+      expect(findByTitle(result, 'Database backups')).toBeUndefined()
+    })
+  })
+
   it('renders one row per deploy workflow, linked to the run', async () => {
     vi.mocked(fetchGitHubActionsStatus).mockResolvedValue({
       status: 'error',
