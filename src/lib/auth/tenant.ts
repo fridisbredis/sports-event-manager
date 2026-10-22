@@ -4,6 +4,7 @@ import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuthEvent } from '@/lib/audit/log-auth-event'
+import { sendAvailabilityConfirmSms } from '@/lib/sms/availability-confirm'
 import { adminDashboardCacheTag, officialHomeCacheTag } from '@/lib/cache/tags'
 import { logger } from '@/lib/logger'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
@@ -235,6 +236,22 @@ export async function confirmOfficialInvite(
     .maybeSingle()
 
   if (tenantError) return null
+
+  // N16: the phone-fallback flow is where this SMS is unambiguously useful —
+  // this official never saw an invite link, so a link into the app is new
+  // information rather than a pointer at the page they are already on.
+  //
+  // Awaited, not fire-and-forget: the only caller redirects immediately after
+  // this returns and Next's redirect() throws, so a send started here would
+  // otherwise race the redirect. sendAvailabilityConfirmSms swallows its own
+  // failures, so awaiting cannot turn a committed confirmation into an error.
+  await sendAvailabilityConfirmSms({
+    service,
+    tenantId,
+    tenantSlug: tenant?.slug,
+    phone,
+    op: 'confirmOfficialInvite',
+  })
 
   return tenant?.slug ?? null
 }

@@ -6,6 +6,7 @@ import { officialHomeCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { z } from 'zod'
 import { logQueryError } from '@/lib/db/query-error'
 import { locales } from '@/lib/i18n/config'
+import { sendAvailabilityConfirmSms } from '@/lib/sms/availability-confirm'
 
 const confirmSchema = z.object({
   token: z.string().uuid(),
@@ -192,6 +193,23 @@ export async function POST(request: NextRequest) {
     .select('slug')
     .eq('id', tenantId)
     .maybeSingle()
+
+  // N16: a confirmation SMS whose value is not what it does on arrival — the
+  // recipient is signed in and looking at this very page — but that the link
+  // sits in their message history afterwards, so they reopen the app from
+  // their SMS thread instead of typing a URL.
+  //
+  // Everything below is best-effort: the confirmation has already committed,
+  // so neither a missing slug, an opted-out official nor a dead Twilio may
+  // turn a successful confirmation into a failed request.
+  await sendAvailabilityConfirmSms({
+    service,
+    tenantId,
+    tenantSlug: tenant?.slug,
+    phone: user.phone,
+    name,
+    op: 'POST /api/officials/confirm',
+  })
 
   // The confirmation itself already committed, so this must not fail the
   // request — but a missing slug drops the caller's post-confirm redirect, so
