@@ -31,15 +31,28 @@
 /**
  * SEK per SMS segment to Swedish mobile numbers.
  *
- * Deliberately NOT a verified figure. Twilio's Swedish outbound SMS price is
- * quoted in USD and varies by destination operator, and nobody has yet
- * confirmed what this account is actually charged — see the open question on
- * card N11. The fallback below is a placeholder of the right order of
- * magnitude so the measurement work is not blocked on a price lookup; it must
- * be replaced with a real figure before any number from here is shown as
- * money to anyone, let alone used to enforce a cap.
+ * MEASURED, no longer a guess (2026-10-22). Twilio's own usage summary for
+ * September 2026 shows $1.81 across 28 outbound segments on this account —
+ * $0.0646 per segment. At around 10.8 SEK/USD that is 0.70 SEK, which is the
+ * figure below.
+ *
+ * Rounded slightly UP rather than to the 0.65 that today's rate gives exactly.
+ * The price is quoted in USD and the exchange rate moves, and a rate that is
+ * a little high stops a tenant marginally early, while one that is too low
+ * lets them run past the cap without anyone noticing. Early is the right
+ * direction for this error to point.
+ *
+ * Two things it does NOT cover, both deliberate:
+ *   - Login OTP, which Supabase Auth sends through its own Twilio
+ *     credentials. It appears on the invoice but never in sms_usage, so the
+ *     per-tenant figure is an undercount. See cap.ts.
+ *   - Phone number rental, which is a fixed monthly cost per number ($3 each,
+ *     measured the same day) and not per segment. It belongs to N13, not here.
+ *
+ * Set SMS_SEK_PER_SEGMENT to override without a deploy when Twilio's pricing
+ * or the exchange rate moves enough to matter.
  */
-const FALLBACK_SEK_PER_SEGMENT = 0.75
+const FALLBACK_SEK_PER_SEGMENT = 0.7
 
 export function sekPerSegment(): number {
   const configured = Number(process.env.SMS_SEK_PER_SEGMENT)

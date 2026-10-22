@@ -72,24 +72,35 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 
 ### `SMS_SEK_PER_SEGMENT` — the rate the N24 cap enforces on
 
-Optional env var. Unset, the app falls back to a **placeholder** of 0.75
-SEK/segment (`src/lib/sms/cost.ts`), which is a guess of the right order of
-magnitude and nothing more.
+Optional env var. Unset, the app uses **0.70 SEK/segment**
+(`src/lib/sms/cost.ts`).
 
-This mattered little while N11 only measured. It matters now: N24 stops a
-tenant's invites and announcements when its month-to-date spend reaches the
-tier cap, and that spend is `segments × this rate`. A rate that is too high
-stops a tenant early; too low lets them run past the limit. Both are silent.
+**Measured, not guessed (2026-10-22).** Twilio's usage summary for September
+2026 on this account: **$1.81 across 28 outbound segments = $0.0646 per
+segment**, which is about 0.70 SEK at ~10.8 SEK/USD. Verify it the same way —
+Console → **Monitor → Usage → Usage summary**, pick a month with real traffic,
+expand _Programmable Messaging → SMS → Outbound SMS_, and divide spend by
+segments. That is what the account was actually charged, which the public
+price list is not.
 
-**Still to confirm:** what this account is actually charged for a Swedish
-outbound segment. Twilio quotes Sweden in USD and the price varies by
-destination operator, so the figure has to come from the console or an
-invoice, not from the public price list. Once known, set it as a GitHub secret
-per environment and pass it through like the other runtime vars.
+Rounded slightly up from the 0.65 today's exchange rate gives exactly. The
+price is quoted in USD and the rate moves; a rate that is a little high stops
+a tenant marginally early, while one that is too low lets them past the cap
+unnoticed. Early is the right direction for the error.
 
-Anything that displays a SEK figure must say when it rests on the fallback —
-`isUsingFallbackRate()` exists for exactly that, and the cap's log lines
-already append `(placeholder per-segment rate)`.
+Set the env var to override without a deploy when pricing or the exchange rate
+moves enough to matter. `isUsingFallbackRate()` reports whether the built-in
+figure is in use, and the cap's log lines say so.
+
+**Two costs this rate does not cover**, both deliberate:
+
+- **Login OTP.** Sent by Supabase Auth through its own Twilio credentials, so
+  it lands on the invoice but never in `sms_usage`. Every per-tenant figure is
+  an undercount by that much.
+- **Phone number rental.** A fixed **$3 per number per month** (3 numbers =
+  $9.00 in the same September summary — more than all the message traffic put
+  together, which was $1.81). It is not per-segment and does not belong in
+  this rate; it belongs to N13's dedicated-sender decision.
 
 ## GitHub Secrets
 

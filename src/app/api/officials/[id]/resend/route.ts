@@ -177,7 +177,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     logger.warn(
       `Invite resend blocked by N24 monthly cap: tenant=${parsed.data.tenantId} ` +
         `spentSek=${capStatus.spentSek} capSek=${capStatus.capSek}` +
-        (capStatus.usingFallbackRate ? ' (placeholder per-segment rate)' : '')
+        (capStatus.usingFallbackRate
+          ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+          : '')
     )
     return NextResponse.json({ error: 'Monthly SMS limit reached' }, { status: 429 })
   }

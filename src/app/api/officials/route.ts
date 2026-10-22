@@ -322,7 +322,9 @@ export async function POST(request: NextRequest) {
     logger.warn(
       `Invite SMS blocked by N24 monthly cap: tenant=${tenantId} ` +
         `spentSek=${capStatus.spentSek} capSek=${capStatus.capSek}` +
-        (capStatus.usingFallbackRate ? ' (placeholder per-segment rate)' : '')
+        (capStatus.usingFallbackRate
+          ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+          : '')
     )
   } else {
     // The client is constructed inside the try on purpose: twilio() throws synchronously

@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
       logger.warn(
         `Announcement SMS blocked by N24 monthly cap: tenant=${tenantId} ` +
           `spentSek=${status.spentSek} capSek=${status.capSek}` +
-          (status.usingFallbackRate ? ' (placeholder per-segment rate)' : '')
+          (status.usingFallbackRate
+            ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+            : '')
       )
     }
   }
