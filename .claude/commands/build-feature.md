@@ -4,6 +4,16 @@ Context:
 @skills/auth-flow.md
 @skills/ui-system.md
 
+Plan first (before anything else):
+
+- Call EnterPlanMode as the very first action of this command, before reading
+  files or running anything. Don't skip it because the task looks small, and
+  don't ask whether to plan — just enter.
+- If plan mode is already active, this is a no-op. Entering twice is harmless;
+  not entering is the failure mode this guards against.
+- Then explore, and present the plan for approval via ExitPlanMode. No edits,
+  migrations or commands that change state until the plan is approved.
+
 Task:
 Build feature:
 {{description}}
@@ -23,12 +33,11 @@ Process:
 
 1. Analyze the feature request
 2. Ask clarifying questions if anything is unclear
-3. Propose a short implementation plan (steps + affected files)
-4. Wait for approval before writing code
-5. Implement step-by-step with minimal changes
-6. If DB changes needed: write migration, show SQL, wait for approval before executing
-7. Write Vitest tests for any new non-trivial logic (see Tests below)
-8. Run `npm test` and `npm run format` on changed files before considering the feature done
+3. The plan (steps + affected files) goes through plan mode — see "Plan first" above
+4. Implement step-by-step with minimal changes
+5. If DB changes needed: write migration, show SQL, wait for approval before executing
+6. Write Vitest tests for any new non-trivial logic (see Tests below)
+7. Run `npm test` and `npm run format` on changed files before considering the feature done
 
 Screen IDs (use in commit messages):
 EVT-01/02, WS-01/02, OFF-01, SCHED-01, COMM-01, ACCT-01, AUTH-01/02,
