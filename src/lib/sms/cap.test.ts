@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { readSmsCapStatus, isSmsBlockedByCap } from './cap'
+import { readSmsCapStatus, isSmsBlockedByCap, readAllTenantSmsUsage } from './cap'
 
 vi.mock('@/lib/db/query-error', () => ({ logQueryError: vi.fn() }))
 
@@ -22,7 +22,7 @@ const row = (segments: number, status = 'sent') => ({ segments, status })
 beforeEach(() => {
   // A known rate, so the SEK assertions below are about the cap logic rather
   // than about whatever the placeholder happens to be.
-  vi.stubEnv('SMS_SEK_PER_SEGMENT', '1')
+  vi.stubEnv('SMS_COST_PER_SEGMENT', '1')
 })
 
 afterEach(() => {
@@ -41,8 +41,12 @@ describe('readSmsCapStatus', () => {
     })
 
     expect(status).toEqual({
-      spentSek: 15,
-      capSek: 100,
+      spentAmount: 15,
+      // Carried through from totalUsage so the detail page can show the
+      // billable unit without a second query.
+      segments: 15,
+      failed: 0,
+      capAmount: 100,
       exceeded: false,
       fraction: 0.15,
       usingFallbackRate: false,
@@ -59,7 +63,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(professional?.capSek).toBe(300)
+    expect(professional?.capAmount).toBe(300)
   })
 
   it('treats an unrecognised tier as the lowest cap, not as uncapped', async () => {
@@ -72,7 +76,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(status?.capSek).toBe(100)
+    expect(status?.capAmount).toBe(100)
   })
 
   it('counts failed sends as costing nothing', async () => {
@@ -86,7 +90,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(status?.spentSek).toBe(10)
+    expect(status?.spentAmount).toBe(10)
     expect(status?.exceeded).toBe(false)
   })
 
@@ -100,7 +104,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(status?.spentSek).toBe(100)
+    expect(status?.spentAmount).toBe(100)
     expect(status?.exceeded).toBe(true)
   })
 
@@ -118,7 +122,7 @@ describe('readSmsCapStatus', () => {
   })
 
   it('flags when the figures rest on the placeholder rate', async () => {
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '')
     const { client } = serviceStub({ data: [] })
 
     const status = await readSmsCapStatus({
@@ -201,5 +205,88 @@ describe('isSmsBlockedByCap', () => {
     await expect(
       isSmsBlockedByCap({ service: client, tenantId: 't1', tier: 'standard', op: 'test' })
     ).resolves.toBe(false)
+  })
+})
+
+describe('readAllTenantSmsUsage', () => {
+  function multiStub(result: { data?: unknown[]; error?: unknown }) {
+    const gte = vi
+      .fn()
+      .mockResolvedValue({ data: result.data ?? null, error: result.error ?? null })
+    const inFn = vi.fn(() => ({ gte }))
+    const select = vi.fn(() => ({ in: inFn }))
+    const from = vi.fn(() => ({ select }))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { client: { from } as any, from, inFn, gte }
+  }
+
+  const TENANTS = [
+    { id: 't1', name: 'Viadal 2026', tier: 'professional' },
+    { id: 't2', name: 'Micke testar', tier: 'premium' },
+    { id: 't3', name: 'Eddo testar', tier: 'standard' },
+  ]
+
+  it('reads every tenant in ONE query, not one per tenant', () => {
+    // The point of this function. A loop issuing a query per tenant looks
+    // fine at three and is quietly doing fifty later.
+    const { client, from, inFn } = multiStub({ data: [] })
+
+    return readAllTenantSmsUsage({ service: client, tenants: TENANTS, op: 'test' }).then(() => {
+      expect(from).toHaveBeenCalledTimes(1)
+      expect(inFn).toHaveBeenCalledWith('tenant_id', ['t1', 't2', 't3'])
+    })
+  })
+
+  it('attributes rows to the right tenant and applies each ones own tier cap', async () => {
+    const { client } = multiStub({
+      data: [
+        { tenant_id: 't1', segments: 10, status: 'sent' },
+        { tenant_id: 't3', segments: 200, status: 'sent' },
+        { tenant_id: 't1', segments: 5, status: 'sent' },
+      ],
+    })
+
+    const rows = await readAllTenantSmsUsage({ service: client, tenants: TENANTS, op: 'test' })
+
+    expect(rows).toHaveLength(3)
+    const [viadal, micke, eddo] = rows!
+
+    expect(viadal).toMatchObject({
+      tenantId: 't1',
+      spentAmount: 15,
+      capAmount: 300,
+      exceeded: false,
+    })
+    expect(micke).toMatchObject({ tenantId: 't2', spentAmount: 0, capAmount: 200, exceeded: false })
+    expect(eddo).toMatchObject({ tenantId: 't3', spentAmount: 200, capAmount: 100, exceeded: true })
+  })
+
+  it('returns tenants with no usage at zero rather than omitting them', async () => {
+    // A tenant missing from the list reads as a tenant that is missing, not
+    // as one that has sent nothing.
+    const { client } = multiStub({ data: [{ tenant_id: 't1', segments: 1, status: 'sent' }] })
+
+    const rows = await readAllTenantSmsUsage({ service: client, tenants: TENANTS, op: 'test' })
+
+    expect(rows!.map((r) => r.tenantId)).toEqual(['t1', 't2', 't3'])
+    expect(rows!.filter((r) => r.spentAmount === 0)).toHaveLength(2)
+  })
+
+  it('returns null when usage cannot be read, rather than a table of zeroes', async () => {
+    // Zeroes would be indistinguishable from a genuinely quiet month.
+    const { client } = multiStub({ error: { message: 'boom' } })
+
+    await expect(
+      readAllTenantSmsUsage({ service: client, tenants: TENANTS, op: 'test' })
+    ).resolves.toBeNull()
+  })
+
+  it('does not query at all for an empty tenant list', async () => {
+    const { client, from } = multiStub({ data: [] })
+
+    await expect(
+      readAllTenantSmsUsage({ service: client, tenants: [], op: 'test' })
+    ).resolves.toEqual([])
+    expect(from).not.toHaveBeenCalled()
   })
 })

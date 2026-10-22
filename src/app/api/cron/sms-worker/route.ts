@@ -118,9 +118,9 @@ export async function POST(request: NextRequest) {
       cappedTenants.add(tenantId)
       logger.warn(
         `Announcement SMS blocked by N24 monthly cap: tenant=${tenantId} ` +
-          `spentSek=${status.spentSek} capSek=${status.capSek}` +
+          `spent=${status.spentAmount} cap=${status.capAmount}` +
           (status.usingFallbackRate
-            ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+            ? ' (built-in per-segment rate, SMS_COST_PER_SEGMENT unset)'
             : '')
       )
     }
