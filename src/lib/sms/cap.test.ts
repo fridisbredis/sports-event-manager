@@ -42,6 +42,10 @@ describe('readSmsCapStatus', () => {
 
     expect(status).toEqual({
       spentSek: 15,
+      // Carried through from totalUsage so the detail page can show the
+      // billable unit without a second query.
+      segments: 15,
+      failed: 0,
       capSek: 100,
       exceeded: false,
       fraction: 0.15,

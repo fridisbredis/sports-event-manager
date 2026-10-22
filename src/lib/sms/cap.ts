@@ -45,6 +45,16 @@ export type CappedSmsKind = 'invite' | 'invite_resend' | 'announcement'
 export interface SmsCapStatus {
   /** SEK spent this calendar month, derived from recorded segments. */
   spentSek: number
+  /**
+   * Billable segments behind spentSek. The kronor are derived from this, so
+   * anyone checking a figure against a Twilio invoice needs the segments
+   * rather than the conversion — totalUsage already counts them, and
+   * discarding them here would mean a second query to get them back.
+   */
+  segments: number
+  /** Messages Twilio refused. They cost nothing, but a tenant generating
+   *  hundreds of them has a problem worth seeing. */
+  failed: number
   /** The tier's monthly allowance in SEK. */
   capSek: number
   /** Whether the cap has been reached — at or over, not merely approaching. */
@@ -131,6 +141,8 @@ export async function readSmsCapStatus({
 
   return {
     spentSek: totals.sek,
+    segments: totals.segments,
+    failed: totals.failed,
     capSek,
     exceeded: totals.sek >= capSek,
     fraction,
@@ -236,6 +248,8 @@ export async function readAllTenantSmsUsage({
       tenantName: tenant.name,
       tier: tenant.tier,
       spentSek: totals.sek,
+      segments: totals.segments,
+      failed: totals.failed,
       capSek,
       exceeded: totals.sek >= capSek,
       fraction: capSek > 0 ? Math.min(totals.sek / capSek, 1) : 1,

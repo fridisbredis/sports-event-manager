@@ -10,6 +10,8 @@ function usage(overrides = {}) {
     tenantName: 'Viadal 2026',
     tier: 'professional',
     spentSek: 56,
+    segments: 80,
+    failed: 0,
     capSek: 300,
     exceeded: false,
     fraction: 0.19,
