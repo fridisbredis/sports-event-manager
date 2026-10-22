@@ -8,23 +8,49 @@ DESIGN PRINCIPLES:
 - Official shell: mobile-first, glanceable, one clear thing per screen
 - Color is reserved for actions and status, never decoration
 
-COLOR SYSTEM:
-Colors are per-tenant, not static. Palettes live in `src/lib/theme/tenant-colors.ts` as `TENANT_PALETTES` ('blue' | 'green' | 'orange'), each an `{ primary, secondary, accent }` triplet in raw `"H S% L%"` form (no `hsl()` wrapper). `src/lib/theme/tenant-theme-style.tsx` picks the tenant's palette and injects it as CSS vars via a `<style>` tag:
+DESIGN TOKENS:
+`tailwind.config.ts` defines the shared tokens (sourced from
+`docs/design_handoff_admin_dashboard/README.md`). These are real Tailwind
+classes — use them:
 
-:root {
---heroui-primary: 212 100% 47%;
---heroui-secondary: 291 64% 42%;
---heroui-accent: 199 89% 48%;
-}
+- `ink` / `ink-soft` / `ink-muted` / `ink-label` / `ink-faint` — text hierarchy
+- `surface` — the page ground admin surfaces sit on, and inset wells
+- `edge` / `edge-field` / `edge-soft` — borders and dividers
+- `status-ok-*`, `status-pending-*`, `status-neutral-*` — tenant-independent
+  status colors (a confirmed badge must read the same in every theme)
+- `destructive` / `destructive-solid` / `destructive-hover` — destructive text
+  and buttons. Deliberately NOT named `danger`: extending `danger` would
+  replace HeroUI's own palette wholesale and break `color="danger"` buttons.
+- `rounded-card` / `rounded-card-sm` / `rounded-control`, `shadow-card`,
+  `shadow-modal`, `tracking-tight` / `tracking-label`
 
-Reference these as `hsl(var(--heroui-accent))` in inline styles when a HeroUI utility class isn't enough (see `src/app/(tenant)/[tenantSlug]/admin/workstations/_components/workstations-list.tsx`). Don't hardcode a new static accent color in globals.css — add a new palette to `TENANT_PALETTES` instead if a new tenant color scheme is needed.
+TENANT COLOR SYSTEM:
+Colors are per-tenant, not static. Palettes live in
+`src/lib/theme/tenant-colors.ts` as `TENANT_PALETTES` — keys are
+`'blue' | 'green' | 'purple'` (`green` is actually teal and `purple` replaced
+an earlier orange; the keys are stored tenant settings, so renaming one needs
+a data migration). Each palette is a set of raw `"H S% L%"` triplets (no
+`hsl()` wrapper): `primary`, `primaryHover`, `primaryTint`, `primaryTintText`,
+`secondary`, `accent`, `accentTint`, `accentTintText`.
+`DEFAULT_TENANT_PALETTE` is `'blue'`.
 
-Color roles (actual Tailwind classes used in this codebase — verified in src/, no theoretical ones):
+`src/lib/theme/tenant-theme-style.tsx` injects the active palette at request
+time as BOTH `--heroui-*` vars (so HeroUI's own `primary` utilities follow the
+tenant) and `--tenant-*` vars. The `--tenant-*` ones are wired up as Tailwind
+colors, so prefer the utility classes:
 
-- `bg-primary`, `text-primary`, `text-primary-foreground` — HeroUI's built-in primary palette, driven by the tenant's `--heroui-primary`
-- `text-default-400` / `text-default-500` / `text-default-700`, `border-default-200`, `text-foreground` — HeroUI's neutral/default palette for body text, borders, muted labels
-- Semantic (`success`/`warning`/`danger`) via component `color` props (e.g. `Chip color="danger"`), not Tailwind utility classes
-- Do NOT use `bg-accent`, `bg-surface`, `text-muted`, `border-separator` — these aren't defined anywhere (tailwind.config.ts has `theme: { extend: {} }`, no custom color names) and have zero usage in the codebase
+- `bg-tenant-primary`, `hover:bg-tenant-primary-hover`,
+  `bg-tenant-primary-tint`, `text-tenant-primary-tint-text`,
+  `bg-tenant-accent-tint`, `text-tenant-accent-tint-text`
+- `bg-primary` / `text-primary` / `text-primary-foreground` — HeroUI's palette,
+  driven by the same tenant values
+
+Don't hardcode a new static accent in globals.css — add a palette to
+`TENANT_PALETTES` instead. All palette values are AA-checked against white;
+keep new ones at 4.5:1 or better and note the ratio, as the existing comments do.
+
+Tier gating: the color theme is a Premium+ feature. Standard tenants get the
+default palette.
 
 Status badge mapping (Chip colors):
 confirmed → success
@@ -35,12 +61,15 @@ removed → danger
 
 TYPOGRAPHY:
 
-- Use the project default font (Geist or Inter from Next.js)
+- Headings use `font-display` (Manrope, via `src/fonts/manrope`)
+- Body/UI text keeps the default system stack (`font-sans`)
 - Weights: 400 body, 500 labels/subtitles, 600 headings and nav items
-- Do not add custom fonts
+- Do not add further custom fonts
 
 SPACING:
 
 - 8px base unit — use Tailwind scale (gap-2=8px, gap-4=16px, p-6=24px, etc.)
-- Cards: light border + bg-surface, no drop shadows in light mode
+- Cards: use `AppCard` or `CARD_SURFACE` from `src/components/ui/` — never
+  hand-rolled `rounded-xl`/`shadow-md`, since Tailwind's and HeroUI's
+  same-named classes resolve to different values
 - Tables: row hover required; zebra-stripe (isStriped) on dense admin tables

@@ -5,7 +5,7 @@ Context:
 Context:
 
 - PostgreSQL via Supabase
-- Migrations in supabase/migrations/ — existing files use sequential NNNN_description.sql (legacy, never renumbered); new migrations use the Supabase CLI's YYYYMMDDHHMMSS_description.sql timestamp format (run `supabase migration new <name>` to generate the filename, don't hand-pick a number). Before merging a new timestamped migration, confirm no other open PR still carries an unmerged NNNN file — see .claude/CLAUDE.md "Migration naming" for why mixing the two after a timestamped migration has been pushed strands the older one.
+- Migrations in supabase/migrations/ — existing files use sequential NNNN_description.sql (legacy, never renumbered); new migrations use the Supabase CLI's YYYYMMDDHHMMSS_description.sql timestamp format (run `supabase migration new <name>` to generate the filename, don't hand-pick a number). Before merging a new timestamped migration, confirm no other open PR still carries an unmerged NNNN file — see .claude/reference/migrations.md "Migration naming" for why mixing the two after a timestamped migration has been pushed strands the older one.
 - Existing production database — do NOT recreate schema, use ALTER TABLE
 - RLS enabled on all tables
 - Both dev (lhflutwvwvzawzbcuwup) and prod must receive the migration
@@ -24,7 +24,7 @@ Rules:
 - Use IF EXISTS / IF NOT EXISTS throughout
 - Minimal change — only what was asked for
 
-Forward-fix header (mandatory — see .claude/CLAUDE.md "Forward-fix plan"):
+Forward-fix header (mandatory — see .claude/reference/migrations.md "Forward-fix plan"):
 
 - Every migration starts with a SQL comment header stating what it does and why
 - The header MUST include a filled-in Forward-fix block:
@@ -61,7 +61,7 @@ replace     — changed RPC / RLS policy / trigger. Rollback is "restore the
   A new mandatory column WITHOUT a default, or a rename/drop of a column any
   deployed page selects, is NOT safe in one release — split it expand/contract
   (first ship code that stops depending on the old shape, then the migration).
-  See .claude/CLAUDE.md "The ordering guarantee".
+  See .claude/reference/migrations.md "The ordering guarantee".
 - CI enforces that the `-- Forward-fix:` line exists; only a human reviewer can
   tell whether the Data line is true, so make it specific
 
@@ -85,7 +85,9 @@ After generating, remind user to:
 1. Verify the Forward-fix block is filled in with real values, not placeholders
 2. Run npm run db:types to regenerate src/types/database.ts
 3. Update src/types/app.ts with any new Row/Insert/Update aliases
-4. Apply to both dev and prod Supabase projects
+4. Apply to both dev and prod Supabase projects, then verify against
+   information_schema — `db push` silently skips a colliding number with
+   "up to date"
 
 Output:
 

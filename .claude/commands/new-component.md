@@ -12,13 +12,14 @@ Conventions:
 - Props interface named `${ComponentName}Props`
 - TypeScript — no `any`
 - Tailwind utility classes for styling — no CSS modules
+- Form fields from @/components/ui/form-fields, white cards via AppCard/CARD_SURFACE — never raw HeroUI equivalents
 - No comments unless the WHY is non-obvious
 - Add 'use client' only if the component uses state, effects, or event handlers — default to Server Component
 
 i18n:
 
 - All visible strings go through t() — import useTranslation from src/lib/i18n/client.ts
-- Namespace: the relevant section in public/locales/en/ (e.g. 'admin', 'official')
+- Namespace: the relevant section under public/locales/ — add the key to BOTH en/ and sv/ (e.g. 'admin', 'official')
 
 Examples of existing components for reference:
 

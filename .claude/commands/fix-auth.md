@@ -14,13 +14,14 @@ Error:
 Checklist:
 
 - OTP sent but no session created → check @supabase/ssr middleware config, cookies being set
-- Session lost after reload → verify proxy.ts runs on protected routes and calls supabase.auth.getUser()
-- Wrong redirect after login → check user_roles row exists for user + role-based routing logic
+- Session lost after reload → verify src/proxy.ts runs on protected routes and calls supabase.auth.getUser()
+- Wrong redirect after login → check user_roles row exists + resolvePostLoginRedirect() in src/lib/auth/tenant.ts (system_admin → /admin, participant → /[slug]/participant)
 - getSession() used instead of getUser() → always use getUser() for auth checks
 - "Invalid login credentials" → OTP expired (60s) or already used
 - Twilio sending but Supabase rejecting → OTP type must be 'sms', not 'phone_change'
 - Prod login not working → check if Supabase Test Phone Number entry is interfering
 - RLS blocking after login → is_system_admin() missing from policy, or user_roles row missing
+- Official surfaces empty despite a role → officials row missing or invite_status != 'confirmed'
 
 Tests (Vitest):
 

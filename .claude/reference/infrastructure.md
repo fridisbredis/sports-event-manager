@@ -4,6 +4,16 @@
 
 ---
 
+## Secrets storage (read this before any `op` call)
+
+Prod secrets live in the **"Viadal Event Manager"** vault on the **Work**
+account (`extrapreneurab.1password.com`) — not the old "Sports Event Manager"
+vault on Personal. A cross-account move is not supported by the `op` CLI, so
+always confirm you're pointed at the right account and vault before running an
+`op` command. Every "in 1Password" reference below means this vault.
+
+---
+
 ## Azure subscription
 
 - Subscription ID: `dc64af83-c062-48db-abae-4cb73a478bb2`
@@ -60,7 +70,7 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 - Supabase: separate prod project in Stockholm region (project ref in 1Password)
 - Twilio: separate Messaging Service "Sports Event Manager Prod" in the same subaccount as dev
 - **Important:** `minReplicas: 1` is required (default `null`/0 causes startup probe failures, see `.claude/reference/lessons-learned.md`)
-- **Custom domain:** `https://app.viadalevent.se` — configured on the prod Container App via a managed certificate on the shared `kanban-env` environment. This is now the primary prod URL; the Azure-generated URL above still works as a fallback.
+- **Custom domain:** `https://app.viadalevent.se` — configured on the prod Container App via a managed certificate on the shared `kanban-env` environment. This is the primary prod URL; the Azure-generated URL above still works as a fallback. (Verified by Frida 2026-10-22.)
 - Sentry project: `viadal-event-prod` in org `extrapreneur` — https://extrapreneur.sentry.io/projects/viadal-event-prod/ (added 2026-08-25, REL-02)
 
 ## Twilio sender setup (MVP-phase)
