@@ -246,10 +246,12 @@ describe('POST /api/officials', () => {
   })
 
   // N19 reversed #219: the invite SMS no longer follows the inviting admin.
-  // Swedish copy forces the message from GSM-7 to UCS-2, cutting the segment
-  // limit from 160 characters to 70 and silently doubling the cost of every
-  // invite, while the recipient has no stored language either way. The landing
-  // page still offers both languages, one tap later.
+  // The reason that still holds is that the recipient has no stored language
+  // either way, and the landing page offers both, one tap later.
+  //
+  // The cost reason this comment used to give was wrong (corrected
+  // 2026-10-22): å, ä and ö are GSM-7, so Swedish copy does not force UCS-2
+  // and does not double the segment count. See the route for the full note.
   it('sends the invite SMS in English even when the admin works in Swedish', async () => {
     // Overrides the global 'en' stub from vitest.setup.ts, so a regression that
     // reinstated getUserLanguage() here would produce Swedish and fail.

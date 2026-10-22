@@ -270,12 +270,21 @@ export async function POST(request: NextRequest) {
   // Pinned to English, not the inviting admin's language (N19, decided by
   // Peter 2026-10-16). This reverses #219, which followed the admin on the
   // reasoning that a Swedish-speaking admin invites Swedish-speaking
-  // officials. Two things outweigh that: the recipient has no language of
-  // their own yet either way, and Swedish copy forces the message from GSM-7
-  // to UCS-2, which cuts the per-segment limit from 160 characters to 70 and
-  // silently doubles the cost of every invite and resend. The landing page
-  // this links to still offers both languages, so the invitee picks their own
-  // one tap later. Revisit once N11 records SMS cost per tenant.
+  // officials. The argument for pinning was that the recipient has no
+  // language of their own yet either way, and the landing page this links to
+  // offers both languages, so the invitee picks their own one tap later.
+  //
+  // ONE OF THE ORIGINAL REASONS WAS WRONG (corrected 2026-10-22). This comment
+  // also claimed Swedish copy forces the message from GSM-7 to UCS-2 and
+  // doubles the cost. It does not: å, ä and ö are in the GSM-7 alphabet. The
+  // current Swedish body measures 144 characters against the same 160-character
+  // limit as the English one — a single segment either way.
+  //
+  // So the cost argument for pinning does not hold, and only the
+  // recipient-has-no-language-yet argument remains. Worth re-raising with
+  // Peter: the decision may still be right, but it should rest on a true
+  // premise. What WOULD force UCS-2 is typographic punctuation (–, ’, ”, …),
+  // in either language.
   const t = await getServerTranslation('en', 'auth')
   const smsBody = t('confirmation.inviteSms.body', {
     name,

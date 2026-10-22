@@ -2,10 +2,17 @@
  * Turning recorded SMS segments into SEK (N11).
  *
  * Twilio bills per SEGMENT, not per message: 160 GSM-7 characters, or 70 when
- * the body contains anything outside GSM-7 — a Swedish å, ä or ö in an
- * announcement halves the budget. The invite SMS is already two segments on
- * prod because of the URL length. So a cost figure built on message COUNT
- * would understate spend by roughly half on exactly the traffic that matters.
+ * the body contains anything outside GSM-7. A long announcement is several
+ * segments, so a cost figure built on message COUNT would understate spend.
+ *
+ * WHAT ACTUALLY FORCES UCS-2 (corrected 2026-10-22): not Swedish letters.
+ * å, ä, ö, Å, Ä and Ö are all in the GSM-7 alphabet and cost one character
+ * each — an earlier version of this comment claimed they halved the budget,
+ * and that was simply wrong. What does force UCS-2 is typographic
+ * punctuation: en/em dashes (–, —), curly quotes (’, ”), and the ellipsis
+ * character (…). Those are easy to paste in from a word processor without
+ * noticing, and one of them anywhere in the body cuts the limit from 160
+ * characters to 70 for the whole message.
  *
  * The rate is configuration, not a constant in the code and not a column on
  * the usage rows:
