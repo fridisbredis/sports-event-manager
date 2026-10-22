@@ -16,6 +16,7 @@ import {
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
+import { readSmsCapStatus } from '@/lib/sms/cap'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
@@ -234,9 +235,10 @@ export async function POST(request: NextRequest) {
   // Server Action.
   revalidateTag(adminDashboardCacheTag(tenantId), { expire: 0 })
 
+  // `tier` for the N24 spending cap below; `name` for the SMS copy.
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('name')
+    .select('name, tier')
     .eq('id', tenantId)
     .single()
 
@@ -268,12 +270,21 @@ export async function POST(request: NextRequest) {
   // Pinned to English, not the inviting admin's language (N19, decided by
   // Peter 2026-10-16). This reverses #219, which followed the admin on the
   // reasoning that a Swedish-speaking admin invites Swedish-speaking
-  // officials. Two things outweigh that: the recipient has no language of
-  // their own yet either way, and Swedish copy forces the message from GSM-7
-  // to UCS-2, which cuts the per-segment limit from 160 characters to 70 and
-  // silently doubles the cost of every invite and resend. The landing page
-  // this links to still offers both languages, so the invitee picks their own
-  // one tap later. Revisit once N11 records SMS cost per tenant.
+  // officials. The argument for pinning was that the recipient has no
+  // language of their own yet either way, and the landing page this links to
+  // offers both languages, so the invitee picks their own one tap later.
+  //
+  // ONE OF THE ORIGINAL REASONS WAS WRONG (corrected 2026-10-22). This comment
+  // also claimed Swedish copy forces the message from GSM-7 to UCS-2 and
+  // doubles the cost. It does not: å, ä and ö are in the GSM-7 alphabet. The
+  // current Swedish body measures 144 characters against the same 160-character
+  // limit as the English one — a single segment either way.
+  //
+  // So the cost argument for pinning does not hold, and only the
+  // recipient-has-no-language-yet argument remains. Worth re-raising with
+  // Peter: the decision may still be right, but it should rest on a true
+  // premise. What WOULD force UCS-2 is typographic punctuation (–, ’, ”, …),
+  // in either language.
   const t = await getServerTranslation('en', 'auth')
   const smsBody = t('confirmation.inviteSms.body', {
     name,
@@ -281,56 +292,87 @@ export async function POST(request: NextRequest) {
     url: inviteUrl,
   })
 
+  // N24: the tenant's monthly SMS spend cap.
+  //
+  // Checked before the send, and handled with a branch rather than by throwing
+  // into the catch below: a capped send is NOT a failed send. It never reached
+  // Twilio, so it must not be recorded as a failed message — that would make a
+  // blocked tenant's usage keep growing against its own cap — and it must not
+  // be logged as a Twilio fault.
+  //
+  // An unreadable usage table allows the send; see cap.ts on failing open.
+  const capStatus = await readSmsCapStatus({
+    service,
+    tenantId,
+    tier: tenant?.tier ?? '',
+    op: 'POST /api/officials',
+  })
+
   // The row is already committed at this point. A failed send must not be reported as a
   // failed create, or the admin retries and we accumulate duplicate invited officials.
-  // The row stays `invited`, which is exactly the state the resend endpoint accepts.
-  //
-  // The client is constructed inside the try on purpose: twilio() throws synchronously
-  // when TWILIO_ACCOUNT_SID is set to a non-AC value, so building it outside would
-  // escape this handler entirely and still surface as a 500.
+  // The row stays `invited`, which is exactly the state the resend endpoint accepts —
+  // so a capped invite can simply be resent once the month rolls over.
   let smsSent = true
-  try {
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-    const message = await client.messages.create({
-      body: smsBody,
-      from: process.env.TWILIO_PHONE_NUMBER!,
-      to: toTwilioE164(phone),
-    })
-    await recordSmsUsage({
-      service,
-      tenantId,
-      kind: 'invite',
-      message,
-      status: 'sent',
-      op: 'POST /api/officials',
-    })
-  } catch (err) {
+
+  if (capStatus?.exceeded) {
     smsSent = false
-    await recordSmsUsage({
-      service,
-      tenantId,
-      kind: 'invite',
-      message: null,
-      status: 'failed',
-      op: 'POST /api/officials',
-    })
+    // The invite never went out, so the rate-limit slot it reserved is released,
+    // same as the Twilio-failure path below.
     await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
-    // Log the DB-generated id and Twilio's numeric code only — never the raw error,
-    // which can echo the submitted phone number back into the logs.
-    //
-    // One pre-formatted string, and never an undefined argument: console patching by
-    // editor extensions can throw on those, and a throw here would escape this catch
-    // and turn a handled SMS failure back into a 500.
-    const code = (err as { code?: unknown } | null)?.code
+    logger.warn(
+      `Invite SMS blocked by N24 monthly cap: tenant=${tenantId} ` +
+        `spentSek=${capStatus.spentSek} capSek=${capStatus.capSek}` +
+        (capStatus.usingFallbackRate
+          ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+          : '')
+    )
+  } else {
+    // The client is constructed inside the try on purpose: twilio() throws synchronously
+    // when TWILIO_ACCOUNT_SID is set to a non-AC value, so building it outside would
+    // escape this handler entirely and still surface as a 500.
     try {
-      logger.error('Invite SMS failed', undefined, {
-        officialId: official.id,
-        twilioCode: code ?? 'none',
+      const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+      const message = await client.messages.create({
+        body: smsBody,
+        from: process.env.TWILIO_PHONE_NUMBER!,
+        to: toTwilioE164(phone),
       })
-    } catch {
-      // A throw here would escape the outer catch and turn a handled SMS failure back
-      // into a 500. Editor extensions that patch console can throw; logging must never
-      // be able to change the response.
+      await recordSmsUsage({
+        service,
+        tenantId,
+        kind: 'invite',
+        message,
+        status: 'sent',
+        op: 'POST /api/officials',
+      })
+    } catch (err) {
+      smsSent = false
+      await recordSmsUsage({
+        service,
+        tenantId,
+        kind: 'invite',
+        message: null,
+        status: 'failed',
+        op: 'POST /api/officials',
+      })
+      await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
+      // Log the DB-generated id and Twilio's numeric code only — never the raw error,
+      // which can echo the submitted phone number back into the logs.
+      //
+      // One pre-formatted string, and never an undefined argument: console patching by
+      // editor extensions can throw on those, and a throw here would escape this catch
+      // and turn a handled SMS failure back into a 500.
+      const code = (err as { code?: unknown } | null)?.code
+      try {
+        logger.error('Invite SMS failed', undefined, {
+          officialId: official.id,
+          twilioCode: code ?? 'none',
+        })
+      } catch {
+        // A throw here would escape the outer catch and turn a handled SMS failure back
+        // into a 500. Editor extensions that patch console can throw; logging must never
+        // be able to change the response.
+      }
     }
   }
 

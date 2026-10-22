@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import type { SmsQueueItem } from '@/types/app'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
+import { readSmsCapStatus } from '@/lib/sms/cap'
 
 // PERF-04: triggered every minute by the sms-queue-worker-trigger pg_cron job
 // (migration 0030) via pg_net, same pattern as the gdpr-warning cron route.
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   const batch = (claimed ?? []) as SmsQueueItem[]
   if (batch.length === 0) {
-    return NextResponse.json({ sent: 0, failed: 0, retried: 0 })
+    return NextResponse.json({ sent: 0, failed: 0, retried: 0, deferred: 0 })
   }
 
   // Prefetch each distinct announcement's body once, rather than re-querying
@@ -74,15 +75,109 @@ export async function POST(request: NextRequest) {
 
   const bodyById = new Map((announcementRows ?? []).map((a) => [a.id, a.body]))
 
+  // N24: the monthly SMS spend cap, resolved once per distinct tenant in this
+  // batch rather than once per message. A batch is up to 100 rows and may mix
+  // tenants; checking per row would mean up to 100 usage queries per tick to
+  // answer at most a handful of distinct questions.
+  //
+  // The snapshot is taken at the start of the tick and not refreshed as the
+  // batch sends, so a tenant can cross its cap partway through and the rest of
+  // that tick still goes out. That is deliberate: the alternative is a usage
+  // query between every message, and overshooting by part of one batch is a
+  // smaller problem than that. The next tick, a minute later, stops them.
+  const tenantIds = [...new Set(batch.map((row) => row.tenant_id))]
+  const { data: tenantRows, error: tenantsError } = await service
+    .from('tenants')
+    .select('id, tier')
+    .in('id', tenantIds)
+
+  if (tenantsError) {
+    // Logged, not thrown: failing the tick here would stop every tenant's
+    // announcements because one tier lookup failed. The caps simply are not
+    // enforced on this tick — the same fail-open posture as cap.ts.
+    logQueryError(tenantsError, {
+      op: 'POST /api/cron/sms-worker',
+      table: 'tenants',
+      kind: 'select',
+      extra: { usage: 'sms_cap_tier', consequence: 'cap_not_enforced_send_allowed' },
+    })
+  }
+
+  const tierById = new Map((tenantRows ?? []).map((t) => [t.id, t.tier]))
+  const cappedTenants = new Set<string>()
+
+  for (const tenantId of tenantIds) {
+    const status = await readSmsCapStatus({
+      service,
+      tenantId,
+      tier: tierById.get(tenantId) ?? '',
+      op: 'POST /api/cron/sms-worker',
+    })
+
+    if (status?.exceeded) {
+      cappedTenants.add(tenantId)
+      logger.warn(
+        `Announcement SMS blocked by N24 monthly cap: tenant=${tenantId} ` +
+          `spentSek=${status.spentSek} capSek=${status.capSek}` +
+          (status.usingFallbackRate
+            ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+            : '')
+      )
+    }
+  }
+
   let sent = 0
   let failed = 0
   let retried = 0
+  let deferred = 0
+
+  // Rows belonging to a capped tenant are released back to 'pending' rather
+  // than sent, failed, or left where they are.
+  //
+  // Not 'failed': nothing failed, and burning an attempt would retire the
+  // message after three capped ticks — the announcement would be silently
+  // dropped rather than delayed. Not left as 'sending': claim_sms_queue_batch
+  // flipped them on claim, and a row abandoned in 'sending' is reclaimed only
+  // by the stale-row path, if at all. 'pending' with attempts untouched means
+  // they simply wait, and go out on the first tick after the month rolls over
+  // or the tier changes.
+  //
+  // The queue is bounded and these rows keep being re-claimed each tick while
+  // the cap holds, which is wasted work but bounded and visible in `deferred`.
+  const sendable = batch.filter((row) => !cappedTenants.has(row.tenant_id))
+  const blocked = batch.filter((row) => cappedTenants.has(row.tenant_id))
+
+  if (blocked.length > 0) {
+    const { error: deferError } = await service
+      .from('sms_queue')
+      .update({ status: 'pending', updated_at: new Date().toISOString() })
+      .in(
+        'id',
+        blocked.map((row) => row.id)
+      )
+
+    if (deferError) {
+      // These rows are now stuck in 'sending' until something reclaims them.
+      // Visible rather than silent, per F-REL-10.
+      logQueryError(deferError, {
+        op: 'POST /api/cron/sms-worker',
+        table: 'sms_queue',
+        kind: 'update',
+        extra: {
+          consequence: 'capped_rows_left_in_sending',
+          rowCount: blocked.length,
+        },
+      })
+    } else {
+      deferred = blocked.length
+    }
+  }
 
   // Bounded concurrency: send CONCURRENCY messages at a time rather than
   // the whole batch at once, so one worker tick can't overwhelm Twilio's
   // rate limits the way the old fully-parallel Promise.allSettled did.
-  for (let i = 0; i < batch.length; i += CONCURRENCY) {
-    const chunk = batch.slice(i, i + CONCURRENCY)
+  for (let i = 0; i < sendable.length; i += CONCURRENCY) {
+    const chunk = sendable.slice(i, i + CONCURRENCY)
     await Promise.allSettled(
       chunk.map(async (row) => {
         try {
@@ -240,5 +335,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ sent, failed, retried })
+  // `deferred` counts rows held back by a tenant's monthly cap (N24). They are
+  // still queued and will go out once the cap clears — distinct from `failed`.
+  return NextResponse.json({ sent, failed, retried, deferred })
 }

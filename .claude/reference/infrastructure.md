@@ -70,6 +70,38 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 - Dev login can be tested via Supabase Test Phone Numbers — number `46768109304` with fixed OTP code `000000` (dev Supabase project `lhflutwvwvzawzbcuwup`), bypasses Twilio entirely
 - Prod login has always used the real Twilio sender — no Supabase Test Phone Number entry was ever added to prod (confirmed 2026-08-18; the earlier note claiming otherwise was incorrect)
 
+### `SMS_SEK_PER_SEGMENT` — the rate the N24 cap enforces on
+
+Optional env var. Unset, the app uses **0.70 SEK/segment**
+(`src/lib/sms/cost.ts`).
+
+**Measured, not guessed (2026-10-22).** Twilio's usage summary for September
+2026 on this account: **$1.81 across 28 outbound segments = $0.0646 per
+segment**, which is about 0.70 SEK at ~10.8 SEK/USD. Verify it the same way —
+Console → **Monitor → Usage → Usage summary**, pick a month with real traffic,
+expand _Programmable Messaging → SMS → Outbound SMS_, and divide spend by
+segments. That is what the account was actually charged, which the public
+price list is not.
+
+Rounded slightly up from the 0.65 today's exchange rate gives exactly. The
+price is quoted in USD and the rate moves; a rate that is a little high stops
+a tenant marginally early, while one that is too low lets them past the cap
+unnoticed. Early is the right direction for the error.
+
+Set the env var to override without a deploy when pricing or the exchange rate
+moves enough to matter. `isUsingFallbackRate()` reports whether the built-in
+figure is in use, and the cap's log lines say so.
+
+**Two costs this rate does not cover**, both deliberate:
+
+- **Login OTP.** Sent by Supabase Auth through its own Twilio credentials, so
+  it lands on the invoice but never in `sms_usage`. Every per-tenant figure is
+  an undercount by that much.
+- **Phone number rental.** A fixed **$3 per number per month** (3 numbers =
+  $9.00 in the same September summary — more than all the message traffic put
+  together, which was $1.81). It is not per-segment and does not belong in
+  this rate; it belongs to N13's dedicated-sender decision.
+
 ## GitHub Secrets
 
 **19 secrets per environment as of SYS-03 (2026-09-02)**, up from 18 — the
