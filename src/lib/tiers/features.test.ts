@@ -6,7 +6,7 @@ import {
   isTier,
   tiersWithFeature,
   featuresForTier,
-  monthlySmsCapSek,
+  monthlySmsCap,
 } from './features'
 
 describe('hasFeature', () => {
@@ -76,11 +76,11 @@ describe('featuresForTier', () => {
   })
 })
 
-describe('monthlySmsCapSek', () => {
+describe('monthlySmsCap', () => {
   it('returns the cap for each tier', () => {
-    expect(monthlySmsCapSek('standard')).toBe(100)
-    expect(monthlySmsCapSek('premium')).toBe(200)
-    expect(monthlySmsCapSek('professional')).toBe(300)
+    expect(monthlySmsCap('standard')).toBe(100)
+    expect(monthlySmsCap('premium')).toBe(200)
+    expect(monthlySmsCap('professional')).toBe(300)
   })
 
   it('gives an unrecognised tier the lowest cap, never an unlimited one', () => {
@@ -88,7 +88,7 @@ describe('monthlySmsCapSek', () => {
     // hand-edited tier value restricts spending rather than removing the
     // limit. Returning Infinity here would make a typo in the tiers table
     // silently uncap a tenant.
-    expect(monthlySmsCapSek('enterprise')).toBe(100)
-    expect(monthlySmsCapSek('')).toBe(100)
+    expect(monthlySmsCap('enterprise')).toBe(100)
+    expect(monthlySmsCap('')).toBe(100)
   })
 })

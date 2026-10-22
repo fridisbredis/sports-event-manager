@@ -1,5 +1,5 @@
 /**
- * Turning recorded SMS segments into SEK (N11).
+ * Turning recorded SMS segments into money (N11).
  *
  * Twilio bills per SEGMENT, not per message: 160 GSM-7 characters, or 70 when
  * the body contains anything outside GSM-7. A long announcement is several
@@ -29,11 +29,30 @@
  */
 
 /**
- * SEK per SMS segment to Swedish mobile numbers.
+ * The currency every SMS cost figure in the app is expressed in.
+ *
+ * One constant rather than 'SEK' written out at each call site, so changing
+ * it is a single edit. The rest of the system is already currency-agnostic
+ * by construction: sms_usage stores SEGMENTS, never money, and the amount is
+ * derived at read time — so changing this restates history rather than
+ * leaving old totals stranded in the old currency.
+ *
+ * It is deliberately NOT per tenant. The cap follows the tier and cannot be
+ * set per tenant (Peter, 2026-10-20); giving tenants their own currencies
+ * would make "300" mean different real limits on the same tier, which is
+ * that rule broken by other means. It would also need an exchange rate per
+ * currency, and a moving rate makes "what did March cost?" depend on when
+ * you ask. Revisit only with a real non-Swedish customer, and as a decision
+ * rather than a setting.
+ */
+export const SMS_COST_CURRENCY = 'SEK'
+
+/**
+ * Cost per SMS segment to Swedish mobile numbers, in SMS_COST_CURRENCY.
  *
  * MEASURED, no longer a guess (2026-10-22). Twilio's own usage summary for
  * September 2026 shows $1.81 across 28 outbound segments on this account —
- * $0.0646 per segment. At around 10.8 SEK/USD that is 0.70 SEK, which is the
+ * $0.0646 per segment. At around 10.8 SEK/USD that is 0.70, which is the
  * figure below.
  *
  * Rounded slightly UP rather than to the 0.65 that today's rate gives exactly.
@@ -49,19 +68,33 @@
  *   - Phone number rental, which is a fixed monthly cost per number ($3 each,
  *     measured the same day) and not per segment. It belongs to N13, not here.
  *
- * Set SMS_SEK_PER_SEGMENT to override without a deploy when Twilio's pricing
- * or the exchange rate moves enough to matter.
+ * Set SMS_COST_PER_SEGMENT to override without a deploy when Twilio's
+ * pricing or the exchange rate moves enough to matter.
  */
-const FALLBACK_SEK_PER_SEGMENT = 0.7
+const FALLBACK_COST_PER_SEGMENT = 0.7
 
-export function sekPerSegment(): number {
-  const configured = Number(process.env.SMS_SEK_PER_SEGMENT)
-  return Number.isFinite(configured) && configured > 0 ? configured : FALLBACK_SEK_PER_SEGMENT
+/**
+ * SMS_SEK_PER_SEGMENT is the old name, still read so an environment that has
+ * it set does not silently fall back to the built-in rate on deploy. Remove
+ * once both environments carry the new name.
+ */
+function configuredRate(): number {
+  // `||`, not `??`: an env var set to an empty string is how a deployment
+  // "unsets" one in practice, and `??` would treat that as a value and stop
+  // looking — leaving an environment that still carries the old name on the
+  // built-in rate.
+  const value = process.env.SMS_COST_PER_SEGMENT || process.env.SMS_SEK_PER_SEGMENT
+  return Number(value)
 }
 
-/** Whether the rate in use is the placeholder rather than a configured one. */
+export function costPerSegment(): number {
+  const configured = configuredRate()
+  return Number.isFinite(configured) && configured > 0 ? configured : FALLBACK_COST_PER_SEGMENT
+}
+
+/** Whether the rate in use is the built-in one rather than a configured one. */
 export function isUsingFallbackRate(): boolean {
-  const configured = Number(process.env.SMS_SEK_PER_SEGMENT)
+  const configured = configuredRate()
   return !(Number.isFinite(configured) && configured > 0)
 }
 
@@ -72,8 +105,8 @@ export interface SmsUsageTotals {
   failed: number
   /** Billable segments across the sent messages. */
   segments: number
-  /** segments × the configured rate. */
-  sek: number
+  /** segments × the configured rate, in SMS_COST_CURRENCY. */
+  amount: number
 }
 
 interface UsageRow {
@@ -111,7 +144,7 @@ export function totalUsage(rows: UsageRow[]): SmsUsageTotals {
     // Rounded to öre. Summing unrounded and rounding once at the end, rather
     // than rounding per row, so a thousand messages do not accumulate a
     // thousand rounding errors.
-    sek: Math.round(segments * sekPerSegment() * 100) / 100,
+    amount: Math.round(segments * costPerSegment() * 100) / 100,
   }
 }
 

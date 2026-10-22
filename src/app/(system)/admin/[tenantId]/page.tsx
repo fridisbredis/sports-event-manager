@@ -1,16 +1,18 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { AppCard } from '@/components/ui/app-card'
 import { TenantDetail } from './_components/tenant-detail'
 import { TenantAdminsSection } from './_components/tenant-admins-section'
+import { TenantSmsSection } from './_components/tenant-sms-section'
 import { listTenantAdmins } from '@/lib/auth/tenant-admins'
 import { maxTenantAdmins } from '@/lib/tiers/features'
 import { dateLocaleFor, EVENT_TIME_ZONE } from '@/lib/i18n/date-locale'
+import { readSmsCapStatus } from '@/lib/sms/cap'
 
 interface Props {
   params: Promise<{ tenantId: string }>
@@ -34,6 +36,16 @@ export default async function TenantDetailPage({ params }: Props) {
   if (!tenant) notFound()
 
   const admins = await listTenantAdmins(tenant.id, tenant.tier)
+
+  // N24: this month's spend for this tenant. Service client because
+  // sms_usage is revoked from `authenticated`; the system-admin check above
+  // has already passed.
+  const smsUsage = await readSmsCapStatus({
+    service: createSupabaseServiceClient(),
+    tenantId: tenant.id,
+    tier: tenant.tier,
+    op: 'GET /(system)/admin/[tenantId]',
+  })
 
   // Formatted here rather than in the client component so the dates follow the
   // user's locale setting (B7: locale and text language are separate settings)
@@ -66,6 +78,23 @@ export default async function TenantDetailPage({ params }: Props) {
           isActive={tenant.is_active}
           tier={tenant.tier as 'standard' | 'premium' | 'professional'}
         />
+        {/* Directly under the feature tier, which is what sets the cap: an
+            admin who has just changed a tenant's tier sees what that did to
+            its allowance without leaving the page. */}
+        <div className="border-t border-edge-soft">
+          <TenantSmsSection
+            usage={smsUsage}
+            language={language}
+            title={t('systemAdmin.smsUsageTitle')}
+            spentLabel={t('systemAdmin.smsSpent')}
+            capLabel={t('systemAdmin.smsCap')}
+            segmentsLabel={t('systemAdmin.smsSegments')}
+            statusLabel={t('systemAdmin.smsWithinCap')}
+            blockedHint={t('systemAdmin.smsBlockedHint')}
+            unavailableHint={t('systemAdmin.smsUnavailable')}
+            estimateHint={smsUsage?.usingFallbackRate ? t('systemAdmin.smsEstimated') : undefined}
+          />
+        </div>
         <div className="border-t border-edge-soft">
           <TenantAdminsSection
             tenantId={tenant.id}

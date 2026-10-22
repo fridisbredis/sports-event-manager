@@ -25,10 +25,10 @@ import { SectionCard } from './section-card'
 interface SmsUsageCardProps {
   title: string
   /** SEK spent this calendar month. */
-  spentSek: number
+  spentAmount: number
   /** The tier's monthly allowance in SEK. */
-  capSek: number
-  /** spentSek / capSek, already clamped to 1 by the cap reader. */
+  capAmount: number
+  /** spentAmount / capAmount, already clamped to 1 by the cap reader. */
   fraction: number
   /** True once sending is actually blocked. */
   exceeded: boolean
@@ -50,8 +50,8 @@ const APPROACHING = 0.8
 
 export function SmsUsageCard({
   title,
-  spentSek: _spentSek,
-  capSek: _capSek,
+  spentAmount: _spentAmount,
+  capAmount: _capAmount,
   fraction,
   exceeded,
   amountLabel,
