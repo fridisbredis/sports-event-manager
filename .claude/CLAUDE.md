@@ -15,7 +15,7 @@ Multi-tenant sports event web platform. Each tenant is a sports organization or 
 - **Frida Bredberg** — IT consultant at Extrapreneur AB, developer on this project
 - **Peter Thorn** — project manager / customer
 - **Deadline:** Viadal 2026
-- As of 2026-10, Frida works on this codebase **solo** again. The team briefly grew to three and then two during 2026-09; those colleagues have since left. Treat all branches, PRs and Trello cards as Frida's own unless proven otherwise.
+- As of 2026-10, Frida works on this codebase **solo** again. Treat every branch, PR and task as Frida's own unless proven otherwise.
 
 **Repo:** github.com/fridisbredis/sports-event-manager
 
@@ -34,12 +34,19 @@ Multi-tenant sports event web platform. Each tenant is a sports organization or 
 
 ## Subagent usage
 
-For read-only research (finding files, grepping symbols, locating patterns —
-"where is X defined"), prefer the `explore` subagent (runs on Haiku, cheaper)
-over `general-purpose`. Don't delegate at all for something answerable with
-one or two direct `grep`/`Read` calls. Reserve `general-purpose` for tasks
-that actually need broader tools (editing, multi-step reasoning) alongside
-research.
+This repo has its own subagents in `.claude/agents/` — prefer them over the
+generic built-ins:
+
+- **`explore`** (Haiku) — read-only code search: finding files, grepping
+  symbols, "where is X defined". Use instead of `general-purpose` for research.
+- **`plan`** (Sonnet) — implementation plans that account for this codebase's
+  constraints (RLS, migrations, tenant isolation). Use before non-trivial work.
+- **`scheduling-env-tester`** — runs the scheduling E2E flow against localhost
+  only, then read-only config diff localhost vs prod.
+
+Don't delegate at all for something answerable with one or two direct
+`grep`/`Read` calls. Reserve `general-purpose` for tasks that need broader
+tools (editing, multi-step reasoning) alongside research.
 
 ---
 
@@ -55,13 +62,10 @@ research.
 
 Peter has delivered a complete v1 specification in `docs/`. These are the source of truth — CLAUDE.md only summarizes.
 
-- `docs/scope/problem-statement-mvp-scope.md` — MVP scope and decisions
-- `docs/flows/*.md` — detailed flow per use case
-- `docs/ia/screen-map.md` — all screens grouped by role
+- `docs/scope/`, `docs/flows/`, `docs/ia/screen-map.md` — scope, per-use-case flows, screen map
 - `docs/screens/screen-documentation.md` — developer-ready screen specs (IDs, blocks, states)
-- `docs/design/claude-design-prompt.md` — wireframe regeneration prompts
-- `docs/wireframes/` — lo-fi grayscale wireframes from Claude Design. Layout-and-content reference only, NOT a visual design spec. Don't recreate the grayscale look in the real app.
-- `docs/c4/level1-context.mermaid` and `docs/c4/level2-container.mermaid` — architecture diagrams
+- `docs/c4/` — architecture diagrams
+- `docs/wireframes/` — lo-fi grayscale wireframes. Layout-and-content reference only, NOT a visual design spec — don't recreate the grayscale look in the real app.
 
 ### Screen IDs
 
@@ -134,7 +138,7 @@ an earlier one already committed, see `docs/patterns/atomic-multi-table-writes.m
 
 ### Workflow
 
-- **Task tracking:** Trello board at https://trello.com/b/7uISlZyI/sports-event-manager is the source of truth for what's in flight and what's done. Reference the Trello card in branch names/commits where it clarifies scope, similar to how screen IDs (EVT-01, SEC-09, etc.) are already used.
+- **Task tracking:** a shared Claude Artifact, maintained together with Peter, is the source of truth for what's in flight and what's done. It replaces the old Trello board — don't treat Trello as current. Board: https://claude.ai/artifact/2eBcTpeqoyiSx54gCxxR2h?sk=mx9-SNZZ9SsO--FyESohvQ Reference the task in branch names/commits where it clarifies scope, the way screen IDs (EVT-01, SEC-09, etc.) already are.
 - Branch + PR for non-trivial changes (traceability and reviewable history; Frida also runs parallel Claude sessions in the same repo, so branches keep those from colliding)
 - Commit messages: imperative mood, scope first if applicable ("auth: add requireTenantAdmin helper")
 - Push tags (`v*`) only when intentionally cutting a release for prod
@@ -143,37 +147,16 @@ an earlier one already committed, see `docs/patterns/atomic-multi-table-writes.m
 
 ## Status
 
-### Phase 1-3: Foundation (DONE)
+**Phases 1-5 (DONE):** Next.js scaffold, Supabase schema with RLS, Twilio SMS-OTP
+login, dev CI/CD to Azure Container Apps, and a fully separate prod environment
+(own Supabase project, Twilio Messaging Service, Azure resources,
+least-privilege SP, approval-gated workflow). SMS login verified end-to-end on
+both live URLs.
 
-- Next.js scaffold, Supabase schema with RLS, Twilio SMS-OTP login working locally
-
-### Phase 4: Dev CI/CD (DONE)
-
-- Full GitHub Actions pipeline from push to deployed Azure Container App
-- End-to-end SMS login verified on live dev URL
-
-### Phase 5: Prod environment (DONE)
-
-- Separate Supabase prod project in Stockholm
-- Separate Twilio Messaging Service for prod
-- Separate Azure resources with least-privilege service principal
-- Prod GitHub Actions workflow with approval gate
-- End-to-end SMS login verified on live prod URL
-
-### Phase 6 (current): Application features
-
-Working through PRE_PROD_CHECKLIST:
-
-- [x] Tenant_id validation in route handlers
-- [x] Post-login routing based on user role
-- [x] DB migration 0003 — workstations, operating windows, todos, event stages, scheduling granularity, draft/published status, assignment statuses
-- [x] TypeScript types regenerated from new schema
-- [x] Lo-fi wireframes from Claude Design (key screens as reference)
-- [x] Build admin screens (EVT-01, EVT-02, WS-01, WS-02, OFF-01, SCHED-01, COMM-01)
-- [ ] Build official screens (HOME-01, INFO-01, MYSCH-01, ANN-01, ACCT-01)
-- [x] Build system admin screens (SYS-01, SYS-02, SYS-03)
-- [x] i18next applied to UI strings
-- [ ] Race Results integration
+**Phase 6 (current):** Application features. All admin, official and system admin
+screens are built and i18next is applied. Remaining in PRE_PROD_CHECKLIST:
+Race Results integration. For everything else in flight, read the task board
+rather than this file.
 
 ### Deferred / blocked on Peter
 
@@ -182,12 +165,9 @@ Working through PRE_PROD_CHECKLIST:
 
 ---
 
-UX decisions and wireframes are located in `/Docs/`
-
 ## Where to find more context
 
 - `DEVELOPMENT.md` — Frida's personal cheat sheet with debug recipes
 - `PRE_PROD_CHECKLIST.md` — living checklist of what must be done before real users
-- `level2-container.mermaid` — current architecture diagram (v0.3)
-- `prisma/migrations/` or Supabase SQL Editor — actual schema source of truth
-- `.claude/reference/` — infrastructure, migrations, and lessons-learned detail (see "Reference documents" above)
+- `supabase/migrations/` — actual schema source of truth
+- `Docs/` — scope PDFs from Peter, ADRs, code-review standards
