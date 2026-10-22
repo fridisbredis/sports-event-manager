@@ -40,6 +40,26 @@ export function dateLocaleFor(language?: string | null): string {
 }
 
 /**
+ * An amount in SEK, formatted for display (N24's spend figures).
+ *
+ * Money is regional for the same reason dates are: the billing currency is
+ * kronor whichever language the UI is in, so this resolves through the same
+ * pinned Swedish locales — "56 kr" in both, with sv and en-SE agreeing on the
+ * separator and placement.
+ *
+ * Whole kronor, no decimals. These are spend-against-a-cap figures where
+ * "56 kr of 300 kr" is the useful reading and "56,25 kr" is noise implying a
+ * precision the underlying rate does not have.
+ */
+export function formatSek(amount: number, language?: string | null): string {
+  return new Intl.NumberFormat(dateLocaleFor(language), {
+    style: 'currency',
+    currency: 'SEK',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+/**
  * The event's wall-clock zone, for formatting timestamps that record a real
  * instant — `published_at` on an announcement, `created_at` on an audit row —
  * as opposed to the wall-clock-UTC timestamps the scheduling side stores and

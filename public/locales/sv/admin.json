@@ -37,6 +37,13 @@
     "doubleBooked": "Dubbelbokade funktionärer",
     "timeOffClash": "Funktionärer trots frånvaro",
     "reviewInScheduling": "Granska i Schemaläggning ›",
+    "smsUsage": "SMS denna månad",
+    "smsUsageAmount": "{{spent}} av {{cap}}",
+    "smsUsageOk": "Inom gränsen",
+    "smsUsageApproaching": "Närmar sig gränsen",
+    "smsUsageReached": "Gränsen nådd",
+    "smsUsageBlocked": "Inbjudningar och meddelanden skickas inte förrän nästa månad börjar. Inloggningskoder påverkas inte.",
+    "smsUsageEstimated": "Uppskattat utifrån Twilios listpris.",
     "adminAreas": "Adminområden"
   },
   "eventConfig": {

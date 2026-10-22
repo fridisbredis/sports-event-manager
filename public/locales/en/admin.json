@@ -37,6 +37,13 @@
     "doubleBooked": "Officials double-booked",
     "timeOffClash": "Officials over time off",
     "reviewInScheduling": "Review in Scheduling ›",
+    "smsUsage": "SMS this month",
+    "smsUsageAmount": "{{spent}} of {{cap}}",
+    "smsUsageOk": "Within limit",
+    "smsUsageApproaching": "Approaching limit",
+    "smsUsageReached": "Limit reached",
+    "smsUsageBlocked": "Invites and announcements have stopped sending until the start of next month. Sign-in codes are not affected.",
+    "smsUsageEstimated": "Estimated from Twilio's list price.",
     "adminAreas": "Admin Areas"
   },
   "eventConfig": {
