@@ -13,7 +13,7 @@ Procedure for building UI with HeroUI v2 on top of Tailwind CSS v3.
 Before generating component code, confirm:
 
 - `@heroui/react` is in `package.json` dependencies (version `^2.x`)
-- `tailwind.config.ts` contains the `heroui()` plugin and the HeroUI content glob:
+- `tailwind.config.ts` contains the `heroui()` plugin, the HeroUI content glob, and this project's own design tokens under `theme.extend` (ink/surface/edge/status/destructive/tenant — see designer.md):
 
 ```ts
 import { heroui } from '@heroui/react'
@@ -56,7 +56,7 @@ Search the catalog before writing custom markup.
 | Tooltip                      | `Tooltip`                                                                        |
 | Popover                      | `Popover` + `PopoverTrigger` + `PopoverContent`                                  |
 | Loading state                | `Spinner`, `Skeleton`                                                            |
-| Toast notification           | No built-in toast in v2 — use a third-party library                              |
+| Toast notification           | `addToast()` from `src/lib/toast.ts` (wraps HeroUI's own `addToast`)             |
 | Navigation bar               | `Navbar` + `NavbarBrand` + `NavbarContent` + `NavbarItem`                        |
 | Tag / label                  | `Chip`                                                                           |
 | User avatar                  | `Avatar`, `AvatarGroup`                                                          |
@@ -68,6 +68,8 @@ Search the catalog before writing custom markup.
 If no component fits, use raw JSX with Tailwind.
 
 **All components are named exports from `@heroui/react`.** Never import from sub-packages like `@heroui/button`.
+
+**Form fields are the exception:** import `Input`, `Textarea`, `Select`, `TimeInput` and `DateRangePicker` from `@/components/ui/form-fields`, not from `@heroui/react` directly — the raw ones render with a grey background that then needs `!important` overrides. Same for white cards: use `AppCard` / `CARD_SURFACE` from `@/components/ui/`.
 
 **React Aria event props:** `Button` uses `onPress` (not `onClick`). Collection items like `DropdownItem` use `key` for identity; actions are handled via `onAction` on the parent `DropdownMenu`.
 

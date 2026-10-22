@@ -13,11 +13,12 @@ Focus on:
 - Security issues: missing tenant_id checks, exposed service role key, RLS bypassed without reason, user_metadata used for auth decisions
 - Next.js App Router misuse: client/server boundary violations, missing 'use client' / 'use server', getSession() instead of getUser()
 - Supabase query issues: missing .eq('tenant_id', ...), wrong client (browser vs server), no error handling on DB writes
-- i18n: hardcoded UI strings instead of t()
+- i18n: hardcoded UI strings instead of t(), or a key added to only one of public/locales/en/ and sv/
 - TypeScript: any casts, missing types
 - Migration hygiene: if a migration file changed, check it follows the 0004 RLS convention (tenant*admin_manage*<table> / tenant*member_read*<table> with the is_system_admin() OR clause) and that a SELECT policy exists before any DELETE policy
 - Unit test coverage: non-trivial logic (calculations, branching, validation) missing a Vitest test, following `src/lib/scheduling/grid-logic.test.ts` as the convention
-- Integration test coverage: changed route handlers or Server Actions missing a test that exercises tenant isolation (cross-tenant access should be denied) and the auth-required path (unauthenticated/wrong-role should be rejected)
+- Integration test coverage: changed route handlers or Server Actions missing a test in tests/integration/ that exercises tenant isolation (cross-tenant access should be denied) and the auth-required path (unauthenticated/wrong-role should be rejected)
+- Service-role usage: createSupabaseServiceClient() where the RLS-bound client would do — flag it, since service role bypasses tenant isolation entirely
 - If DB schema changed: confirm `npm run db:types` was run and `src/types/app.ts` was updated to match (per the "After any DB migration" convention)
 
 Skip:

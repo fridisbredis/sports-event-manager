@@ -15,7 +15,7 @@ Rules:
 
 - Follow existing project patterns (Server Components by default, Server Actions for mutations)
 - Admin screens: web-first. Official/participant screens: mobile-first
-- All UI strings through t() — add keys to public/locales/en/ as needed
+- All UI strings through t() — add every new key to BOTH public/locales/en/ and public/locales/sv/ (a locale-parity test enforces this)
 - No theme.ts — use Tailwind utility classes directly, consistent with existing components
 - Don't add features beyond what was asked for
 
@@ -28,11 +28,11 @@ Process:
 5. Implement step-by-step with minimal changes
 6. If DB changes needed: write migration, show SQL, wait for approval before executing
 7. Write Vitest tests for any new non-trivial logic (see Tests below)
-8. Run `npm test` and fix any failures before considering the feature done
+8. Run `npm test` and `npm run format` on changed files before considering the feature done
 
 Screen IDs (use in commit messages):
 EVT-01/02, WS-01/02, OFF-01, SCHED-01, COMM-01, ACCT-01, AUTH-01/02,
-HOME-01, INFO-01, MYSCH-01, ANN-01, SYS-01/02
+HOME-01, INFO-01, MYSCH-01, ANN-01, SYS-01/02/03
 
 Tests (Vitest):
 
