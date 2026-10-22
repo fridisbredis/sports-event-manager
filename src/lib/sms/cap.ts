@@ -148,3 +148,98 @@ export async function isSmsBlockedByCap(args: ReadArgs): Promise<boolean> {
   const status = await readSmsCapStatus(args)
   return status?.exceeded ?? false
 }
+
+export interface TenantSmsUsage extends SmsCapStatus {
+  tenantId: string
+  tenantName: string
+  tier: string
+}
+
+interface ReadAllArgs {
+  service: SupabaseClient<Database>
+  /** The tenants to report on, already read by the caller. */
+  tenants: { id: string; name: string; tier: string }[]
+  op: string
+}
+
+/**
+ * This month's spend for every tenant, for the system-admin overview (N24).
+ *
+ * One query for all of them rather than one per tenant. Three tenants today
+ * makes the difference academic, but the shape of the wrong version — a loop
+ * issuing a query each iteration — is the kind that looks fine until it is
+ * quietly doing fifty, and this page is precisely where more tenants show up
+ * first.
+ *
+ * Tenants with no usage are still returned, at zero. A system admin scanning
+ * for a tenant about to be cut off needs to see every tenant in the list; one
+ * that is missing because it has sent nothing reads as a tenant that is
+ * missing.
+ *
+ * Returns null if usage could not be read at all — the caller shows nothing
+ * rather than a table of zeroes, which would be indistinguishable from a
+ * genuinely quiet month.
+ */
+export async function readAllTenantSmsUsage({
+  service,
+  tenants,
+  op,
+}: ReadAllArgs): Promise<TenantSmsUsage[] | null> {
+  if (tenants.length === 0) return []
+
+  let rows: { tenant_id: string; segments: number; status: string }[] | null = null
+
+  try {
+    const result = await service
+      .from('sms_usage')
+      .select('tenant_id, segments, status')
+      .in(
+        'tenant_id',
+        tenants.map((t) => t.id)
+      )
+      .gte('created_at', startOfMonthUtc())
+
+    if (result.error) {
+      logQueryError(result.error, {
+        op,
+        table: 'sms_usage',
+        kind: 'select',
+        extra: { consequence: 'sysadmin_usage_overview_unavailable' },
+      })
+      return null
+    }
+
+    rows = result.data
+  } catch (err) {
+    logQueryError(err as never, {
+      op,
+      table: 'sms_usage',
+      kind: 'select',
+      extra: { consequence: 'sysadmin_usage_overview_unavailable' },
+    })
+    return null
+  }
+
+  const byTenant = new Map<string, { segments: number; status: string }[]>()
+  for (const row of rows ?? []) {
+    const list = byTenant.get(row.tenant_id)
+    if (list) list.push(row)
+    else byTenant.set(row.tenant_id, [row])
+  }
+
+  return tenants.map((tenant) => {
+    const totals = totalUsage(byTenant.get(tenant.id) ?? [])
+    const capSek = monthlySmsCapSek(tenant.tier)
+
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tier: tenant.tier,
+      spentSek: totals.sek,
+      capSek,
+      exceeded: totals.sek >= capSek,
+      fraction: capSek > 0 ? Math.min(totals.sek / capSek, 1) : 1,
+      usingFallbackRate: isUsingFallbackRate(),
+    }
+  })
+}

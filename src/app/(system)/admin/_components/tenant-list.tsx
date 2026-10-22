@@ -11,6 +11,8 @@ import { SystemButton } from './system-button'
 import { setTenantActive } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
+import { formatSek } from '@/lib/i18n/date-locale'
+import type { TenantSmsUsage } from '@/lib/sms/cap'
 
 interface Tenant {
   id: string
@@ -22,10 +24,16 @@ interface Tenant {
 
 interface Props {
   tenants: Tenant[]
+  /** N24 month-to-date spend per tenant. Null when usage could not be read —
+   *  the column is then hidden rather than showing every tenant at zero,
+   *  which would read as a quiet month rather than a failed query. */
+  smsUsage: TenantSmsUsage[] | null
 }
 
-export function TenantList({ tenants }: Props) {
-  const { t } = useTranslation('admin')
+export function TenantList({ tenants, smsUsage }: Props) {
+  const { t, i18n } = useTranslation('admin')
+  const language = i18n.language
+  const usageById = new Map((smsUsage ?? []).map((u) => [u.tenantId, u]))
   const [modalOpen, setModalOpen] = useState(false)
   const [pending, setPending] = useState<string | null>(null)
 
@@ -88,6 +96,12 @@ export function TenantList({ tenants }: Props) {
               <TableColumn>{t('systemAdmin.tenantColumn')}</TableColumn>
               <TableColumn>{t('systemAdmin.statusColumn')}</TableColumn>
               <TableColumn>{t('systemAdmin.tierColumn')}</TableColumn>
+              {/* Hidden when usage could not be read at all, rather than
+                  rendering a column of blanks that invites the reader to
+                  conclude nobody has sent anything. */}
+              <TableColumn className={smsUsage === null ? 'hidden' : 'hidden sm:table-cell'}>
+                {t('systemAdmin.smsColumn')}
+              </TableColumn>
               {/* Hidden below md: four columns is one too many for a phone,
                   and this one is the least useful there — activate/deactivate
                   is also on the tenant's own page, which the name links to, so
@@ -124,6 +138,18 @@ export function TenantList({ tenants }: Props) {
                     </Chip>
                   </TableCell>
                   <TableCell className="capitalize text-ink-muted">{tenant.tier}</TableCell>
+                  {/* The column is kept in the DOM and hidden with a class
+                      rather than conditionally rendered: HeroUI's Table types
+                      its children as a fixed column set, so a conditional
+                      element breaks the header/cell pairing. */}
+                  <TableCell className={smsUsage === null ? 'hidden' : 'hidden sm:table-cell'}>
+                    <TenantSmsCell
+                      usage={usageById.get(tenant.id)}
+                      language={language}
+                      ofLabel={t('systemAdmin.smsOf')}
+                      blockedLabel={t('systemAdmin.smsBlocked')}
+                    />
+                  </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <button
                       type="button"
@@ -143,5 +169,62 @@ export function TenantList({ tenants }: Props) {
 
       <CreateTenantModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </>
+  )
+}
+
+/**
+ * One tenant's month-to-date SMS spend (N24).
+ *
+ * The figure is the point, not a meter: a system admin reads this column to
+ * spot the one row that needs attention, and three progress bars in a table
+ * make that harder rather than easier. Colour carries the signal instead,
+ * and only when there is one — ordinary rows stay muted like the tier beside
+ * them.
+ *
+ * "Blocked" is spelled out rather than left to colour alone. It is the one
+ * state with a consequence (sending has actually stopped), and a red number
+ * says "high" while the word says what happened.
+ */
+export function TenantSmsCell({
+  usage,
+  language,
+  ofLabel,
+  blockedLabel,
+}: {
+  usage?: TenantSmsUsage
+  language: string
+  ofLabel: string
+  blockedLabel: string
+}) {
+  // A tenant with no row at all: readAllTenantSmsUsage returns every tenant,
+  // so this only happens if the two lists disagree. An em dash rather than
+  // "0 kr", which would assert something this cell does not know.
+  if (!usage) return <span className="text-ink-faint">—</span>
+
+  const approaching = !usage.exceeded && usage.fraction >= 0.8
+
+  return (
+    <div className="whitespace-nowrap">
+      <span
+        className={`tabular-nums ${
+          usage.exceeded
+            ? 'font-semibold text-destructive'
+            : approaching
+              ? 'font-semibold text-status-pending-text'
+              : 'text-ink-muted'
+        }`}
+      >
+        {formatSek(usage.spentSek, language)}
+      </span>
+      <span className="text-ink-faint">
+        {' '}
+        {ofLabel} {formatSek(usage.capSek, language)}
+      </span>
+      {usage.exceeded && (
+        <span className="ml-2 rounded px-1.5 py-0.5 text-xs font-semibold text-destructive">
+          {blockedLabel}
+        </span>
+      )}
+    </div>
   )
 }
