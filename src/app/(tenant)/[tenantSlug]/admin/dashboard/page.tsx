@@ -9,8 +9,10 @@ import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
 import { OfficialsCard } from './_components/officials-card'
 import { SchedulingWarningsCard } from './_components/scheduling-warnings-card'
+import { SmsUsageCard } from './_components/sms-usage-card'
 import { AdminAreasGrid } from './_components/admin-areas-grid'
-import { dateLocaleFor } from '@/lib/i18n/date-locale'
+import { dateLocaleFor, formatMoney } from '@/lib/i18n/date-locale'
+import { readSmsCapStatus } from '@/lib/sms/cap'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -104,6 +106,25 @@ export default async function DashboardPage({ params }: Props) {
     earliest_stage_id: earliestStageId,
   } = await getAdminDashboardCached(tenant.id)
 
+  // N24: this month's SMS spend against the tenant's cap.
+  //
+  // Read OUTSIDE getAdminDashboardCached on purpose. That cache holds for 60
+  // seconds, which is right for counts that only change when an admin edits
+  // something — but this figure is the explanation for why sending just
+  // stopped, and a minute-old "you have room left" next to invites that are
+  // failing is worse than no card at all. One indexed range scan per
+  // dashboard load is a fair price for it being true.
+  //
+  // Returns null if usage can't be read; the card is then omitted rather than
+  // shown with a figure nobody can stand behind. Sending is unaffected either
+  // way — cap.ts fails open.
+  const smsCap = await readSmsCapStatus({
+    service: createSupabaseServiceClient(),
+    tenantId: tenant.id,
+    tier: tenant.tier,
+    op: 'GET /[tenantSlug]/admin/dashboard',
+  })
+
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = raceStageCount > 0
   const canPublish = hasName && hasRaceStage
@@ -181,6 +202,27 @@ export default async function DashboardPage({ params }: Props) {
           reviewLabel={t('dashboard.reviewInScheduling')}
         />
       </div>
+
+      {smsCap && (
+        <div className="mb-5">
+          <SmsUsageCard
+            title={t('dashboard.smsUsage')}
+            spentAmount={smsCap.spentAmount}
+            capAmount={smsCap.capAmount}
+            fraction={smsCap.fraction}
+            exceeded={smsCap.exceeded}
+            amountLabel={t('dashboard.smsUsageAmount', {
+              spent: formatMoney(smsCap.spentAmount, language),
+              cap: formatMoney(smsCap.capAmount, language),
+            })}
+            okLabel={t('dashboard.smsUsageOk')}
+            approachingLabel={t('dashboard.smsUsageApproaching')}
+            reachedLabel={t('dashboard.smsUsageReached')}
+            blockedExplanation={t('dashboard.smsUsageBlocked')}
+            estimateNote={smsCap.usingFallbackRate ? t('dashboard.smsUsageEstimated') : undefined}
+          />
+        </div>
+      )}
 
       <AdminAreasGrid
         title={t('dashboard.adminAreas')}

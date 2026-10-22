@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { totalUsage, sekPerSegment, isUsingFallbackRate, startOfMonthUtc } from './cost'
+import { totalUsage, costPerSegment, isUsingFallbackRate, startOfMonthUtc } from './cost'
 import { parseSegments, parsePrice } from './usage'
 
 afterEach(() => {
@@ -46,11 +46,11 @@ describe('parsePrice', () => {
   })
 })
 
-describe('sekPerSegment', () => {
+describe('costPerSegment', () => {
   it('uses a configured rate when one is set', () => {
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '0.42')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '0.42')
 
-    expect(sekPerSegment()).toBe(0.42)
+    expect(costPerSegment()).toBe(0.42)
     expect(isUsingFallbackRate()).toBe(false)
   })
 
@@ -61,9 +61,9 @@ describe('sekPerSegment', () => {
     ['zero', '0'],
     ['negative', '-1'],
   ])('falls back and says so when the rate is %s', (_label, value) => {
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', value as string)
+    vi.stubEnv('SMS_COST_PER_SEGMENT', value as string)
 
-    expect(sekPerSegment()).toBeGreaterThan(0)
+    expect(costPerSegment()).toBeGreaterThan(0)
     expect(isUsingFallbackRate()).toBe(true)
   })
 })
@@ -72,7 +72,7 @@ describe('totalUsage', () => {
   it('counts segments rather than messages', () => {
     // The distinction the whole module exists for: two 2-segment invites cost
     // the same as four single-segment announcements.
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '1')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '1')
 
     const totals = totalUsage([
       { segments: 2, status: 'sent' },
@@ -81,11 +81,11 @@ describe('totalUsage', () => {
 
     expect(totals.sent).toBe(2)
     expect(totals.segments).toBe(4)
-    expect(totals.sek).toBe(4)
+    expect(totals.amount).toBe(4)
   })
 
   it('counts failed sends but charges nothing for them', () => {
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '1')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '1')
 
     const totals = totalUsage([
       { segments: 1, status: 'sent' },
@@ -98,17 +98,17 @@ describe('totalUsage', () => {
     // Twilio does not charge for a message it refused, so the failed rows'
     // segments must not reach the total.
     expect(totals.segments).toBe(1)
-    expect(totals.sek).toBe(1)
+    expect(totals.amount).toBe(1)
   })
 
   it('returns zeroes for no usage', () => {
-    expect(totalUsage([])).toEqual({ sent: 0, failed: 0, segments: 0, sek: 0 })
+    expect(totalUsage([])).toEqual({ sent: 0, failed: 0, segments: 0, amount: 0 })
   })
 
   it('rounds once at the end, not per row', () => {
     // 3 × 0.333 = 0.999 → 1.00. Rounding each row to öre first would give
     // 3 × 0.33 = 0.99, and the error grows with volume.
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '0.333')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '0.333')
 
     const totals = totalUsage([
       { segments: 1, status: 'sent' },
@@ -116,17 +116,17 @@ describe('totalUsage', () => {
       { segments: 1, status: 'sent' },
     ])
 
-    expect(totals.sek).toBe(1)
+    expect(totals.amount).toBe(1)
   })
 
   it('stays exact over a realistic announcement volume', () => {
     // 500 recipients — the per-announcement cap — at 2 segments each.
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '0.75')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '0.75')
 
     const totals = totalUsage(Array.from({ length: 500 }, () => ({ segments: 2, status: 'sent' })))
 
     expect(totals.segments).toBe(1000)
-    expect(totals.sek).toBe(750)
+    expect(totals.amount).toBe(750)
   })
 })
 
@@ -141,5 +141,25 @@ describe('startOfMonthUtc', () => {
 
   it('handles a January date without rolling the year', () => {
     expect(startOfMonthUtc(new Date('2026-01-15T12:00:00.000Z'))).toBe('2026-01-01T00:00:00.000Z')
+  })
+})
+
+describe('SMS_COST_PER_SEGMENT rename', () => {
+  it('still honours the old SMS_SEK_PER_SEGMENT name', () => {
+    // An environment that has only the old name set must not silently drop to
+    // the built-in rate on the deploy that renames it — that would move every
+    // tenant's cap without anyone touching a figure.
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '')
+    vi.stubEnv('SMS_SEK_PER_SEGMENT', '0.42')
+
+    expect(costPerSegment()).toBe(0.42)
+    expect(isUsingFallbackRate()).toBe(false)
+  })
+
+  it('prefers the new name when both are set', () => {
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '0.9')
+    vi.stubEnv('SMS_SEK_PER_SEGMENT', '0.42')
+
+    expect(costPerSegment()).toBe(0.9)
   })
 })

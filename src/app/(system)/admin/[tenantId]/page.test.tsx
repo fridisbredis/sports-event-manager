@@ -7,6 +7,16 @@ import { TenantDetail } from './_components/tenant-detail'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  // N24 reads sms_usage with the service client — revoked from
+  // `authenticated`, so the RLS-scoped client cannot see it. No rows: the
+  // tenant has sent nothing this month, which is what these cases assume.
+  createSupabaseServiceClient: vi.fn(() => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({ gte: () => Promise.resolve({ data: [], error: null }) }),
+      }),
+    }),
+  })),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
