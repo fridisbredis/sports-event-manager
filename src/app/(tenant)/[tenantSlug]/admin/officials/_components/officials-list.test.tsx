@@ -141,6 +141,7 @@ vi.mock('@heroui/react', () => {
     type,
     description,
     onKeyDown,
+    onBlur,
     isInvalid,
     errorMessage,
     autoFocus,
@@ -152,6 +153,7 @@ vi.mock('@heroui/react', () => {
     type?: string
     description?: ReactNode
     onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void
+    onBlur?: () => void
     isInvalid?: boolean
     errorMessage?: ReactNode
     autoFocus?: boolean
@@ -166,6 +168,10 @@ vi.mock('@heroui/react', () => {
         autoFocus={autoFocus}
         onChange={(e) => onValueChange?.(e.target.value)}
         onKeyDown={onKeyDown}
+        // Forwarded because validation timing depends on it: a stub that
+        // dropped onBlur would let blur-gated error display pass every test
+        // here and do nothing in the browser.
+        onBlur={onBlur}
       />
       {description}
       {isInvalid && errorMessage ? <span role="alert">{errorMessage}</span> : null}
@@ -259,6 +265,81 @@ async function openAddModalAndFillValidForm() {
 
   return screen.getByRole('button', { name: 'officials.sendInvite' })
 }
+
+describe('OfficialsList — phone validation timing', () => {
+  // The bug: the field turned red on the third keystroke of a number the user
+  // was still typing. Every valid number passes through invalid prefixes, so
+  // per-keystroke validation complains about input that is merely incomplete.
+  function openAddModalWithPartialPhone(value: string) {
+    fireEvent.click(screen.getByRole('button', { name: 'officials.add' }))
+    const phoneInput = screen.getByLabelText('officials.phone')
+    fireEvent.change(phoneInput, { target: { value } })
+    return phoneInput
+  }
+
+  const renderList = () =>
+    render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        officials={officials}
+        currentUserId={currentUserId}
+        details={{}}
+        language="en"
+      />
+    )
+
+  it('stays silent while an incomplete number is still being typed', () => {
+    renderList()
+    openAddModalWithPartialPhone('768')
+
+    expect(screen.queryByText('officials.invalidPhone')).not.toBeInTheDocument()
+  })
+
+  it('shows the error once the field is left still invalid', async () => {
+    renderList()
+    const phoneInput = openAddModalWithPartialPhone('768')
+
+    fireEvent.blur(phoneInput)
+
+    expect(await screen.findByText('officials.invalidPhone')).toBeInTheDocument()
+  })
+
+  it('stays silent when the field is left holding a valid number', () => {
+    renderList()
+    const phoneInput = openAddModalWithPartialPhone('0701234567')
+
+    fireEvent.blur(phoneInput)
+
+    expect(screen.queryByText('officials.invalidPhone')).not.toBeInTheDocument()
+  })
+
+  it('stays silent when an untouched empty field is left', () => {
+    renderList()
+    const phoneInput = openAddModalWithPartialPhone('')
+
+    fireEvent.blur(phoneInput)
+
+    // Leaving a field you never filled is not an error worth colouring red —
+    // the disabled submit button already says the form is incomplete.
+    expect(screen.queryByText('officials.invalidPhone')).not.toBeInTheDocument()
+  })
+
+  it('forgets it was touched when the modal is reopened', async () => {
+    renderList()
+    const phoneInput = openAddModalWithPartialPhone('768')
+    fireEvent.blur(phoneInput)
+    expect(await screen.findByText('officials.invalidPhone')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'officials.cancel' }))
+    await waitFor(() => expect(screen.queryByLabelText('officials.phone')).not.toBeInTheDocument())
+
+    // A fresh form must start clean. Without resetting phoneTouched, the next
+    // invite would go red on the first keystroke — the original bug, restored.
+    openAddModalWithPartialPhone('768')
+    expect(screen.queryByText('officials.invalidPhone')).not.toBeInTheDocument()
+  })
+})
 
 describe('OfficialsList — handleAdd error branches', () => {
   it('409: shows duplicate-phone toast and marks the phone field invalid', async () => {
