@@ -16,7 +16,12 @@ import { logQueryError } from '@/lib/db/query-error'
  * why it still has to be stated: the SEK figure is an undercount.
  */
 
-export type SmsKind = 'invite' | 'invite_resend' | 'announcement' | 'gdpr_warning'
+export type SmsKind =
+  | 'invite'
+  | 'invite_resend'
+  | 'announcement'
+  | 'gdpr_warning'
+  | 'availability_confirm'
 
 /** The shape of a Twilio create() response, narrowed to what we record. */
 interface TwilioMessageLike {

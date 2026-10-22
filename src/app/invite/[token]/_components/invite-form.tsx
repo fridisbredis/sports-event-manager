@@ -495,7 +495,11 @@ export default function InviteForm({
         {/* Pressing "Confirm availability" sends a second SMS and swaps the form
             for a code field. Unannounced, that reads as the form having gone
             wrong — and an SMS arriving right after someone taps a link in an SMS
-            is exactly the shape people are taught to distrust. */}
+            is exactly the shape people are taught to distrust.
+            A third SMS follows once the code is verified (N16, the bookmark
+            link). That one is announced on the success screen rather than here:
+            it arrives two steps later, and naming it now would warn about
+            something the user cannot yet act on. */}
         <p className="mb-3 text-center text-xs text-gray-400 leading-relaxed">
           {t('confirmation.confirmButtonHint')}
         </p>

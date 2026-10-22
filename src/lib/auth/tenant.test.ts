@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   getUserRoles,
   resolvePostLoginRedirect,
@@ -28,6 +28,16 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/audit/log-auth-event', () => ({
   logAuthEvent: vi.fn(),
+}))
+
+const messagesCreate = vi.fn()
+
+vi.mock('twilio', () => ({
+  default: vi.fn(() => ({ messages: { create: messagesCreate } })),
+}))
+
+vi.mock('@/lib/sms/usage', () => ({
+  recordSmsUsage: vi.fn(),
 }))
 
 vi.mock('next/cache', () => ({
@@ -87,6 +97,10 @@ const OTHER_TENANT_ID = '22222222-2222-2222-2222-222222222222'
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('getUserRoles', () => {
@@ -172,6 +186,67 @@ describe('confirmOfficialInvite', () => {
     vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
     return { rpc, fromMock }
   }
+
+  // N16: the phone-fallback flow is the case where a confirmation SMS is
+  // unambiguously useful — this official never saw an invite link, so the
+  // link in their message history is genuinely new information.
+  describe('N16 confirmation SMS', () => {
+    function mockServiceClientByTable({
+      rpcResult,
+      tenantResult,
+      officialResult,
+    }: {
+      rpcResult: { data: unknown; error: { message: string } | null }
+      tenantResult: unknown
+      officialResult: unknown
+    }) {
+      const rpc = vi.fn().mockResolvedValue(rpcResult)
+      const fromMock = vi.fn((table: string) =>
+        chain(table === 'officials' ? officialResult : tenantResult)
+      )
+      vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc, from: fromMock } as never)
+      return { rpc, fromMock }
+    }
+
+    const granted = {
+      rpcResult: { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+      tenantResult: { data: { slug: 'viadal' } },
+      officialResult: { data: { sms_opt_out: false } },
+    }
+
+    it('sends a confirmation SMS with a link to the tenant home', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+      mockServiceClientByTable(granted)
+
+      await confirmOfficialInvite('user-1', TENANT_ID, '+46701234567', true)
+
+      expect(messagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('https://app.example.com/viadal/home'),
+        })
+      )
+    })
+
+    it('does not send when the official has opted out of SMS', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+      mockServiceClientByTable({ ...granted, officialResult: { data: { sms_opt_out: true } } })
+
+      await confirmOfficialInvite('user-1', TENANT_ID, '+46701234567', true)
+
+      expect(messagesCreate).not.toHaveBeenCalled()
+    })
+
+    // The caller redirects immediately after this returns, and Next's
+    // redirect() throws — so a dead Twilio must not propagate out of here or
+    // the official lands back on /login having actually been confirmed.
+    it('still returns the slug when the SMS fails to send', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+      mockServiceClientByTable(granted)
+      messagesCreate.mockRejectedValueOnce(Object.assign(new Error('twilio down'), { code: 21211 }))
+
+      expect(await confirmOfficialInvite('user-1', TENANT_ID, '+46701234567', true)).toBe('viadal')
+    })
+  })
 
   it('returns null when the RPC reports no matching invited official', async () => {
     const { rpc } = mockServiceClientWithRpc({

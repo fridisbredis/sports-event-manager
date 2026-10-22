@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
@@ -17,6 +17,16 @@ vi.mock('@/lib/audit/log-auth-event', () => ({
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
+}))
+
+const messagesCreate = vi.fn()
+
+vi.mock('twilio', () => ({
+  default: vi.fn(() => ({ messages: { create: messagesCreate } })),
+}))
+
+vi.mock('@/lib/sms/usage', () => ({
+  recordSmsUsage: vi.fn(),
 }))
 
 const TOKEN = '11111111-1111-1111-1111-111111111111'
@@ -61,6 +71,10 @@ const validBody = { token: TOKEN, name: 'Kalle Official', privacyAccepted: true 
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('POST /api/officials/confirm', () => {
@@ -185,6 +199,59 @@ describe('POST /api/officials/confirm', () => {
 
     expect(res.status).toBe(200)
     expect(body).toEqual({ ok: true, tenantSlug: undefined })
+  })
+
+  // N16: the SMS is a bookmark — its value is the link sitting in the
+  // official's message history later, not what it does on arrival.
+  describe('N16 confirmation SMS', () => {
+    it('sends a confirmation SMS with a link to the tenant home', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      mockServiceClient(
+        { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+        { data: { slug: 'viadal', sms_opt_out: false } }
+      )
+
+      await POST(makeRequest(validBody))
+
+      expect(messagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: PHONE,
+          body: expect.stringContaining('https://app.example.com/viadal/home'),
+        })
+      )
+    })
+
+    it('does not send when the official has opted out of SMS', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      mockServiceClient(
+        { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+        { data: { slug: 'viadal', sms_opt_out: true } }
+      )
+
+      await POST(makeRequest(validBody))
+
+      expect(messagesCreate).not.toHaveBeenCalled()
+    })
+
+    // The confirmation has already committed by this point. A dead Twilio
+    // must not turn a successful confirmation into a failed request — the
+    // same rule the language upsert above it already follows.
+    it('still confirms when the SMS fails to send', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      mockServiceClient(
+        { data: { tenant_id: TENANT_ID, role_granted: true }, error: null },
+        { data: { slug: 'viadal', sms_opt_out: false } }
+      )
+      messagesCreate.mockRejectedValueOnce(Object.assign(new Error('twilio down'), { code: 21211 }))
+
+      const res = await POST(makeRequest(validBody))
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ ok: true, tenantSlug: 'viadal' })
+    })
   })
 
   // PERF-06 / F-PERF-04 Phase 3
