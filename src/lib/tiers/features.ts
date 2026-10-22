@@ -47,7 +47,8 @@ export function maxTenantAdmins(tier: string): number {
   return MAX_TENANT_ADMINS[tier]
 }
 
-// N24: the monthly SMS spending cap per tenant, in SEK, by tier.
+// N24: the monthly SMS spending cap per tenant, by tier, in the currency
+// SMS_COST_CURRENCY names (SEK today).
 //
 // ONE cap, per calendar month, per tenant. An earlier version of the
 // requirement (carried from N11 and the gap list) also specified a per-EVENT
@@ -68,16 +69,16 @@ export function maxTenantAdmins(tier: string): number {
 //
 // Unrecognised tier gets the lowest cap, matching maxTenantAdmins: a renamed
 // or hand-edited tier value restricts spending rather than removing the limit.
-export const MONTHLY_SMS_CAP_SEK: Record<Tier, number> = {
+export const MONTHLY_SMS_CAP: Record<Tier, number> = {
   standard: 100,
   premium: 200,
   professional: 300,
 }
 
-export function monthlySmsCapSek(tier: string): number {
-  if (!isTier(tier)) return MONTHLY_SMS_CAP_SEK[TIER_ORDER[0]]
+export function monthlySmsCap(tier: string): number {
+  if (!isTier(tier)) return MONTHLY_SMS_CAP[TIER_ORDER[0]]
 
-  return MONTHLY_SMS_CAP_SEK[tier]
+  return MONTHLY_SMS_CAP[tier]
 }
 
 export function isTier(value: string): value is Tier {

@@ -8,6 +8,17 @@ import { expectRangeCeiling, expectReadCeilingWarn } from '@/lib/db/bounded-read
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  // N24 reads sms_usage with the service client — that table is revoked from
+  // `authenticated`, so the RLS-scoped client above cannot see it. Answers
+  // with no rows: every tenant at zero spend, which is what these cases
+  // assume. The column itself is asserted in tenant-list.test.tsx.
+  createSupabaseServiceClient: vi.fn(() => ({
+    from: () => ({
+      select: () => ({
+        in: () => ({ gte: () => Promise.resolve({ data: [], error: null }) }),
+      }),
+    }),
+  })),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -63,7 +74,7 @@ describe('SystemAdminPage', () => {
     expect(fromMock).toHaveBeenCalledWith('tenants')
     expect(tenantsBuilder.select).toHaveBeenCalledWith('id, name, slug, is_active, tier')
     expect(tenantsBuilder.order).toHaveBeenCalledWith('created_at', { ascending: false })
-    expect(result.props).toEqual({ tenants })
+    expect(result.props.tenants).toEqual(tenants)
   })
 
   it('bounds the read, asking for one row past the ceiling (PERF-06)', async () => {
@@ -121,6 +132,9 @@ describe('SystemAdminPage', () => {
 
     const result = await SystemAdminPage()
 
-    expect(result.props).toEqual({ tenants: [] })
+    expect(result.props.tenants).toEqual([])
+    // N24 adds a smsUsage prop alongside; an empty tenant list means no
+    // usage query is issued at all, so it comes back empty rather than null.
+    expect(result.props.smsUsage).toEqual([])
   })
 })

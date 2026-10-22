@@ -321,9 +321,9 @@ export async function POST(request: NextRequest) {
     await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
     logger.warn(
       `Invite SMS blocked by N24 monthly cap: tenant=${tenantId} ` +
-        `spentSek=${capStatus.spentSek} capSek=${capStatus.capSek}` +
+        `spent=${capStatus.spentAmount} cap=${capStatus.capAmount}` +
         (capStatus.usingFallbackRate
-          ? ' (built-in per-segment rate, SMS_SEK_PER_SEGMENT unset)'
+          ? ' (built-in per-segment rate, SMS_COST_PER_SEGMENT unset)'
           : '')
     )
   } else {
