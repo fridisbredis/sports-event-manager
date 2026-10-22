@@ -84,8 +84,14 @@ export default function OfficialsList({
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY)
+  // Validation is only shown once the field has been left. Typing a valid
+  // number means passing through every invalid prefix of it, so validating on
+  // each keystroke marks the field red while the user is still mid-number.
+  // Same pattern as the login form (src/app/(auth)/login/page.tsx).
+  const [phoneTouched, setPhoneTouched] = useState(false)
 
   const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
+  const showPhoneError = phoneTouched && phone.trim() !== '' && !phoneIsValid
 
   async function handleAdd() {
     if (!name.trim() || !phoneIsValid || pending) return
@@ -108,6 +114,7 @@ export default function OfficialsList({
         setName('')
         setPhone('')
         setPhoneCountry(DEFAULT_PHONE_COUNTRY)
+        setPhoneTouched(false)
         setAddModalOpen(false)
         // The official exists either way — only the invite SMS can have failed here.
         if (smsSent === false) {
@@ -222,6 +229,7 @@ export default function OfficialsList({
     setName('')
     setPhone('')
     setPhoneCountry(DEFAULT_PHONE_COUNTRY)
+    setPhoneTouched(false)
     setAddError(null)
   }
 
@@ -444,10 +452,13 @@ export default function OfficialsList({
                 placeholder={t('officials.phonePlaceholder')}
                 description={t('officials.phoneHint')}
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                isInvalid={!!addError || (phone.trim() !== '' && !phoneIsValid)}
+                onBlur={() => setPhoneTouched(true)}
+                // addError is not gated on touch: it comes back from the server
+                // after a submit, so the field has necessarily been used by then,
+                // and hiding it would leave a rejected submit unexplained.
+                isInvalid={!!addError || showPhoneError}
                 errorMessage={
-                  addError ??
-                  (phone.trim() !== '' && !phoneIsValid ? t('officials.invalidPhone') : undefined)
+                  addError ?? (showPhoneError ? t('officials.invalidPhone') : undefined)
                 }
               />
             </div>

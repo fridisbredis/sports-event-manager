@@ -202,11 +202,22 @@ test.describe('OFF-01 officials roster', () => {
     await expect(send).toBeDisabled()
 
     await modal.getByLabel('Name').fill('E2E Test Official')
-    await modal.getByLabel('Mobile number').fill('123')
+
+    const phone = modal.getByLabel('Mobile number')
+    const invalidNumber = modal.getByText('Enter a valid mobile number for the selected country.')
+
+    await phone.fill('123')
     await expect(send).toBeDisabled()
-    await expect(
-      modal.getByText('Enter a valid mobile number for the selected country.')
-    ).toBeVisible()
+
+    // Still focused, so the number is only incomplete, not wrong: every valid
+    // number is typed through invalid prefixes, and colouring the field red
+    // mid-entry reads as a complaint about input the user has not finished.
+    await expect(invalidNumber).toBeHidden()
+
+    // Leaving it still invalid is what makes it an error worth showing.
+    await phone.blur()
+    await expect(invalidNumber).toBeVisible()
+    await expect(send).toBeDisabled()
 
     // Closing without sending leaves the roster untouched — this suite must not
     // add officials to the shared seed tenant, which would skew EVT-01's counts.
