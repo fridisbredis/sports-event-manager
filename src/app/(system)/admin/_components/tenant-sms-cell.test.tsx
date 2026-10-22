@@ -9,10 +9,10 @@ function usage(overrides = {}) {
     tenantId: 't1',
     tenantName: 'Viadal 2026',
     tier: 'professional',
-    spentSek: 56,
+    spentAmount: 56,
     segments: 80,
     failed: 0,
-    capSek: 300,
+    capAmount: 300,
     exceeded: false,
     fraction: 0.19,
     usingFallbackRate: false,
@@ -32,14 +32,14 @@ describe('TenantSmsCell', () => {
     // The one state with a consequence. Colour alone says "high"; the word
     // says what actually happened.
     render(
-      <TenantSmsCell usage={usage({ exceeded: true, spentSek: 300, fraction: 1 })} {...LABELS} />
+      <TenantSmsCell usage={usage({ exceeded: true, spentAmount: 300, fraction: 1 })} {...LABELS} />
     )
 
     expect(screen.getByText('Stoppat')).toBeInTheDocument()
   })
 
   it('does not say Blocked while the tenant is merely close', () => {
-    render(<TenantSmsCell usage={usage({ spentSek: 250, fraction: 0.83 })} {...LABELS} />)
+    render(<TenantSmsCell usage={usage({ spentAmount: 250, fraction: 0.83 })} {...LABELS} />)
 
     expect(screen.queryByText('Stoppat')).not.toBeInTheDocument()
   })
@@ -57,7 +57,7 @@ describe('TenantSmsCell', () => {
     const { rerender } = render(<TenantSmsCell usage={usage()} {...LABELS} />)
     expect(screen.getByText('56 kr').className).not.toContain('font-semibold')
 
-    rerender(<TenantSmsCell usage={usage({ spentSek: 250, fraction: 0.83 })} {...LABELS} />)
+    rerender(<TenantSmsCell usage={usage({ spentAmount: 250, fraction: 0.83 })} {...LABELS} />)
     expect(screen.getByText('250 kr').className).toContain('font-semibold')
   })
 })

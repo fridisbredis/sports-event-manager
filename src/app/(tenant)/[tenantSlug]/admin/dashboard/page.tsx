@@ -11,7 +11,7 @@ import { OfficialsCard } from './_components/officials-card'
 import { SchedulingWarningsCard } from './_components/scheduling-warnings-card'
 import { SmsUsageCard } from './_components/sms-usage-card'
 import { AdminAreasGrid } from './_components/admin-areas-grid'
-import { dateLocaleFor, formatSek } from '@/lib/i18n/date-locale'
+import { dateLocaleFor, formatMoney } from '@/lib/i18n/date-locale'
 import { readSmsCapStatus } from '@/lib/sms/cap'
 
 interface Props {
@@ -207,13 +207,13 @@ export default async function DashboardPage({ params }: Props) {
         <div className="mb-5">
           <SmsUsageCard
             title={t('dashboard.smsUsage')}
-            spentSek={smsCap.spentSek}
-            capSek={smsCap.capSek}
+            spentAmount={smsCap.spentAmount}
+            capAmount={smsCap.capAmount}
             fraction={smsCap.fraction}
             exceeded={smsCap.exceeded}
             amountLabel={t('dashboard.smsUsageAmount', {
-              spent: formatSek(smsCap.spentSek, language),
-              cap: formatSek(smsCap.capSek, language),
+              spent: formatMoney(smsCap.spentAmount, language),
+              cap: formatMoney(smsCap.capAmount, language),
             })}
             okLabel={t('dashboard.smsUsageOk')}
             approachingLabel={t('dashboard.smsUsageApproaching')}

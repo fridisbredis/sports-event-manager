@@ -11,7 +11,7 @@ import { SystemButton } from './system-button'
 import { setTenantActive } from '../actions'
 import { useTranslation } from '@/lib/i18n/client'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
-import { formatSek } from '@/lib/i18n/date-locale'
+import { formatMoney } from '@/lib/i18n/date-locale'
 import type { TenantSmsUsage } from '@/lib/sms/cap'
 
 interface Tenant {
@@ -214,11 +214,11 @@ export function TenantSmsCell({
               : 'text-ink-muted'
         }`}
       >
-        {formatSek(usage.spentSek, language)}
+        {formatMoney(usage.spentAmount, language)}
       </span>
       <span className="text-ink-faint">
         {' '}
-        {ofLabel} {formatSek(usage.capSek, language)}
+        {ofLabel} {formatMoney(usage.capAmount, language)}
       </span>
       {usage.exceeded && (
         <span className="ml-2 rounded px-1.5 py-0.5 text-xs font-semibold text-destructive">

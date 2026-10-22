@@ -15,10 +15,10 @@ const LABELS = {
 
 function usage(overrides = {}) {
   return {
-    spentSek: 56,
+    spentAmount: 56,
     segments: 80,
     failed: 0,
-    capSek: 300,
+    capAmount: 300,
     exceeded: false,
     fraction: 0.19,
     usingFallbackRate: false,
@@ -46,7 +46,10 @@ describe('TenantSmsSection', () => {
 
   it('replaces that with the blocked explanation once the cap is reached', () => {
     render(
-      <TenantSmsSection usage={usage({ exceeded: true, spentSek: 140, fraction: 1 })} {...LABELS} />
+      <TenantSmsSection
+        usage={usage({ exceeded: true, spentAmount: 140, fraction: 1 })}
+        {...LABELS}
+      />
     )
 
     expect(screen.getByText(LABELS.blockedHint)).toBeInTheDocument()

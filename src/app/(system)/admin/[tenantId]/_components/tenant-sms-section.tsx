@@ -1,4 +1,4 @@
-import { formatSek } from '@/lib/i18n/date-locale'
+import { formatMoney } from '@/lib/i18n/date-locale'
 import type { SmsCapStatus } from '@/lib/sms/cap'
 
 /**
@@ -64,11 +64,11 @@ export function TenantSmsSection({
                       : 'text-ink'
                 }
               >
-                {formatSek(usage.spentSek, language)}
+                {formatMoney(usage.spentAmount, language)}
               </span>
             </Row>
             <Row label={capLabel}>
-              <span className="text-ink">{formatSek(usage.capSek, language)}</span>
+              <span className="text-ink">{formatMoney(usage.capAmount, language)}</span>
             </Row>
             {/* The billable unit. Kronor are derived from this, so anyone
                 checking a figure against Twilio needs it rather than the

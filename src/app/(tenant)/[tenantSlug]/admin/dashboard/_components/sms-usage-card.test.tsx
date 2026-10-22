@@ -14,7 +14,7 @@ const BASE = {
 
 /** A tenant well under its cap — the state this card is in most of the year. */
 function quiet(overrides = {}) {
-  return { ...BASE, spentSek: 56, capSek: 300, fraction: 0.19, exceeded: false, ...overrides }
+  return { ...BASE, spentAmount: 56, capAmount: 300, fraction: 0.19, exceeded: false, ...overrides }
 }
 
 describe('SmsUsageCard', () => {
@@ -32,7 +32,7 @@ describe('SmsUsageCard', () => {
   })
 
   it('shows the bar and warns once spend approaches the cap', () => {
-    render(<SmsUsageCard {...quiet({ spentSek: 250, fraction: 0.83 })} />)
+    render(<SmsUsageCard {...quiet({ spentAmount: 250, fraction: 0.83 })} />)
 
     expect(screen.getByText('Approaching limit')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '83')
@@ -52,7 +52,7 @@ describe('SmsUsageCard', () => {
   it('says plainly that sending has stopped, and that login is unaffected', () => {
     // The reason the card exists. Without this sentence a capped admin sees
     // invites vanish with no explanation anywhere in the app.
-    render(<SmsUsageCard {...quiet({ spentSek: 300, fraction: 1, exceeded: true })} />)
+    render(<SmsUsageCard {...quiet({ spentAmount: 300, fraction: 1, exceeded: true })} />)
 
     expect(screen.getByText('Limit reached')).toBeInTheDocument()
     expect(screen.getByText(BASE.blockedExplanation)).toBeInTheDocument()

@@ -1,14 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { logQueryError } from '@/lib/db/query-error'
-import { monthlySmsCapSek } from '@/lib/tiers/features'
+import { monthlySmsCap } from '@/lib/tiers/features'
 import { isUsingFallbackRate, startOfMonthUtc, totalUsage } from './cost'
 
 /**
  * Enforcing the per-tenant monthly SMS spending cap (N24).
  *
  * N11 measures; this stops. One cap, in SEK, per calendar month, per tenant,
- * set by the tenant's tier in `MONTHLY_SMS_CAP_SEK`.
+ * set by the tenant's tier in `MONTHLY_SMS_CAP`.
  *
  * WHAT IS AND IS NOT STOPPED
  *
@@ -44,9 +44,9 @@ export type CappedSmsKind = 'invite' | 'invite_resend' | 'announcement'
 
 export interface SmsCapStatus {
   /** SEK spent this calendar month, derived from recorded segments. */
-  spentSek: number
+  spentAmount: number
   /**
-   * Billable segments behind spentSek. The kronor are derived from this, so
+   * Billable segments behind spentAmount. The kronor are derived from this, so
    * anyone checking a figure against a Twilio invoice needs the segments
    * rather than the conversion — totalUsage already counts them, and
    * discarding them here would mean a second query to get them back.
@@ -56,10 +56,10 @@ export interface SmsCapStatus {
    *  hundreds of them has a problem worth seeing. */
   failed: number
   /** The tier's monthly allowance in SEK. */
-  capSek: number
+  capAmount: number
   /** Whether the cap has been reached — at or over, not merely approaching. */
   exceeded: boolean
-  /** spentSek / capSek, clamped to 1. For a usage bar. */
+  /** spentAmount / capAmount, clamped to 1. For a usage bar. */
   fraction: number
   /**
    * True when the SEK figures rest on the placeholder per-segment rate rather
@@ -92,7 +92,7 @@ export async function readSmsCapStatus({
   tier,
   op,
 }: ReadArgs): Promise<SmsCapStatus | null> {
-  const capSek = monthlySmsCapSek(tier)
+  const capAmount = monthlySmsCap(tier)
 
   // Only `sent` rows carry segments, but failed rows are fetched too and
   // discarded by totalUsage — filtering here would mean two different
@@ -137,14 +137,14 @@ export async function readSmsCapStatus({
   }
 
   const totals = totalUsage(data ?? [])
-  const fraction = capSek > 0 ? Math.min(totals.sek / capSek, 1) : 1
+  const fraction = capAmount > 0 ? Math.min(totals.amount / capAmount, 1) : 1
 
   return {
-    spentSek: totals.sek,
+    spentAmount: totals.amount,
     segments: totals.segments,
     failed: totals.failed,
-    capSek,
-    exceeded: totals.sek >= capSek,
+    capAmount,
+    exceeded: totals.amount >= capAmount,
     fraction,
     usingFallbackRate: isUsingFallbackRate(),
   }
@@ -241,18 +241,18 @@ export async function readAllTenantSmsUsage({
 
   return tenants.map((tenant) => {
     const totals = totalUsage(byTenant.get(tenant.id) ?? [])
-    const capSek = monthlySmsCapSek(tenant.tier)
+    const capAmount = monthlySmsCap(tenant.tier)
 
     return {
       tenantId: tenant.id,
       tenantName: tenant.name,
       tier: tenant.tier,
-      spentSek: totals.sek,
+      spentAmount: totals.amount,
       segments: totals.segments,
       failed: totals.failed,
-      capSek,
-      exceeded: totals.sek >= capSek,
-      fraction: capSek > 0 ? Math.min(totals.sek / capSek, 1) : 1,
+      capAmount,
+      exceeded: totals.amount >= capAmount,
+      fraction: capAmount > 0 ? Math.min(totals.amount / capAmount, 1) : 1,
       usingFallbackRate: isUsingFallbackRate(),
     }
   })

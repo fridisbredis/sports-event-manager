@@ -70,10 +70,16 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 - Dev login can be tested via Supabase Test Phone Numbers — number `46768109304` with fixed OTP code `000000` (dev Supabase project `lhflutwvwvzawzbcuwup`), bypasses Twilio entirely
 - Prod login has always used the real Twilio sender — no Supabase Test Phone Number entry was ever added to prod (confirmed 2026-08-18; the earlier note claiming otherwise was incorrect)
 
-### `SMS_SEK_PER_SEGMENT` — the rate the N24 cap enforces on
+### `SMS_COST_PER_SEGMENT` — the rate the N24 cap enforces on
 
-Optional env var. Unset, the app uses **0.70 SEK/segment**
-(`src/lib/sms/cost.ts`).
+Optional env var. Unset, the app uses **0.70 per segment**
+(`src/lib/sms/cost.ts`), in whatever currency `SMS_COST_CURRENCY` names —
+SEK today.
+
+Renamed from `SMS_SEK_PER_SEGMENT` on 2026-10-22 so the currency is not
+baked into the variable name. **The old name is still read as a fallback**,
+so an environment that has it set keeps working; set the new name and drop
+the old one when convenient.
 
 **Measured, not guessed (2026-10-22).** Twilio's usage summary for September
 2026 on this account: **$1.81 across 28 outbound segments = $0.0646 per
@@ -89,7 +95,9 @@ a tenant marginally early, while one that is too low lets them past the cap
 unnoticed. Early is the right direction for the error.
 
 Set the env var to override without a deploy when pricing or the exchange rate
-moves enough to matter. `isUsingFallbackRate()` reports whether the built-in
+moves enough to matter. To change the currency itself, edit `SMS_COST_CURRENCY`
+in `src/lib/sms/cost.ts` — one edit, and past totals restate automatically
+because `sms_usage` stores segments rather than money. `isUsingFallbackRate()` reports whether the built-in
 figure is in use, and the cap's log lines say so.
 
 **Two costs this rate does not cover**, both deliberate:

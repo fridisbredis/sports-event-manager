@@ -1,4 +1,5 @@
 import type { Locale } from './config'
+import { SMS_COST_CURRENCY } from '@/lib/sms/cost'
 
 // Dates and calendar conventions are regional, not linguistic: the users are
 // at a Swedish event and expect Monday-first weeks, YYYY-MM-DD and 24-hour
@@ -40,21 +41,30 @@ export function dateLocaleFor(language?: string | null): string {
 }
 
 /**
- * An amount in SEK, formatted for display (N24's spend figures).
+ * A money amount formatted for display (N24's spend figures).
  *
  * Money is regional for the same reason dates are: the billing currency is
- * kronor whichever language the UI is in, so this resolves through the same
- * pinned Swedish locales — "56 kr" in both, with sv and en-SE agreeing on the
- * separator and placement.
+ * the platform's, not the reader's, so this resolves through the same pinned
+ * Swedish locales — "56 kr" in both sv and en-SE, which agree on separator
+ * and placement.
  *
- * Whole kronor, no decimals. These are spend-against-a-cap figures where
+ * The currency itself comes from SMS_COST_CURRENCY rather than a literal, so
+ * changing what the platform bills in is one edit there rather than a search
+ * through every call site. Takes an explicit `currency` only where a caller
+ * genuinely needs a different one — nothing does today.
+ *
+ * Whole units, no decimals. These are spend-against-a-cap figures where
  * "56 kr of 300 kr" is the useful reading and "56,25 kr" is noise implying a
  * precision the underlying rate does not have.
  */
-export function formatSek(amount: number, language?: string | null): string {
+export function formatMoney(
+  amount: number,
+  language?: string | null,
+  currency: string = SMS_COST_CURRENCY
+): string {
   return new Intl.NumberFormat(dateLocaleFor(language), {
     style: 'currency',
-    currency: 'SEK',
+    currency,
     maximumFractionDigits: 0,
   }).format(amount)
 }

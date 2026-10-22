@@ -22,7 +22,7 @@ const row = (segments: number, status = 'sent') => ({ segments, status })
 beforeEach(() => {
   // A known rate, so the SEK assertions below are about the cap logic rather
   // than about whatever the placeholder happens to be.
-  vi.stubEnv('SMS_SEK_PER_SEGMENT', '1')
+  vi.stubEnv('SMS_COST_PER_SEGMENT', '1')
 })
 
 afterEach(() => {
@@ -41,12 +41,12 @@ describe('readSmsCapStatus', () => {
     })
 
     expect(status).toEqual({
-      spentSek: 15,
+      spentAmount: 15,
       // Carried through from totalUsage so the detail page can show the
       // billable unit without a second query.
       segments: 15,
       failed: 0,
-      capSek: 100,
+      capAmount: 100,
       exceeded: false,
       fraction: 0.15,
       usingFallbackRate: false,
@@ -63,7 +63,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(professional?.capSek).toBe(300)
+    expect(professional?.capAmount).toBe(300)
   })
 
   it('treats an unrecognised tier as the lowest cap, not as uncapped', async () => {
@@ -76,7 +76,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(status?.capSek).toBe(100)
+    expect(status?.capAmount).toBe(100)
   })
 
   it('counts failed sends as costing nothing', async () => {
@@ -90,7 +90,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(status?.spentSek).toBe(10)
+    expect(status?.spentAmount).toBe(10)
     expect(status?.exceeded).toBe(false)
   })
 
@@ -104,7 +104,7 @@ describe('readSmsCapStatus', () => {
       op: 'test',
     })
 
-    expect(status?.spentSek).toBe(100)
+    expect(status?.spentAmount).toBe(100)
     expect(status?.exceeded).toBe(true)
   })
 
@@ -122,7 +122,7 @@ describe('readSmsCapStatus', () => {
   })
 
   it('flags when the figures rest on the placeholder rate', async () => {
-    vi.stubEnv('SMS_SEK_PER_SEGMENT', '')
+    vi.stubEnv('SMS_COST_PER_SEGMENT', '')
     const { client } = serviceStub({ data: [] })
 
     const status = await readSmsCapStatus({
@@ -251,9 +251,14 @@ describe('readAllTenantSmsUsage', () => {
     expect(rows).toHaveLength(3)
     const [viadal, micke, eddo] = rows!
 
-    expect(viadal).toMatchObject({ tenantId: 't1', spentSek: 15, capSek: 300, exceeded: false })
-    expect(micke).toMatchObject({ tenantId: 't2', spentSek: 0, capSek: 200, exceeded: false })
-    expect(eddo).toMatchObject({ tenantId: 't3', spentSek: 200, capSek: 100, exceeded: true })
+    expect(viadal).toMatchObject({
+      tenantId: 't1',
+      spentAmount: 15,
+      capAmount: 300,
+      exceeded: false,
+    })
+    expect(micke).toMatchObject({ tenantId: 't2', spentAmount: 0, capAmount: 200, exceeded: false })
+    expect(eddo).toMatchObject({ tenantId: 't3', spentAmount: 200, capAmount: 100, exceeded: true })
   })
 
   it('returns tenants with no usage at zero rather than omitting them', async () => {
@@ -264,7 +269,7 @@ describe('readAllTenantSmsUsage', () => {
     const rows = await readAllTenantSmsUsage({ service: client, tenants: TENANTS, op: 'test' })
 
     expect(rows!.map((r) => r.tenantId)).toEqual(['t1', 't2', 't3'])
-    expect(rows!.filter((r) => r.spentSek === 0)).toHaveLength(2)
+    expect(rows!.filter((r) => r.spentAmount === 0)).toHaveLength(2)
   })
 
   it('returns null when usage cannot be read, rather than a table of zeroes', async () => {
