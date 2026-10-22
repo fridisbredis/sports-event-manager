@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { checkInviteRateLimit, releaseInviteRateLimit } from '@/lib/rate-limit'
 import twilio from 'twilio'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -14,10 +14,21 @@ vi.mock('@/lib/auth/tenant', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
-  // N11 usage accounting writes with the service client: sms_usage is revoked
-  // from `authenticated`, so this route needs one even though the rest of it
-  // is RLS-scoped.
-  createSupabaseServiceClient: vi.fn(() => ({})),
+  // N11 usage accounting writes with the service client, and N24's cap reads
+  // sms_usage with it: that table is revoked from `authenticated`, so this
+  // route needs one even though the rest of it is RLS-scoped.
+  //
+  // Answers the cap's query with no rows — a tenant that has sent nothing this
+  // month, which is the default these tests assume. Returning a bare {} would
+  // make every test exercise the cap's fail-open path instead, and the extra
+  // error log that produces would be mistaken for the route's own.
+  createSupabaseServiceClient: vi.fn(() => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({ gte: () => Promise.resolve({ data: [], error: null }) }),
+      }),
+    }),
+  })),
 }))
 
 vi.mock('@/lib/sms/usage', () => ({
@@ -107,8 +118,8 @@ describe('POST /api/officials/[id]/resend', () => {
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsBuilder)
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier: 'professional' } }))
       .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
-      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
@@ -160,12 +171,12 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
@@ -209,8 +220,8 @@ describe('POST /api/officials/[id]/resend', () => {
           data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
         })
       )
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier: 'professional' } }))
       .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
-      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
     messagesCreate.mockResolvedValueOnce({ sid: 'SM1', numSegments: '2' })
 
@@ -239,8 +250,8 @@ describe('POST /api/officials/[id]/resend', () => {
           data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
         })
       )
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier: 'professional' } }))
       .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
-      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
     messagesCreate.mockRejectedValueOnce(Object.assign(new Error('nope'), { code: 21211 }))
 
@@ -275,8 +286,8 @@ describe('POST /api/officials/[id]/resend', () => {
           data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
         })
       )
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier: 'professional' } }))
       .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
-      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026' } }))
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
@@ -301,6 +312,7 @@ describe('POST /api/officials/[id]/resend', () => {
           data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
         })
       )
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier: 'professional' } }))
       .mockReturnValueOnce(chain({ data: null }))
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
@@ -323,6 +335,7 @@ describe('POST /api/officials/[id]/resend', () => {
           data: { id: 'off-1', name: 'Anna', phone: '+46701234567', invite_status: 'invited' },
         })
       )
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier: 'professional' } }))
       .mockReturnValueOnce(chain({ data: null }))
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
@@ -343,12 +356,12 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     messagesCreate.mockRejectedValueOnce(new Error('send failed'))
@@ -372,12 +385,12 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const twilioError = Object.assign(new Error('Invalid To number: +46701234567'), {
@@ -413,12 +426,12 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     vi.mocked(twilio).mockImplementationOnce(() => {
@@ -449,12 +462,12 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -528,12 +541,12 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     messagesCreate.mockRejectedValueOnce(new Error('send failed'))
@@ -553,16 +566,92 @@ describe('POST /api/officials/[id]/resend', () => {
       data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
     })
     const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
-    const tenantsBuilder = chain({ data: { name: 'Viadal 2026' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
     const fromMock = vi.fn()
     fromMock
       .mockReturnValueOnce(officialsSelectBuilder)
-      .mockReturnValueOnce(officialsUpdateBuilder)
       .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
     vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
 
     expect(releaseInviteRateLimit).not.toHaveBeenCalled()
+  })
+
+  // N24: the monthly SMS spend cap.
+  describe('N24 monthly spend cap', () => {
+    function cappedService(rows: Record<string, unknown>[]) {
+      vi.mocked(createSupabaseServiceClient).mockReturnValue({
+        from: () => ({
+          select: () => ({
+            eq: () => ({ gte: () => Promise.resolve({ data: rows, error: null }) }),
+          }),
+        }),
+      } as never)
+    }
+
+    function arrange(tier: string) {
+      vi.mocked(requireTenantAdmin).mockResolvedValue({
+        user: { id: 'admin-1' },
+        role: 'tenant_admin',
+      } as never)
+      const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+      const fromMock = vi.fn()
+      fromMock
+        .mockReturnValueOnce(
+          chain({
+            data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+          })
+        )
+        .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier } }))
+        .mockReturnValueOnce(officialsUpdateBuilder)
+      vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+      return officialsUpdateBuilder
+    }
+
+    it('returns 429 and does not send when the cap is reached', async () => {
+      arrange('standard')
+      cappedService([{ segments: 200, status: 'sent' }])
+
+      const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+      // 429, not 502: nothing failed, and the condition clears by itself at
+      // the start of next month.
+      expect(res.status).toBe(429)
+      expect(messagesCreate).not.toHaveBeenCalled()
+    })
+
+    it('does NOT rotate the invite token when the cap blocks the resend', async () => {
+      // The rotation kills the previous link irreversibly. Blocking after it
+      // would leave the official with a dead link and no replacement —
+      // strictly worse than never pressing resend.
+      const officialsUpdateBuilder = arrange('standard')
+      cappedService([{ segments: 200, status: 'sent' }])
+
+      await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+      expect(officialsUpdateBuilder.update).not.toHaveBeenCalled()
+    })
+
+    it('releases the rate-limit slot a blocked resend reserved', async () => {
+      arrange('standard')
+      cappedService([{ segments: 200, status: 'sent' }])
+
+      await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+      expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+    })
+
+    it('sends normally for a tenant under its cap', async () => {
+      arrange('professional')
+      cappedService([{ segments: 1, status: 'sent' }])
+      messagesCreate.mockResolvedValueOnce({ sid: 'SM1', numSegments: '1' })
+
+      const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+      expect(res.status).toBe(200)
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+    })
   })
 })

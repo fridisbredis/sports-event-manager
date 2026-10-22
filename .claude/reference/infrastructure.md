@@ -70,6 +70,27 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 - Dev login can be tested via Supabase Test Phone Numbers — number `46768109304` with fixed OTP code `000000` (dev Supabase project `lhflutwvwvzawzbcuwup`), bypasses Twilio entirely
 - Prod login has always used the real Twilio sender — no Supabase Test Phone Number entry was ever added to prod (confirmed 2026-08-18; the earlier note claiming otherwise was incorrect)
 
+### `SMS_SEK_PER_SEGMENT` — the rate the N24 cap enforces on
+
+Optional env var. Unset, the app falls back to a **placeholder** of 0.75
+SEK/segment (`src/lib/sms/cost.ts`), which is a guess of the right order of
+magnitude and nothing more.
+
+This mattered little while N11 only measured. It matters now: N24 stops a
+tenant's invites and announcements when its month-to-date spend reaches the
+tier cap, and that spend is `segments × this rate`. A rate that is too high
+stops a tenant early; too low lets them run past the limit. Both are silent.
+
+**Still to confirm:** what this account is actually charged for a Swedish
+outbound segment. Twilio quotes Sweden in USD and the price varies by
+destination operator, so the figure has to come from the console or an
+invoice, not from the public price list. Once known, set it as a GitHub secret
+per environment and pass it through like the other runtime vars.
+
+Anything that displays a SEK figure must say when it rests on the fallback —
+`isUsingFallbackRate()` exists for exactly that, and the cap's log lines
+already append `(placeholder per-segment rate)`.
+
 ## GitHub Secrets
 
 **19 secrets per environment as of SYS-03 (2026-09-02)**, up from 18 — the

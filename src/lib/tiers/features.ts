@@ -47,6 +47,39 @@ export function maxTenantAdmins(tier: string): number {
   return MAX_TENANT_ADMINS[tier]
 }
 
+// N24: the monthly SMS spending cap per tenant, in SEK, by tier.
+//
+// ONE cap, per calendar month, per tenant. An earlier version of the
+// requirement (carried from N11 and the gap list) also specified a per-EVENT
+// cap; Peter removed it on 2026-10-20 — "it's one cap: cost for SMS per month
+// for one tenant. then SMS stop." With one event per tenant the two are the
+// same number today; they diverge if a tenant ever runs several events at
+// once (N23), and that is the moment to revisit this.
+//
+// THESE FIGURES ARE PROVISIONAL and Peter set them as such: "it's easier to
+// implement with a set figure than none, and it's easy to change." They are
+// not measured. N11 is collecting the data that should eventually replace
+// them, which is the whole reason measurement shipped before enforcement.
+//
+// In code rather than in the system-admin UI on purpose. The rule is that the
+// cap follows the TIER and cannot be set per tenant; a form field for it would
+// eventually be used to make an exception for one tenant, which is exactly the
+// rule being broken. Changing a number here is a one-line PR with review.
+//
+// Unrecognised tier gets the lowest cap, matching maxTenantAdmins: a renamed
+// or hand-edited tier value restricts spending rather than removing the limit.
+export const MONTHLY_SMS_CAP_SEK: Record<Tier, number> = {
+  standard: 100,
+  premium: 200,
+  professional: 300,
+}
+
+export function monthlySmsCapSek(tier: string): number {
+  if (!isTier(tier)) return MONTHLY_SMS_CAP_SEK[TIER_ORDER[0]]
+
+  return MONTHLY_SMS_CAP_SEK[tier]
+}
+
 export function isTier(value: string): value is Tier {
   return (TIER_ORDER as readonly string[]).includes(value)
 }

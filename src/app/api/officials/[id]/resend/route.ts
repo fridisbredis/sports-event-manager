@@ -13,6 +13,7 @@ import {
 } from '@/lib/rate-limit'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
+import { readSmsCapStatus } from '@/lib/sms/cap'
 import { getServerTranslation } from '@/lib/i18n/server'
 
 const resendSchema = z.object({
@@ -131,6 +132,56 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   }
 
+  // Read BEFORE the token is rotated, because the N24 cap check below depends
+  // on it and must run before the rotation — see why there. `name` is only
+  // needed later, for the SMS copy, but reading both here keeps it to one
+  // query.
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
+    .select('name, tier')
+    .eq('id', parsed.data.tenantId)
+    .single()
+
+  // Cosmetic for the copy (the SMS falls back to 'an event') and fail-open for
+  // the cap, so this must not fail the resend on its own.
+  if (tenantError) {
+    logQueryError(tenantError, {
+      op: 'POST /api/officials/[id]/resend',
+      table: 'tenants',
+      kind: 'select',
+      tenantId: parsed.data.tenantId,
+      extra: { usage: 'invite_sms_copy_and_sms_cap_tier' },
+    })
+  }
+
+  // N24: the monthly SMS spend cap, checked BEFORE the token is rotated.
+  //
+  // Position matters more here than anywhere else the cap is enforced. The
+  // rotation below deliberately kills the previous invite link, and that
+  // cannot be undone. Blocking after it would leave the official with a dead
+  // link and no replacement — strictly worse than if the admin had never
+  // pressed resend. Checked here, a capped resend changes nothing at all: the
+  // existing link keeps working until the month rolls over.
+  const capStatus = await readSmsCapStatus({
+    service: createSupabaseServiceClient(),
+    tenantId: parsed.data.tenantId,
+    tier: tenant?.tier ?? '',
+    op: 'POST /api/officials/[id]/resend',
+  })
+
+  if (capStatus?.exceeded) {
+    // 429, not 502: nothing failed. The send was refused on purpose, and the
+    // condition clears on its own at the start of next month — which is what
+    // 429 means and 502 does not.
+    await releaseInviteRateLimit(parsed.data.tenantId, rateLimitPhone)
+    logger.warn(
+      `Invite resend blocked by N24 monthly cap: tenant=${parsed.data.tenantId} ` +
+        `spentSek=${capStatus.spentSek} capSek=${capStatus.capSek}` +
+        (capStatus.usingFallbackRate ? ' (placeholder per-segment rate)' : '')
+    )
+    return NextResponse.json({ error: 'Monthly SMS limit reached' }, { status: 429 })
+  }
+
   // Regenerate the token as well as the expiry, so the old link is genuinely revoked
   // rather than extended: resend is the only tool an admin has when a link has gone to
   // the wrong number or leaked, and reusing the token would hand that URL another seven
@@ -160,24 +211,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     })
     await releaseInviteRateLimit(parsed.data.tenantId, rateLimitPhone)
     return NextResponse.json({ error: 'Failed to refresh invite token' }, { status: 500 })
-  }
-
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    .select('name')
-    .eq('id', parsed.data.tenantId)
-    .single()
-
-  // Cosmetic only — the SMS falls back to 'an event' — so it must not fail a
-  // resend whose token has already been rotated.
-  if (tenantError) {
-    logQueryError(tenantError, {
-      op: 'POST /api/officials/[id]/resend',
-      table: 'tenants',
-      kind: 'select',
-      tenantId: parsed.data.tenantId,
-      extra: { usage: 'invite_sms_copy' },
-    })
   }
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${updated.invite_token}`

@@ -32,6 +32,8 @@ function chain(result: unknown) {
   builder.eq = vi.fn(() => builder)
   builder.in = vi.fn(() => builder)
   builder.update = vi.fn(() => builder)
+  // N24's cap query ends `.gte('created_at', ...)`.
+  builder.gte = vi.fn(() => builder)
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
   return builder
@@ -49,9 +51,26 @@ function serviceWith(builders: {
   rpc: ReturnType<typeof vi.fn>
   announcements?: Record<string, unknown>[]
   smsQueue?: Record<string, unknown>[]
+  /** Tier rows for N24's cap. Defaults to one professional tenant, `t1`. */
+  tenants?: Record<string, unknown>[]
+  /** sms_usage rows for N24's cap. Defaults to none — nothing sent yet. */
+  smsUsage?: Record<string, unknown>[] | { error: unknown }
 }) {
   const used: Record<string, number> = { announcements: 0, sms_queue: 0 }
   const from = vi.fn((table: string) => {
+    // N24: the cap resolves each distinct tenant's tier and month-to-date
+    // usage before sending. Both default to "a professional tenant that has
+    // sent nothing", so existing cases are unaffected by the cap; a test that
+    // wants the cap to bite passes its own rows.
+    if (table === 'tenants') {
+      return chain({ data: builders.tenants ?? [{ id: 't1', tier: 'professional' }], error: null })
+    }
+    if (table === 'sms_usage') {
+      const usage = builders.smsUsage
+      if (usage && !Array.isArray(usage)) return chain({ data: null, error: usage.error })
+      return chain({ data: usage ?? [], error: null })
+    }
+
     const list = table === 'announcements' ? builders.announcements : builders.smsQueue
     const index = used[table] ?? 0
     used[table] = index + 1
@@ -137,7 +156,7 @@ describe('POST /api/cron/sms-worker', () => {
       from: '+15550001111',
       to: '+46701111111',
     })
-    expect(body).toEqual({ sent: 2, failed: 0, retried: 0 })
+    expect(body).toEqual({ sent: 2, failed: 0, retried: 0, deferred: 0 })
   })
 
   it('returns zero counts without sending when the queue is empty', async () => {
@@ -150,7 +169,7 @@ describe('POST /api/cron/sms-worker', () => {
     const res = await POST(makeRequest(AUTHED))
     const body = await res.json()
 
-    expect(body).toEqual({ sent: 0, failed: 0, retried: 0 })
+    expect(body).toEqual({ sent: 0, failed: 0, retried: 0, deferred: 0 })
     expect(messagesCreate).not.toHaveBeenCalled()
   })
 
@@ -171,7 +190,7 @@ describe('POST /api/cron/sms-worker', () => {
     const res = await POST(makeRequest(AUTHED))
     const body = await res.json()
 
-    expect(body).toEqual({ sent: 0, failed: 0, retried: 1 })
+    expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
     expect(queueUpdateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'pending', attempts: 1 })
     )
@@ -194,7 +213,7 @@ describe('POST /api/cron/sms-worker', () => {
     const res = await POST(makeRequest(AUTHED))
     const body = await res.json()
 
-    expect(body).toEqual({ sent: 0, failed: 1, retried: 0 })
+    expect(body).toEqual({ sent: 0, failed: 1, retried: 0, deferred: 0 })
     expect(queueUpdateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'failed', attempts: 3 })
     )
@@ -347,7 +366,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await res.json()
 
       expect(messagesCreate).not.toHaveBeenCalled()
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 1 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
       // Follows the ordinary failure path: attempts incremented, back to
       // pending for the next tick, last_error 'none' because this is our own
       // error rather than a Twilio one with a numeric code.
@@ -371,7 +390,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       expect(messagesCreate).not.toHaveBeenCalled()
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 1 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
     })
   })
 
@@ -398,7 +417,7 @@ describe('POST /api/cron/sms-worker', () => {
 
       expect(messagesCreate).toHaveBeenCalledTimes(1)
       // Counted as sent: the SMS did go out, whatever the row says.
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: update on sms_queue failed',
         markSentError,
@@ -438,7 +457,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       // The counters track what this tick did, not what the table records.
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 1 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: update on sms_queue failed',
         markFailedError,
@@ -485,7 +504,7 @@ describe('POST /api/cron/sms-worker', () => {
       // alone rather than written from a count we do not have.
       expect(announcementUpdateBuilder.update).not.toHaveBeenCalled()
       // The tick itself still succeeds — the send already happened.
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: select on sms_queue failed',
         countError,
@@ -519,7 +538,7 @@ describe('POST /api/cron/sms-worker', () => {
 
       // Reconcile is bookkeeping after the fact — a failure there must not
       // change the tick's reported counts.
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: update on announcements failed',
         reconcileError,
@@ -532,6 +551,107 @@ describe('POST /api/cron/sms-worker', () => {
           stage: 'reconcile_sms_sent',
         })
       )
+    })
+  })
+
+  // N24: the monthly SMS spend cap. The worker is the one send path where a
+  // capped tenant's messages are already queued, so "stopped" has to mean
+  // "held", not "dropped".
+  describe('N24 monthly spend cap', () => {
+    it("holds a capped tenant's rows back to pending instead of sending them", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: [queueRow()], error: null })
+      const queueUpdateBuilder = chain({ error: null })
+
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [queueUpdateBuilder, chain({ count: 0, error: null })],
+          tenants: [{ id: 't1', tier: 'standard' }],
+          // 200 segments at the fallback rate is far past standard's 100 SEK.
+          smsUsage: [{ segments: 200, status: 'sent' }],
+        }) as never
+      )
+
+      const body = await (await POST(makeRequest(AUTHED))).json()
+
+      expect(messagesCreate).not.toHaveBeenCalled()
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 0, deferred: 1 })
+    })
+
+    it('releases held rows to pending WITHOUT burning an attempt', async () => {
+      // Counting a capped tick as an attempt would retire the message after
+      // three of them — a dropped announcement rather than a delayed one.
+      const rpc = vi.fn().mockResolvedValue({ data: [queueRow({ attempts: 2 })], error: null })
+      const queueUpdateBuilder = chain({ error: null })
+
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [queueUpdateBuilder, chain({ count: 0, error: null })],
+          tenants: [{ id: 't1', tier: 'standard' }],
+          smsUsage: [{ segments: 200, status: 'sent' }],
+        }) as never
+      )
+
+      await POST(makeRequest(AUTHED))
+
+      expect(queueUpdateBuilder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'pending' })
+      )
+      const updateMock = queueUpdateBuilder.update as ReturnType<typeof vi.fn>
+      const written = updateMock.mock.calls[0][0] as Record<string, unknown>
+      expect(written).not.toHaveProperty('attempts')
+      expect(written).not.toHaveProperty('last_error')
+    })
+
+    it('sends for an uncapped tenant in the same batch as a capped one', async () => {
+      // A batch mixes tenants. One tenant hitting its cap must not silence
+      // another's announcements.
+      const rpc = vi.fn().mockResolvedValue({
+        data: [queueRow({ id: 'q1', tenant_id: 't1' }), queueRow({ id: 'q2', tenant_id: 't2' })],
+        error: null,
+      })
+
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [chain({ error: null }), chain({ count: 1, error: null })],
+          tenants: [
+            { id: 't1', tier: 'standard' },
+            { id: 't2', tier: 'professional' },
+          ],
+          // One usage stub answers both tenants' queries, so both read as
+          // heavily used: only standard's 100 SEK cap is actually crossed.
+          smsUsage: [{ segments: 150, status: 'sent' }],
+        }) as never
+      )
+
+      const body = await (await POST(makeRequest(AUTHED))).json()
+
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 1 })
+    })
+
+    it('FAILS OPEN: sends when usage cannot be read', async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: [queueRow()], error: null })
+
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [chain({ error: null }), chain({ count: 1, error: null })],
+          tenants: [{ id: 't1', tier: 'standard' }],
+          smsUsage: { error: { message: 'usage table unreadable' } },
+        }) as never
+      )
+
+      const body = await (await POST(makeRequest(AUTHED))).json()
+
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
     })
   })
 })

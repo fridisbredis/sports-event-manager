@@ -83,6 +83,15 @@ function mockService(...afterDuplicateCheck: unknown[]) {
   vi.mocked(createSupabaseServiceClient).mockReturnValue({
     auth: { admin: { createUser, deleteUser } },
     rpc,
+    // N24's cap reads sms_usage with the service client. No rows = a tenant
+    // that has sent nothing this month, which is what these tests assume.
+    // Without it the cap takes its fail-open path and logs an error, which
+    // would be mistaken for the route's own.
+    from: () => ({
+      select: () => ({
+        eq: () => ({ gte: () => Promise.resolve({ data: [], error: null }) }),
+      }),
+    }),
   } as unknown as SupabaseClient<Database>)
   return fromMock
 }
@@ -588,5 +597,79 @@ describe('POST /api/officials', () => {
     )
 
     expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+
+  // N24: the monthly SMS spend cap.
+  describe('N24 monthly spend cap', () => {
+    function withUsage(rows: Record<string, unknown>[]) {
+      // mockService() installs a service client whose sms_usage query returns
+      // no rows. These cases need it to return spend so the cap bites — but
+      // the same client also carries auth.admin and rpc, which the route uses
+      // before it ever reaches the cap, so they have to be carried over.
+      vi.mocked(createSupabaseServiceClient).mockReturnValue({
+        auth: { admin: { createUser, deleteUser } },
+        rpc,
+        from: () => ({
+          select: () => ({
+            eq: () => ({ gte: () => Promise.resolve({ data: rows, error: null }) }),
+          }),
+        }),
+      } as unknown as SupabaseClient<Database>)
+    }
+
+    it('keeps the official but reports smsSent false when the cap is reached', async () => {
+      // The row is already committed when the cap is checked. It must survive
+      // and stay `invited`, which is the state resend accepts — so the admin
+      // can simply resend next month rather than re-creating the official.
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier: 'standard' } })
+      )
+      withUsage([{ segments: 200, status: 'sent' }])
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+      const body = await res.json()
+
+      expect(res.status).toBe(200)
+      expect(body.smsSent).toBe(false)
+      expect(body.official).toBeTruthy()
+      expect(messagesCreate).not.toHaveBeenCalled()
+    })
+
+    it('releases the rate-limit slot a capped invite reserved', async () => {
+      // The invite never went out, so the slot it reserved must not count
+      // against the admin's next attempt.
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier: 'standard' } })
+      )
+      withUsage([{ segments: 200, status: 'sent' }])
+
+      await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+
+      expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+    })
+
+    it('sends normally for a tenant under its cap', async () => {
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
+      )
+      withUsage([{ segments: 1, status: 'sent' }])
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+
+      expect(await res.json()).toMatchObject({ smsSent: true })
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+    })
   })
 })
