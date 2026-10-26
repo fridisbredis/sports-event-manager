@@ -32,7 +32,9 @@ const stageIdSchema = z.string().uuid()
  * for the same reason updateTenantColorPalette reads it: it governs
  * access, so it must not come from the client.
  */
-async function authorize(tenantId: string): Promise<
+async function authorize(
+  tenantId: string
+): Promise<
   | { ok: true; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>; tenantId: string }
   | { ok: false; error: string }
 > {

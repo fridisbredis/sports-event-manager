@@ -150,9 +150,9 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     source: p.source,
     extra: (p.extra ?? {}) as Record<string, string>,
     withdrawnAt: p.withdrawn_at,
-    stageIds: (
-      (p.participant_stages ?? []) as unknown as Array<{ stage_id: string }>
-    ).map((link) => link.stage_id),
+    stageIds: ((p.participant_stages ?? []) as unknown as Array<{ stage_id: string }>).map(
+      (link) => link.stage_id
+    ),
   }))
 
   return (
