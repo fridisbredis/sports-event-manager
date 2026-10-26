@@ -601,6 +601,81 @@ describe('POST /api/officials', () => {
     expect(logAuditEvent).not.toHaveBeenCalled()
   })
 
+  // B9: the invite link's origin.
+  describe('B9 unusable app origin', () => {
+    // beforeEach re-sets NEXT_PUBLIC_APP_URL for every test, so deleting it
+    // here cannot leak into the ones that follow.
+    it.each([
+      ['unset', undefined],
+      ['not https', 'http://app.example.com'],
+    ])('keeps the official but sends nothing when the origin is %s', async (_label, value) => {
+      // The row is already committed when the origin is checked, so this
+      // behaves like the cap: the official survives as `invited` and the admin
+      // can resend once the image is rebuilt with a correct origin.
+      if (value === undefined) delete process.env.NEXT_PUBLIC_APP_URL
+      else process.env.NEXT_PUBLIC_APP_URL = value
+
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
+      )
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+      const body = await res.json()
+
+      expect(res.status).toBe(200)
+      expect(body.official).toBeTruthy()
+      expect(body.smsSent).toBe(false)
+      // The whole point: no segment is spent on a message that cannot work.
+      expect(messagesCreate).not.toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('releases the rate-limit slot, since no invite went out', async () => {
+      delete process.env.NEXT_PUBLIC_APP_URL
+
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
+      )
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+
+      expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('sends a link built from the configured origin when it is usable', async () => {
+      // The guard must not cost the normal path its link: this is what the
+      // official actually receives, and the mutation check for the two cases
+      // above — delete the guard and they fail, break the link and this does.
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
+      )
+
+      await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+
+      expect(messagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('https://app.example.com/invite/tok-abc'),
+        })
+      )
+    })
+  })
+
   // N24: the monthly SMS spend cap.
   describe('N24 monthly spend cap', () => {
     function withUsage(rows: Record<string, unknown>[]) {

@@ -488,6 +488,81 @@ describe('POST /api/officials/[id]/resend', () => {
     )
   })
 
+  // B9: the invite link's origin, checked before the rotation for the same
+  // reason the two Twilio faults above are.
+  it.each([
+    ['unset', undefined],
+    ['not https', 'http://app.example.com'],
+  ])(
+    'returns 500 and never rotates the invite token when NEXT_PUBLIC_APP_URL is %s',
+    async (_label, value) => {
+      if (value === undefined) delete process.env.NEXT_PUBLIC_APP_URL
+      else process.env.NEXT_PUBLIC_APP_URL = value
+
+      vi.mocked(requireTenantAdmin).mockResolvedValue({
+        user: { id: 'admin-1' },
+        role: 'tenant_admin',
+      } as never)
+
+      const officialsSelectBuilder = chain({
+        data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+      })
+      const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+      const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
+      const fromMock = vi.fn()
+      fromMock
+        .mockReturnValueOnce(officialsSelectBuilder)
+        .mockReturnValueOnce(tenantsBuilder)
+        .mockReturnValueOnce(officialsUpdateBuilder)
+      vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+      const res = await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+      const body = await res.json()
+
+      expect(res.status).toBe(500)
+      expect(body).toEqual({ error: 'SMS is not configured' })
+      expect(messagesCreate).not.toHaveBeenCalled()
+
+      // The point of checking before the rotation: a resend that cannot produce a
+      // working link must leave the official's existing link intact, rather than
+      // revoking it to replace it with a dead one.
+      expect(officialsUpdateBuilder.update).not.toHaveBeenCalled()
+    }
+  )
+
+  it('sends a link built from the configured origin when it is usable', async () => {
+    // Mutation check for the two cases above: delete the guard and they fail,
+    // break the link construction and this one does.
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const officialsSelectBuilder = chain({
+      data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+    })
+    const officialsUpdateBuilder = chain({ data: { invite_token: 'tok-new' } })
+    const tenantsBuilder = chain({ data: { name: 'Viadal 2026', tier: 'professional' } })
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(officialsSelectBuilder)
+      .mockReturnValueOnce(tenantsBuilder)
+      .mockReturnValueOnce(officialsUpdateBuilder)
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+    messagesCreate.mockResolvedValue({ sid: 'SM1', numSegments: '2' })
+
+    await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(messagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining('https://app.example.com/invite/tok-new'),
+      })
+    )
+  })
+
   it('returns 429 with Retry-After when the invite rate limit is exceeded, without rotating the token', async () => {
     vi.mocked(requireTenantAdmin).mockResolvedValue({
       user: { id: 'admin-1' },

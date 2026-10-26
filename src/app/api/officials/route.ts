@@ -18,6 +18,7 @@ import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { buildAppLink } from '@/lib/sms/app-link'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
@@ -255,7 +256,11 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${official.invite_token}`
+  // B9: null when NEXT_PUBLIC_APP_URL is unset or not https. Unlike the resend
+  // route, this one cannot refuse the request — the official row is already
+  // committed above — so the bad origin is handled below alongside the cap,
+  // as a send that does not happen rather than a create that fails.
+  const inviteUrl = buildAppLink(`/invite/${official.invite_token}`)
 
   // Segment budget, measured 2026-10-16 (N19). The fixed English copy is 61
   // GSM-7 characters and `/invite/<uuid>` another 44, leaving 55 for the origin
@@ -289,7 +294,7 @@ export async function POST(request: NextRequest) {
   const smsBody = t('confirmation.inviteSms.body', {
     name,
     tenant: tenant?.name ?? t('confirmation.inviteSms.fallbackTenant'),
-    url: inviteUrl,
+    url: inviteUrl ?? '',
   })
 
   // N24: the tenant's monthly SMS spend cap.
@@ -314,7 +319,25 @@ export async function POST(request: NextRequest) {
   // so a capped invite can simply be resent once the month rolls over.
   let smsSent = true
 
-  if (capStatus?.exceeded) {
+  if (!inviteUrl) {
+    // No link, no send: an SMS reading "...Confirm within 7 days:
+    // undefined/invite/<uuid>" costs a segment and can never be acted on, and
+    // nothing downstream would report a problem — Twilio and sms_usage would
+    // both record a successful send.
+    //
+    // Ordered before the cap check because this is the more fundamental fault
+    // and the one worth seeing in the logs; a capped tenant with a broken
+    // origin has two problems, and this is the one a rebuild fixes.
+    smsSent = false
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
+    try {
+      logger.error('Invite SMS skipped: NEXT_PUBLIC_APP_URL is unset or not https', undefined, {
+        officialId: official.id,
+      })
+    } catch {
+      // Logging must never be able to change the response — see the send catch below.
+    }
+  } else if (capStatus?.exceeded) {
     smsSent = false
     // The invite never went out, so the rate-limit slot it reserved is released,
     // same as the Twilio-failure path below.
