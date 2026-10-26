@@ -9,6 +9,7 @@ import {
   Trophy,
   Flag,
   Users,
+  UsersRound,
   CalendarClock,
   MessageSquare,
   Smartphone,
@@ -28,11 +29,14 @@ interface Props {
   // False when the caller has no `officials` row in this tenant, so ACCT-01
   // has nothing to show them — see hasAccountScreen in lib/auth/tenant.
   showAccount: boolean
+  // False on Standard, where PART-01 does not exist (N21). The page and its
+  // server actions enforce the same tier independently.
+  showParticipants: boolean
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
+export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipants }: Props) {
   const pathname = usePathname()
   const { t } = useTranslation('admin')
   const [collapsed, setCollapsed] = useState(false)
@@ -61,6 +65,15 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount }: Props) {
     { segment: 'admin/event', label: t('navigation.eventConfig'), icon: Trophy },
     { segment: 'admin/workstations', label: t('navigation.workstations'), icon: Flag },
     { segment: 'admin/officials', label: t('navigation.officials'), icon: Users },
+    ...(showParticipants
+      ? [
+          {
+            segment: 'admin/participants',
+            label: t('navigation.participants'),
+            icon: UsersRound,
+          },
+        ]
+      : []),
     { segment: 'admin/scheduling', label: t('navigation.scheduling'), icon: CalendarClock },
     { segment: 'admin/communication', label: t('navigation.communication'), icon: MessageSquare },
   ]

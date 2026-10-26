@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
+import { hasFeature } from '@/lib/tiers/features'
 import { SidebarNav } from './_components/sidebar-nav'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -28,7 +29,21 @@ export async function SidebarChrome({
   // tenant by role alone does not have — see hasAccountScreen.
   const showAccount = await hasAccountScreen(tenantSlug)
 
-  return <SidebarNav tenantSlug={tenantSlug} adminLabel={adminLabel} showAccount={showAccount} />
+  // N21: PART-01 is Premium and up, so a Standard tenant gets no link.
+  // getAdminTenant is memoised per render pass, so this costs no extra
+  // query. The page and every participants server action carry the same
+  // gate independently — hiding a link is not access control.
+  const tenant = await getAdminTenant(tenantSlug)
+  const showParticipants = tenant != null && hasFeature(tenant.tier, 'participants')
+
+  return (
+    <SidebarNav
+      tenantSlug={tenantSlug}
+      adminLabel={adminLabel}
+      showAccount={showAccount}
+      showParticipants={showParticipants}
+    />
+  )
 }
 
 export default async function TenantLayout({ children, params }: Props) {

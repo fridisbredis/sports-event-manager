@@ -11,7 +11,8 @@
     "officialView": "Funktionärsvy",
     "logOut": "Logga ut",
     "openMenu": "Öppna meny",
-    "closeMenu": "Stäng meny"
+    "closeMenu": "Stäng meny",
+    "participants": "Deltagare"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",
@@ -250,6 +251,57 @@
     "addServiceUnavailable": "Inget skickades. Försök igen om en stund.",
     "addUnexpectedError": "Något gick fel. Försök igen, eller kontakta supporten om det fortsätter.",
     "sessionExpired": "Sessionen har gått ut — uppdatera sidan och försök igen."
+  },
+  "participants": {
+    "title": "Deltagare",
+    "subtitle": "Startlistan för eventets tävlingsetapper.",
+    "withdrawn": "Struken",
+    "manual": "Tillagd för hand",
+    "pagination": "Sidor i deltagarlistan",
+    "previous": "Föregående",
+    "next": "Nästa",
+    "page": "Sida {{page}}",
+    "columns": {
+      "bib": "Startnr",
+      "name": "Namn",
+      "category": "Klass",
+      "club": "Klubb",
+      "nation": "Nation",
+      "gender": "Kön",
+      "phone": "Telefon",
+      "stages": "Tävlingsetapper"
+    },
+    "filters": {
+      "stage": "Tävlingsetapp",
+      "allStages": "Alla etapper",
+      "showWithdrawn": "Visa strukna"
+    },
+    "empty": {
+      "title": "Inga deltagare än",
+      "description": "Importera startlistan från Race Results, eller lägg till någon för hand."
+    },
+    "import": {
+      "button": "Importera från Race Results",
+      "title": "Importera deltagare",
+      "explanation": "Välj vilka tävlingsetapper som ska importeras. Varje etapp hämtas separat, så en som misslyckas stoppar inte de andra.",
+      "confirm": "Importera",
+      "cancel": "Avbryt",
+      "close": "Stäng",
+      "noLinkChip": "Ingen länk",
+      "noStagesWithLink": "Ingen av eventets tävlingsetapper har någon Race Results-länk än. Lägg till en i etappinställningarna först.",
+      "summary": "{{inserted}} tillagda, {{updated}} uppdaterade, {{withdrawn}} strukna, {{revived}} återkomna.",
+      "skipped": "{{count}} rad(er) saknade användbart ID och hoppades över.",
+      "genericError": "Importen kunde inte slutföras."
+    },
+    "add": {
+      "button": "Lägg till deltagare",
+      "title": "Lägg till en deltagare",
+      "confirm": "Lägg till",
+      "cancel": "Avbryt",
+      "success": "Deltagaren lades till.",
+      "phoneHint": "Valfritt. Race Results tillhandahåller inga telefonnummer.",
+      "genericError": "Deltagaren kunde inte läggas till."
+    }
   },
   "scheduling": {
     "title": "Schemaläggning",
