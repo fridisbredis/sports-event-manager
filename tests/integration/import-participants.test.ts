@@ -311,6 +311,95 @@ describe('import_participants (N21)', () => {
     expect(error).not.toBeNull()
   })
 
+  // ------------------------------------------------------------------
+  // participants.user_id integrity (migration 20261026104544).
+  //
+  // Participant login does not exist yet — Peter designs that flow. These
+  // assert that the column it will hang off cannot be populated wrongly
+  // before it does, which is cheap now (prod holds no participants) and a
+  // data-cleanup exercise later.
+  // ------------------------------------------------------------------
+
+  it('refuses to link one auth user to two participants', async () => {
+    // The split-identity case: two rows, one account, and a personal
+    // schedule that shows half their races. Linking will be an automated
+    // phone match against an imported list, where a person appearing twice
+    // (two entries, a re-import, a corrected bib) is exactly what produces
+    // it — so this must be impossible rather than merely unlikely.
+    const admin = serviceClient()
+    const { data: authUser } = await admin.auth.admin.createUser({
+      phone: '+46709000111',
+      phone_confirm: true,
+    })
+    const userId = authUser.user!.id
+
+    const first = await admin
+      .from('participants')
+      .insert({ tenant_id: tenantId, name: 'Linked A', user_id: userId })
+    expect(first.error).toBeNull()
+
+    const second = await admin
+      .from('participants')
+      .insert({ tenant_id: tenantId, name: 'Linked B', user_id: userId })
+    expect(second.error).not.toBeNull()
+
+    await admin.from('participants').delete().eq('user_id', userId)
+    await admin.auth.admin.deleteUser(userId)
+  })
+
+  it('refuses a user_id with no matching auth user', async () => {
+    const { error } = await serviceClient().from('participants').insert({
+      tenant_id: tenantId,
+      name: 'Ghost',
+      user_id: '00000000-0000-0000-0000-0000000000ff',
+    })
+
+    expect(error).not.toBeNull()
+  })
+
+  it('unlinks rather than deletes when the auth user goes away', async () => {
+    // ON DELETE SET NULL, matching officials. A participant row records
+    // that someone entered the race; the bib and class stay true after the
+    // account is gone, and the admin roster still needs the row.
+    const admin = serviceClient()
+    const { data: authUser } = await admin.auth.admin.createUser({
+      phone: '+46709000222',
+      phone_confirm: true,
+    })
+    const userId = authUser.user!.id
+
+    const { data: inserted } = await admin
+      .from('participants')
+      .insert({ tenant_id: tenantId, name: 'Survives', bib: '999', user_id: userId })
+      .select('id')
+      .single()
+
+    await admin.auth.admin.deleteUser(userId)
+
+    const { data: after } = await admin
+      .from('participants')
+      .select('name, bib, user_id')
+      .eq('id', inserted!.id)
+      .single()
+
+    expect(after).toMatchObject({ name: 'Survives', bib: '999', user_id: null })
+
+    await admin.from('participants').delete().eq('id', inserted!.id)
+  })
+
+  it('allows many participants with no linked account', async () => {
+    // The normal state: every imported participant has user_id NULL, so
+    // the uniqueness must not treat NULLs as colliding.
+    const { error } = await serviceClient()
+      .from('participants')
+      .insert([
+        { tenant_id: tenantId, name: 'Unlinked A' },
+        { tenant_id: tenantId, name: 'Unlinked B' },
+      ])
+
+    expect(error).toBeNull()
+  })
+
   it('accepts an empty list without writing anything', async () => {
     const before = (await participants()).length
     const { data, error } = await importInto(stageBId, [])
