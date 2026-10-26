@@ -230,3 +230,57 @@ test.describe('system admin on a phone', () => {
     await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden()
   })
 })
+
+// N28: the global role's own list. The seeded system admin is the only one on
+// a fresh stack, which makes them both "You" and the last admin — the two
+// reasons the remove button can be dead.
+test.describe('System admins', () => {
+  test('is reached from the sidebar and marks the signed-in admin', async ({
+    systemAdminPage: page,
+  }) => {
+    await page.goto('/admin')
+    await page.getByRole('link', { name: 'System admins' }).first().click()
+    await expect(page).toHaveURL(/\/admin\/system-admins$/)
+    await expect(page.getByRole('heading', { name: 'System admins' })).toBeVisible()
+
+    // The sidebar must move its highlight here: /admin/<uuid> pages share the
+    // /admin/ prefix, and "Tenants" used to claim all of them.
+    await expect(page.getByRole('link', { name: 'System admins' }).first()).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    await expect(page.getByRole('link', { name: 'Tenants' }).first()).not.toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+
+    const ownRow = page.getByRole('listitem').filter({ hasText: 'You' })
+    await expect(ownRow).toHaveCount(1)
+    await expect(ownRow.getByRole('button', { name: 'Remove' })).toBeDisabled()
+  })
+
+  test('add modal requires a name and a valid number, and can be cancelled', async ({
+    systemAdminPage: page,
+  }) => {
+    await page.goto('/admin/system-admins')
+
+    const modal = page.getByRole('dialog')
+    await clickWhenInteractive(page.getByRole('button', { name: 'Add system admin' }), modal)
+
+    const add = modal.getByRole('button', { name: 'Add system admin' })
+    await expect(add).toBeDisabled()
+
+    await modal.getByLabel('Name', { exact: true }).fill('E2E System Admin')
+    await expect(add).toBeDisabled()
+
+    await modal.getByLabel('Phone number').fill('709900124')
+    await expect(add).toBeEnabled()
+
+    // Cancel rather than add: a granted role would outlive the run, and a
+    // second system admin would change what the test above can assert. The
+    // grant itself is covered by tests/integration/system-admin-rpcs.test.ts.
+    await modal.getByRole('button', { name: 'Cancel' }).click()
+    await expect(modal).not.toBeVisible()
+    await expect(page.getByText('E2E System Admin')).toHaveCount(0)
+  })
+})

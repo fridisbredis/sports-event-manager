@@ -550,7 +550,17 @@
     "removeAdminConfirmBodyUnnamed": "This admin loses access to administer this tenant. They stay on the officials roster and keep their shifts — only the admin role is removed. You can add them back later.",
     "lastAdminHint": "A tenant must keep at least one admin.",
     "firstAdminSection": "First admin",
-    "firstAdminHint": "Somebody has to be able to sign in to the new tenant. They are added as its first admin."
+    "firstAdminHint": "Somebody has to be able to sign in to the new tenant. They are added as its first admin.",
+    "systemAdmins": "System admins",
+    "systemAdminsHint": "Who can sign in to this view and manage every tenant. There must always be at least one.",
+    "addSystemAdmin": "Add system admin",
+    "addSystemAdminHint": "They sign in with this number and get access to every tenant. If they already have an account, it is reused.",
+    "systemAdminYou": "You",
+    "removeSystemAdminConfirmTitle": "Remove system admin?",
+    "removeSystemAdminConfirmBody": "{{name}} loses access to the system admin view, and with it to every tenant. Any admin or official role they hold in a tenant stays. You can add them back later.",
+    "removeSystemAdminConfirmBodyUnnamed": "This system admin loses access to the system admin view, and with it to every tenant. Any admin or official role they hold in a tenant stays. You can add them back later.",
+    "lastSystemAdminHint": "There must always be at least one system admin.",
+    "cannotRemoveSelfHint": "You cannot remove yourself. Ask another system admin."
   },
   "health": {
     "backToTenants": "Tenants",

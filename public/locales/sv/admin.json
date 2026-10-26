@@ -550,7 +550,17 @@
     "removeAdminConfirmBodyUnnamed": "Administratören förlorar behörigheten att administrera den här tenanten. Personen ligger kvar i funktionärslistan och behåller sina pass — bara administratörsrollen tas bort. Du kan lägga till personen igen senare.",
     "lastAdminHint": "En tenant måste ha minst en administratör.",
     "firstAdminSection": "Första administratören",
-    "firstAdminHint": "Någon måste kunna logga in på den nya tenanten. Personen läggs till som dess första administratör."
+    "firstAdminHint": "Någon måste kunna logga in på den nya tenanten. Personen läggs till som dess första administratör.",
+    "systemAdmins": "Systemadministratörer",
+    "systemAdminsHint": "Vilka som kan logga in i den här vyn och hantera alla tenants. Det måste alltid finnas minst en.",
+    "addSystemAdmin": "Lägg till systemadministratör",
+    "addSystemAdminHint": "Personen loggar in med det här numret och får åtkomst till alla tenants. Finns kontot redan återanvänds det.",
+    "systemAdminYou": "Du",
+    "removeSystemAdminConfirmTitle": "Ta bort systemadministratör?",
+    "removeSystemAdminConfirmBody": "{{name}} förlorar åtkomsten till systemadminvyn och därmed till alla tenants. Roller som personen har i en enskild tenant ligger kvar. Du kan lägga till personen igen senare.",
+    "removeSystemAdminConfirmBodyUnnamed": "Systemadministratören förlorar åtkomsten till systemadminvyn och därmed till alla tenants. Roller som personen har i en enskild tenant ligger kvar. Du kan lägga till personen igen senare.",
+    "lastSystemAdminHint": "Det måste alltid finnas minst en systemadministratör.",
+    "cannotRemoveSelfHint": "Du kan inte ta bort dig själv. Be en annan systemadministratör."
   },
   "health": {
     "backToTenants": "Kunder",

@@ -19,7 +19,7 @@ const ADMIN_PATHS = [
   `/${SEED_TENANT_SLUG}/admin/account`,
 ]
 
-const SYSTEM_PATHS = ['/admin', '/admin/health']
+const SYSTEM_PATHS = ['/admin', '/admin/health', '/admin/system-admins']
 
 const OFFICIAL_PATHS = [
   `/${SEED_TENANT_SLUG}/home`,
