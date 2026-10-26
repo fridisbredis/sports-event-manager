@@ -244,6 +244,17 @@ COMMENT ON TABLE public.participant_stages IS
 
 ALTER TABLE public.participant_stages ENABLE ROW LEVEL SECURITY;
 
+-- Table grants are a SEPARATE gate from RLS, and a new table gets none by
+-- default: RLS decides which ROWS a role may touch, but without a GRANT
+-- the role cannot touch the table at all and PostgREST answers 42501
+-- ("permission denied for table"). Mirrors what participants itself
+-- carries, read from information_schema rather than assumed.
+--
+-- anon is deliberately NOT granted anything, matching migration 0035
+-- (revoke anon table DML): nothing here is reachable without a session.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.participant_stages TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.participant_stages TO service_role;
+
 DROP POLICY IF EXISTS tenant_admin_manage_participant_stages ON public.participant_stages;
 
 CREATE POLICY tenant_admin_manage_participant_stages
@@ -313,4 +324,14 @@ CREATE POLICY tenant_admin_manage_participants
 --   WHERE schemaname = 'public'
 --     AND tablename IN ('participants', 'participant_stages');
 --   -- expect with_check populated on both manage policies
+--
+--   -- Grants are a separate gate from RLS; without them PostgREST answers
+--   -- 42501 even though the policy would have allowed the row.
+--   SELECT grantee, string_agg(privilege_type, ',' ORDER BY privilege_type)
+--   FROM information_schema.role_table_grants
+--   WHERE table_schema = 'public' AND table_name = 'participant_stages'
+--     AND grantee IN ('authenticated', 'anon')
+--   GROUP BY grantee;
+--   -- expect authenticated to carry SELECT/INSERT/UPDATE/DELETE, and anon
+--   -- to carry none of them
 -- ============================================================================

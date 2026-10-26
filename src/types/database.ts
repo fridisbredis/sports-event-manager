@@ -1187,6 +1187,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
       }
+      import_participants: {
+        Args: { p_rows: Json; p_stage_id: string; p_tenant_id: string }
+        Returns: Json
+      }
       is_on_workstation_shift: {
         Args: {
           p_timeslot_end: string
