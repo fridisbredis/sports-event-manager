@@ -1,0 +1,29 @@
+{
+  "data": {
+    "#1_Viadal Ultra Six Days": [
+      [
+        "1",
+        "16",
+        "Höskuldur Kristvinsson",
+        "[img:/graphics/flags/IS.svg]",
+        "M",
+        "M75",
+        "Náttúruhlaup"
+      ],
+      [
+        "2",
+        "22",
+        "PerOla Axelsson",
+        "[img:/graphics/flags/SE.svg]",
+        "M",
+        "M60",
+        "stockholm långdistansklubb"
+      ],
+      ["3", "4", "Tommy Carlsson", "[img:/graphics/flags/SE.svg]", "M", "M55", "LK TV88"],
+      ["5", "17", "Lars Lindblom", "[img:/graphics/flags/SE.svg]", "M", "M65", ""],
+      ["6", "6", "Maria Forsgren", "[img:/graphics/flags/SE.svg]", "K", "K55", "LKTV88"],
+      ["8", "10", "Bertil Palmqvist", "[img:/graphics/flags/SE.svg]", "M", "M80", "Bälinge IF"]
+    ]
+  },
+  "DataFields": ["BIB", "ID", "FLNAME", "NATION.FLAG", "KönM/K", "AGEGROUP.NAME", "CLUB"]
+}

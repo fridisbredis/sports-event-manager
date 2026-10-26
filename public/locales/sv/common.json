@@ -35,7 +35,15 @@
     "grantAdminFailed": "Kunde inte lägga till administratören. Försök igen.",
     "revokeAdminFailed": "Kunde inte ta bort administratören. Försök igen.",
     "adminCapReached": "Den här tenanten har nått det högsta antalet administratörer för sin nivå. Höj nivån eller ta bort en administratör först.",
-    "lastAdminCannotRemove": "Det här är tenantens sista administratör. En tenant måste ha minst en — inaktivera tenanten i stället."
+    "lastAdminCannotRemove": "Det här är tenantens sista administratör. En tenant måste ha minst en — inaktivera tenanten i stället.",
+    "participantsNotInTier": "Deltagare ingår inte i den här kundens abonnemang.",
+    "noStagesSelected": "Välj minst en tävlingsetapp.",
+    "participantsNoResultsLink": "Den här etappen har ingen Race Results-länk än.",
+    "participantsFetch_network": "Race Results gick inte att nå.",
+    "participantsFetch_http": "Race Results svarade med ett fel.",
+    "participantsFetch_malformed": "Race Results gav ett oväntat svar.",
+    "participantsFetch_api_error": "Race Results avvisade förfrågan.",
+    "participantsFetch_no_list": "Det här Race Results-eventet publicerar ingen deltagarlista."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

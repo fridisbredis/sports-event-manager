@@ -24,6 +24,7 @@ function chain(result: unknown) {
   builder.insert = vi.fn(() => builder)
   builder.update = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
+  builder.not = vi.fn(() => builder)
   builder.single = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
@@ -198,6 +199,57 @@ describe('POST /api/announcements', () => {
 
     expect(fromMock).toHaveBeenNthCalledWith(1, 'participants')
     expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
+  })
+
+  it('excludes participants without a phone number from the recipient query', async () => {
+    // participants.phone is nullable since migration 20261026084206 (N21):
+    // an imported Race Results participant has no number. Without this
+    // filter the sms_queue insert trips its own NOT NULL column, and since
+    // that insert is one statement the whole announcement is lost —
+    // including the messages to participants who do have a number.
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({ data: [], error: null })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
+
+    expect(recipientsBuilder.not).toHaveBeenCalledWith('phone', 'is', null)
+  })
+
+  it('never enqueues an SMS row for a recipient with a null phone', async () => {
+    // Belt to the query filter's braces: if the filter above is ever
+    // dropped, the enqueue must still not hand a null to sms_queue. Mirrors
+    // the narrowing in the route rather than trusting PostgREST alone.
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    const recipientsBuilder = chain({
+      data: [{ phone: '+46700000001' }, { phone: null }],
+      error: null,
+    })
+    const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
+    const queueBuilder = chain({ data: null, error: null })
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce(recipientsBuilder)
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValue(queueBuilder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
+
+    expect(queueBuilder.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ recipient_phone: '+46700000001' }),
+    ])
   })
 
   it('returns 500 and skips insert/enqueue when the recipients fetch fails', async () => {

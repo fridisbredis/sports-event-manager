@@ -33,6 +33,27 @@ describe('hasFeature', () => {
   })
 })
 
+describe('participants (N21 / PART-01)', () => {
+  // The card is explicit: "Tier: Premium and Professional. No participants
+  // in Standard." Asserted by name rather than left to the generic cases
+  // above, because this gate decides whether a tenant's participant roster
+  // and its Race Results import exist at all — and because the import
+  // MUTATES, so the same gate has to hold on the server action, not only
+  // on the page.
+  it('is locked on standard', () => {
+    expect(hasFeature('standard', 'participants')).toBe(false)
+  })
+
+  it('is unlocked on premium and professional', () => {
+    expect(hasFeature('premium', 'participants')).toBe(true)
+    expect(hasFeature('professional', 'participants')).toBe(true)
+  })
+
+  it('lists exactly the tiers the card names', () => {
+    expect(tiersWithFeature('participants')).toEqual(['premium', 'professional'])
+  })
+})
+
 describe('TIER_ORDER', () => {
   // The ordering is the thing the gate reasons over, not an incidental
   // detail of the array: reordering it silently changes who gets what.

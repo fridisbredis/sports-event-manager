@@ -35,7 +35,15 @@
     "grantAdminFailed": "Could not add the admin. Try again.",
     "revokeAdminFailed": "Could not remove the admin. Try again.",
     "adminCapReached": "This tenant has reached the maximum number of admins for its tier. Raise the tier or remove an admin first.",
-    "lastAdminCannotRemove": "This is the tenant’s last admin. A tenant must keep at least one admin — deactivate the tenant instead."
+    "lastAdminCannotRemove": "This is the tenant’s last admin. A tenant must keep at least one admin — deactivate the tenant instead.",
+    "participantsNotInTier": "Participants are not included in this tenant's plan.",
+    "noStagesSelected": "Choose at least one Race stage.",
+    "participantsNoResultsLink": "This stage has no Race Results link yet.",
+    "participantsFetch_network": "Race Results could not be reached.",
+    "participantsFetch_http": "Race Results returned an error.",
+    "participantsFetch_malformed": "Race Results returned an unexpected response.",
+    "participantsFetch_api_error": "Race Results rejected the request.",
+    "participantsFetch_no_list": "This Race Results event publishes no participant list."
   },
   "notFoundPage": {
     "eyebrow": "No result",

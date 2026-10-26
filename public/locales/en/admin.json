@@ -11,7 +11,8 @@
     "officialView": "Official view",
     "logOut": "Log out",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "participants": "Participants"
   },
   "dashboard": {
     "eventName": "Untitled event",
@@ -250,6 +251,57 @@
     "addServiceUnavailable": "Nothing was sent. Try again in a moment.",
     "addUnexpectedError": "Something went wrong. Try again, or contact support if it keeps happening.",
     "sessionExpired": "Session expired — please refresh the page and try again."
+  },
+  "participants": {
+    "title": "Participants",
+    "subtitle": "The start list for this event's Race stages.",
+    "withdrawn": "Withdrawn",
+    "manual": "Added by hand",
+    "pagination": "Participant list pages",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}",
+    "columns": {
+      "bib": "Bib",
+      "name": "Name",
+      "category": "Class",
+      "club": "Club",
+      "nation": "Nation",
+      "gender": "Gender",
+      "phone": "Phone",
+      "stages": "Race stages"
+    },
+    "filters": {
+      "stage": "Race stage",
+      "allStages": "All stages",
+      "showWithdrawn": "Show withdrawn"
+    },
+    "empty": {
+      "title": "No participants yet",
+      "description": "Import the start list from Race Results, or add someone by hand."
+    },
+    "import": {
+      "button": "Import from Race Results",
+      "title": "Import participants",
+      "explanation": "Choose which Race stages to import. Each stage is fetched separately, so one failing does not stop the others.",
+      "confirm": "Import",
+      "cancel": "Cancel",
+      "close": "Close",
+      "noLinkChip": "No link",
+      "noStagesWithLink": "None of this event's Race stages has a Race Results link yet. Add one in the stage settings first.",
+      "summary": "{{inserted}} added, {{updated}} updated, {{withdrawn}} withdrawn, {{revived}} returned.",
+      "skipped": "{{count}} row(s) had no usable ID and were skipped.",
+      "genericError": "The import could not be completed."
+    },
+    "add": {
+      "button": "Add participant",
+      "title": "Add a participant",
+      "confirm": "Add",
+      "cancel": "Cancel",
+      "success": "Participant added.",
+      "phoneHint": "Optional. Race Results does not supply phone numbers.",
+      "genericError": "The participant could not be added."
+    }
   },
   "scheduling": {
     "title": "Scheduling",

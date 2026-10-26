@@ -638,48 +638,112 @@ export type Database = {
           },
         ]
       }
+      participant_stages: {
+        Row: {
+          created_at: string
+          participant_id: string
+          stage_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          participant_id: string
+          stage_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          participant_id?: string
+          stage_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'participant_stages_participant_id_fkey'
+            columns: ['participant_id']
+            isOneToOne: false
+            referencedRelation: 'participants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'participant_stages_stage_id_fkey'
+            columns: ['stage_id']
+            isOneToOne: false
+            referencedRelation: 'event_stages'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'participant_stages_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       participants: {
         Row: {
           bib: string | null
           category: string | null
+          club: string | null
           created_at: string
+          external_id: string | null
+          extra: Json
           gdpr_warning_sent_at: string | null
+          gender: string | null
           id: string
-          name: string
-          phone: string
+          name: string | null
+          nation: string | null
+          phone: string | null
           privacy_accepted_at: string | null
           race_results_url: string | null
           sms_opt_out: boolean
+          source: string
           tenant_id: string
           user_id: string | null
+          withdrawn_at: string | null
         }
         Insert: {
           bib?: string | null
           category?: string | null
+          club?: string | null
           created_at?: string
+          external_id?: string | null
+          extra?: Json
           gdpr_warning_sent_at?: string | null
+          gender?: string | null
           id?: string
-          name: string
-          phone: string
+          name?: string | null
+          nation?: string | null
+          phone?: string | null
           privacy_accepted_at?: string | null
           race_results_url?: string | null
           sms_opt_out?: boolean
+          source?: string
           tenant_id: string
           user_id?: string | null
+          withdrawn_at?: string | null
         }
         Update: {
           bib?: string | null
           category?: string | null
+          club?: string | null
           created_at?: string
+          external_id?: string | null
+          extra?: Json
           gdpr_warning_sent_at?: string | null
+          gender?: string | null
           id?: string
-          name?: string
-          phone?: string
+          name?: string | null
+          nation?: string | null
+          phone?: string | null
           privacy_accepted_at?: string | null
           race_results_url?: string | null
           sms_opt_out?: boolean
+          source?: string
           tenant_id?: string
           user_id?: string | null
+          withdrawn_at?: string | null
         }
         Relationships: [
           {
@@ -1121,6 +1185,10 @@ export type Database = {
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
       grant_tenant_admin: {
         Args: { p_tenant_id: string; p_user_id: string }
+        Returns: Json
+      }
+      import_participants: {
+        Args: { p_rows: Json; p_stage_id: string; p_tenant_id: string }
         Returns: Json
       }
       is_on_workstation_shift: {

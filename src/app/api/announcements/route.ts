@@ -50,11 +50,20 @@ export async function POST(request: NextRequest) {
           .eq('sms_opt_out', false)
           .eq('invite_status', 'confirmed')
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
-      : await supabase
+      : // `.not('phone', 'is', null)` is required, not defensive: since
+        // migration 20261026084206 (N21) participants.phone is nullable,
+        // and a participant imported from Race Results has no phone number
+        // at all — the API does not expose one. Without this filter the
+        // sms_queue insert below fails on its own NOT NULL column, and
+        // because that insert is a single statement the whole announcement
+        // is dropped, including the messages to participants who DO have a
+        // number.
+        await supabase
           .from('participants')
           .select('phone')
           .eq('tenant_id', tenantId)
           .eq('sms_opt_out', false)
+          .not('phone', 'is', null)
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
 
   if (error) {
@@ -114,12 +123,20 @@ export async function POST(request: NextRequest) {
   // handler does not have.
   let queueError: { message: string } | null = null
   if (recipients && recipients.length > 0) {
+    // The `.not('phone', 'is', null)` filter above already excludes rows
+    // without a number, but that is a runtime guarantee PostgREST makes and
+    // the generated type still says `string | null` (participants.phone is
+    // nullable since N21). Narrow it here rather than asserting, so a future
+    // change that drops the filter fails this map instead of the database.
     const result = await supabase.from('sms_queue').insert(
-      recipients.map(({ phone }) => ({
-        tenant_id: tenantId,
-        announcement_id: announcement.id,
-        recipient_phone: phone,
-      }))
+      recipients
+        .map(({ phone }) => phone)
+        .filter((phone): phone is string => phone !== null)
+        .map((phone) => ({
+          tenant_id: tenantId,
+          announcement_id: announcement.id,
+          recipient_phone: phone,
+        }))
     )
     queueError = result.error
 
