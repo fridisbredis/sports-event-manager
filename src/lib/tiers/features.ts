@@ -23,6 +23,10 @@ export const TIER_FEATURES = {
   // N18's read-only mobile schedule, for checking coverage on site. SCHED-01's
   // editable grid is not gated — this is the phone-shaped companion to it.
   mobileSchedule: 'premium',
+  // N21's participants admin (PART-01), including the Race Results import.
+  // "Premium and Professional. No participants in Standard" — which the
+  // cumulative rule expresses exactly.
+  participants: 'premium',
 } as const satisfies Record<string, Tier>
 
 export type TierFeature = keyof typeof TIER_FEATURES
