@@ -43,7 +43,12 @@
     "participantsFetch_http": "Race Results svarade med ett fel.",
     "participantsFetch_malformed": "Race Results gav ett oväntat svar.",
     "participantsFetch_api_error": "Race Results avvisade förfrågan.",
-    "participantsFetch_no_list": "Det här Race Results-eventet publicerar ingen deltagarlista."
+    "participantsFetch_no_list": "Det här Race Results-eventet publicerar ingen deltagarlista.",
+    "adminRoleOfficialUnavailable": "Funktionären finns inte längre i listan. Ladda om sidan och försök igen.",
+    "cannotChangeOwnAdminRole": "Du kan inte ändra din egen adminroll.",
+    "adminCapReachedForTenant": "Ert abonnemang har nått max antal admins. Ta bort en adminroll först.",
+    "lastAdminCannotRemoveForTenant": "Det här är evenemangets sista admin. Det måste alltid finnas minst en.",
+    "adminRoleRequiresConfirmed": "Bara en bekräftad funktionär kan bli admin. Vänta tills personen har bekräftat sin inbjudan."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

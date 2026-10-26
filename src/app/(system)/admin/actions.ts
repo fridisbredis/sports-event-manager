@@ -9,6 +9,12 @@ import { z } from 'zod'
 import { translateActionError as tError } from '@/lib/actions/action-error'
 import { normalizePhoneToE164, PHONE_COUNTRIES } from '@/lib/phone'
 import { logger } from '@/lib/logger'
+import {
+  resolveAdminAuthUser,
+  grantTenantAdminRole,
+  revokeTenantAdminRole,
+  type AdminRoleChangeResult,
+} from '@/lib/auth/tenant-admins'
 
 const setTenantActiveSchema = z.object({
   tenantId: z.string().uuid(),
@@ -41,75 +47,15 @@ const createTenantWithAdminSchema = z.object({
   adminPhoneCountry: z.enum(PHONE_COUNTRY_CODES as [string, ...string[]]),
 })
 
-type ResolvedAdminUser = { ok: true; userId: string } | { ok: false; error: string }
-
-// Turns a phone number into an auth user id, creating the account when the
-// number is new and reusing it when it is not.
-//
-// The auth row is created up front rather than lazily on first sign-in, for
-// the same reason the officials invite route does it (src/app/api/officials/
-// route.ts): it lets "Allow new users to sign up" stay disabled in Supabase
-// Auth, so a phone number cannot self-register just by requesting an OTP.
-//
-// `name` is written to user_metadata because ensure_admin_roster_row
-// (migration 20260911130436) builds the roster row's display name from
-// raw_user_meta_data->>'name' and falls back to the phone number when it is
-// empty — which is what made early admins appear named after their own number.
-// An existing account keeps the name it already has: a system admin typing a
-// name here must not silently rewrite one the person chose themselves.
-async function resolveAdminAuthUser(
-  service: Awaited<ReturnType<typeof createSupabaseServiceClient>>,
-  normalizedPhone: string,
-  name: string,
-  logContext: Record<string, unknown>
-): Promise<ResolvedAdminUser> {
-  const { data: created, error: createUserError } = await service.auth.admin.createUser({
-    phone: normalizedPhone,
-    phone_confirm: true,
-    user_metadata: { name },
-  })
-
-  if (!createUserError) return { ok: true, userId: created.user.id }
-
-  if (createUserError.code !== 'phone_exists') {
-    logger.error('Admin grant: failed to create auth user', createUserError, logContext)
-    return { ok: false, error: await tError('actionErrors.grantAdminFailed') }
-  }
-
-  const { data: existingUserId, error: lookupError } = await service.rpc('get_user_id_by_phone', {
-    p_phone: normalizedPhone,
-  })
-
-  if (lookupError || !existingUserId) {
-    // phone_exists said the auth row is there, so an empty result is a real
-    // inconsistency rather than an ordinary miss.
-    logger.error(
-      'Admin grant: phone exists but no auth user found',
-      lookupError ?? undefined,
-      logContext
-    )
-    return { ok: false, error: await tError('actionErrors.grantAdminFailed') }
-  }
-
-  const { data: existing } = await service.auth.admin.getUserById(existingUserId)
-  const currentName =
-    typeof existing?.user?.user_metadata?.name === 'string'
-      ? existing.user.user_metadata.name.trim()
-      : ''
-
-  if (!currentName) {
-    const { error: updateError } = await service.auth.admin.updateUserById(existingUserId, {
-      user_metadata: { ...(existing?.user?.user_metadata ?? {}), name },
-    })
-    // Not fatal: the grant itself is what matters, and the roster row falls
-    // back to the phone number for a display name. Logged so an odd-looking
-    // name is traceable rather than mysterious.
-    if (updateError) {
-      logger.error('Admin grant: could not set name on existing auth user', updateError, logContext)
-    }
-  }
-
-  return { ok: true, userId: existingUserId }
+// SYS-02's wording for a refused grant or revoke. Written for a system admin,
+// who can act on it: raise the tier, or deactivate the tenant.
+function adminRoleErrorKey(
+  reason: Extract<AdminRoleChangeResult, { ok: false }>['reason'],
+  failedKey: string
+) {
+  if (reason === 'capReached') return 'actionErrors.adminCapReached'
+  if (reason === 'lastAdmin') return 'actionErrors.lastAdminCannotRemove'
+  return failedKey
 }
 
 type SystemAdminCheck =
@@ -188,7 +134,7 @@ export async function createTenant(
   const adminUser = await resolveAdminAuthUser(service, normalizedPhone, parsed.data.adminName, {
     slug,
   })
-  if (!adminUser.ok) return { error: adminUser.error }
+  if (!adminUser.ok) return { error: await tError('actionErrors.grantAdminFailed') }
 
   // REL-01: tenant + default event + default stages + the first admin and its
   // roster row, all in one transaction — see migrations 20260908130253 and
@@ -337,36 +283,17 @@ export async function grantTenantAdmin(
   const adminUser = await resolveAdminAuthUser(service, normalizedPhone, parsed.data.name, {
     tenantId: parsed.data.tenantId,
   })
-  if (!adminUser.ok) return { error: adminUser.error }
+  if (!adminUser.ok) return { error: await tError('actionErrors.grantAdminFailed') }
   const adminUserId = adminUser.userId
 
-  const { data, error } = await service.rpc('grant_tenant_admin', {
-    p_tenant_id: parsed.data.tenantId,
-    p_user_id: adminUserId,
+  const result = await grantTenantAdminRole(parsed.data.tenantId, adminUserId, {
+    userId,
+    role: 'system_admin',
   })
-
-  if (error) {
-    // P0001 from the RPC is the cap being full — a normal outcome the system
-    // admin should see explained, not a failure to log as an error.
-    if (error.code === 'P0001') return { error: await tError('actionErrors.adminCapReached') }
-    logger.error('Admin grant: RPC failed', error, { tenantId: parsed.data.tenantId })
-    return { error: await tError('actionErrors.grantAdminFailed') }
-  }
-
-  const { granted } = data as unknown as { granted: boolean }
-
-  // Only audit an actual change. Re-granting an existing admin is idempotent
-  // and would otherwise fill the log with no-ops.
-  if (granted) {
-    await logAuditEvent({
-      tenantId: parsed.data.tenantId,
-      actorUserId: userId,
-      actorRole: 'system_admin',
-      action: 'tenant_admin_granted',
-      targetType: 'user_role',
-      targetId: adminUserId,
-      detail: {},
-    })
+  if (!result.ok) {
+    return {
+      error: await tError(adminRoleErrorKey(result.reason, 'actionErrors.grantAdminFailed')),
+    }
   }
 
   revalidatePath('/admin/' + parsed.data.tenantId)
@@ -375,8 +302,10 @@ export async function grantTenantAdmin(
 
 // N20: remove someone's tenant admin role.
 //
-// Leaves their officials row intact, so they stay an ordinary official of the
-// tenant rather than losing their identity, assignments and consent state —
+// Leaves their officials row intact and, since 20261026123231, demotes their
+// role to 'official' rather than deleting it, so they stay an ordinary official
+// who can still sign in — not a roster row nobody can reach. Their identity,
+// assignments and consent state are kept;
 // removing the person entirely is remove_official's job (0025), and SYS-02
 // does not need a second way to do it.
 export async function revokeTenantAdmin(
@@ -390,32 +319,14 @@ export async function revokeTenantAdmin(
   const parsed = revokeAdminSchema.safeParse({ tenantId, userId: targetUserId })
   if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
 
-  const service = await createSupabaseServiceClient()
-  const { data, error } = await service.rpc('revoke_tenant_admin', {
-    p_tenant_id: parsed.data.tenantId,
-    p_user_id: parsed.data.userId,
+  const result = await revokeTenantAdminRole(parsed.data.tenantId, parsed.data.userId, {
+    userId,
+    role: 'system_admin',
   })
-
-  if (error) {
-    // P0001 is the last-admin guard: refusing to leave a tenant with nobody
-    // who can enter it. An expected outcome, not an error to log.
-    if (error.code === 'P0001') return { error: await tError('actionErrors.lastAdminCannotRemove') }
-    logger.error('Admin revoke: RPC failed', error, { tenantId: parsed.data.tenantId })
-    return { error: await tError('actionErrors.revokeAdminFailed') }
-  }
-
-  const { revoked } = data as unknown as { revoked: boolean }
-
-  if (revoked) {
-    await logAuditEvent({
-      tenantId: parsed.data.tenantId,
-      actorUserId: userId,
-      actorRole: 'system_admin',
-      action: 'tenant_admin_revoked',
-      targetType: 'user_role',
-      targetId: parsed.data.userId,
-      detail: {},
-    })
+  if (!result.ok) {
+    return {
+      error: await tError(adminRoleErrorKey(result.reason, 'actionErrors.revokeAdminFailed')),
+    }
   }
 
   revalidatePath('/admin/' + parsed.data.tenantId)

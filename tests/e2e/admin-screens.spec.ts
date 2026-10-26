@@ -108,24 +108,24 @@ test.describe('OFF-01 officials roster', () => {
   })
 
   // F-MNT-20: OFF-01 lists the admin as implicitly Confirmed, marked
-  // "<name> — Event admin" and without action buttons — Peter's decision of
-  // 2026-06-24. This used to assert the opposite: the tenant admin had a
+  // "<name> — You" (N27; "— Event admin" before) and without action buttons —
+  // Peter's decision of 2026-06-24. This used to assert the opposite: the tenant admin had a
   // user_roles row but no `officials` row, so the roster omitted them. The
   // roster row now exists (ensure_admin_roster_row, migration
   // 20260911130436, applied to the seed admin by the backfill in
   // 20260911130546), which also clears the 404 the same admin used to get on
   // the official account screen (see access-control.spec.ts).
-  test('lists the admin on the roster as Event admin, without action buttons', async ({
+  test('lists the admin on the roster as You, without action buttons', async ({
     tenantAdminPage: page,
   }) => {
     await page.goto(`${base}/officials`)
 
     // Not anchored with $: hasText matches the row's whole concatenated text,
     // which runs on past the name cell into the number and status cells
-    // ('…— Event admin+46 70 990 00 01Confirmed'). An end anchor can therefore
+    // ('…— You+46 70 990 00 01ConfirmedAdmin'). An end anchor can therefore
     // never match a grid row, and this silently asserted on a shape the markup
     // never had.
-    const adminRow = page.getByRole('row').filter({ hasText: /— Event admin/ })
+    const adminRow = page.getByRole('row').filter({ hasText: /— You/ })
     await expect(adminRow).toHaveCount(1)
 
     // Implicitly Confirmed — never shown as Invited, since no SMS invite is
@@ -139,8 +139,11 @@ test.describe('OFF-01 officials roster', () => {
     // button, the disclosure that opens the shifts panel. A bare count would
     // now be 1 on a row that still carries no actions, so it would be
     // asserting the layout rather than the rule this test is about.
-    await expect(adminRow.getByRole('button', { name: 'Remove' })).toHaveCount(0)
-    await expect(adminRow.getByRole('button', { name: 'Re-send invite' })).toHaveCount(0)
+    //
+    // Since N27 every other row's actions sit behind a ⋯ menu, so "no actions"
+    // means no menu trigger on this row. You cannot change your own role.
+    await expect(adminRow.getByRole('button', { name: /^Actions for / })).toHaveCount(0)
+    await expect(adminRow.getByText('Admin', { exact: true })).toBeVisible()
   })
 
   // N17. This exercises the real HeroUI table, which is what the component
@@ -157,7 +160,9 @@ test.describe('OFF-01 officials roster', () => {
     await page.goto(`${base}/officials`)
 
     // Seeded with shifts, unlike 'Seed Official No Shifts' below.
-    const toggle = page.getByRole('button', { name: /Seed Official Confirmed/ })
+    // exact: the row's ⋯ menu trigger is labelled "Actions for Seed Official
+    // Confirmed" (N27), which a pattern on the name alone also matches.
+    const toggle = page.getByRole('button', { name: 'Seed Official Confirmed', exact: true })
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
 
     // The panel is the click's outcome, so clickWhenInteractive can retry
@@ -183,7 +188,7 @@ test.describe('OFF-01 officials roster', () => {
   test('an official with no shifts still gets a panel', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/officials`)
 
-    const toggle = page.getByRole('button', { name: /Seed Official No Shifts/ })
+    const toggle = page.getByRole('button', { name: 'Seed Official No Shifts', exact: true })
     const panel = page.locator('[id^="official-detail-"]')
 
     await clickWhenInteractive(toggle, panel.getByText('Not scheduled yet.'))
@@ -228,8 +233,16 @@ test.describe('OFF-01 officials roster', () => {
   test('removing an official asks for confirmation first', async ({ tenantAdminPage: page }) => {
     await page.goto(`${base}/officials`)
 
+    // Remove sits in the row's ⋯ menu since N27. A confirmed non-admin row:
+    // an admin's menu deliberately has no Remove.
+    const menu = page.getByRole('menu')
+    await clickWhenInteractive(
+      page.getByRole('button', { name: 'Actions for Seed Official No Shifts' }),
+      menu
+    )
+
     const dialog = page.getByRole('dialog')
-    await clickWhenInteractive(page.getByRole('button', { name: 'Remove' }).first(), dialog)
+    await menu.getByRole('menuitem', { name: 'Remove' }).click()
 
     await expect(dialog.getByText(/also frees any work-area assignments/)).toBeVisible()
 
@@ -237,6 +250,29 @@ test.describe('OFF-01 officials roster', () => {
     // with every other test in this suite.
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(dialog).not.toBeVisible()
+  })
+
+  // N27, against the real HeroUI dropdown the component tests stub out.
+  // Read-only on purpose: the roster and its roles are shared with every
+  // other test in this suite, so nothing here grants or revokes a role.
+  test('an invited official cannot be made admin until they confirm', async ({
+    tenantAdminPage: page,
+  }) => {
+    await page.goto(`${base}/officials`)
+
+    const menu = page.getByRole('menu')
+    await clickWhenInteractive(
+      page.getByRole('button', { name: 'Actions for Seed Official Invited' }),
+      menu
+    )
+
+    const makeAdmin = menu.getByRole('menuitem', { name: /Make admin/ })
+    await expect(makeAdmin).toHaveAttribute('aria-disabled', 'true')
+    await expect(makeAdmin).toContainText('Can be made admin once they have confirmed the invite')
+    await expect(menu.getByRole('menuitem', { name: 'Re-send invite' })).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
   })
 })
 

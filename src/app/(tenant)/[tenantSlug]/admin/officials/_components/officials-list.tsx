@@ -1,7 +1,8 @@
 'use client'
 
-import { Users, ChevronRight } from 'lucide-react'
+import { Users, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Chip,
   Table,
@@ -16,12 +17,16 @@ import {
   ModalBody,
   ModalFooter,
   SelectItem,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/form-fields'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
-import { LinkButton } from '@/components/ui/link-button'
+import { LISTBOX_ITEM } from '@/components/ui/form-fields'
 import { WORK_AREA_COLORS, workAreaColorMap } from '@/lib/theme/work-area-colors'
 import { AvatarImage } from '@/components/ui/avatar-image'
 import { useTranslation } from '@/lib/i18n/client'
@@ -37,6 +42,7 @@ import {
 import type { OfficialListItem } from '@/types/app'
 import type { OfficialDetail } from '@/lib/scheduling/official-detail'
 import { formatStageDate, formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
+import { makeTenantAdmin, removeTenantAdmin } from '../actions'
 
 interface Props {
   tenantSlug: string
@@ -47,7 +53,15 @@ interface Props {
   details: Record<string, OfficialDetail>
   /** Drives date and time formatting, which follows the locale setting (B7). */
   language: string
+  /** N27: user ids holding tenant_admin in this tenant. */
+  adminUserIds: string[]
+  /** N27: how many tenant admins the tenant's tier allows. */
+  adminCap: number
+  /** N27: the tenant's tier, named in the cap explanation. */
+  tier: string
 }
+
+type AdminRoleChange = { official: OfficialListItem; action: 'make' | 'remove' }
 
 /**
  * Up to two initials for the avatar. Falls back to the first two characters
@@ -62,13 +76,18 @@ function initialsOf(name: string): string {
 }
 
 export default function OfficialsList({
+  tenantSlug,
   tenantId,
   officials: initialOfficials,
   currentUserId,
   details,
   language,
+  adminUserIds,
+  adminCap,
+  tier,
 }: Props) {
   const { t } = useTranslation('admin')
+  const router = useRouter()
   const [officials, setOfficials] = useState<OfficialListItem[]>(initialOfficials)
   // N17: which rows are expanded. A set rather than a single id — comparing
   // two officials' shifts means having both open at once.
@@ -79,6 +98,8 @@ export default function OfficialsList({
   const [pending, setPending] = useState(false)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
+  const [adminRoleChange, setAdminRoleChange] = useState<AdminRoleChange | null>(null)
+  const [adminRolePendingId, setAdminRolePendingId] = useState<string | null>(null)
 
   // Form state
   const [name, setName] = useState('')
@@ -209,7 +230,26 @@ export default function OfficialsList({
     }
   }
 
+  async function handleAdminRoleChange(change: AdminRoleChange) {
+    setAdminRoleChange(null)
+    setAdminRolePendingId(change.official.id)
+    try {
+      const action = change.action === 'make' ? makeTenantAdmin : removeTenantAdmin
+      const result = await action({ tenantSlug, tenantId, officialId: change.official.id })
+      if (result.error) toastError(result.error)
+      // The admin set and the cap come from the server, so re-read them rather
+      // than guessing locally — the RPC may have refused for a reason (the cap,
+      // a concurrent change) the client cannot see.
+      router.refresh()
+    } finally {
+      setAdminRolePendingId(null)
+    }
+  }
+
+  const adminIds = new Set(adminUserIds)
   const visibleOfficials = officials.filter((o) => o.invite_status !== 'removed')
+  const adminPlacesUsed = adminUserIds.length
+  const adminCapReached = adminPlacesUsed >= adminCap
 
   // Keyed off the full roster rather than `visibleOfficials`, so removing
   // someone never repaints the avatars of the people who remain.
@@ -233,6 +273,21 @@ export default function OfficialsList({
     setAddError(null)
   }
 
+  // What the admin-role dialog says.
+  const adminRoleDialog = adminRoleChange
+    ? adminRoleChange.action === 'make'
+      ? {
+          title: t('officials.makeAdminConfirmTitle'),
+          body: t('officials.makeAdminConfirmBody', { name: adminRoleChange.official.name }),
+          confirm: t('officials.makeAdmin'),
+        }
+      : {
+          title: t('officials.removeAdminRoleConfirmTitle'),
+          body: t('officials.removeAdminRoleConfirmBody', { name: adminRoleChange.official.name }),
+          confirm: t('officials.removeAdminRole'),
+        }
+    : null
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -241,6 +296,19 @@ export default function OfficialsList({
           {t('officials.add')}
         </Button>
       </div>
+
+      {/* The admin limit, stated before it is hit rather than discovered
+          through a greyed-out menu item. */}
+      {visibleOfficials.length > 0 && (
+        <p className="-mt-3 mb-4 text-sm text-ink-label">
+          {t('officials.adminCapHint', {
+            count: adminCap,
+            used: adminPlacesUsed,
+            tier: t(`systemAdmin.${tier}`, { defaultValue: tier }),
+          })}
+          {adminCapReached && <> {t('officials.adminCapReachedHint')}</>}
+        </p>
+      )}
 
       {visibleOfficials.length === 0 ? (
         <EmptyStateCard
@@ -274,14 +342,17 @@ export default function OfficialsList({
             <TableColumn>{t('officials.name')}</TableColumn>
             <TableColumn>{t('officials.phone')}</TableColumn>
             <TableColumn>{t('officials.status')}</TableColumn>
-            {/* A fixed width so the two actions keep the same two columns on
-                every row; without it the cell shrinks to its content and
-                Re-send invite lands wherever Remove happens to end. */}
-            <TableColumn width={260}>{t('officials.actions')}</TableColumn>
+            {/* One ⋯ button per row (N27): four text links in a row read as
+                the same action. Narrow, right-aligned, and labelled for
+                screen readers since the header is the only visible text. */}
+            <TableColumn width={64} align="end">
+              <span className="sr-only">{t('officials.actions')}</span>
+            </TableColumn>
           </TableHeader>
           <TableBody>
             {visibleOfficials.flatMap((official) => {
               const isCurrentUser = official.user_id === currentUserId
+              const isAdmin = official.user_id !== null && adminIds.has(official.user_id)
               const isResending = resendingId === official.id
               const isExpanded = expanded.has(official.id)
 
@@ -346,30 +417,31 @@ export default function OfficialsList({
                         ? t('officials.confirmed')
                         : t('officials.invited')}
                     </Chip>
+                    {isAdmin && (
+                      <Chip
+                        size="sm"
+                        variant="flat"
+                        // The tenant's own tint, so the badge reads as a role
+                        // rather than as a third invite status.
+                        className="ml-1.5 bg-tenant-primary-tint text-tenant-primary-tint-text"
+                      >
+                        {t('officials.adminBadge')}
+                      </Chip>
+                    )}
                   </TableCell>
                   <TableCell>
                     {!isCurrentUser && (
-                      // Remove sits on the left, Re-send invite pinned to the
-                      // right, so the second action lines up down the column
-                      // instead of starting wherever the first one ends.
-                      <div className="flex items-center justify-between gap-5">
-                        <LinkButton
-                          size="sm"
-                          tone="danger"
-                          onPress={() => setRemoveTarget(official)}
-                        >
-                          {t('officials.remove')}
-                        </LinkButton>
-                        {official.invite_status === 'invited' && (
-                          <LinkButton
-                            size="sm"
-                            isLoading={isResending}
-                            onPress={() => setResendTarget(official)}
-                          >
-                            {t('officials.resendInvite')}
-                          </LinkButton>
-                        )}
-                      </div>
+                      <OfficialActionsMenu
+                        official={official}
+                        isAdmin={isAdmin}
+                        adminCapReached={adminCapReached}
+                        busy={isResending || adminRolePendingId === official.id}
+                        t={t}
+                        onResend={() => setResendTarget(official)}
+                        onMakeAdmin={() => setAdminRoleChange({ official, action: 'make' })}
+                        onRemoveAdmin={() => setAdminRoleChange({ official, action: 'remove' })}
+                        onRemove={() => setRemoveTarget(official)}
+                      />
                     )}
                   </TableCell>
                 </TableRow>,
@@ -491,6 +563,17 @@ export default function OfficialsList({
       />
 
       <ConfirmDialog
+        open={adminRoleChange !== null}
+        title={adminRoleDialog?.title ?? ''}
+        body={adminRoleDialog?.body ?? ''}
+        cancelLabel={t('officials.cancel')}
+        confirmLabel={adminRoleDialog?.confirm ?? ''}
+        destructive={adminRoleChange?.action === 'remove'}
+        onCancel={() => setAdminRoleChange(null)}
+        onConfirm={() => adminRoleChange && handleAdminRoleChange(adminRoleChange)}
+      />
+
+      <ConfirmDialog
         open={resendTarget !== null}
         title={t('officials.resendConfirmTitle')}
         body={t('officials.resendConfirmBody', { name: resendTarget?.name ?? '' })}
@@ -500,6 +583,103 @@ export default function OfficialsList({
         onConfirm={() => resendTarget && handleResend(resendTarget)}
       />
     </div>
+  )
+}
+
+/**
+ * N27: a row's actions behind one ⋯ button.
+ *
+ * Re-send, the admin role and Remove used to sit side by side as text links,
+ * and four links in a row read as one kind of thing. A menu separates them
+ * and keeps the destructive one last, under a divider.
+ *
+ * Every row shows the admin role. It is disabled, with the reason beneath
+ * it, for an official who has not confirmed yet (only a confirmed official
+ * can be made admin) and while the tier's cap is used up — a disabled HeroUI
+ * button cannot carry a tooltip, but a menu item can carry a description.
+ */
+function OfficialActionsMenu({
+  official,
+  isAdmin,
+  adminCapReached,
+  busy,
+  t,
+  onResend,
+  onMakeAdmin,
+  onRemoveAdmin,
+  onRemove,
+}: {
+  official: OfficialListItem
+  isAdmin: boolean
+  adminCapReached: boolean
+  busy: boolean
+  t: ReturnType<typeof useTranslation>['t']
+  onResend: () => void
+  onMakeAdmin: () => void
+  onRemoveAdmin: () => void
+  onRemove: () => void
+}) {
+  const isInvited = official.invite_status === 'invited'
+  // Why "Make admin" is unavailable, if it is. Unconfirmed comes first: it
+  // stays true however many places free up.
+  const makeAdminBlockedBy = isInvited
+    ? t('officials.makeAdminRequiresConfirmed')
+    : adminCapReached
+      ? t('officials.adminCapReachedShort')
+      : null
+
+  // Built as an array: HeroUI's DropdownMenu reads its children as a
+  // collection, and a `false` from a conditional would not be a valid item.
+  const items = [
+    ...(isInvited ? [<DropdownItem key="resend">{t('officials.resendInvite')}</DropdownItem>] : []),
+    isAdmin ? (
+      <DropdownItem key="removeAdmin">{t('officials.removeAdminRole')}</DropdownItem>
+    ) : (
+      <DropdownItem key="makeAdmin" showDivider description={makeAdminBlockedBy ?? undefined}>
+        {t('officials.makeAdmin')}
+      </DropdownItem>
+    ),
+    // Not offered for an admin: remove_official revokes only the 'official'
+    // role, so it would take them off the roster while leaving their admin
+    // access in place. Removing the admin role comes first.
+    ...(isAdmin
+      ? []
+      : [
+          <DropdownItem key="remove" className="text-destructive" color="danger">
+            {t('officials.remove')}
+          </DropdownItem>,
+        ]),
+  ]
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button
+          isIconOnly
+          variant="light"
+          size="sm"
+          isLoading={busy}
+          aria-label={t('officials.actionsFor', { name: official.name })}
+        >
+          <MoreHorizontal className="size-5 text-ink-soft" aria-hidden="true" />
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu
+        aria-label={t('officials.actionsFor', { name: official.name })}
+        // Shared with the Select fields so hover picks up the tenant palette
+        // instead of HeroUI's grey.
+        itemClasses={{ base: LISTBOX_ITEM }}
+        disabledKeys={!isAdmin && makeAdminBlockedBy ? ['makeAdmin'] : []}
+        onAction={(key) => {
+          if (key === 'resend') onResend()
+          else if (key === 'makeAdmin') onMakeAdmin()
+          else if (key === 'removeAdmin') onRemoveAdmin()
+          else if (key === 'remove') onRemove()
+        }}
+      >
+        {items}
+      </DropdownMenu>
+    </Dropdown>
   )
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialsPage from './page'
+import { listTenantAdmins } from '@/lib/auth/tenant-admins'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
@@ -27,6 +28,13 @@ vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
   }),
+}))
+
+// N27: the admin set comes from the service-role helper, not from the RLS
+// client this test stubs; a tenant with no admins keeps these tests about the
+// roster read they were written for.
+vi.mock('@/lib/auth/tenant-admins', () => ({
+  listTenantAdmins: vi.fn(async () => []),
 }))
 
 vi.mock('./_components/officials-list', () => ({
@@ -143,7 +151,34 @@ describe('OfficialsPage', () => {
       // assignment and unavailability reads return no rows (N17).
       details: { 'off-1': { shifts: [], timeOff: [] } },
       language: 'en',
+      adminUserIds: [],
+      // No tier on this fixture, so the lowest cap applies (fail-closed).
+      adminCap: 1,
+      tier: undefined,
     })
+  })
+
+  it('passes the admins and whether the tier cap is used up (N27)', async () => {
+    mockServerClient(
+      'user-1',
+      { id: TENANT_ID, name: 'Viadal', slug: 'viadal', tier: 'premium' },
+      { data: [] }
+    )
+    vi.mocked(listTenantAdmins).mockResolvedValueOnce([
+      { userId: 'a1', name: null, phone: null, createdAt: '', lockedOut: false },
+      { userId: 'a2', name: null, phone: null, createdAt: '', lockedOut: false },
+      // Locked out after a downgrade, but still a role row the RPC counts.
+      { userId: 'a3', name: null, phone: null, createdAt: '', lockedOut: true },
+    ])
+
+    const result = await OfficialsPage({ params: PARAMS })
+
+    expect(listTenantAdmins).toHaveBeenCalledWith(TENANT_ID, 'premium')
+    const list = findByType(result, OfficialsList)
+    expect(list!.props.adminUserIds).toEqual(['a1', 'a2', 'a3'])
+    // Premium allows three.
+    expect(list!.props.adminCap).toBe(3)
+    expect(list!.props.tier).toBe('premium')
   })
 
   it('passes an empty officials array when the query returns no data', async () => {

@@ -5,6 +5,8 @@ import OfficialsList from './_components/officials-list'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
 import { fetchOfficialDetail, type OfficialDetail } from '@/lib/scheduling/official-detail'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { listTenantAdmins } from '@/lib/auth/tenant-admins'
+import { maxTenantAdmins } from '@/lib/tiers/features'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -63,6 +65,14 @@ export default async function OfficialsPage({ params }: Props) {
   const visible = rows.filter((o) => o.invite_status !== 'removed')
   const language = await getUserLanguage()
 
+  // N27: who on the roster is an admin, and the tier's cap. Every
+  // tenant_admin row counts toward the cap, locked-out ones included —
+  // grant_tenant_admin counts them the same way, so a button enabled here is
+  // one the RPC will not refuse for being full.
+  const admins = await listTenantAdmins(tenant.id, tenant.tier)
+  const adminUserIds = admins.map((a) => a.userId)
+  const adminCap = maxTenantAdmins(tenant.tier)
+
   const details = new Map<string, OfficialDetail>(
     await Promise.all(
       visible.map(
@@ -84,6 +94,9 @@ export default async function OfficialsPage({ params }: Props) {
         currentUserId={user.id}
         details={Object.fromEntries(details)}
         language={language}
+        adminUserIds={adminUserIds}
+        adminCap={adminCap}
+        tier={tenant.tier}
       />
     </div>
   )

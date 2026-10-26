@@ -43,7 +43,12 @@
     "participantsFetch_http": "Race Results returned an error.",
     "participantsFetch_malformed": "Race Results returned an unexpected response.",
     "participantsFetch_api_error": "Race Results rejected the request.",
-    "participantsFetch_no_list": "This Race Results event publishes no participant list."
+    "participantsFetch_no_list": "This Race Results event publishes no participant list.",
+    "adminRoleOfficialUnavailable": "This official is no longer on the roster. Reload the page and try again.",
+    "cannotChangeOwnAdminRole": "You cannot change your own admin role.",
+    "adminCapReachedForTenant": "Your plan’s maximum number of admins is reached. Remove an admin role first.",
+    "lastAdminCannotRemoveForTenant": "This is the event’s last admin. There must always be at least one.",
+    "adminRoleRequiresConfirmed": "Only a confirmed official can be made admin. Wait until they have confirmed their invite."
   },
   "notFoundPage": {
     "eyebrow": "No result",

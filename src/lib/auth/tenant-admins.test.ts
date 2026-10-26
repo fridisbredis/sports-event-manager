@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { listTenantAdmins, isAdminWithinCap, remainingAdminSlots } from './tenant-admins'
+import {
+  listTenantAdmins,
+  isAdminWithinCap,
+  remainingAdminSlots,
+  grantTenantAdminRole,
+  revokeTenantAdminRole,
+} from './tenant-admins'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { logAuditEvent } from '@/lib/audit/log-audit-event'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
+}))
+
+vi.mock('@/lib/audit/log-audit-event', () => ({
+  logAuditEvent: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -184,5 +195,94 @@ describe('remainingAdminSlots', () => {
 
   it('never reports negative room for a tenant already over its cap', () => {
     expect(remainingAdminSlots(3, 'standard')).toBe(0)
+  })
+})
+
+// N27: the grant/revoke core shared by SYS-02 and OFF-01. The RPC bodies are
+// covered against real Postgres in tests/integration/revoke-tenant-admin.test.ts;
+// these cover what the app does with their answers.
+describe('grantTenantAdminRole / revokeTenantAdminRole', () => {
+  const actor = { userId: 'actor-1', role: 'tenant_admin' as const }
+
+  function mockRpc(result: unknown) {
+    const rpc = vi.fn(() => Promise.resolve(result))
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc } as never)
+    return rpc
+  }
+
+  it("grants through the RPC and audits the change with the actor's own role", async () => {
+    const rpc = mockRpc({ data: { granted: true, official_id: 'o1', cap: 3 }, error: null })
+
+    expect(await grantTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({ ok: true })
+    expect(rpc).toHaveBeenCalledWith('grant_tenant_admin', {
+      p_tenant_id: TENANT_ID,
+      p_user_id: 'u9',
+    })
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        actorUserId: 'actor-1',
+        actorRole: 'tenant_admin',
+        action: 'tenant_admin_granted',
+        targetId: 'u9',
+      })
+    )
+  })
+
+  it('does not audit a grant that changed nothing', async () => {
+    mockRpc({ data: { granted: false, official_id: 'o1', cap: 3 }, error: null })
+
+    expect(await grantTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({ ok: true })
+    expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+
+  it('reports a full cap as a reason, not a failure', async () => {
+    mockRpc({ data: null, error: { code: 'P0001', message: 'cap' } })
+
+    expect(await grantTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({
+      ok: false,
+      reason: 'capReached',
+    })
+  })
+
+  it('reports any other grant error as failed', async () => {
+    mockRpc({ data: null, error: { code: '42501', message: 'denied' } })
+
+    expect(await grantTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({
+      ok: false,
+      reason: 'failed',
+    })
+  })
+
+  it('records whether a revoke left the person an official', async () => {
+    mockRpc({ data: { revoked: true, demoted: true }, error: null })
+
+    expect(await revokeTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({ ok: true })
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'tenant_admin_revoked',
+        targetId: 'u9',
+        detail: { demotedToOfficial: true },
+      })
+    )
+  })
+
+  it('tolerates the pre-20261026123231 shape with no demoted key', async () => {
+    mockRpc({ data: { revoked: true }, error: null })
+
+    expect(await revokeTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({ ok: true })
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { demotedToOfficial: false } })
+    )
+  })
+
+  it('reports the last-admin guard as a reason', async () => {
+    mockRpc({ data: null, error: { code: 'P0001', message: 'last' } })
+
+    expect(await revokeTenantAdminRole(TENANT_ID, 'u9', actor)).toEqual({
+      ok: false,
+      reason: 'lastAdmin',
+    })
+    expect(logAuditEvent).not.toHaveBeenCalled()
   })
 })
