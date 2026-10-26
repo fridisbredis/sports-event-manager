@@ -52,6 +52,29 @@ export function formatPhoneForDisplay(storedPhone: string): string {
   return parsed ? parsed.formatInternational() : storedPhone
 }
 
+// For numbers typed as free text and stored unnormalised — participants.phone
+// (PART-01), which an admin can enter as "070-123 45 67", "+47 …" or our own
+// stored E.164 form. formatPhoneForDisplay assumes the stored form and would
+// prefix a '+' to a national "07…" number, so this reads the shape first:
+//   '+…'        international, as written
+//   '0…'        national, in the default country
+//   digits only E.164 without its '+', as normalizePhoneToE164 stores it
+// Anything that does not parse to a valid number is shown exactly as entered:
+// a confident-looking wrong number (a stray "+7 …") is worse than raw text.
+// Display-only, like formatPhoneForDisplay.
+export function formatEnteredPhoneForDisplay(
+  enteredPhone: string,
+  defaultCountry: CountryCode = DEFAULT_PHONE_COUNTRY
+): string {
+  const trimmed = enteredPhone.trim()
+  const parsed = trimmed.startsWith('+')
+    ? parsePhoneNumberFromString(trimmed)
+    : trimmed.startsWith('0')
+      ? parsePhoneNumberFromString(trimmed, defaultCountry)
+      : parsePhoneNumberFromString(toTwilioE164(trimmed.replace(/[\s-]/g, '')))
+  return parsed?.isValid() ? parsed.formatInternational() : enteredPhone
+}
+
 const LOCALE_REGION_TO_COUNTRY: Record<string, CountryCode> = {
   SE: 'SE',
   NO: 'NO',

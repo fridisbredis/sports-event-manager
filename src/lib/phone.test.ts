@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { guessPhoneCountryFromLocale, DEFAULT_PHONE_COUNTRY } from './phone'
+import {
+  guessPhoneCountryFromLocale,
+  DEFAULT_PHONE_COUNTRY,
+  formatEnteredPhoneForDisplay,
+} from './phone'
 
 describe('guessPhoneCountryFromLocale', () => {
   it('resolves a region we offer in the picker', () => {
@@ -24,5 +28,26 @@ describe('guessPhoneCountryFromLocale', () => {
 
   it('falls back to the default when no locale is available', () => {
     expect(guessPhoneCountryFromLocale(undefined)).toBe(DEFAULT_PHONE_COUNTRY)
+  })
+})
+
+describe('formatEnteredPhoneForDisplay', () => {
+  it('formats a national number in the default country', () => {
+    expect(formatEnteredPhoneForDisplay('070-123 45 67')).toBe('+46 70 123 45 67')
+  })
+
+  it('formats an international number as written', () => {
+    expect(formatEnteredPhoneForDisplay('+47 412 34 567')).toBe('+47 41 23 45 67')
+  })
+
+  it('formats our stored E.164 form without its plus', () => {
+    expect(formatEnteredPhoneForDisplay('46701234567')).toBe('+46 70 123 45 67')
+  })
+
+  // The case formatPhoneForDisplay gets wrong for free text: a leading '+'
+  // added to a national number either fails or lands in another country.
+  it('shows anything that is not a valid number exactly as entered', () => {
+    expect(formatEnteredPhoneForDisplay('ring Kalle')).toBe('ring Kalle')
+    expect(formatEnteredPhoneForDisplay('12345')).toBe('12345')
   })
 })
