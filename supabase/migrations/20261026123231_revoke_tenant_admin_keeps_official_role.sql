@@ -50,8 +50,14 @@
 --             20261015122314_grant_revoke_tenant_admin_rpcs.sql (same
 --             signature, create or replace). Rows this version demoted stay
 --             'official'; that is the state the old header already claimed.
---   Data:     no data loss. Changes no existing row on apply; at call time it
---             updates or deletes exactly one user_roles row, as before.
+--   Data:     prod snapshot 20261026123231_pre-migration_2026-10-26T13-21-08Z.tar.gz
+--             (Azure Blob sportsevtmgrprodsnaps, container db-snapshots),
+--             taken by hand before the push; restore with
+--             scripts/ops/restore-prod-db.sh <that filename>. Not required
+--             for a replace, taken anyway as a record of user_roles as they
+--             stood. No data loss expected: changes no existing row on
+--             apply; at call time it updates or deletes exactly one
+--             user_roles row, as before.
 --   Blast:    a bad body breaks removing a tenant admin in SYS-02 and OFF-01.
 --             Granting, sign-in and every other path are untouched.
 --   Window:   compatible. Same signature and grants, and the old caller only
