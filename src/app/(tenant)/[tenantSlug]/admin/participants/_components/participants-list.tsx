@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Users, Download, Plus } from 'lucide-react'
+import { ClipboardList } from 'lucide-react'
 import {
   Chip,
   Table,
@@ -28,11 +28,7 @@ import { useTranslation } from '@/lib/i18n/client'
 import { toastError, toastSuccess, extractErrorMessage } from '@/lib/toast'
 import { logger } from '@/lib/logger'
 
-import {
-  importParticipants,
-  addParticipant,
-  type StageImportOutcome,
-} from '../actions'
+import { importParticipants, addParticipant, type StageImportOutcome } from '../actions'
 
 export interface ParticipantRow {
   id: string
@@ -154,23 +150,15 @@ export default function ParticipantsList({
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{t('participants.title')}</h1>
-          <p className="text-default-500 text-sm">{t('participants.subtitle')}</p>
-        </div>
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="page-title">{t('participants.title')}</h1>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="bordered"
-            startContent={<Plus className="h-4 w-4" />}
-            onPress={() => setAddOpen(true)}
-          >
+          <Button variant="bordered" onPress={() => setAddOpen(true)}>
             {t('participants.add.button')}
           </Button>
           <Button
             color="primary"
-            startContent={<Download className="h-4 w-4" />}
             onPress={() => {
               setOutcomes(null)
               setSelectedStages(importableStages.map((s) => s.id))
@@ -180,9 +168,9 @@ export default function ParticipantsList({
             {t('participants.import.button')}
           </Button>
         </div>
-      </header>
+      </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <Select
           label={t('participants.filters.stage')}
           selectedKeys={[selectedStageId ?? 'all']}
@@ -198,6 +186,7 @@ export default function ParticipantsList({
         <Checkbox
           isSelected={showWithdrawn}
           onValueChange={(checked) => setParam('withdrawn', checked ? '1' : null)}
+          classNames={{ label: 'text-[15px] text-ink-soft' }}
         >
           {t('participants.filters.showWithdrawn')}
         </Checkbox>
@@ -205,71 +194,101 @@ export default function ParticipantsList({
 
       {participants.length === 0 ? (
         <EmptyStateCard
-          Icon={Users}
+          Icon={ClipboardList}
           title={t('participants.empty.title')}
           description={t('participants.empty.description')}
-        />
+        >
+          <Button
+            color="primary"
+            isDisabled={importableStages.length === 0}
+            onPress={() => {
+              setOutcomes(null)
+              setSelectedStages(importableStages.map((s) => s.id))
+              setImportOpen(true)
+            }}
+          >
+            {t('participants.import.button')}
+          </Button>
+        </EmptyStateCard>
       ) : (
-        <div className={CARD_SURFACE}>
-          {/* Wide tables get their own horizontal scroll container so the
-              page body never scrolls sideways on a phone. */}
-          <div className="overflow-x-auto">
-            <Table aria-label={t('participants.title')} removeWrapper>
-              <TableHeader>
-                <TableColumn>{t('participants.columns.bib')}</TableColumn>
-                <TableColumn>{t('participants.columns.name')}</TableColumn>
-                <TableColumn>{t('participants.columns.category')}</TableColumn>
-                <TableColumn>{t('participants.columns.club')}</TableColumn>
-                <TableColumn>{t('participants.columns.nation')}</TableColumn>
-                <TableColumn>{t('participants.columns.gender')}</TableColumn>
-                <TableColumn>{t('participants.columns.phone')}</TableColumn>
-                <TableColumn>{t('participants.columns.stages')}</TableColumn>
-              </TableHeader>
-              <TableBody>
-                {participants.map((p) => (
-                  <TableRow key={p.id} className={p.withdrawnAt ? 'opacity-50' : undefined}>
-                    <TableCell>{p.bib ?? '—'}</TableCell>
-                    <TableCell>
-                      <span className="flex flex-wrap items-center gap-2">
-                        {p.name ?? '—'}
-                        {p.withdrawnAt && (
-                          <Chip size="sm" variant="flat" color="warning">
-                            {t('participants.withdrawn')}
-                          </Chip>
-                        )}
-                        {p.source === 'manual' && (
-                          <Chip size="sm" variant="flat">
-                            {t('participants.manual')}
-                          </Chip>
-                        )}
-                      </span>
-                    </TableCell>
-                    <TableCell>{p.category ?? '—'}</TableCell>
-                    <TableCell>{p.club ?? '—'}</TableCell>
-                    <TableCell>{p.nation ?? '—'}</TableCell>
-                    <TableCell>{p.gender ?? '—'}</TableCell>
-                    {/* Always shown, empty until filled: Race Results does
-                        not expose phone numbers, so an imported row has
-                        none until someone links it. */}
-                    <TableCell>{p.phone ?? '—'}</TableCell>
-                    <TableCell>
-                      {p.stageIds.length === 0
-                        ? '—'
-                        : stages
-                            .filter((s) => p.stageIds.includes(s.id))
-                            .map((s) => s.name)
-                            .join(', ')}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+        <Table
+          aria-label={t('participants.title')}
+          // Same treatment as the officials roster and the system-admin
+          // tenant list: the shared card surface, the theme accent line, and
+          // a rule between rows that stops before the card's own edge.
+          classNames={{
+            wrapper: `${CARD_SURFACE} p-4 card-accent-primary`,
+            th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+            tr: 'border-b border-edge-soft last:border-b-0',
+            td: 'py-4',
+          }}
+        >
+          <TableHeader>
+            <TableColumn>{t('participants.columns.bib')}</TableColumn>
+            <TableColumn>{t('participants.columns.name')}</TableColumn>
+            <TableColumn>{t('participants.columns.category')}</TableColumn>
+            <TableColumn>{t('participants.columns.club')}</TableColumn>
+            <TableColumn>{t('participants.columns.nation')}</TableColumn>
+            <TableColumn>{t('participants.columns.gender')}</TableColumn>
+            <TableColumn>{t('participants.columns.phone')}</TableColumn>
+            <TableColumn>{t('participants.columns.stages')}</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {participants.map((p) => (
+              <TableRow key={p.id} className={p.withdrawnAt ? 'opacity-60' : undefined}>
+                <TableCell className="text-[15px] tabular-nums text-ink-soft">
+                  {p.bib ?? '—'}
+                </TableCell>
+                <TableCell className="text-[15px] font-medium text-ink">
+                  <span className="flex flex-wrap items-center gap-2">
+                    {p.name ?? '—'}
+                    {p.withdrawnAt && (
+                      <Chip
+                        size="sm"
+                        variant="flat"
+                        className="bg-status-pending-bg text-status-pending-text"
+                      >
+                        {t('participants.withdrawn')}
+                      </Chip>
+                    )}
+                    {p.source === 'manual' && (
+                      <Chip
+                        size="sm"
+                        variant="flat"
+                        className="bg-status-neutral-bg text-status-neutral-text"
+                      >
+                        {t('participants.manual')}
+                      </Chip>
+                    )}
+                  </span>
+                </TableCell>
+                <TableCell className="text-[15px] text-ink-soft">{p.category ?? '—'}</TableCell>
+                <TableCell className="text-[15px] text-ink-soft">{p.club ?? '—'}</TableCell>
+                <TableCell className="text-[15px] text-ink-soft">{p.nation ?? '—'}</TableCell>
+                <TableCell className="text-[15px] text-ink-soft">{p.gender ?? '—'}</TableCell>
+                {/* Always shown, empty until filled: Race Results does not
+                    expose phone numbers, so an imported row has none until
+                    someone links it. */}
+                <TableCell className="text-[15px] text-ink-soft">{p.phone ?? '—'}</TableCell>
+                <TableCell className="text-[15px] text-ink-soft">
+                  {p.stageIds.length === 0
+                    ? '—'
+                    : stages
+                        .filter((s) => p.stageIds.includes(s.id))
+                        .map((s) => s.name)
+                        .join(', ')}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {(page > 1 || hasMore) && (
-        <nav className="flex items-center justify-between" aria-label={t('participants.pagination')}>
+        <nav
+          className="mt-6 flex items-center justify-between"
+          aria-label={t('participants.pagination')}
+        >
           <Button
             variant="bordered"
             isDisabled={page <= 1}
@@ -277,7 +296,7 @@ export default function ParticipantsList({
           >
             {t('participants.previous')}
           </Button>
-          <span className="text-default-500 text-sm">{t('participants.page', { page })}</span>
+          <span className="text-[14px] text-ink-faint">{t('participants.page', { page })}</span>
           <Button
             variant="bordered"
             isDisabled={!hasMore}
@@ -290,7 +309,7 @@ export default function ParticipantsList({
 
       <Modal isOpen={importOpen} onOpenChange={setImportOpen} size="2xl">
         <ModalContent>
-          <ModalHeader>{t('participants.import.title')}</ModalHeader>
+          <ModalHeader className="text-ink">{t('participants.import.title')}</ModalHeader>
           <ModalBody>
             {outcomes ? (
               // The per-stage report. Shown instead of a single summary
@@ -298,8 +317,8 @@ export default function ParticipantsList({
               // API that can fail for one stage and not another.
               <ul className="space-y-2">
                 {outcomes.map((o) => (
-                  <li key={o.stageId} className="text-sm">
-                    <span className="font-medium">{o.stageName}: </span>
+                  <li key={o.stageId} className="text-[15px] text-ink-soft">
+                    <span className="font-medium text-ink">{o.stageName}: </span>
                     {o.ok ? (
                       <span>
                         {t('participants.import.summary', {
@@ -312,19 +331,23 @@ export default function ParticipantsList({
                             Surfaced rather than silently dropped — a short
                             list that looks plausible is the F-REL-10
                             failure mode. */}
-                        {o.skipped ? ` ${t('participants.import.skipped', { count: o.skipped })}` : ''}
+                        {o.skipped
+                          ? ` ${t('participants.import.skipped', { count: o.skipped })}`
+                          : ''}
                       </span>
                     ) : (
-                      <span className="text-danger">{o.error}</span>
+                      <span className="text-destructive">{o.error}</span>
                     )}
                   </li>
                 ))}
               </ul>
             ) : importableStages.length === 0 ? (
-              <p className="text-sm">{t('participants.import.noStagesWithLink')}</p>
+              <p className="text-[15px] text-ink-soft">
+                {t('participants.import.noStagesWithLink')}
+              </p>
             ) : (
               <div className="space-y-3">
-                <p className="text-default-500 text-sm">{t('participants.import.explanation')}</p>
+                <p className="text-[15px] text-ink-soft">{t('participants.import.explanation')}</p>
                 {stages.map((s) => (
                   <Checkbox
                     key={s.id}
@@ -339,7 +362,11 @@ export default function ParticipantsList({
                     <span className="flex flex-wrap items-center gap-2">
                       {s.name}
                       {!s.hasResultsLink && (
-                        <Chip size="sm" variant="flat">
+                        <Chip
+                          size="sm"
+                          variant="flat"
+                          className="bg-status-neutral-bg text-status-neutral-text"
+                        >
                           {t('participants.import.noLinkChip')}
                         </Chip>
                       )}
@@ -370,7 +397,7 @@ export default function ParticipantsList({
       <Modal isOpen={addOpen} onOpenChange={setAddOpen}>
         <ModalContent>
           <form action={submitAdd}>
-            <ModalHeader>{t('participants.add.title')}</ModalHeader>
+            <ModalHeader className="text-ink">{t('participants.add.title')}</ModalHeader>
             <ModalBody className="space-y-3">
               <Input name="name" label={t('participants.columns.name')} isRequired />
               <Input name="bib" label={t('participants.columns.bib')} />

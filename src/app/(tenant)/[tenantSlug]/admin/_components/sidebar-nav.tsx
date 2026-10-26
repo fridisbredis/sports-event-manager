@@ -9,7 +9,7 @@ import {
   Trophy,
   Flag,
   Users,
-  UsersRound,
+  ClipboardList,
   CalendarClock,
   MessageSquare,
   Smartphone,
@@ -70,7 +70,7 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
           {
             segment: 'admin/participants',
             label: t('navigation.participants'),
-            icon: UsersRound,
+            icon: ClipboardList,
           },
         ]
       : []),
