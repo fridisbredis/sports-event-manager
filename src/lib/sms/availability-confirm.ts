@@ -28,10 +28,12 @@ export function buildAvailabilityConfirmSms(input: AvailabilityConfirmSmsInput):
   // and the sentence has to stand on its own — capitalised, not mid-sentence.
   const opening = input.name ? `Hi ${input.name}, your` : 'Your'
 
-  // Deliberately short. The invite SMS is already two segments on prod
-  // because of the URL length, and this one carries a URL too. Plain ASCII
-  // only: a curly quote or an en dash anywhere in the body forces UCS-2 and
-  // cuts the segment budget from 160 characters to 70.
+  // Deliberately short: this carries a URL, which is most of the budget.
+  // (Corrected 2026-10-26, B11: this said the invite SMS is already two
+  // segments on prod. It is not — prod runs a short custom domain and the
+  // real invite sent on 2026-10-24 cost one segment.) Plain ASCII only: a
+  // curly quote or an en dash anywhere in the body forces UCS-2 and cuts the
+  // segment budget from 160 characters to 70.
   return `${opening} availability for ${input.tenant} is confirmed. Open the app any time: ${input.url}`
 }
 

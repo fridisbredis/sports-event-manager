@@ -262,15 +262,26 @@ export async function POST(request: NextRequest) {
   // as a send that does not happen rather than a create that fails.
   const inviteUrl = buildAppLink(`/invite/${official.invite_token}`)
 
-  // Segment budget, measured 2026-10-16 (N19). The fixed English copy is 61
-  // GSM-7 characters and `/invite/<uuid>` another 44, leaving 55 for the origin
-  // plus the official's name plus the tenant name before this tips from one
-  // 160-character segment into two. That fits a short domain (viadal.se leaves
-  // 38) but not a default Azure Container Apps hostname, which leaves 2 — so on
-  // the current prod URL every invite is two segments no matter how this is
-  // worded. Shortening the copy does not fix that; shortening the invite URL
-  // would, and is its own change. N11 is where this stops being guesswork and
-  // starts being measured per tenant.
+  // Segment budget, re-measured against prod 2026-10-26 (B11). The fixed
+  // English copy is 61 GSM-7 characters and `/invite/<uuid>` another 44, so
+  // with an 11-character tenant name 44 are left for the origin and the
+  // official's name before this tips from one 160-character segment into two.
+  //
+  // Prod runs the custom domain https://app.viadalevent.se (26), which leaves
+  // roughly 17-18 characters for the NAME: "Anna Svensson" is one segment,
+  // "Anna-Karin Johansson" is two. A thin margin, not a hard ceiling.
+  //
+  // THE EARLIER VERSION OF THIS COMMENT WAS WRONG and is corrected here. It
+  // said every prod invite is two segments regardless of wording, on the
+  // assumption that prod serves the 87-character default Azure Container Apps
+  // hostname. That stopped being true when the custom domain landed on
+  // 2026-10-22, and the one real invite sent in prod since (2026-10-24) is
+  // recorded in sms_usage as segments=1 — Twilio's own count via N11, not a
+  // calculation. Do not treat two segments as the floor.
+  //
+  // Shortening the copy barely moves this; shortening the invite URL would
+  // end it (the uuid is 36 of the path's 44 characters), and is its own change
+  // with migration and token-collision implications. See B11.
   //
   // Pinned to English, not the inviting admin's language (N19, decided by
   // Peter 2026-10-16). This reverses #219, which followed the admin on the
