@@ -179,4 +179,27 @@ to service_role;
 
 grant insert on table public.sms_queue to authenticated;
 
+-- ----------------------------------------------------------------------------
+-- sms_usage — service_role only.
+-- ----------------------------------------------------------------------------
+-- Migration 20261019093632 (N11) revokes all from anon and authenticated and
+-- layers a deny-all policy on top, taking the same posture as sms_queue and
+-- rate_limit_hits above. What it does NOT do is grant service_role, because
+-- hosted Supabase supplies that automatically — and like the three tables in
+-- the section above, a local `supabase db reset` does not.
+--
+-- The symptom is specific and misleading: every admin dashboard render logs
+-- "permission denied for table sms_usage" (42501) with consequence
+-- cap_not_enforced_send_allowed, i.e. the N24 SMS cap silently fails open
+-- locally, and four tests in sms-usage-accounting.test.ts fail. Dev and prod
+-- are unaffected — verified against prod's information_schema on 2026-10-26,
+-- where service_role holds full DML on this table.
+--
+-- Granted here rather than by amending that migration, for the reason the
+-- section above gives: it is already applied everywhere, and hosted projects
+-- need nothing added.
+
+grant select, insert, update, delete on table public.sms_usage
+to service_role;
+
 commit;
