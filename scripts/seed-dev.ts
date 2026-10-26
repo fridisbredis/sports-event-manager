@@ -225,7 +225,7 @@ async function main() {
 
   const { data: tenant, error: tenantError } = await admin
     .from('tenants')
-    .insert({ name: 'Seed Klubben', slug, is_active: true, tier: 'standard' })
+    .insert({ name: 'Seed Klubben', slug, is_active: true, tier: 'premium' })
     .select()
     .single()
   if (tenantError) throw tenantError

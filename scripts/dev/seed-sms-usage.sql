@@ -11,9 +11,9 @@
 --   blocked    — red + "Blocked"        (at or over the cap; sending stopped)
 --
 -- WHY IT ADDS TENANTS. A tenant's cap comes from its tier, so showing the
--- three states at once needs more than one tier in the table. The seed has a
--- single standard tenant; this adds a premium and a professional one beside
--- it.
+-- three states at once needs one tenant per tier. It adds its own three demo
+-- tenants and leaves the seed tenant alone: seed-klubben is premium since the
+-- seed changed, and its tier may also be changed by hand in SYS-02.
 --
 -- LOCAL ONLY. Run it against the local stack, never dev or prod:
 --
@@ -32,22 +32,23 @@
 
 begin;
 
--- Two extra tenants, so the three tier caps (100 / 200 / 300) are all present.
+-- Three demo tenants, so the three tier caps (100 / 200 / 300) are all present.
 insert into tenants (name, slug, tier, is_active)
 values
+  ('Demo Standard', 'demo-standard', 'standard', true),
   ('Demo Premium', 'demo-premium', 'premium', true),
   ('Demo Professional', 'demo-professional', 'professional', true)
 on conflict (slug) do update
   set tier = excluded.tier,
       is_active = excluded.is_active;
 
--- Clear this month's rows for the three tenants so re-running does not stack
+-- Clear this month's rows for the three demo tenants so re-running does not stack
 -- spend on top of the previous run and push everything into "blocked".
 delete from sms_usage
 where created_at >= date_trunc('month', now() at time zone 'utc')
   and tenant_id in (
     select id from tenants
-    where slug in ('seed-klubben', 'demo-premium', 'demo-professional')
+    where slug in ('demo-standard', 'demo-premium', 'demo-professional')
   );
 
 -- UNDER THE CAP — professional, 300 kr cap.
@@ -72,7 +73,7 @@ where t.slug = 'demo-premium';
 insert into sms_usage (tenant_id, kind, status, segments, created_at)
 select t.id, 'announcement', 'sent', 1, now() - (n || ' minutes')::interval
 from tenants t, generate_series(1, 200) n
-where t.slug = 'seed-klubben';
+where t.slug = 'demo-standard';
 
 -- A handful of failed sends on the blocked tenant. Twilio does not charge for
 -- a message it refused, so these must NOT move the SEK figure — worth having
@@ -80,7 +81,7 @@ where t.slug = 'seed-klubben';
 insert into sms_usage (tenant_id, kind, status, segments, created_at)
 select t.id, 'announcement', 'failed', 2, now() - (n || ' minutes')::interval
 from tenants t, generate_series(1, 5) n
-where t.slug = 'seed-klubben';
+where t.slug = 'demo-standard';
 
 commit;
 
