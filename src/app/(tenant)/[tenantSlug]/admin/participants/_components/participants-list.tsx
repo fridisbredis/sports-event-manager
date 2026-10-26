@@ -307,17 +307,29 @@ export default function ParticipantsList({
         </nav>
       )}
 
-      <Modal isOpen={importOpen} onOpenChange={setImportOpen} size="2xl">
+      <Modal
+        isOpen={importOpen}
+        onOpenChange={setImportOpen}
+        size="lg"
+        classNames={{
+          base: 'bg-white rounded-card shadow-modal',
+          backdrop: 'bg-ink/45',
+          header: 'px-6 pb-2 pt-6 font-display text-xl font-extrabold tracking-tight text-ink',
+          body: 'px-6',
+          footer: 'gap-3 px-6 pb-6 pt-4',
+          closeButton: 'right-4 top-4 text-ink-label hover:bg-status-neutral-bg',
+        }}
+      >
         <ModalContent>
-          <ModalHeader className="text-ink">{t('participants.import.title')}</ModalHeader>
+          <ModalHeader>{t('participants.import.title')}</ModalHeader>
           <ModalBody>
             {outcomes ? (
               // The per-stage report. Shown instead of a single summary
               // because the import runs one stage per request against an
               // API that can fail for one stage and not another.
-              <ul className="space-y-2">
+              <ul className="divide-y divide-edge-soft rounded-lg border border-edge-soft">
                 {outcomes.map((o) => (
-                  <li key={o.stageId} className="text-[15px] text-ink-soft">
+                  <li key={o.stageId} className="px-4 py-3 text-[15px] text-ink-soft">
                     <span className="font-medium text-ink">{o.stageName}: </span>
                     {o.ok ? (
                       <span>
@@ -346,33 +358,41 @@ export default function ParticipantsList({
                 {t('participants.import.noStagesWithLink')}
               </p>
             ) : (
-              <div className="space-y-3">
-                <p className="text-[15px] text-ink-soft">{t('participants.import.explanation')}</p>
-                {stages.map((s) => (
-                  <Checkbox
-                    key={s.id}
-                    isSelected={selectedStages.includes(s.id)}
-                    isDisabled={!s.hasResultsLink}
-                    onValueChange={(checked) =>
-                      setSelectedStages((prev) =>
-                        checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)
-                      )
-                    }
-                  >
-                    <span className="flex flex-wrap items-center gap-2">
-                      {s.name}
-                      {!s.hasResultsLink && (
-                        <Chip
-                          size="sm"
-                          variant="flat"
-                          className="bg-status-neutral-bg text-status-neutral-text"
-                        >
-                          {t('participants.import.noLinkChip')}
-                        </Chip>
-                      )}
-                    </span>
-                  </Checkbox>
-                ))}
+              <div>
+                <p className="mb-4 text-[15px] text-ink-soft">
+                  {t('participants.import.explanation')}
+                </p>
+                {/* One stage per row. Laid out as inline siblings before, so
+                    a stage name ran straight into the next stage's box. */}
+                <ul className="divide-y divide-edge-soft rounded-lg border border-edge-soft">
+                  {stages.map((s) => (
+                    <li key={s.id} className="px-4 py-3">
+                      <Checkbox
+                        isSelected={selectedStages.includes(s.id)}
+                        isDisabled={!s.hasResultsLink}
+                        onValueChange={(checked) =>
+                          setSelectedStages((prev) =>
+                            checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)
+                          )
+                        }
+                        classNames={{ base: 'w-full max-w-full', label: 'w-full' }}
+                      >
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span className="text-[15px] text-ink">{s.name}</span>
+                          {!s.hasResultsLink && (
+                            <Chip
+                              size="sm"
+                              variant="flat"
+                              className="bg-status-neutral-bg text-status-neutral-text"
+                            >
+                              {t('participants.import.noLinkChip')}
+                            </Chip>
+                          )}
+                        </span>
+                      </Checkbox>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </ModalBody>
@@ -394,11 +414,23 @@ export default function ParticipantsList({
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={addOpen} onOpenChange={setAddOpen}>
+      <Modal
+        isOpen={addOpen}
+        onOpenChange={setAddOpen}
+        size="lg"
+        classNames={{
+          base: 'bg-white rounded-card shadow-modal',
+          backdrop: 'bg-ink/45',
+          header: 'px-6 pb-2 pt-6 font-display text-xl font-extrabold tracking-tight text-ink',
+          body: 'px-6',
+          footer: 'gap-3 px-6 pb-6 pt-4',
+          closeButton: 'right-4 top-4 text-ink-label hover:bg-status-neutral-bg',
+        }}
+      >
         <ModalContent>
           <form action={submitAdd}>
-            <ModalHeader className="text-ink">{t('participants.add.title')}</ModalHeader>
-            <ModalBody className="space-y-3">
+            <ModalHeader>{t('participants.add.title')}</ModalHeader>
+            <ModalBody className="flex flex-col gap-3">
               <Input name="name" label={t('participants.columns.name')} isRequired />
               <Input name="bib" label={t('participants.columns.bib')} />
               <Input name="category" label={t('participants.columns.category')} />
