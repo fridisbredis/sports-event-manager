@@ -60,9 +60,12 @@
 --             If zero, re-run the constraint block from 20261015122735. If
 --             non-zero, leave the wider constraint in place rather than
 --             deleting audit rows to make a rollback possible.
---   Data:     prod snapshot PENDING — taken by hand before the push with
---             scripts/ops/snapshot-prod-db.sh 20261026134923; filename goes
---             here. No data loss expected: on apply, no row is written. At
+--   Data:     prod snapshot 20261026134923_pre-migration_2026-10-26T14-25-02Z.tar.gz
+--             (Azure Blob sportsevtmgrprodsnaps, container db-snapshots),
+--             taken by hand before the push; restore with
+--             scripts/ops/restore-prod-db.sh <that filename>. Taken as a
+--             record of user_roles as they stood (3 system admins).
+--             No data loss expected: on apply, no row is written. At
 --             call time grant inserts one user_roles row and revoke deletes
 --             a user's system_admin rows, so a bad body could remove a system
 --             admin.
