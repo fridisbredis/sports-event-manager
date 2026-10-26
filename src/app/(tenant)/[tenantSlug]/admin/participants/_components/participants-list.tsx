@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ClipboardList } from 'lucide-react'
+import { Check, ClipboardList, TriangleAlert } from 'lucide-react'
 import {
   Chip,
   Table,
@@ -327,29 +327,57 @@ export default function ParticipantsList({
               // The per-stage report. Shown instead of a single summary
               // because the import runs one stage per request against an
               // API that can fail for one stage and not another.
-              <ul className="divide-y divide-edge-soft rounded-lg border border-edge-soft">
+              <ul className="flex flex-col gap-2">
                 {outcomes.map((o) => (
-                  <li key={o.stageId} className="px-4 py-3 text-[15px] text-ink-soft">
-                    <span className="font-medium text-ink">{o.stageName}: </span>
+                  // A tinted status row per stage rather than a line of
+                  // text. The outcome is the whole point of this view, and
+                  // on a white sheet an edge-soft border (#EEF0F3) is
+                  // effectively invisible — it read as unstyled.
+                  <li
+                    key={o.stageId}
+                    className={`flex gap-3 rounded-lg border px-4 py-3 ${
+                      o.ok
+                        ? 'border-status-ok-border bg-status-ok-soft'
+                        : 'border-destructive/30 bg-destructive/5'
+                    }`}
+                  >
                     {o.ok ? (
-                      <span>
-                        {t('participants.import.summary', {
-                          inserted: o.inserted ?? 0,
-                          updated: o.updated ?? 0,
-                          withdrawn: o.withdrawn ?? 0,
-                          revived: o.revived ?? 0,
-                        })}
-                        {/* Rows the API returned without a usable ID.
-                            Surfaced rather than silently dropped — a short
-                            list that looks plausible is the F-REL-10
-                            failure mode. */}
-                        {o.skipped
-                          ? ` ${t('participants.import.skipped', { count: o.skipped })}`
-                          : ''}
-                      </span>
+                      <Check
+                        className="mt-0.5 size-4 shrink-0 text-status-ok-dot"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <span className="text-destructive">{o.error}</span>
+                      <TriangleAlert
+                        className="mt-0.5 size-4 shrink-0 text-destructive"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
                     )}
+                    <div className="text-[15px]">
+                      <span className="font-medium text-ink">{o.stageName}</span>
+                      <span
+                        className={`block ${o.ok ? 'text-status-ok-text' : 'text-destructive'}`}
+                      >
+                        {o.ok
+                          ? t('participants.import.summary', {
+                              inserted: o.inserted ?? 0,
+                              updated: o.updated ?? 0,
+                              withdrawn: o.withdrawn ?? 0,
+                              revived: o.revived ?? 0,
+                            })
+                          : o.error}
+                      </span>
+                      {/* Rows the API returned without a usable ID.
+                          Surfaced rather than silently dropped — a short
+                          list that looks plausible is the F-REL-10 failure
+                          mode. */}
+                      {o.ok && o.skipped ? (
+                        <span className="block text-ink-label">
+                          {t('participants.import.skipped', { count: o.skipped })}
+                        </span>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -364,7 +392,7 @@ export default function ParticipantsList({
                 </p>
                 {/* One stage per row. Laid out as inline siblings before, so
                     a stage name ran straight into the next stage's box. */}
-                <ul className="divide-y divide-edge-soft rounded-lg border border-edge-soft">
+                <ul className="divide-y divide-edge-soft rounded-lg border border-edge">
                   {stages.map((s) => (
                     <li key={s.id} className="px-4 py-3">
                       <Checkbox
