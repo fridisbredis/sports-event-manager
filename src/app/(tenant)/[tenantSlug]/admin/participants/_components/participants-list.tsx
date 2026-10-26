@@ -27,6 +27,7 @@ import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError, toastSuccess, extractErrorMessage } from '@/lib/toast'
 import { logger } from '@/lib/logger'
+import { formatEnteredPhoneForDisplay } from '@/lib/phone'
 
 import { importParticipants, addParticipant, type StageImportOutcome } from '../actions'
 
@@ -269,7 +270,11 @@ export default function ParticipantsList({
                 {/* Always shown, empty until filled: Race Results does not
                     expose phone numbers, so an imported row has none until
                     someone links it. */}
-                <TableCell className="text-[15px] text-ink-soft">{p.phone ?? '—'}</TableCell>
+                <TableCell className="text-[15px] text-ink-soft">
+                  {/* Free text, not normalised on save — hence not
+                      formatPhoneForDisplay, which assumes the stored E.164. */}
+                  {p.phone ? formatEnteredPhoneForDisplay(p.phone) : '—'}
+                </TableCell>
                 <TableCell className="text-[15px] text-ink-soft">
                   {p.stageIds.length === 0
                     ? '—'

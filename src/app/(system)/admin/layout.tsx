@@ -25,6 +25,7 @@ export default async function SystemAdminLayout({ children }: Props) {
 
   const labels = {
     tenants: t('systemAdmin.tenants'),
+    systemAdmins: t('systemAdmin.systemAdmins'),
     privacyPolicy: t('systemAdmin.privacyPolicy'),
     privacyPolicyNewTab: tCommon('privacyPage.opensInNewTab'),
     logOut: t('systemAdmin.logOut'),

@@ -1183,6 +1183,7 @@ export type Database = {
       }
       get_user_id_by_phone: { Args: { p_phone: string }; Returns: string }
       get_user_role: { Args: { p_tenant_id: string }; Returns: string }
+      grant_system_admin: { Args: { p_user_id: string }; Returns: Json }
       grant_tenant_admin: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
@@ -1210,6 +1211,7 @@ export type Database = {
         Args: { p_official_id: string; p_tenant_id: string }
         Returns: Json
       }
+      revoke_system_admin: { Args: { p_user_id: string }; Returns: Json }
       revoke_tenant_admin: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json

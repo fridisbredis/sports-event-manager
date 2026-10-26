@@ -3,11 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
-import { FileText, LayoutPanelLeft, LogOut, Menu } from 'lucide-react'
+import { FileText, LayoutPanelLeft, LogOut, Menu, UserCog } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 
 interface Labels {
   tenants: string
+  systemAdmins: string
   logOut: string
   privacyPolicy: string
   privacyPolicyNewTab: string
@@ -34,12 +35,16 @@ export function SidebarNav({ labels }: Props) {
   // this there is no navigation at all on a phone — the same gap the tenant
   // admin screens had before their own drawer.
   const menu = useDisclosure()
+  // N28: its own tab. Checked first, because the tenant detail pages live at
+  // /admin/<tenantId> and "Tenants" therefore claims every other /admin/ path.
+  const systemAdminsActive = pathname.startsWith('/admin/system-admins')
   // Excludes /admin/health: it's reached via a link from the tenant list
   // (SYS-03), not a sidebar tab, so this is the first admin route where
   // highlighting "Tenants" would be wrong.
   const isActive =
-    pathname === '/admin' ||
-    (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/health'))
+    !systemAdminsActive &&
+    (pathname === '/admin' ||
+      (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/health')))
 
   // One definition, rendered twice: in the desktop rail and inside the
   // drawer. A second copy of the links is how the two would drift apart.
@@ -60,6 +65,19 @@ export function SidebarNav({ labels }: Props) {
           <LayoutPanelLeft className="size-[18px] shrink-0" strokeWidth={1.5} />
           <span className="truncate" title={labels.tenants}>
             {labels.tenants}
+          </span>
+        </Link>
+        <Link
+          href="/admin/system-admins"
+          aria-current={systemAdminsActive ? 'page' : undefined}
+          onClick={onNavigate}
+          className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${
+            systemAdminsActive ? ACTIVE_ITEM : IDLE_ITEM
+          }`}
+        >
+          <UserCog className="size-[18px] shrink-0" strokeWidth={1.5} />
+          <span className="truncate" title={labels.systemAdmins}>
+            {labels.systemAdmins}
           </span>
         </Link>
       </nav>

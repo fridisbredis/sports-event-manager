@@ -8,7 +8,12 @@ import { Input, Select } from '@/components/ui/form-fields'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError } from '@/lib/toast'
 import { useTranslation } from '@/lib/i18n/client'
-import { isValidPhoneForCountry, DEFAULT_PHONE_COUNTRY, PHONE_COUNTRIES } from '@/lib/phone'
+import {
+  isValidPhoneForCountry,
+  DEFAULT_PHONE_COUNTRY,
+  PHONE_COUNTRIES,
+  formatPhoneForDisplay,
+} from '@/lib/phone'
 import { grantTenantAdmin, revokeTenantAdmin } from '../../actions'
 import type { TenantAdmin } from '@/lib/auth/tenant-admins'
 
@@ -106,7 +111,9 @@ export function TenantAdminsSection({ tenantId, admins, cap, formattedDates }: P
                   )}
                 </p>
                 <p className="mt-0.5 truncate text-xs text-ink-label">
-                  {admin.phone && admin.phone !== admin.name ? `${admin.phone} · ` : ''}
+                  {admin.phone && admin.phone !== admin.name
+                    ? `${formatPhoneForDisplay(admin.phone)} · `
+                    : ''}
                   {t('systemAdmin.adminAddedOn', { date: formattedDates[admin.userId] ?? '' })}
                 </p>
                 {admin.lockedOut && (
@@ -224,7 +231,7 @@ export function TenantAdminsSection({ tenantId, admins, cap, formattedDates }: P
         body={
           removing?.name || removing?.phone
             ? t('systemAdmin.removeAdminConfirmBody', {
-                name: removing.name ?? removing.phone,
+                name: removing.name ?? formatPhoneForDisplay(removing.phone!),
               })
             : t('systemAdmin.removeAdminConfirmBodyUnnamed')
         }

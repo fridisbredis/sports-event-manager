@@ -179,6 +179,23 @@ export async function createSystemAdmin() {
   return { userId: userData.user.id, phone }
 }
 
+// An auth user with no user_roles row at all — someone about to be granted a
+// global role (N28). Like createSystemAdmin(), cleanup is the caller's job
+// via deleteAuthUser().
+export async function createUserWithoutRole() {
+  const admin = serviceClient()
+  const phone = await claimTestPhone(admin)
+
+  const { data: userData, error: userError } = await admin.auth.admin.createUser({
+    phone,
+    phone_confirm: true,
+  })
+  if (userError) throw userError
+  claimedPhonesByUserId.set(userData.user.id, phone)
+
+  return { userId: userData.user.id, phone }
+}
+
 // Frees the test phone the user holds. Only needed for users created outside
 // createUserWithRole() — cleanupTenant() already deletes the ones it tracks.
 export async function deleteAuthUser(userId: string) {
