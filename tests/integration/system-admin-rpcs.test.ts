@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
+import type { Database } from '@/types/database'
 import {
   serviceClient,
   createTenant,
@@ -38,11 +39,35 @@ describe('grant_system_admin / revoke_system_admin', () => {
   const revoke = (userId: string) =>
     serviceClient().rpc('revoke_system_admin', { p_user_id: userId })
 
+  // The guard counts every system admin in the database, so these tests only
+  // mean something if they start from none. The local stack usually has one:
+  // the E2E global setup and scripts/seed-dev.ts both create the seed system
+  // admin. Their rows are set aside for this suite and put back verbatim —
+  // same id and created_at — so nothing outside it notices.
+  let setAside: Database['public']['Tables']['user_roles']['Row'][] = []
+
   beforeAll(async () => {
-    // The guard counts every system admin in the database, so these tests
-    // only mean something if they start from none. The local seed creates
-    // none, and every other suite deletes the ones it creates.
-    expect(await systemAdminIds(), 'a system_admin is left over in the local DB').toEqual([])
+    const service = serviceClient()
+    const { data, error } = await service.from('user_roles').select('*').eq('role', 'system_admin')
+    if (error) throw error
+    setAside = data ?? []
+
+    if (setAside.length > 0) {
+      const { error: deleteError } = await service
+        .from('user_roles')
+        .delete()
+        .in(
+          'id',
+          setAside.map((row) => row.id)
+        )
+      if (deleteError) throw deleteError
+    }
+  })
+
+  afterAll(async () => {
+    if (setAside.length === 0) return
+    const { error } = await serviceClient().from('user_roles').insert(setAside)
+    if (error) throw error
   })
 
   afterEach(async () => {
