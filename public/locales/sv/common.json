@@ -48,6 +48,7 @@
     "cannotChangeOwnAdminRole": "Du kan inte ändra din egen adminroll.",
     "adminCapReachedForTenant": "Ert abonnemang har nått max antal admins. Ta bort en adminroll först.",
     "lastAdminCannotRemoveForTenant": "Det här är evenemangets sista admin. Det måste alltid finnas minst en.",
+    "lastSystemAdminCannotRemove": "Det här är den sista systemadministratören. Det måste alltid finnas minst en.",
     "adminRoleRequiresConfirmed": "Bara en bekräftad funktionär kan bli admin. Vänta tills personen har bekräftat sin inbjudan."
   },
   "notFoundPage": {

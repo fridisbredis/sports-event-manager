@@ -15,6 +15,7 @@ import {
   revokeTenantAdminRole,
   type AdminRoleChangeResult,
 } from '@/lib/auth/tenant-admins'
+import { grantSystemAdminRole, revokeSystemAdminRole } from '@/lib/auth/system-admins'
 
 const setTenantActiveSchema = z.object({
   tenantId: z.string().uuid(),
@@ -37,6 +38,16 @@ const grantAdminSchema = z.object({
 
 const revokeAdminSchema = z.object({
   tenantId: z.string().uuid(),
+  userId: z.string().uuid(),
+})
+
+const grantSystemAdminSchema = z.object({
+  name: z.string().trim().min(1),
+  phone: z.string().min(1),
+  phoneCountry: z.enum(PHONE_COUNTRY_CODES as [string, ...string[]]),
+})
+
+const revokeSystemAdminSchema = z.object({
   userId: z.string().uuid(),
 })
 
@@ -330,5 +341,73 @@ export async function revokeTenantAdmin(
   }
 
   revalidatePath('/admin/' + parsed.data.tenantId)
+  return {}
+}
+
+// N28: make someone a system admin, by phone number — the same identity
+// path as grantTenantAdmin, through resolveAdminAuthUser. The role is global,
+// so there is no tenant to validate and nothing to revalidate but the list.
+export async function grantSystemAdmin(
+  name: string,
+  phone: string,
+  phoneCountry: string
+): Promise<{ error?: string }> {
+  const check = await assertSystemAdmin()
+  if (!check.ok) return { error: check.error }
+  const { userId } = check
+
+  const parsed = grantSystemAdminSchema.safeParse({ name, phone, phoneCountry })
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  const normalizedPhone = normalizePhoneToE164(
+    parsed.data.phone,
+    parsed.data.phoneCountry as (typeof PHONE_COUNTRY_CODES)[number]
+  )
+  if (!normalizedPhone) return { error: await tError('actionErrors.invalidPhone') }
+
+  const service = await createSupabaseServiceClient()
+  const adminUser = await resolveAdminAuthUser(service, normalizedPhone, parsed.data.name, {
+    scope: 'system_admin',
+  })
+  if (!adminUser.ok) return { error: await tError('actionErrors.grantAdminFailed') }
+
+  const result = await grantSystemAdminRole(adminUser.userId, userId)
+  if (!result.ok) return { error: await tError('actionErrors.grantAdminFailed') }
+
+  revalidatePath('/admin/system-admins')
+  return {}
+}
+
+// N28: remove someone's system admin role. Any tenant roles they hold stay.
+//
+// Removing yourself is refused here rather than in the RPC, which runs as
+// service_role and cannot see who is calling. Without it, the last-admin
+// guard would still stop an empty platform, but an admin could lock
+// themselves out while others remain — a mistake only another admin can
+// undo.
+export async function revokeSystemAdmin(targetUserId: string): Promise<{ error?: string }> {
+  const check = await assertSystemAdmin()
+  if (!check.ok) return { error: check.error }
+  const { userId } = check
+
+  const parsed = revokeSystemAdminSchema.safeParse({ userId: targetUserId })
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  if (parsed.data.userId === userId) {
+    return { error: await tError('actionErrors.cannotChangeOwnAdminRole') }
+  }
+
+  const result = await revokeSystemAdminRole(parsed.data.userId, userId)
+  if (!result.ok) {
+    return {
+      error: await tError(
+        result.reason === 'lastAdmin'
+          ? 'actionErrors.lastSystemAdminCannotRemove'
+          : 'actionErrors.revokeAdminFailed'
+      ),
+    }
+  }
+
+  revalidatePath('/admin/system-admins')
   return {}
 }

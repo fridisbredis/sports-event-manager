@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createTenant, setTenantActive, setTenantTier } from './actions'
+import {
+  createTenant,
+  setTenantActive,
+  setTenantTier,
+  grantSystemAdmin,
+  revokeSystemAdmin,
+} from './actions'
+import { grantSystemAdminRole, revokeSystemAdminRole } from '@/lib/auth/system-admins'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { redirect } from 'next/navigation'
@@ -22,6 +29,13 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
+}))
+
+// N28: the RPC and audit behaviour is covered in system-admins.test.ts; here
+// only what the actions add on top — the gate, validation, self-removal.
+vi.mock('@/lib/auth/system-admins', () => ({
+  grantSystemAdminRole: vi.fn(),
+  revokeSystemAdminRole: vi.fn(),
 }))
 
 function chain(result: unknown) {
@@ -354,5 +368,92 @@ describe('setTenantTier', () => {
     expect(result).toEqual({ error: 'Failed to update tier' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+})
+
+describe('grantSystemAdmin (N28)', () => {
+  it('refuses a caller who is not a system admin', async () => {
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+    } as never)
+    vi.mocked(createSupabaseServiceClient).mockResolvedValue({
+      from: vi.fn().mockReturnValueOnce(chain({ data: null })),
+    } as never)
+
+    const result = await grantSystemAdmin(...ADMIN_ARGS)
+
+    expect(result.error).toBeDefined()
+    expect(grantSystemAdminRole).not.toHaveBeenCalled()
+  })
+
+  it('rejects a phone number that is not valid for the chosen country', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+
+    const result = await grantSystemAdmin('Peter Thörn', '123', 'SE')
+
+    expect(result.error).toBeDefined()
+    expect(grantSystemAdminRole).not.toHaveBeenCalled()
+  })
+
+  it('resolves the auth user by phone, grants as the caller, and revalidates the list', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    vi.mocked(grantSystemAdminRole).mockResolvedValue({ ok: true })
+
+    expect(await grantSystemAdmin(...ADMIN_ARGS)).toEqual({})
+    expect(grantSystemAdminRole).toHaveBeenCalledWith('admin-user-1', 'admin-1')
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/system-admins')
+  })
+
+  it('returns an error and skips revalidation when the grant fails', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    vi.mocked(grantSystemAdminRole).mockResolvedValue({ ok: false, reason: 'failed' })
+
+    const result = await grantSystemAdmin(...ADMIN_ARGS)
+
+    expect(result.error).toBeDefined()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('revokeSystemAdmin (N28)', () => {
+  const TARGET = '22222222-2222-2222-2222-222222222222'
+
+  it('rejects a non-uuid user id', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+
+    expect((await revokeSystemAdmin('not-a-uuid')).error).toBeDefined()
+    expect(revokeSystemAdminRole).not.toHaveBeenCalled()
+  })
+
+  it('refuses to let a system admin remove themselves', async () => {
+    const self = '33333333-3333-3333-3333-333333333333'
+    mockAuthedSystemAdmin(vi.fn())
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: self } } }) },
+    } as never)
+
+    const result = await revokeSystemAdmin(self)
+
+    expect(result.error).toBe('You cannot change your own admin role.')
+    expect(revokeSystemAdminRole).not.toHaveBeenCalled()
+  })
+
+  it('revokes as the caller and revalidates the list', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    vi.mocked(revokeSystemAdminRole).mockResolvedValue({ ok: true })
+
+    expect(await revokeSystemAdmin(TARGET)).toEqual({})
+    expect(revokeSystemAdminRole).toHaveBeenCalledWith(TARGET, 'admin-1')
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/system-admins')
+  })
+
+  it('explains the last-admin guard', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    vi.mocked(revokeSystemAdminRole).mockResolvedValue({ ok: false, reason: 'lastAdmin' })
+
+    expect((await revokeSystemAdmin(TARGET)).error).toBe(
+      'This is the last system admin. There must always be at least one.'
+    )
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

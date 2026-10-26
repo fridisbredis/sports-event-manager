@@ -111,6 +111,10 @@ export type AuditAction =
   // log alone.
   | 'tenant_admin_granted'
   | 'tenant_admin_revoked'
+  // N28 (migration 20261026134923): the global role, so these rows carry a
+  // null tenant_id and no tenant admin can read them.
+  | 'system_admin_granted'
+  | 'system_admin_revoked'
 export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement'
 // Match migration 0038's CHECK constraint (SEC-07-rest). Separate from
 // AuditAction/audit_events — see docs/adr/0001 category 5.
