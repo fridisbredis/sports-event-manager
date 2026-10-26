@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
   buildAvailabilityConfirmSms,
   shouldSendAvailabilityConfirmSms,
-  buildAppLink,
+  buildTenantHomeLink,
 } from './availability-confirm'
 
 afterEach(() => {
@@ -76,31 +76,19 @@ describe('shouldSendAvailabilityConfirmSms', () => {
   })
 })
 
-describe('buildAppLink', () => {
-  it('builds a link to the tenant home from the configured base URL', () => {
+describe('buildTenantHomeLink', () => {
+  it('points at the tenant home, which is the page this SMS bookmarks', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
 
-    expect(buildAppLink('viadal')).toBe('https://app.example.com/viadal/home')
+    expect(buildTenantHomeLink('viadal')).toBe('https://app.example.com/viadal/home')
   })
 
-  it('does not double the slash when the base URL has a trailing one', () => {
-    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com/')
+  // The origin rules themselves are buildAppLink's and are tested there
+  // (app-link.test.ts). What matters here is that this path keeps honouring
+  // them rather than growing its own interpolation.
+  it('returns null when the origin cannot produce a working link', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
 
-    expect(buildAppLink('viadal')).toBe('https://app.example.com/viadal/home')
-  })
-
-  // The whole point of this card is a link the official can tap later. A
-  // misconfigured origin would otherwise send "undefined/viadal/home" — an
-  // SMS that has already cost money and can never work. Returning null lets
-  // the caller skip the send instead.
-  it.each([
-    ['unset', undefined],
-    ['empty', ''],
-    ['not absolute', '/app'],
-    ['not https', 'http://app.example.com'],
-  ])('returns null when the base URL is %s', (_label, value) => {
-    vi.stubEnv('NEXT_PUBLIC_APP_URL', value as string)
-
-    expect(buildAppLink('viadal')).toBeNull()
+    expect(buildTenantHomeLink('viadal')).toBeNull()
   })
 })

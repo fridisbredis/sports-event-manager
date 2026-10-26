@@ -15,6 +15,7 @@ import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { buildAppLink, hasUsableAppOrigin } from '@/lib/sms/app-link'
 
 const resendSchema = z.object({
   tenantId: z.string().uuid(),
@@ -97,6 +98,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // credential back in its own message.
     try {
       logger.error('Invite SMS resend blocked: Twilio client could not be constructed')
+    } catch {
+      // Logging must never be able to change the response - see the send catch below.
+    }
+    return NextResponse.json({ error: 'SMS is not configured' }, { status: 500 })
+  }
+
+  // The third configuration fault checked before the rotation, and for exactly the
+  // reason given above: NEXT_PUBLIC_APP_URL is what the invite link is built from, so
+  // a missing or non-https origin produces an SMS reading
+  // "...Confirm within 7 days: undefined/invite/<uuid>" — already paid for, impossible
+  // to act on. Worse here than on the create route, because the rotation below has by
+  // then revoked the official's previous link to replace it with a dead one.
+  //
+  // Not a 502 for the same reason as the two above: this is our deployment being wrong,
+  // and it is permanent. NEXT_PUBLIC_* is inlined at BUILD time, so no runtime
+  // configuration change can fix it — only a rebuild — and every retry would burn
+  // another token for a send that cannot work.
+  if (!hasUsableAppOrigin()) {
+    try {
+      logger.error('Invite SMS resend blocked: NEXT_PUBLIC_APP_URL is unset or not https')
     } catch {
       // Logging must never be able to change the response - see the send catch below.
     }
@@ -215,7 +236,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Failed to refresh invite token' }, { status: 500 })
   }
 
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${updated.invite_token}`
+  // Non-null: the same origin was validated before the rotation above, and nothing
+  // between here and there can change an inlined build-time constant.
+  const inviteUrl = buildAppLink(`/invite/${updated.invite_token}`)!
 
   // Same language rule as the create route: pinned to English rather than
   // following the admin (N19). See the comment there for why.
