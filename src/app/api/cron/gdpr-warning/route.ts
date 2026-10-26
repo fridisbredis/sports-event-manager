@@ -47,10 +47,17 @@ export async function POST(request: NextRequest) {
       .not('user_id', 'is', null)
       .is('gdpr_warning_sent_at', null)
       .eq('sms_opt_out', false),
+    // participants.phone is nullable since migration 20261026084206 (N21) —
+    // a participant imported from Race Results has no number. There is
+    // nowhere to send a warning for such a row, so it is excluded here
+    // rather than failing mid-loop. (`user_id is not null` already excludes
+    // every imported row today, since participant login does not exist yet;
+    // this filter is what keeps that true once it does.)
     service
       .from('participants')
       .select('id, tenant_id, name, phone, user_id, sms_opt_out')
       .not('user_id', 'is', null)
+      .not('phone', 'is', null)
       .is('gdpr_warning_sent_at', null)
       .eq('sms_opt_out', false),
   ])
@@ -101,6 +108,13 @@ export async function POST(request: NextRequest) {
         continue
       }
       if (!lastSignInAt || new Date(lastSignInAt).getTime() > warningCutoff) continue
+
+      // participants.phone is nullable since N21 and the query above filters
+      // nulls out, so this is unreachable today. It is a `continue` rather
+      // than a non-null assertion because the alternative — asserting — would
+      // turn a dropped filter into a thrown TypeError mid-tick, which aborts
+      // the whole cohort and leaves everyone after this row unwarned.
+      if (row.phone === null) continue
 
       try {
         const message = await client.messages.create({
