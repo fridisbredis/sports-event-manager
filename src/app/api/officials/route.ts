@@ -18,6 +18,7 @@ import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
 import { getServerTranslation } from '@/lib/i18n/server'
+import { buildAppLink } from '@/lib/sms/app-link'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
@@ -255,17 +256,32 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${official.invite_token}`
+  // B9: null when NEXT_PUBLIC_APP_URL is unset or not https. Unlike the resend
+  // route, this one cannot refuse the request — the official row is already
+  // committed above — so the bad origin is handled below alongside the cap,
+  // as a send that does not happen rather than a create that fails.
+  const inviteUrl = buildAppLink(`/invite/${official.invite_token}`)
 
-  // Segment budget, measured 2026-10-16 (N19). The fixed English copy is 61
-  // GSM-7 characters and `/invite/<uuid>` another 44, leaving 55 for the origin
-  // plus the official's name plus the tenant name before this tips from one
-  // 160-character segment into two. That fits a short domain (viadal.se leaves
-  // 38) but not a default Azure Container Apps hostname, which leaves 2 — so on
-  // the current prod URL every invite is two segments no matter how this is
-  // worded. Shortening the copy does not fix that; shortening the invite URL
-  // would, and is its own change. N11 is where this stops being guesswork and
-  // starts being measured per tenant.
+  // Segment budget, re-measured against prod 2026-10-26 (B11). The fixed
+  // English copy is 61 GSM-7 characters and `/invite/<uuid>` another 44, so
+  // with an 11-character tenant name 44 are left for the origin and the
+  // official's name before this tips from one 160-character segment into two.
+  //
+  // Prod runs the custom domain https://app.viadalevent.se (26), which leaves
+  // roughly 17-18 characters for the NAME: "Anna Svensson" is one segment,
+  // "Anna-Karin Johansson" is two. A thin margin, not a hard ceiling.
+  //
+  // THE EARLIER VERSION OF THIS COMMENT WAS WRONG and is corrected here. It
+  // said every prod invite is two segments regardless of wording, on the
+  // assumption that prod serves the 87-character default Azure Container Apps
+  // hostname. That stopped being true when the custom domain landed on
+  // 2026-10-22, and the one real invite sent in prod since (2026-10-24) is
+  // recorded in sms_usage as segments=1 — Twilio's own count via N11, not a
+  // calculation. Do not treat two segments as the floor.
+  //
+  // Shortening the copy barely moves this; shortening the invite URL would
+  // end it (the uuid is 36 of the path's 44 characters), and is its own change
+  // with migration and token-collision implications. See B11.
   //
   // Pinned to English, not the inviting admin's language (N19, decided by
   // Peter 2026-10-16). This reverses #219, which followed the admin on the
@@ -289,7 +305,7 @@ export async function POST(request: NextRequest) {
   const smsBody = t('confirmation.inviteSms.body', {
     name,
     tenant: tenant?.name ?? t('confirmation.inviteSms.fallbackTenant'),
-    url: inviteUrl,
+    url: inviteUrl ?? '',
   })
 
   // N24: the tenant's monthly SMS spend cap.
@@ -314,7 +330,25 @@ export async function POST(request: NextRequest) {
   // so a capped invite can simply be resent once the month rolls over.
   let smsSent = true
 
-  if (capStatus?.exceeded) {
+  if (!inviteUrl) {
+    // No link, no send: an SMS reading "...Confirm within 7 days:
+    // undefined/invite/<uuid>" costs a segment and can never be acted on, and
+    // nothing downstream would report a problem — Twilio and sms_usage would
+    // both record a successful send.
+    //
+    // Ordered before the cap check because this is the more fundamental fault
+    // and the one worth seeing in the logs; a capped tenant with a broken
+    // origin has two problems, and this is the one a rebuild fixes.
+    smsSent = false
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
+    try {
+      logger.error('Invite SMS skipped: NEXT_PUBLIC_APP_URL is unset or not https', undefined, {
+        officialId: official.id,
+      })
+    } catch {
+      // Logging must never be able to change the response — see the send catch below.
+    }
+  } else if (capStatus?.exceeded) {
     smsSent = false
     // The invite never went out, so the rate-limit slot it reserved is released,
     // same as the Twilio-failure path below.

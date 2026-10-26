@@ -15,6 +15,7 @@ import { recordSmsUsage } from './usage'
 import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import { logQueryError } from '@/lib/db/query-error'
+import { buildAppLink } from './app-link'
 
 export interface AvailabilityConfirmSmsInput {
   name?: string
@@ -27,10 +28,12 @@ export function buildAvailabilityConfirmSms(input: AvailabilityConfirmSmsInput):
   // and the sentence has to stand on its own — capitalised, not mid-sentence.
   const opening = input.name ? `Hi ${input.name}, your` : 'Your'
 
-  // Deliberately short. The invite SMS is already two segments on prod
-  // because of the URL length, and this one carries a URL too. Plain ASCII
-  // only: a curly quote or an en dash anywhere in the body forces UCS-2 and
-  // cuts the segment budget from 160 characters to 70.
+  // Deliberately short: this carries a URL, which is most of the budget.
+  // (Corrected 2026-10-26, B11: this said the invite SMS is already two
+  // segments on prod. It is not — prod runs a short custom domain and the
+  // real invite sent on 2026-10-24 cost one segment.) Plain ASCII only: a
+  // curly quote or an en dash anywhere in the body forces UCS-2 and cuts the
+  // segment budget from 160 characters to 70.
   return `${opening} availability for ${input.tenant} is confirmed. Open the app any time: ${input.url}`
 }
 
@@ -42,12 +45,12 @@ export function shouldSendAvailabilityConfirmSms(recipient: AvailabilityConfirmR
   return !recipient.smsOptOut
 }
 
-export function buildAppLink(tenantSlug: string): string | null {
-  const base = process.env.NEXT_PUBLIC_APP_URL
-
-  if (!base?.startsWith('https://')) return null
-
-  return `${base.replace(/\/+$/, '')}/${tenantSlug}/home`
+/**
+ * The tenant home, which is where this SMS's bookmark points. The origin
+ * handling it shares with the invite links lives in buildAppLink (B9).
+ */
+export function buildTenantHomeLink(tenantSlug: string): string | null {
+  return buildAppLink(`/${tenantSlug}/home`)
 }
 
 /**
@@ -74,7 +77,7 @@ export async function sendAvailabilityConfirmSms({
 }): Promise<void> {
   if (!tenantSlug || !phone) return
 
-  const url = buildAppLink(tenantSlug)
+  const url = buildTenantHomeLink(tenantSlug)
   // A misconfigured origin would otherwise send "undefined/<slug>/home" — an
   // SMS that has already cost money and can never work. No link, no send.
   if (!url) {
