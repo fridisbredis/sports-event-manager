@@ -1,9 +1,24 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import twilio from 'twilio'
 import {
   buildAvailabilityConfirmSms,
   shouldSendAvailabilityConfirmSms,
   buildTenantHomeLink,
+  sendAvailabilityConfirmSms,
 } from './availability-confirm'
+
+const messagesCreate = vi.fn()
+vi.mock('twilio', () => ({
+  default: vi.fn(() => ({ messages: { create: messagesCreate } })),
+}))
+
+vi.mock('./usage', () => ({
+  recordSmsUsage: vi.fn(),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -90,5 +105,62 @@ describe('buildTenantHomeLink', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
 
     expect(buildTenantHomeLink('viadal')).toBeNull()
+  })
+})
+
+// N13: the confirmation goes out from the tenant's own sender.
+describe('sendAvailabilityConfirmSms — N13 sender', () => {
+  // Without this, a call from an earlier case would satisfy a later
+  // toHaveBeenCalledWith.
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function chain(result: unknown) {
+    const builder: Record<string, unknown> = {}
+    for (const method of ['select', 'eq']) builder[method] = vi.fn(() => builder)
+    builder.maybeSingle = vi.fn(() => Promise.resolve(result))
+    return builder
+  }
+
+  function serviceWith(tenant: { data?: unknown; error?: unknown }) {
+    return {
+      from: vi.fn((table: string) =>
+        table === 'tenants'
+          ? chain({ data: tenant.data ?? null, error: tenant.error ?? null })
+          : chain({ data: { sms_opt_out: false }, error: null })
+      ),
+    }
+  }
+
+  async function send(service: ReturnType<typeof serviceWith>) {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+    vi.stubEnv('TWILIO_PHONE_NUMBER', '+15550001111')
+    messagesCreate.mockResolvedValue({})
+    vi.mocked(twilio).mockReturnValue({ messages: { create: messagesCreate } } as never)
+
+    await sendAvailabilityConfirmSms({
+      service: service as never,
+      tenantId: 't1',
+      tenantSlug: 'viadal',
+      phone: '46701111111',
+      name: 'Anna',
+      op: 'test',
+    })
+  }
+
+  it.each([
+    ['its name on Professional', 'professional', 'Viadal'],
+    ['the platform number on Premium', 'premium', '+15550001111'],
+  ])('sends from %s', async (_label, tier, expectedFrom) => {
+    await send(serviceWith({ data: { tier, sms_sender_id: 'Viadal' } }))
+
+    expect(messagesCreate).toHaveBeenCalledWith(expect.objectContaining({ from: expectedFrom }))
+  })
+
+  it('still sends, from the platform number, when the tenant cannot be read', async () => {
+    await send(serviceWith({ error: { message: 'tenants unreadable' } }))
+
+    expect(messagesCreate).toHaveBeenCalledWith(expect.objectContaining({ from: '+15550001111' }))
   })
 })

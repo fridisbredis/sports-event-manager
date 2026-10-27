@@ -204,6 +204,32 @@ describe('POST /api/officials/[id]/resend', () => {
     })
   })
 
+  // N13: the tenant's alphanumeric sender name, gated on Professional.
+  it.each([
+    ['its name on Professional', 'professional', 'Viadal'],
+    ['the platform number on Premium', 'premium', '+15550001111'],
+  ])('sends the resend from %s', async (_label, tier, expectedFrom) => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(
+        chain({
+          data: { id: 'off-1', name: 'Anna', phone: '46701234567', invite_status: 'invited' },
+        })
+      )
+      .mockReturnValueOnce(chain({ data: { name: 'Viadal 2026', tier, sms_sender_id: 'Viadal' } }))
+      .mockReturnValueOnce(chain({ data: { invite_token: 'tok-new' } }))
+    vi.mocked(createSupabaseServerClient).mockReturnValue({ from: fromMock } as never)
+
+    await POST(makeRequest({ tenantId: TENANT_ID }), makeParams('off-1'))
+
+    expect(messagesCreate).toHaveBeenCalledWith(expect.objectContaining({ from: expectedFrom }))
+  })
+
   // N11: a resend costs the tenant money, so it has to reach the usage ledger.
   // An uncounted send path is invisible until the SEK total disagrees with the
   // Twilio invoice and nobody can say which route is missing.

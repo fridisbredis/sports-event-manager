@@ -16,6 +16,7 @@ import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import { logQueryError } from '@/lib/db/query-error'
 import { buildAppLink } from './app-link'
+import { resolveSmsSender } from './sender'
 
 export interface AvailabilityConfirmSmsInput {
   name?: string
@@ -107,6 +108,24 @@ export async function sendAvailabilityConfirmSms({
     return
   }
 
+  // N13: the tenant's sender name. A failed read sends from the platform
+  // number rather than dropping the message.
+  const { data: tenant, error: tenantError } = await service
+    .from('tenants')
+    .select('tier, sms_sender_id')
+    .eq('id', tenantId)
+    .maybeSingle()
+
+  if (tenantError) {
+    logQueryError(tenantError, {
+      op,
+      table: 'tenants',
+      kind: 'select',
+      tenantId,
+      extra: { usage: 'availability_confirm_sms_sender', consequence: 'platform_sender_used' },
+    })
+  }
+
   const body = buildAvailabilityConfirmSms({ name, tenant: tenantSlug, url })
 
   // Constructed inside the try: twilio() throws synchronously on a non-AC
@@ -116,7 +135,7 @@ export async function sendAvailabilityConfirmSms({
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
     const message = await client.messages.create({
       body,
-      from: process.env.TWILIO_PHONE_NUMBER!,
+      from: resolveSmsSender(tenant, process.env.TWILIO_PHONE_NUMBER!),
       to: toTwilioE164(phone),
     })
     await recordSmsUsage({

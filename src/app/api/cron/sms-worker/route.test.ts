@@ -654,4 +654,39 @@ describe('POST /api/cron/sms-worker', () => {
       expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
     })
   })
+
+  // N13: each message goes out from its own tenant's sender, even when one
+  // batch mixes tenants on different tiers.
+  describe('N13 sender', () => {
+    it('sends a Professional tenant from its name and a Premium tenant from the platform number', async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: [
+          queueRow({ id: 'q1', tenant_id: 't1', recipient_phone: '46701111111' }),
+          queueRow({ id: 'q2', tenant_id: 't2', recipient_phone: '46702222222' }),
+        ],
+        error: null,
+      })
+
+      vi.mocked(createSupabaseServiceClient).mockReturnValue(
+        serviceWith({
+          rpc,
+          announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+          smsQueue: [chain({ error: null }), chain({ count: 1, error: null })],
+          tenants: [
+            { id: 't1', tier: 'professional', sms_sender_id: 'Viadal' },
+            { id: 't2', tier: 'premium', sms_sender_id: 'Micke' },
+          ],
+        }) as never
+      )
+
+      await POST(makeRequest(AUTHED))
+
+      expect(messagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ to: '+46701111111', from: 'Viadal' })
+      )
+      expect(messagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ to: '+46702222222', from: '+15550001111' })
+      )
+    })
+  })
 })
