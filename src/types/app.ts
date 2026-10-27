@@ -115,6 +115,9 @@ export type AuditAction =
   // null tenant_id and no tenant admin can read them.
   | 'system_admin_granted'
   | 'system_admin_revoked'
+  // N13 (migration 20261027143113): a system admin set or cleared a tenant's
+  // alphanumeric SMS sender name.
+  | 'tenant_sms_sender_changed'
 export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement'
 // Match migration 0038's CHECK constraint (SEC-07-rest). Separate from
 // AuditAction/audit_events — see docs/adr/0001 category 5.
