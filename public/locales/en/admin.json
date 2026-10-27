@@ -528,6 +528,8 @@
     "tierIncludes": "Includes:",
     "featureColorTheme": "Event colour theme",
     "featureMobileSchedule": "Mobile schedule view",
+    "featureParticipants": "Participants and Race Results import",
+    "featureSmsSenderId": "Own SMS sender name",
     "tenantAdmins": "Tenant admins",
     "tenantAdminsHint": "Who can sign in and administer this tenant. The tier sets the maximum; admins keep access in the order they were added.",
     "adminsUsedOfCap": "{{count}} of {{cap}} used",

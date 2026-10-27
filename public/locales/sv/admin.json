@@ -528,6 +528,8 @@
     "tierIncludes": "Innehåller:",
     "featureColorTheme": "Färgtema för evenemang",
     "featureMobileSchedule": "Mobilt schemaläge",
+    "featureParticipants": "Deltagare och import från Race Results",
+    "featureSmsSenderId": "Eget SMS-avsändarnamn",
     "tenantAdmins": "Tenantadministratörer",
     "tenantAdminsHint": "Vilka som kan logga in och administrera den här tenanten. Nivån sätter maxantalet; administratörer behåller åtkomst i den ordning de lades till.",
     "adminsUsedOfCap": "{{count}} av {{cap}} använda",

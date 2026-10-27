@@ -27,6 +27,10 @@ export const TIER_FEATURES = {
   // "Premium and Professional. No participants in Standard" — which the
   // cumulative rule expresses exactly.
   participants: 'premium',
+  // N13's alphanumeric SMS sender name ("Viadal" instead of the platform
+  // number). Lower tiers send from the platform number; see
+  // resolveSmsSender in src/lib/sms/sender.ts.
+  smsSenderId: 'professional',
 } as const satisfies Record<string, Tier>
 
 export type TierFeature = keyof typeof TIER_FEATURES
