@@ -5,14 +5,21 @@ import { setTenantActive, setTenantTier } from '../../actions'
 import { toastError } from '@/lib/toast'
 import { useTranslation } from '@/lib/i18n/client'
 import { TIER_ORDER, featuresForTier, type Tier } from '@/lib/tiers/features'
+import { TenantSmsSenderSection } from './tenant-sms-sender-section'
 
 interface Props {
   tenantId: string
   isActive: boolean
   tier: Tier
+  smsSenderId: string | null
 }
 
-export function TenantDetail({ tenantId, isActive: initialActive, tier: initialTier }: Props) {
+export function TenantDetail({
+  tenantId,
+  isActive: initialActive,
+  tier: initialTier,
+  smsSenderId,
+}: Props) {
   const { t } = useTranslation('admin')
   const [isActive, setIsActive] = useState(initialActive)
   const [tier, setTier] = useState<Tier>(initialTier)
@@ -112,6 +119,10 @@ export function TenantDetail({ tenantId, isActive: initialActive, tier: initialT
         </div>
         <p className="mt-3 text-sm text-ink-label">{t('systemAdmin.tierHint')}</p>
       </div>
+
+      {/* N13: under the tier, which decides whether the name is used. Takes
+          the live tier state so its hint follows a tier change made here. */}
+      <TenantSmsSenderSection tenantId={tenantId} tier={tier} smsSenderId={smsSenderId} />
     </div>
   )
 }

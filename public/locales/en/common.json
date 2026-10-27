@@ -18,6 +18,8 @@
     "createTenantFailed": "Failed to create tenant",
     "updateTenantFailed": "Failed to update tenant",
     "updateTierFailed": "Failed to update tier",
+    "invalidSmsSenderId": "The sender name must be up to 11 characters: letters A–Z, digits and spaces, with at least one letter.",
+    "updateSmsSenderFailed": "Failed to update the SMS sender",
     "saveAssignmentsFailed": "Failed to save assignments. Please try again.",
     "windowShorterThanGranularity": "Operating window is shorter than the scheduling granularity",
     "granularityFixed": "Scheduling granularity is fixed at 60 minutes.",

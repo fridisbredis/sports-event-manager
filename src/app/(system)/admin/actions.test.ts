@@ -3,6 +3,7 @@ import {
   createTenant,
   setTenantActive,
   setTenantTier,
+  setTenantSmsSenderId,
   grantSystemAdmin,
   revokeSystemAdmin,
 } from './actions'
@@ -368,6 +369,65 @@ describe('setTenantTier', () => {
     expect(result).toEqual({ error: 'Failed to update tier' })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+})
+
+describe('setTenantSmsSenderId (N13)', () => {
+  it('rejects a name Twilio would refuse, without writing', async () => {
+    const fromMock = vi.fn()
+    mockAuthedSystemAdmin(fromMock)
+
+    const result = await setTenantSmsSenderId(TENANT_ID, 'Viadal2026xx')
+
+    expect(result.error).toBeDefined()
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  it('saves a trimmed name, audits it and revalidates the tenant page', async () => {
+    const fromMock = vi.fn()
+    mockAuthedSystemAdmin(fromMock)
+    const updateBuilder = chain({ error: null })
+    fromMock.mockReturnValueOnce(updateBuilder)
+
+    const result = await setTenantSmsSenderId(TENANT_ID, '  Viadal ')
+
+    expect(result).toEqual({})
+    expect(updateBuilder.update).toHaveBeenCalledWith({ sms_sender_id: 'Viadal' })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('id', TENANT_ID)
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/' + TENANT_ID)
+    expect(logAuditEvent).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      actorUserId: 'admin-1',
+      actorRole: 'system_admin',
+      action: 'tenant_sms_sender_changed',
+      targetType: 'tenant',
+      targetId: TENANT_ID,
+      detail: { smsSenderId: 'Viadal' },
+    })
+  })
+
+  // Clearing is how a tenant goes back to the platform number.
+  it('clears the name when given an empty value', async () => {
+    const fromMock = vi.fn()
+    mockAuthedSystemAdmin(fromMock)
+    const updateBuilder = chain({ error: null })
+    fromMock.mockReturnValueOnce(updateBuilder)
+
+    await setTenantSmsSenderId(TENANT_ID, '')
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ sms_sender_id: null })
+  })
+
+  it('returns an error and skips the audit when the update fails', async () => {
+    const fromMock = vi.fn()
+    mockAuthedSystemAdmin(fromMock)
+    fromMock.mockReturnValueOnce(chain({ error: { message: 'db is down' } }))
+
+    const result = await setTenantSmsSenderId(TENANT_ID, 'Viadal')
+
+    expect(result).toEqual({ error: 'Failed to update the SMS sender' })
+    expect(logAuditEvent).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
 
