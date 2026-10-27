@@ -877,6 +877,7 @@ export type Database = {
           is_active: boolean
           name: string
           slug: string
+          sms_sender_id: string | null
           tier: string
         }
         Insert: {
@@ -887,6 +888,7 @@ export type Database = {
           is_active?: boolean
           name: string
           slug: string
+          sms_sender_id?: string | null
           tier?: string
         }
         Update: {
@@ -897,6 +899,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           slug?: string
+          sms_sender_id?: string | null
           tier?: string
         }
         Relationships: []

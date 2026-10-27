@@ -17,6 +17,7 @@ import {
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
+import { resolveSmsSender } from '@/lib/sms/sender'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { buildAppLink } from '@/lib/sms/app-link'
 
@@ -236,10 +237,11 @@ export async function POST(request: NextRequest) {
   // Server Action.
   revalidateTag(adminDashboardCacheTag(tenantId), { expire: 0 })
 
-  // `tier` for the N24 spending cap below; `name` for the SMS copy.
+  // `tier` for the N24 spending cap below; `name` for the SMS copy;
+  // `sms_sender_id` (with `tier`) for N13's sender.
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('name, tier')
+    .select('name, tier, sms_sender_id')
     .eq('id', tenantId)
     .single()
 
@@ -368,7 +370,7 @@ export async function POST(request: NextRequest) {
       const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
       const message = await client.messages.create({
         body: smsBody,
-        from: process.env.TWILIO_PHONE_NUMBER!,
+        from: resolveSmsSender(tenant, process.env.TWILIO_PHONE_NUMBER!),
         to: toTwilioE164(phone),
       })
       await recordSmsUsage({

@@ -18,6 +18,8 @@
     "createTenantFailed": "Kunden kunde inte skapas",
     "updateTenantFailed": "Kunden kunde inte uppdateras",
     "updateTierFailed": "Nivån kunde inte uppdateras",
+    "invalidSmsSenderId": "Avsändarnamnet får ha högst 11 tecken: bokstäver A–Z, siffror och mellanslag, minst en bokstav.",
+    "updateSmsSenderFailed": "SMS-avsändaren kunde inte uppdateras",
     "saveAssignmentsFailed": "Inplaneringarna kunde inte sparas. Försök igen.",
     "windowShorterThanGranularity": "Tidsfönstret är kortare än schemaintervallet",
     "granularityFixed": "Schemaintervallet är låst till 60 minuter.",

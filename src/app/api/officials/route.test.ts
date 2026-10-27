@@ -676,6 +676,26 @@ describe('POST /api/officials', () => {
     })
   })
 
+  // N13: the tenant's alphanumeric sender name.
+  describe('N13 sender', () => {
+    it.each([
+      ['its name on Professional', 'professional', 'Viadal'],
+      ['the platform number on Premium', 'premium', '+15550001111'],
+    ])('sends from %s', async (_label, tier, expectedFrom) => {
+      asAdmin()
+      mockService(
+        chain({ data: { id: 'off-1', invite_token: 'tok-abc' }, error: null }),
+        chain({ data: { name: 'Viadal 2026', tier, sms_sender_id: 'Viadal' } })
+      )
+
+      await POST(
+        makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
+      )
+
+      expect(messagesCreate).toHaveBeenCalledWith(expect.objectContaining({ from: expectedFrom }))
+    })
+  })
+
   // N24: the monthly SMS spend cap.
   describe('N24 monthly spend cap', () => {
     function withUsage(rows: Record<string, unknown>[]) {

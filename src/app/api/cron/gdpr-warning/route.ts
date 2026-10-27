@@ -5,6 +5,7 @@ import { toTwilioE164 } from '@/lib/phone'
 import { logger } from '@/lib/logger'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
+import { resolveSmsSender } from '@/lib/sms/sender'
 
 // SEC-09: triggered daily by the gdpr-warning-sms-trigger pg_cron job (migration
 // 0029) via pg_net. Sends the 23-month inactivity warning SMS to officials and
@@ -77,6 +78,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to read warning candidates' }, { status: 500 })
   }
 
+  // N13: each warning goes out from its own tenant's sender. One read for
+  // every tenant in the cohorts rather than one per person.
+  //
+  // Logged, not fatal: a sender that cannot be resolved falls back to the
+  // platform number, and a GDPR warning from the wrong sender is far better
+  // than one that never goes out.
+  const tenantIds = [
+    ...new Set([...(officials ?? []), ...(participants ?? [])].map((row) => row.tenant_id)),
+  ]
+  const tenantById = new Map<string, { tier: string; sms_sender_id: string | null }>()
+
+  if (tenantIds.length > 0) {
+    const { data: tenantRows, error: tenantsError } = await service
+      .from('tenants')
+      .select('id, tier, sms_sender_id')
+      .in('id', tenantIds)
+
+    if (tenantsError) {
+      logQueryError(tenantsError, {
+        op: 'GET /api/cron/gdpr-warning',
+        table: 'tenants',
+        kind: 'select',
+        extra: { usage: 'sms_sender', consequence: 'platform_sender_used' },
+      })
+    }
+
+    for (const tenant of tenantRows ?? []) tenantById.set(tenant.id, tenant)
+  }
+
   const warningCutoff = Date.now() - 23 * 30 * 24 * 60 * 60 * 1000
 
   let sent = 0
@@ -119,7 +149,7 @@ export async function POST(request: NextRequest) {
       try {
         const message = await client.messages.create({
           body: `Hi ${row.name}, you haven't logged in for a while. If you don't log in again, your account will be automatically removed in about a month.`,
-          from: fromNumber,
+          from: resolveSmsSender(tenantById.get(row.tenant_id), fromNumber),
           to: toTwilioE164(row.phone),
         })
         await recordSmsUsage({

@@ -29,7 +29,7 @@ export default async function TenantDetailPage({ params }: Props) {
   const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('id, name, is_active, tier')
+    .select('id, name, is_active, tier, sms_sender_id')
     .eq('id', tenantId)
     .maybeSingle()
 
@@ -77,6 +77,7 @@ export default async function TenantDetailPage({ params }: Props) {
           tenantId={tenant.id}
           isActive={tenant.is_active}
           tier={tenant.tier as 'standard' | 'premium' | 'professional'}
+          smsSenderId={tenant.sms_sender_id}
         />
         {/* Directly under the feature tier, which is what sets the cap: an
             admin who has just changed a tenant's tier sees what that did to

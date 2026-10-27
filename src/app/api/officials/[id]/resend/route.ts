@@ -14,6 +14,7 @@ import {
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
+import { resolveSmsSender } from '@/lib/sms/sender'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { buildAppLink, hasUsableAppOrigin } from '@/lib/sms/app-link'
 
@@ -154,12 +155,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // Read BEFORE the token is rotated, because the N24 cap check below depends
-  // on it and must run before the rotation — see why there. `name` is only
-  // needed later, for the SMS copy, but reading both here keeps it to one
-  // query.
+  // on it and must run before the rotation — see why there. `name` (the SMS
+  // copy) and `sms_sender_id` (N13's sender) are only needed later, but
+  // reading them here keeps it to one query.
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('name, tier')
+    .select('name, tier, sms_sender_id')
     .eq('id', parsed.data.tenantId)
     .single()
 
@@ -264,7 +265,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const message = await client.messages.create({
       body: smsBody,
-      from: fromNumber,
+      from: resolveSmsSender(tenant, fromNumber),
       to: toTwilioE164(official.phone),
     })
     // N11 usage accounting. sms_usage is revoked from `authenticated`, so this

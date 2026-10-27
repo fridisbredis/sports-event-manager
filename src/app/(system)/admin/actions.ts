@@ -16,6 +16,7 @@ import {
   type AdminRoleChangeResult,
 } from '@/lib/auth/tenant-admins'
 import { grantSystemAdminRole, revokeSystemAdminRole } from '@/lib/auth/system-admins'
+import { smsSenderIdSchema } from '@/lib/sms/sender'
 
 const setTenantActiveSchema = z.object({
   tenantId: z.string().uuid(),
@@ -25,6 +26,11 @@ const setTenantActiveSchema = z.object({
 const setTenantTierSchema = z.object({
   tenantId: z.string().uuid(),
   tier: z.enum(['standard', 'premium', 'professional']),
+})
+
+const setTenantSmsSenderIdSchema = z.object({
+  tenantId: z.string().uuid(),
+  smsSenderId: smsSenderIdSchema,
 })
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
@@ -251,6 +257,48 @@ export async function setTenantTier(
     targetType: 'tenant',
     targetId: parsed.data.tenantId,
     detail: { tier: parsed.data.tier },
+  })
+
+  revalidatePath('/admin/' + parsed.data.tenantId)
+  return {}
+}
+
+// N13: set or clear a tenant's alphanumeric SMS sender name. An empty value
+// clears it, which puts the tenant back on the platform number.
+//
+// Saved regardless of tier: whether the name is USED is decided per message
+// by resolveSmsSender, so a name entered on a Premium tenant waits on the row
+// and takes effect on an upgrade to Professional.
+//
+// The database also refuses this write from anyone but a system admin
+// (trigger guard_tenant_sms_sender_id), since tenant admins can otherwise
+// update their own tenant row.
+export async function setTenantSmsSenderId(
+  tenantId: string,
+  smsSenderId: string
+): Promise<{ error?: string }> {
+  const check = await assertSystemAdmin()
+  if (!check.ok) return { error: check.error }
+  const { supabase, userId } = check
+
+  const parsed = setTenantSmsSenderIdSchema.safeParse({ tenantId, smsSenderId })
+  if (!parsed.success) return { error: await tError('actionErrors.invalidSmsSenderId') }
+
+  const { error } = await supabase
+    .from('tenants')
+    .update({ sms_sender_id: parsed.data.smsSenderId })
+    .eq('id', parsed.data.tenantId)
+
+  if (error) return { error: await tError('actionErrors.updateSmsSenderFailed') }
+
+  await logAuditEvent({
+    tenantId: parsed.data.tenantId,
+    actorUserId: userId,
+    actorRole: 'system_admin',
+    action: 'tenant_sms_sender_changed',
+    targetType: 'tenant',
+    targetId: parsed.data.tenantId,
+    detail: { smsSenderId: parsed.data.smsSenderId },
   })
 
   revalidatePath('/admin/' + parsed.data.tenantId)

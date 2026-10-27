@@ -7,6 +7,7 @@ import type { SmsQueueItem } from '@/types/app'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
+import { resolveSmsSender } from '@/lib/sms/sender'
 
 // PERF-04: triggered every minute by the sms-queue-worker-trigger pg_cron job
 // (migration 0030) via pg_net, same pattern as the gdpr-warning cron route.
@@ -85,16 +86,21 @@ export async function POST(request: NextRequest) {
   // that tick still goes out. That is deliberate: the alternative is a usage
   // query between every message, and overshooting by part of one batch is a
   // smaller problem than that. The next tick, a minute later, stops them.
+  //
+  // The same read also carries N13's sender name, so the sender costs no
+  // extra query.
   const tenantIds = [...new Set(batch.map((row) => row.tenant_id))]
   const { data: tenantRows, error: tenantsError } = await service
     .from('tenants')
-    .select('id, tier')
+    .select('id, tier, sms_sender_id')
     .in('id', tenantIds)
 
   if (tenantsError) {
     // Logged, not thrown: failing the tick here would stop every tenant's
     // announcements because one tier lookup failed. The caps simply are not
-    // enforced on this tick — the same fail-open posture as cap.ts.
+    // enforced on this tick — the same fail-open posture as cap.ts — and every
+    // message goes out from the platform number (resolveSmsSender on a
+    // missing tenant).
     logQueryError(tenantsError, {
       op: 'POST /api/cron/sms-worker',
       table: 'tenants',
@@ -103,14 +109,14 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const tierById = new Map((tenantRows ?? []).map((t) => [t.id, t.tier]))
+  const tenantById = new Map((tenantRows ?? []).map((t) => [t.id, t]))
   const cappedTenants = new Set<string>()
 
   for (const tenantId of tenantIds) {
     const status = await readSmsCapStatus({
       service,
       tenantId,
-      tier: tierById.get(tenantId) ?? '',
+      tier: tenantById.get(tenantId)?.tier ?? '',
       op: 'POST /api/cron/sms-worker',
     })
 
@@ -192,7 +198,7 @@ export async function POST(request: NextRequest) {
 
           const message = await client.messages.create({
             body,
-            from: fromNumber,
+            from: resolveSmsSender(tenantById.get(row.tenant_id), fromNumber),
             to: toTwilioE164(row.recipient_phone),
           })
 
