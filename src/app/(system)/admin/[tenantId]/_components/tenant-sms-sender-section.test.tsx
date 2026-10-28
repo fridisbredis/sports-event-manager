@@ -41,13 +41,29 @@ describe('TenantSmsSenderSection', () => {
     ).toBeInTheDocument()
   })
 
-  // The downgrade case: the name is kept, and the page must not suggest it is
-  // still being used.
-  it('says a stored name is not used below Professional', () => {
-    render(<TenantSmsSenderSection tenantId={TENANT_ID} tier="premium" smsSenderId="Viadal" />)
+  // An editable box below Professional read as if the name were in use.
+  it('shows no field below Professional, only that it is a Professional feature', () => {
+    render(<TenantSmsSenderSection tenantId={TENANT_ID} tier="premium" smsSenderId={null} />)
 
     expect(screen.getByText('systemAdmin.smsSenderLockedHint')).toBeInTheDocument()
-    expect(input()).toHaveValue('Viadal')
+    expect(screen.queryByLabelText('systemAdmin.smsSenderLabel')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByText(/smsSenderKeptHint/)).not.toBeInTheDocument()
+  })
+
+  // The downgrade case: the name stays on the row and comes back on upgrade,
+  // so the page says so rather than hiding it.
+  it('says a name saved before a downgrade is kept', () => {
+    render(<TenantSmsSenderSection tenantId={TENANT_ID} tier="standard" smsSenderId="Viadal" />)
+
+    expect(screen.getByText('systemAdmin.smsSenderKeptHint:{"name":"Viadal"}')).toBeInTheDocument()
+    expect(screen.queryByLabelText('systemAdmin.smsSenderLabel')).not.toBeInTheDocument()
+  })
+
+  it('has no example name in the field', () => {
+    render(<TenantSmsSenderSection tenantId={TENANT_ID} tier="professional" smsSenderId={null} />)
+
+    expect(input()).not.toHaveAttribute('placeholder')
   })
 
   it('says the platform number is used when no name is set', () => {
