@@ -1,7 +1,4 @@
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeftRight, ChevronRight } from 'lucide-react'
-import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { listOfficialEvents } from '@/lib/events/official-event'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -67,27 +64,6 @@ export default async function OfficialAccountPage({ params }: Props) {
           nowhere else. */}
       <div className="px-5 pt-10">
         <h1 className="page-title">{t('account.title')}</h1>
-        {/* N23: only for someone with more than one event — with one there
-            is nothing to change to. Leads to the same picker as login. */}
-        {hasSeveralEvents && (
-          <Link
-            href={`/${tenantSlug}/events`}
-            className={`card-accent-left mt-6 flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:border-tenant-primary hover:bg-tenant-primary-tint`}
-          >
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-large bg-tenant-primary-tint text-tenant-primary-tint-text">
-              <ArrowLeftRight className="size-6" strokeWidth={1.8} aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[17px] font-bold leading-snug text-ink">
-                {t('events.changeEvent')}
-              </p>
-              <p className="mt-0.5 text-[15px] leading-snug text-ink-muted">
-                {t('events.changeEventSub')}
-              </p>
-            </div>
-            <ChevronRight className="size-5 shrink-0 text-tenant-primary" aria-hidden="true" />
-          </Link>
-        )}
       </div>
       <AccountForm
         name={official.name}
@@ -98,6 +74,7 @@ export default async function OfficialAccountPage({ params }: Props) {
         tenantSlug={tenantSlug}
         shiftCount={shiftCount}
         i18nNamespace="official"
+        changeEventHref={hasSeveralEvents ? `/${tenantSlug}/events` : null}
         language={language}
       />
     </div>

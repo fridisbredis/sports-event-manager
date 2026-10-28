@@ -177,6 +177,7 @@ describe('OfficialAccountPage', () => {
       tenantSlug: 'viadal',
       shiftCount: 2,
       i18nNamespace: 'official',
+      changeEventHref: null,
       language: 'en',
       avatarUrl: undefined,
     })

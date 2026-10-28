@@ -2,7 +2,14 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, ChevronRight, ExternalLink, FileText, LogOut } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  LogOut,
+  ArrowLeftRight,
+} from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
@@ -27,6 +34,8 @@ interface AccountFormProps {
   i18nNamespace: 'official' | 'admin'
   language: Locale
   layout?: 'mobile' | 'desktop'
+  /** N23: the event picker, for an official with more than one event. */
+  changeEventHref?: string | null
 }
 
 export default function AccountForm({
@@ -40,6 +49,7 @@ export default function AccountForm({
   i18nNamespace,
   language,
   layout = 'mobile',
+  changeEventHref = null,
 }: AccountFormProps) {
   const { t } = useTranslation(i18nNamespace)
   // The section heading is shared with every other language control in the
@@ -331,6 +341,38 @@ export default function AccountForm({
                   {t('account.shiftCount', { count: shiftCount })}
                 </p>
                 <p className="mt-0.5 text-sm text-ink-muted">{t('account.viewSchedule')}</p>
+              </div>
+              <ChevronRight
+                aria-hidden="true"
+                strokeWidth={1.5}
+                className="size-5 shrink-0 text-ink-label"
+              />
+            </Link>
+          </>
+        )}
+
+        {/* N23: its own section, apart from the person above — which event
+            you are looking at is not part of who you are. Only for someone
+            with more than one event; with one there is nothing to change to. */}
+        {changeEventHref && (
+          <>
+            <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+              {t('events.sectionHeading')}
+            </p>
+            <Link
+              href={changeEventHref}
+              className={`flex items-center gap-4 ${CARD_SURFACE} ${
+                isDesktop ? 'mb-10' : 'mb-8'
+              } px-4 py-4 transition-colors hover:bg-surface`}
+            >
+              <ArrowLeftRight
+                aria-hidden="true"
+                strokeWidth={1.7}
+                className="size-8 shrink-0 text-tenant-primary"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-semibold text-ink">{t('events.changeEvent')}</p>
+                <p className="mt-0.5 text-sm text-ink-muted">{t('events.changeEventSub')}</p>
               </div>
               <ChevronRight
                 aria-hidden="true"

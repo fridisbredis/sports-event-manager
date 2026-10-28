@@ -130,12 +130,19 @@ export default async function OfficialHomePage({ params }: Props) {
       subtitle: t('home.announcementsSub'),
       Icon: Bell,
     },
-    {
-      href: `/${tenantSlug}/account`,
-      title: t('home.accountTitle'),
-      subtitle: t('home.accountSub'),
-      Icon: User,
-    },
+    // ACCT-01 is backed by an officials row; a system admin looking at the
+    // official view has none, so the card would lead to a 404. The tab bar
+    // and the admin sidebar already leave the link out for the same reason.
+    ...(tenant.officialId != null
+      ? [
+          {
+            href: `/${tenantSlug}/account`,
+            title: t('home.accountTitle'),
+            subtitle: t('home.accountSub'),
+            Icon: User,
+          },
+        ]
+      : []),
   ]
 
   return (

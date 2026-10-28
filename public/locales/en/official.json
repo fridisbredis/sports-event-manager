@@ -142,6 +142,7 @@
     "emptyTitle": "No events yet",
     "emptyBody": "You have not been added to an event in this organization yet.",
     "changeEvent": "Change event",
-    "changeEventSub": "Switch to another of your events"
+    "changeEventSub": "Switch to another of your events",
+    "sectionHeading": "Event"
   }
 }
