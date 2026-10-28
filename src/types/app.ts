@@ -80,7 +80,7 @@ export type WorkstationUpdate = DbTables['workstations']['Update']
 // Domain enums — stricter than the DB's plain text columns
 // These match the CHECK constraints in migrations 0003 + 0007 + 0008
 export type TenantRole = 'system_admin' | 'tenant_admin' | 'official' | 'participant'
-export type EventStatus = 'draft' | 'published'
+export type EventStatus = 'draft' | 'published' | 'archived'
 export type RaceType = 'distance' | 'time'
 export type StageType = 'race' | 'non_race'
 // All four values the assignments status CHECK allows
