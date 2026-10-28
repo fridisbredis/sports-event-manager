@@ -11,6 +11,7 @@ import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Database } from '@/types/database'
 import twilio from 'twilio'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { resolveRequestEventId } from '@/lib/events/request-event'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -23,6 +24,12 @@ vi.mock('next/cache', () => ({
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
   createSupabaseServiceClient: vi.fn(),
+}))
+
+// N23: which event the invite goes into is resolveRequestEventId's job and
+// is tested there; here it is the one event the request names.
+vi.mock('@/lib/events/request-event', () => ({
+  resolveRequestEventId: vi.fn(async () => 'event-1'),
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -53,6 +60,29 @@ function chain(result: unknown) {
   return builder
 }
 
+/**
+ * N23: the officials insert is now create_official_in_event, which writes the
+ * official and their membership in one transaction. This stands in for it on
+ * the session client: it takes the next builder in the `from` queue — where
+ * the insert used to sit — and records the same columns on it, so the
+ * assertions about what was inserted still hold.
+ */
+function rpcFor(fromMock: (table: string) => unknown) {
+  return vi.fn((name: string, args: Record<string, unknown>) => {
+    if (name !== 'create_official_in_event') throw new Error(`unexpected rpc ${name}`)
+    const builder = fromMock('officials') as ReturnType<typeof chain>
+    ;(builder.insert as (row: unknown) => unknown)({
+      tenant_id: args.p_tenant_id,
+      user_id: args.p_user_id,
+      name: args.p_name,
+      phone: args.p_phone,
+      invite_status: 'invited',
+      invite_token_expires_at: args.p_invite_token_expires_at,
+    })
+    return (builder.single as () => Promise<unknown>)()
+  })
+}
+
 /** No active official already holds the submitted phone number. */
 const noDuplicate = () => chain({ data: null })
 
@@ -79,7 +109,10 @@ function mockService(...afterDuplicateCheck: unknown[]) {
   fromMock.mockReturnValueOnce(noDuplicate())
   afterDuplicateCheck.forEach((builder) => fromMock.mockReturnValueOnce(builder))
   freshAuthUser()
-  vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+  vi.mocked(createSupabaseServerClient).mockResolvedValue({
+    from: fromMock,
+    rpc: rpcFor(fromMock),
+  } as never)
   vi.mocked(createSupabaseServiceClient).mockReturnValue({
     auth: { admin: { createUser, deleteUser } },
     rpc,
@@ -298,7 +331,10 @@ describe('POST /api/officials', () => {
     fromMock
       .mockReturnValueOnce(chain({ data: { id: 'existing-official' } }))
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      from: fromMock,
+      rpc: rpcFor(fromMock),
+    } as never)
 
     const res = await POST(
       makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })
@@ -326,6 +362,50 @@ describe('POST /api/officials', () => {
     expect(body.code).toBe('duplicate_phone')
     expect(messagesCreate).not.toHaveBeenCalled()
     expect(releaseInviteRateLimit).toHaveBeenCalledWith(TENANT_ID, '46701234567')
+  })
+
+  it('invites the official into the event the request names (N23)', async () => {
+    asAdmin()
+    mockService(
+      chain({ data: { id: 'off-3', name: 'Anna', invite_token: 'tok-3' }, error: null }),
+      chain({ data: { name: 'Viadal' } })
+    )
+
+    const res = await POST(
+      makeRequest({
+        tenantId: TENANT_ID,
+        eventId: '22222222-2222-4222-8222-222222222222',
+        name: 'Anna',
+        phone: '0709998877',
+        phoneCountry: 'SE',
+      })
+    )
+
+    expect(res.status).toBe(200)
+    expect(resolveRequestEventId).toHaveBeenCalledWith(
+      expect.anything(),
+      TENANT_ID,
+      '22222222-2222-4222-8222-222222222222'
+    )
+    const session = await vi.mocked(createSupabaseServerClient).mock.results.at(-1)!.value
+    expect(session.rpc).toHaveBeenCalledWith(
+      'create_official_in_event',
+      expect.objectContaining({ p_tenant_id: TENANT_ID, p_event_id: 'event-1' })
+    )
+  })
+
+  it('answers 400 without inserting when the event is unknown or ambiguous (N23)', async () => {
+    asAdmin()
+    mockService()
+    vi.mocked(resolveRequestEventId).mockResolvedValueOnce(null)
+
+    const res = await POST(
+      makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0709998877', phoneCountry: 'SE' })
+    )
+
+    expect(res.status).toBe(400)
+    expect(createUser).not.toHaveBeenCalled()
+    expect(releaseInviteRateLimit).toHaveBeenCalled()
   })
 
   it('allows a repeated name as long as the phone number differs', async () => {
@@ -428,7 +508,10 @@ describe('POST /api/officials', () => {
     asAdmin()
     const fromMock = vi.fn()
     fromMock.mockReturnValueOnce(noDuplicate())
-    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      from: fromMock,
+      rpc: rpcFor(fromMock),
+    } as never)
     createUser.mockResolvedValue({
       data: null,
       error: { code: 'phone_exists', message: 'phone already registered' },
@@ -452,7 +535,10 @@ describe('POST /api/officials', () => {
     asAdmin()
     const fromMock = vi.fn()
     fromMock.mockReturnValueOnce(noDuplicate())
-    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      from: fromMock,
+      rpc: rpcFor(fromMock),
+    } as never)
     createUser.mockResolvedValue({
       data: null,
       error: { code: 'unexpected_failure', message: 'boom' },
@@ -592,7 +678,10 @@ describe('POST /api/officials', () => {
     fromMock
       .mockReturnValueOnce(chain({ data: { id: 'existing-official' } }))
       .mockReturnValueOnce(insertBuilder)
-    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      from: fromMock,
+      rpc: rpcFor(fromMock),
+    } as never)
 
     await POST(
       makeRequest({ tenantId: TENANT_ID, name: 'Anna', phone: '0701234567', phoneCountry: 'SE' })

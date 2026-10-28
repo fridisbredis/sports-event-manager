@@ -71,10 +71,11 @@ export interface OfficialDetail {
  */
 export async function fetchOfficialDetail(
   supabase: SupabaseClient,
-  { tenantId, officialId }: { tenantId: string; officialId: string }
+  { tenantId, eventId, officialId }: { tenantId: string; eventId: string; officialId: string }
 ): Promise<OfficialDetail> {
+  // N23: shifts are this event's; time off is the person's, whatever the event.
   const [shifts, timeOff] = await Promise.all([
-    fetchShifts(supabase, tenantId, officialId),
+    fetchShifts(supabase, tenantId, eventId, officialId),
     fetchTimeOff(supabase, tenantId, officialId),
   ])
 
@@ -84,6 +85,7 @@ export async function fetchOfficialDetail(
 async function fetchShifts(
   supabase: SupabaseClient,
   tenantId: string,
+  eventId: string,
   officialId: string
 ): Promise<OfficialShift[]> {
   const { data, error } = await supabase
@@ -91,6 +93,7 @@ async function fetchShifts(
     .select('timeslot_start, timeslot_end, workstation_id, workstations ( id, name )')
     .eq('official_id', officialId)
     .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
     .eq('status', 'assigned')
     .not('workstation_id', 'is', null)
     .order('timeslot_start')

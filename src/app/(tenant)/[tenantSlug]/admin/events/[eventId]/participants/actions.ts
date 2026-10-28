@@ -15,6 +15,7 @@ import { parseRaceResultsEventId } from '@/lib/race-results/parse-url'
 import { hasFeature } from '@/lib/tiers/features'
 import type { Json } from '@/types/database'
 import { adminEventRoutePattern } from '@/lib/events/paths'
+import { resolveRequestEventId } from '@/lib/events/request-event'
 
 const tenantIdSchema = z.string().uuid()
 const stageIdSchema = z.string().uuid()
@@ -270,6 +271,8 @@ export interface AddParticipantResult {
 export async function addParticipant(input: {
   tenantSlug: string
   tenantId: string
+  /** N23: the event the participant is entered in. */
+  eventId: string
   name: string
   bib?: string
   category?: string
@@ -287,8 +290,14 @@ export async function addParticipant(input: {
     return { error: await tError('actionErrors.invalidRequest') }
   }
 
+  // N23: the event must be one of this tenant's, read through the caller's
+  // RLS; the composite FK on participants refuses a foreign one regardless.
+  const eventId = await resolveRequestEventId(supabase, tenantId, input.eventId)
+  if (!eventId) return { error: await tError('actionErrors.invalidRequest') }
+
   const { error } = await supabase.from('participants').insert({
     tenant_id: tenantId,
+    event_id: eventId,
     name: parsed.data.name,
     // Empty optional fields are stored as NULL rather than '': an empty
     // string would read as a known-blank value, and for phone it would be

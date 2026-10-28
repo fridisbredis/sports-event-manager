@@ -20,11 +20,16 @@ import { readSmsCapStatus } from '@/lib/sms/cap'
 import { resolveSmsSender } from '@/lib/sms/sender'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { buildAppLink } from '@/lib/sms/app-link'
+import { resolveRequestEventId } from '@/lib/events/request-event'
+import type { Official } from '@/types/app'
 
 const PHONE_COUNTRY_CODES = PHONE_COUNTRIES.map((c) => c.code)
 
 const inviteSchema = z.object({
   tenantId: z.string().uuid(),
+  // N23: the event the official is invited into. Optional only for clients
+  // loaded before the event moved into the URL; see resolveRequestEventId.
+  eventId: z.string().uuid().optional(),
   name: z.string().min(1),
   phone: z.string().min(1),
   phoneCountry: z.enum(PHONE_COUNTRY_CODES as [string, ...string[]]),
@@ -37,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { tenantId, name, phoneCountry } = parsed.data
+  const { tenantId, eventId: requestedEventId, name, phoneCountry } = parsed.data
   const phone = normalizePhoneToE164(
     parsed.data.phone,
     phoneCountry as (typeof PHONE_COUNTRY_CODES)[number]
@@ -82,6 +87,12 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient()
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, requestedEventId)
+  if (!eventId) {
+    await releaseInviteRateLimit(tenantId, stripE164Plus(phone))
+    return NextResponse.json({ error: 'Unknown or ambiguous event' }, { status: 400 })
+  }
 
   const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -171,18 +182,17 @@ export async function POST(request: NextRequest) {
     officialUserId = created.user.id
   }
 
-  const { data: official, error } = await supabase
-    .from('officials')
-    .insert({
-      tenant_id: tenantId,
-      user_id: officialUserId,
-      name,
-      phone,
-      invite_status: 'invited',
-      invite_token_expires_at: tokenExpiresAt,
-    })
-    .select()
-    .single()
+  // N23: the official and their membership in this event, in one
+  // transaction (REL-01) — see migration 20261028141228.
+  const { data: inserted, error } = await supabase.rpc('create_official_in_event', {
+    p_tenant_id: tenantId,
+    p_event_id: eventId,
+    p_user_id: officialUserId,
+    p_name: name,
+    p_phone: phone,
+    p_invite_token_expires_at: tokenExpiresAt,
+  })
+  const official = inserted as unknown as Official | null
 
   // Two concurrent requests can both pass the check above; the unique index is the
   // real guarantee, so translate its violation into the same 409 rather than a 500.

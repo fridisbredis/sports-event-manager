@@ -4,6 +4,7 @@ import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
+import { resolveRequestEventId } from '@/lib/events/request-event'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -11,6 +12,12 @@ vi.mock('@/lib/auth/tenant', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+}))
+
+// N23: the event is resolveRequestEventId's job; here it is the one the
+// request names.
+vi.mock('@/lib/events/request-event', () => ({
+  resolveRequestEventId: vi.fn(async () => 'event-1'),
 }))
 
 vi.mock('@/lib/audit/log-audit-event', () => ({
@@ -100,6 +107,27 @@ describe('POST /api/announcements', () => {
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
     expect(recipientsBuilder.eq).toHaveBeenCalledWith('invite_status', 'confirmed')
     expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
+    // N23: only the event's officials, and the announcement belongs to it.
+    expect(recipientsBuilder.select).toHaveBeenCalledWith('phone, official_events!inner(event_id)')
+    expect(recipientsBuilder.eq).toHaveBeenCalledWith('official_events.event_id', 'event-1')
+    expect(insertBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ tenant_id: TENANT_ID, event_id: 'event-1' })
+    )
+  })
+
+  it('answers 400 without sending when the event is unknown or ambiguous (N23)', async () => {
+    vi.mocked(requireTenantAdmin).mockResolvedValue({
+      user: { id: 'admin-1' },
+      role: 'tenant_admin',
+    } as never)
+    vi.mocked(resolveRequestEventId).mockResolvedValueOnce(null)
+    const fromMock = vi.fn()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+
+    const res = await POST(makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' }))
+
+    expect(res.status).toBe(400)
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('caps the recipient query at 500 and logs when the cap is hit (F-SEC-04)', async () => {

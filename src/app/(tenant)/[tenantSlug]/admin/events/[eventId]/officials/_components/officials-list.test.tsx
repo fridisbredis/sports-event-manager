@@ -337,6 +337,7 @@ describe('OfficialsList — phone validation timing', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -406,6 +407,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -429,6 +431,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -452,6 +455,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -481,6 +485,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -504,6 +509,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -531,6 +537,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -562,6 +569,7 @@ describe('OfficialsList — handleAdd error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -612,6 +620,7 @@ describe('OfficialsList — handleAdd success', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -641,6 +650,7 @@ describe('OfficialsList — handleAdd success', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -678,6 +688,7 @@ describe('OfficialsList — handleRemove', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -708,6 +719,7 @@ describe('OfficialsList — handleRemove', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -731,6 +743,7 @@ describe('OfficialsList — handleResend error branches', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={{}}
@@ -859,6 +872,7 @@ describe('OfficialsList — N17 expanded row', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={officials}
         currentUserId={currentUserId}
         details={details}
@@ -974,6 +988,7 @@ describe('OfficialsList — N27 admin role', () => {
       <OfficialsList
         tenantSlug="acme"
         tenantId="tenant-1"
+        eventId="event-1"
         officials={roster}
         currentUserId={currentUserId}
         details={{}}

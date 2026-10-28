@@ -26,6 +26,7 @@ interface Props {
 export async function fetchAssignmentsForDay(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   tenantId: string,
+  eventId: string,
   day: string
 ) {
   const dayStart = new Date(`${day}T00:00:00.000Z`)
@@ -36,6 +37,8 @@ export async function fetchAssignmentsForDay(
     .from('assignments')
     .select('id, official_id, workstation_id, timeslot_start, timeslot_end, status, slot_index')
     .eq('tenant_id', tenantId)
+    // N23: this event's shifts only.
+    .eq('event_id', eventId)
     .gte('timeslot_start', dayStart.toISOString())
     .lt('timeslot_start', dayEnd.toISOString())
     .order('id', { ascending: true })
@@ -131,8 +134,11 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
 
     supabase
       .from('officials')
-      .select('id, name, invite_status, avatar_url')
+      // N23: the event's officials (members in official_events) are the
+      // ones schedulable here.
+      .select('id, name, invite_status, avatar_url, official_events!inner(event_id)')
       .eq('tenant_id', tenant.id)
+      .eq('official_events.event_id', event.id)
       .eq('invite_status', 'confirmed')
       .order('name', { ascending: true }),
   ])
@@ -162,7 +168,7 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
 
   const [assignments, unavailability] = selectedDay
     ? await Promise.all([
-        fetchAssignmentsForDay(supabase, tenant.id, selectedDay),
+        fetchAssignmentsForDay(supabase, tenant.id, event.id, selectedDay),
         fetchUnavailabilityForDay(supabase, tenant.id, selectedDay),
       ])
     : [[], []]
@@ -188,6 +194,7 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
     showMobileView && selectedDay
       ? await fetchDayCoverage(supabase, {
           tenantId: tenant.id,
+          eventId: event.id,
           day: selectedDay,
           workstations: stageWorkstations.map((ws) => ({
             id: ws.id,

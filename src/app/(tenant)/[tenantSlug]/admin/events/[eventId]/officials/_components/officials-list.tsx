@@ -47,6 +47,8 @@ import { makeTenantAdmin, removeTenantAdmin } from '../actions'
 interface Props {
   tenantSlug: string
   tenantId: string
+  /** N23: the event invites go into. */
+  eventId: string
   officials: OfficialListItem[]
   currentUserId: string
   /** N17: shifts and time off per official id, read server-side. */
@@ -78,6 +80,7 @@ function initialsOf(name: string): string {
 export default function OfficialsList({
   tenantSlug,
   tenantId,
+  eventId,
   officials: initialOfficials,
   currentUserId,
   details,
@@ -124,6 +127,7 @@ export default function OfficialsList({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantId,
+          eventId,
           name: name.trim(),
           phone: phone.trim(),
           phoneCountry,

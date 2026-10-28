@@ -5,7 +5,7 @@ import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
 import { CommunicationPanel } from './_components/communication-panel'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
   searchParams: Promise<{ page?: string }>
 }
 
@@ -13,7 +13,7 @@ const ANNOUNCEMENT_FIELDS =
   'id, tenant_id, event_id, channel, body, sms_sent, published_at, created_at'
 
 export default async function CommunicationPage({ params, searchParams }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const { page: pageParam } = await searchParams
   const page = parsePageParam(pageParam)
 
@@ -47,6 +47,7 @@ export default async function CommunicationPage({ params, searchParams }: Props)
       .from('announcements')
       .select(ANNOUNCEMENT_FIELDS)
       .eq('tenant_id', tenant.id)
+      .eq('event_id', eventId)
       .eq('channel', channel)
       .order('published_at', { ascending: false })
       .range(from, to)
@@ -66,6 +67,7 @@ export default async function CommunicationPage({ params, searchParams }: Props)
     <div className="px-4 py-6 md:px-8 md:py-8">
       <CommunicationPanel
         tenantId={tenant.id}
+        eventId={eventId}
         page={page}
         announcements={{ participants: participants.items, officials: officials.items }}
         hasMore={{ participants: participants.hasMore, officials: officials.hasMore }}

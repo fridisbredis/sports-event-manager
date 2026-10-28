@@ -121,6 +121,7 @@ function announcement(channel: 'participants' | 'officials', i: number): Announc
 function renderPanel(overrides: Partial<Parameters<typeof CommunicationPanel>[0]> = {}) {
   const props = {
     tenantId: TENANT_ID,
+    eventId: 'event-1',
     page: 1,
     announcements: {
       participants: [announcement('participants', 0)],
@@ -296,6 +297,7 @@ describe('CommunicationPanel', () => {
     rerender(
       <CommunicationPanel
         tenantId={TENANT_ID}
+        eventId="event-1"
         page={2}
         announcements={{ participants: [announcement('participants', 5)], officials: [] }}
         hasMore={{ participants: false, officials: false }}
@@ -320,6 +322,7 @@ describe('CommunicationPanel', () => {
     rerender(
       <CommunicationPanel
         tenantId={TENANT_ID}
+        eventId="event-1"
         page={1}
         announcements={{ participants: [fromServer], officials: [] }}
         hasMore={{ participants: false, officials: false }}
