@@ -7,6 +7,7 @@ import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { translateActionError as tError } from '@/lib/actions/action-error'
 import { toPeriodBounds } from '@/lib/scheduling/period-bounds'
+import { officialEventRoutePattern } from '@/lib/events/paths'
 
 // A declared period, as the form sends it. Dates arrive as `YYYY-MM-DD` and
 // times as `HH:MM` rather than as two ISO instants, because that is what the
@@ -125,7 +126,7 @@ export async function declareUnavailability(
   // revalidated from here: it is a different route segment under a different
   // layout, it re-reads on its own navigation, and an official has no business
   // invalidating an admin's render.
-  revalidatePath(`/${tenantSlug}/availability`)
+  revalidatePath(officialEventRoutePattern('availability'), 'page')
 
   // The first row's id, which is what the form uses to confirm the save.
   return { id: data[0]?.id }
@@ -198,7 +199,7 @@ export async function withdrawUnavailability(
     return { notOwned: true, error: 'availability.notOwned' }
   }
 
-  revalidatePath(`/${tenantSlug}/availability`)
+  revalidatePath(officialEventRoutePattern('availability'), 'page')
 
   return {}
 }

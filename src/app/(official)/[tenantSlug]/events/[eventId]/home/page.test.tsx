@@ -50,7 +50,7 @@ function chain(result: unknown) {
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
+const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 
 function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)

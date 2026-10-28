@@ -9,9 +9,10 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { AvatarImage } from '@/components/ui/avatar-image'
+import { officialEventPath } from '@/lib/events/paths'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
 }
 
 function NavCard({
@@ -46,7 +47,7 @@ function NavCard({
 }
 
 export default async function OfficialHomePage({ params }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const t = await getServerTranslation(await getUserLanguage(), 'official')
 
   const supabase = await createSupabaseServerClient()
@@ -92,7 +93,12 @@ export default async function OfficialHomePage({ params }: Props) {
 
   const [officialHome, { data: event }] = await Promise.all([
     getOfficialHomeCached(tenant.id, user.id),
-    supabase.from('events').select('name').eq('tenant_id', tenant.id).maybeSingle(),
+    supabase
+      .from('events')
+      .select('name')
+      .eq('id', eventId)
+      .eq('tenant_id', tenant.id)
+      .maybeSingle(),
   ])
 
   const name = officialHome?.name ?? ''
@@ -107,19 +113,19 @@ export default async function OfficialHomePage({ params }: Props) {
 
   const cards = [
     {
-      href: `/${tenantSlug}/event-info`,
+      href: officialEventPath(tenantSlug, eventId, 'event-info'),
       title: t('home.eventInfo'),
       subtitle: t('home.eventInfoSub'),
       Icon: Info,
     },
     {
-      href: `/${tenantSlug}/schedule`,
+      href: officialEventPath(tenantSlug, eventId, 'schedule'),
       title: t('home.mySchedule'),
       subtitle: t('home.myScheduleSub'),
       Icon: Calendar,
     },
     {
-      href: `/${tenantSlug}/announcements`,
+      href: officialEventPath(tenantSlug, eventId, 'announcements'),
       title: t('home.announcements'),
       subtitle: t('home.announcementsSub'),
       Icon: Bell,

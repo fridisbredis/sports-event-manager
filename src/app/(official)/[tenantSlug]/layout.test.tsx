@@ -23,6 +23,10 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
+vi.mock('@/lib/events/official-event', () => ({
+  getSoleOfficialEventId: vi.fn(async () => 'event-1'),
+}))
+
 vi.mock('./_components/bottom-tab-bar', () => ({
   BottomTabBar: vi.fn(() => null),
 }))
@@ -144,7 +148,11 @@ describe('OfficialLayout', () => {
 
     const tabBar = findByType(result, BottomTabBar)
     expect(tabBar).not.toBeNull()
-    expect(tabBar!.props).toEqual({ tenantSlug: 'viadal', showAccount: true })
+    expect(tabBar!.props).toEqual({
+      tenantSlug: 'viadal',
+      showAccount: true,
+      defaultEventId: 'event-1',
+    })
 
     const flat = JSON.stringify(result)
     expect(flat).toContain('CHILD_CONTENT')
@@ -166,6 +174,7 @@ describe('OfficialLayout', () => {
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
     expect(findByType(result, BottomTabBar)!.props.showAccount).toBe(false)
+    expect(findByType(result, BottomTabBar)!.props.defaultEventId).toBe('event-1')
   })
   // The cross-surface link (both directions) exists because an admin who is
   // also on the roster has two surfaces for the same tenant and otherwise no

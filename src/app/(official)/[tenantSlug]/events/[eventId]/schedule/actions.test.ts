@@ -235,6 +235,6 @@ describe('toggleChecklistItem revalidation', () => {
 
     await toggleChecklistItem(BASE_INPUT)
 
-    expect(revalidatePath).toHaveBeenCalledWith('/viadal/schedule')
+    expect(revalidatePath).toHaveBeenCalledWith('/[tenantSlug]/events/[eventId]/schedule', 'page')
   })
 })

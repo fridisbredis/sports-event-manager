@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { translateActionError as tError } from '@/lib/actions/action-error'
+import { officialEventRoutePattern } from '@/lib/events/paths'
 
 // The shift a check belongs to. Not an assignment id: a check is shared by
 // every official on the shift, so there is no single assignment row that owns
@@ -160,7 +161,7 @@ export async function toggleChecklistItem(
   // MYSCH-01 is ADR-0003 Group 2 (uncached) — revalidatePath is what pushes
   // a colleague's tick to the other officials on the shift on their next
   // navigation, since there is no cache tag to update here.
-  revalidatePath(`/${tenantSlug}/schedule`)
+  revalidatePath(officialEventRoutePattern('schedule'), 'page')
 
   return {}
 }

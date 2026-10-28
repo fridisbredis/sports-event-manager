@@ -30,6 +30,7 @@ import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './
 import { AvailabilityManager } from '../../availability/_components/availability-manager'
 import { dateLocaleFor } from '@/lib/i18n/date-locale'
 import { useLanguage } from '@/components/i18n-provider'
+import { useOfficialEventPath } from '@/lib/hooks/use-official-event-path'
 
 type Todo = { id: string; instruction_text: string; position: number; item_type: string }
 
@@ -163,7 +164,6 @@ function DaySelector({
   days,
   selectedDay,
   shownDay,
-  tenantSlug,
   label,
   onSelect,
 }: {
@@ -173,12 +173,12 @@ function DaySelector({
   // a day is being fetched. Owned by ScheduleView, because the content below
   // the tabs has to agree with them about which day is on its way in.
   shownDay: string | null
-  tenantSlug: string
   label: string
   onSelect: (day: string) => void
 }) {
   // Above the early returns below — hooks cannot be called conditionally.
   const language = useLanguage()
+  const eventPath = useOfficialEventPath()
 
   // Zero days renders the empty state instead, so there is nothing to label.
   if (days.length === 0) return null
@@ -204,7 +204,7 @@ function DaySelector({
           return (
             <Link
               key={day}
-              href={`/${tenantSlug}/schedule?day=${day}`}
+              href={eventPath(`schedule?day=${day}`)}
               // aria-current follows the day actually rendered, not the
               // optimistic one: a screen reader announcing the new day while
               // the old one is still below it would be a lie. The visual
@@ -868,6 +868,7 @@ export function ScheduleView({
   const [timeOffOpen, setTimeOffOpen] = useState(false)
   const timeOffPanelRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const eventPath = useOfficialEventPath()
   const [, startTransition] = useTransition()
 
   // Fetching a day is a server round trip on a phone on event day, and a plain
@@ -887,7 +888,7 @@ export function ScheduleView({
       // Inside the transition, not before it: an optimistic update outside one
       // throws, and this is what scopes the revert to the navigation below.
       setShownDay(day)
-      router.push(`/${tenantSlug}/schedule?day=${day}`, { scroll: false })
+      router.push(eventPath(`schedule?day=${day}`), { scroll: false })
     })
   }
 
@@ -1019,7 +1020,6 @@ export function ScheduleView({
         days={days}
         selectedDay={selectedDay}
         shownDay={shownDay}
-        tenantSlug={tenantSlug}
         label={strings.dayTabsLabel}
         onSelect={handleDaySelect}
       />

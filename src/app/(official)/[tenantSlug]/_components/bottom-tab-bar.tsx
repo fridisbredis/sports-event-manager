@@ -1,20 +1,29 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useOptimistic, useTransition } from 'react'
 import { Bell, Calendar, House, Info, User } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
+import { officialEventPath } from '@/lib/events/paths'
 
 interface Props {
   tenantSlug: string
   // False when the caller has no `officials` row in this tenant, so ACCT-01
   // would answer notFound() — see hasAccountScreen in lib/auth/tenant.
   showAccount: boolean
+  // N23: the event the event tabs open when the URL names none (ACCT-01):
+  // the caller's only event. null when they have several or none, which
+  // sends those tabs to the event picker instead.
+  defaultEventId: string | null
 }
 
-export function BottomTabBar({ tenantSlug, showAccount }: Props) {
+export function BottomTabBar({ tenantSlug, showAccount, defaultEventId }: Props) {
   const pathname = usePathname()
+  const { eventId: urlEventId } = useParams<{ eventId?: string }>()
+  const eventId = urlEventId ?? defaultEventId
+  const eventTab = (subpath: string) =>
+    eventId ? officialEventPath(tenantSlug, eventId, subpath) : `/${tenantSlug}/events`
   const router = useRouter()
   const { t } = useTranslation('official')
   const [, startTransition] = useTransition()
@@ -33,10 +42,10 @@ export function BottomTabBar({ tenantSlug, showAccount }: Props) {
   const [shownPath, setShownPath] = useOptimistic(pathname)
 
   const tabs = [
-    { href: `/${tenantSlug}/home`, label: t('nav.home'), Icon: House },
-    { href: `/${tenantSlug}/event-info`, label: t('nav.eventInfo'), Icon: Info },
-    { href: `/${tenantSlug}/schedule`, label: t('nav.mySchedule'), Icon: Calendar },
-    { href: `/${tenantSlug}/announcements`, label: t('nav.announcements'), Icon: Bell },
+    { href: eventTab('home'), label: t('nav.home'), Icon: House },
+    { href: eventTab('event-info'), label: t('nav.eventInfo'), Icon: Info },
+    { href: eventTab('schedule'), label: t('nav.mySchedule'), Icon: Calendar },
+    { href: eventTab('announcements'), label: t('nav.announcements'), Icon: Bell },
     ...(showAccount
       ? [{ href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User }]
       : []),

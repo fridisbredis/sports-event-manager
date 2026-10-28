@@ -39,7 +39,7 @@ vi.mock('@/lib/i18n/server', () => ({
 }))
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
+const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 
 function mockUser(userId: string | null) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
@@ -85,7 +85,7 @@ describe('EventInfoPage', () => {
     expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('reads event, stages, and facilities via the cached RPC scoped by tenant_id', async () => {
+  it('reads event, stages, and facilities via the cached RPC scoped by tenant and event', async () => {
     mockResolvedTenant()
     mockUser('user-1')
     const rpc = mockEventInfoRpc({
@@ -101,6 +101,7 @@ describe('EventInfoPage', () => {
 
     expect(rpc).toHaveBeenCalledWith('get_event_info_cached', {
       p_tenant_id: TENANT_ID,
+      p_event_id: 'event-1',
     })
   })
 

@@ -134,5 +134,14 @@
     "sectionLabel": "Frånvaro",
     "setByOrganisers": "Satt av arrangörerna",
     "notOwned": "Arrangörerna satte den här – bara de kan ta bort den."
+  },
+  "events": {
+    "title": "Dina event",
+    "subtitle": "Välj vilket event du vill öppna.",
+    "new": "Nytt",
+    "emptyTitle": "Inga event än",
+    "emptyBody": "Du har inte lagts till i något event hos den här arrangören än.",
+    "changeEvent": "Byt event",
+    "changeEventSub": "Växla till ett annat av dina event"
   }
 }

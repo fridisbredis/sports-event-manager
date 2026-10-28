@@ -147,7 +147,7 @@ describe('resolvePostLoginRedirect', () => {
   it.each<[UserRoleWithTenant['role'], string]>([
     ['system_admin', '/admin'],
     ['tenant_admin', '/viadal/admin'],
-    ['official', '/viadal/home'],
+    ['official', '/viadal/events'],
     ['participant', '/viadal/participant'],
   ])('routes a single %s role to %s', (role, expected) => {
     const roles: UserRoleWithTenant[] = [{ role, tenant_id: TENANT_ID, tenantSlug: 'viadal' }]

@@ -7,15 +7,19 @@ import { BottomTabBar } from './bottom-tab-bar'
 // the one thing the bar has to get right — had no coverage. These tests render
 // it for real against a given pathname.
 
-const { mockPathname, mockPush } = vi.hoisted(() => ({
+const { mockPathname, mockPush, mockParams } = vi.hoisted(() => ({
   mockPathname: vi.fn(),
   mockPush: vi.fn(),
+  mockParams: vi.fn(
+    () => ({ tenantSlug: 'seed-klubben', eventId: 'e1' }) as Record<string, string>
+  ),
 }))
 
 // The bar navigates through the router now, so it needs one mounted — the
 // tap has to move the highlight before the pathname catches up.
 vi.mock('next/navigation', () => ({
   usePathname: mockPathname,
+  useParams: mockParams,
   useRouter: () => ({ push: mockPush, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }))
 
@@ -33,7 +37,9 @@ vi.mock('@/lib/i18n/client', () => ({
 
 function renderBar(pathname: string, showAccount = true) {
   mockPathname.mockReturnValue(pathname)
-  return render(<BottomTabBar tenantSlug="seed-klubben" showAccount={showAccount} />)
+  return render(
+    <BottomTabBar tenantSlug="seed-klubben" showAccount={showAccount} defaultEventId={null} />
+  )
 }
 
 // Selected by href like the assertions above: the labels come from i18n,
@@ -53,7 +59,7 @@ describe('BottomTabBar', () => {
   beforeEach(() => mockPush.mockClear())
 
   it('renders one link per tab', () => {
-    renderBar('/seed-klubben/home')
+    renderBar('/seed-klubben/events/e1/home')
 
     expect(screen.getAllByRole('link')).toHaveLength(5)
   })
@@ -62,7 +68,7 @@ describe('BottomTabBar', () => {
   // without one — so for a role-only admin (a global system_admin holds no
   // roster row in any tenant) the tab is omitted rather than leading to a 404.
   it('omits the account tab when the caller has no officials row', () => {
-    renderBar('/seed-klubben/home', false)
+    renderBar('/seed-klubben/events/e1/home', false)
 
     const hrefs = screen.getAllByRole('link').map((el) => el.getAttribute('href'))
     expect(hrefs).toHaveLength(4)
@@ -70,19 +76,19 @@ describe('BottomTabBar', () => {
   })
 
   it('marks exactly the tab matching the current path', () => {
-    renderBar('/seed-klubben/schedule')
+    renderBar('/seed-klubben/events/e1/schedule')
 
-    expect(activeHrefs()).toEqual(['/seed-klubben/schedule'])
+    expect(activeHrefs()).toEqual(['/seed-klubben/events/e1/schedule'])
   })
 
   it('marks the parent tab on a nested route', () => {
-    renderBar('/seed-klubben/event-info/stage-2')
+    renderBar('/seed-klubben/events/e1/event-info/stage-2')
 
-    expect(activeHrefs()).toEqual(['/seed-klubben/event-info'])
+    expect(activeHrefs()).toEqual(['/seed-klubben/events/e1/event-info'])
   })
 
   it('marks no tab on a path outside the bar', () => {
-    renderBar('/seed-klubben/something-else')
+    renderBar('/seed-klubben/events/e1/something-else')
 
     expect(activeHrefs()).toEqual([])
   })
@@ -90,7 +96,7 @@ describe('BottomTabBar', () => {
   it('does not treat a sibling with a shared prefix as active', () => {
     // '/schedule-archive' starts with '/schedule' as a string but is a
     // different route, so only a '/' boundary may count as nesting.
-    renderBar('/seed-klubben/schedule-archive')
+    renderBar('/seed-klubben/events/e1/schedule-archive')
 
     expect(activeHrefs()).toEqual([])
   })
@@ -98,17 +104,17 @@ describe('BottomTabBar', () => {
   // Tapping a tab starts a navigation that the pathname only reflects once it
   // commits. These cover the gap in between.
   it('navigates through the router rather than a full page load', () => {
-    renderBar('/seed-klubben/home')
+    renderBar('/seed-klubben/events/e1/home')
 
-    fireEvent.click(tabLink('/seed-klubben/schedule'))
+    fireEvent.click(tabLink('/seed-klubben/events/e1/schedule'))
 
-    expect(mockPush).toHaveBeenCalledWith('/seed-klubben/schedule')
+    expect(mockPush).toHaveBeenCalledWith('/seed-klubben/events/e1/schedule')
   })
 
   it('leaves modified clicks to the browser so a tab can be opened', () => {
-    renderBar('/seed-klubben/home')
+    renderBar('/seed-klubben/events/e1/home')
 
-    fireEvent.click(tabLink('/seed-klubben/schedule'), { metaKey: true })
+    fireEvent.click(tabLink('/seed-klubben/events/e1/schedule'), { metaKey: true })
 
     expect(mockPush).not.toHaveBeenCalled()
   })
@@ -117,21 +123,43 @@ describe('BottomTabBar', () => {
   // tab while the previous page is still mounted would misreport where the
   // user is.
   it('keeps aria-current on the tab actually rendered', () => {
-    renderBar('/seed-klubben/home')
+    renderBar('/seed-klubben/events/e1/home')
 
-    fireEvent.click(tabLink('/seed-klubben/schedule'))
+    fireEvent.click(tabLink('/seed-klubben/events/e1/schedule'))
 
-    expect(activeHrefs()).toEqual(['/seed-klubben/home'])
+    expect(activeHrefs()).toEqual(['/seed-klubben/events/e1/home'])
   })
 
   it('distinguishes the active tab by more than colour alone', () => {
     // Colour is the primary marker, but it must not be the only one — so the
     // active tab's icon also carries a heavier stroke.
-    const { container } = renderBar('/seed-klubben/home')
+    const { container } = renderBar('/seed-klubben/events/e1/home')
 
     const strokeWidth = (href: string) =>
       Number(container.querySelector(`a[href="${href}"] svg`)?.getAttribute('stroke-width'))
 
-    expect(strokeWidth('/seed-klubben/home')).toBeGreaterThan(strokeWidth('/seed-klubben/account'))
+    expect(strokeWidth('/seed-klubben/events/e1/home')).toBeGreaterThan(
+      strokeWidth('/seed-klubben/account')
+    )
+  })
+
+  // N23: ACCT-01 has no event in its URL, so the event tabs fall back to the
+  // caller's only event, or to the picker when there is no single one.
+  describe('without an event in the URL', () => {
+    beforeEach(() => mockParams.mockReturnValue({ tenantSlug: 'seed-klubben' }))
+
+    it("opens the caller's only event", () => {
+      mockPathname.mockReturnValue('/seed-klubben/account')
+      render(<BottomTabBar tenantSlug="seed-klubben" showAccount defaultEventId="e9" />)
+      expect(tabLink('/seed-klubben/events/e9/schedule')).toBeDefined()
+    })
+
+    it('sends the event tabs to the picker when there is no single event', () => {
+      mockPathname.mockReturnValue('/seed-klubben/account')
+      render(<BottomTabBar tenantSlug="seed-klubben" showAccount defaultEventId={null} />)
+      const hrefs = screen.getAllByRole('link').map((el) => el.getAttribute('href'))
+      expect(hrefs.filter((h) => h === '/seed-klubben/events')).toHaveLength(4)
+      expect(hrefs).toContain('/seed-klubben/account')
+    })
   })
 })

@@ -86,7 +86,7 @@ describe('confirmInviteByPhone', () => {
     await expect(confirmInviteByPhone(TENANT_ID, true)).rejects.toThrow('NEXT_REDIRECT')
 
     expect(confirmOfficialInvite).toHaveBeenCalledWith('user-1', TENANT_ID, '+46701234567', true)
-    expect(redirect).toHaveBeenCalledWith('/viadal/home')
+    expect(redirect).toHaveBeenCalledWith('/viadal/events')
   })
 
   // Adversarial: this action is a POST endpoint under the hood (Next.js

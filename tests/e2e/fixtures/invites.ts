@@ -52,6 +52,50 @@ export async function tenantIdBySlug(admin: SupabaseClient<Database>, slug: stri
 export const SECOND_TENANT_SLUG = 'e2e-invite-klubben'
 
 export async function ensureSecondTenant(admin: SupabaseClient<Database>) {
+  const tenantId = await ensureSecondTenantRow(admin)
+  await ensureSecondTenantEvent(admin, tenantId)
+  return tenantId
+}
+
+// N23: an official sees only the events they are a member of, so a tenant
+// with no event leaves its officials on an empty event picker. Real tenants
+// always have one (create_tenant_with_defaults); this gives the fixture one
+// too, and puts its officials in it — including any created by an earlier
+// run against a local stack that predates this, before the event existed.
+async function ensureSecondTenantEvent(admin: SupabaseClient<Database>, tenantId: string) {
+  const { data: events, error: readError } = await admin
+    .from('events')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .limit(1)
+  if (readError) throw readError
+
+  let eventId = events?.[0]?.id
+  if (!eventId) {
+    const { data, error } = await admin
+      .from('events')
+      .insert({ tenant_id: tenantId, name: 'E2E Invite Event', event_type: 'race' })
+      .select('id')
+      .single()
+    if (error) throw error
+    eventId = data.id
+  }
+
+  const { data: officials, error: officialsError } = await admin
+    .from('officials')
+    .select('id')
+    .eq('tenant_id', tenantId)
+  if (officialsError) throw officialsError
+  if (officials && officials.length > 0) {
+    const { error } = await admin.from('official_events').upsert(
+      officials.map((o) => ({ official_id: o.id, event_id: eventId, tenant_id: tenantId })),
+      { onConflict: 'official_id,event_id', ignoreDuplicates: true }
+    )
+    if (error) throw error
+  }
+}
+
+async function ensureSecondTenantRow(admin: SupabaseClient<Database>) {
   const { data: existing, error: readError } = await admin
     .from('tenants')
     .select('id')

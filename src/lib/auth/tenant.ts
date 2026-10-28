@@ -60,7 +60,7 @@ export function resolvePostLoginRedirect(roles: UserRoleWithTenant[]): string | 
     case 'tenant_admin':
       return `/${primary.tenantSlug}/admin`
     case 'official':
-      return `/${primary.tenantSlug}/home`
+      return `/${primary.tenantSlug}/events`
     case 'participant':
       return `/${primary.tenantSlug}/participant`
   }
@@ -188,7 +188,7 @@ export async function confirmOfficialInvite(
   // cached read (migration 0050) must not keep serving the stale pre-confirm
   // shape. { expire: 0 }, not profile="max", because the official who just
   // confirmed is the same user who reads this tag — it is registered on
-  // (official)/[tenantSlug]/home/page.tsx keyed on their own user_id — so a
+  // (official)/[tenantSlug]/events/[eventId]/home/page.tsx keyed on their own user_id — so a
   // stale window would serve that user the pre-confirm shape of their own
   // write.
   // The only caller (actions/confirm-invite-by-phone.ts) redirects to
