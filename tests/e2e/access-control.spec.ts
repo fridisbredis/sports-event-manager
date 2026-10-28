@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/auth'
-import { SEED_TENANT_SLUG } from './fixtures/users'
+import { SEED_TENANT_SLUG, EVENT_SEGMENT } from './fixtures/users'
 
 // The permission matrix, asserted through the UI.
 //
@@ -37,10 +37,21 @@ async function expectNotFound(page: import('@playwright/test').Page, path: strin
   expect(response?.status(), `${path} should not be reachable`).toBe(404)
 }
 
+// N23: the event-scoped admin screens moved under /admin/events/[eventId]/.
+// ADMIN_PATHS keep the pre-N23 addresses on purpose — they must still work,
+// by redirecting to the same screen of the tenant's event — so the landing
+// URL is matched as that pattern. Account is tenant-level and did not move.
+function landingPattern(path: string): string {
+  const tenantAdmin = `/${SEED_TENANT_SLUG}/admin/`
+  return path.startsWith(tenantAdmin) && !path.endsWith('/admin/account')
+    ? path.replace(tenantAdmin, `${tenantAdmin}${EVENT_SEGMENT}/`)
+    : path
+}
+
 async function expectReachable(page: import('@playwright/test').Page, path: string) {
   const response = await page.goto(path)
   expect(response?.status(), `${path} should be reachable`).toBe(200)
-  await expect(page).toHaveURL(new RegExp(`${path}$`))
+  await expect(page).toHaveURL(new RegExp(`${landingPattern(path)}$`))
 }
 
 test.describe('signed out', () => {
@@ -113,6 +124,17 @@ test.describe('tenant admin', () => {
     // getAdminTenant() resolves the slug against this user's roles, so an
     // unknown tenant is indistinguishable from one they lack access to.
     await expectNotFound(tenantAdminPage, '/some-other-club/admin/dashboard')
+  })
+
+  // N23: the event in the URL is checked against the tenant, so an id that
+  // is not one of this tenant's events — or not an id at all — is a 404
+  // rather than a screen rendered for some other event.
+  test("cannot reach an event that is not this tenant's", async ({ tenantAdminPage }) => {
+    await expectNotFound(
+      tenantAdminPage,
+      `/${SEED_TENANT_SLUG}/admin/events/00000000-0000-4000-8000-000000000000/dashboard`
+    )
+    await expectNotFound(tenantAdminPage, `/${SEED_TENANT_SLUG}/admin/events/not-a-uuid/dashboard`)
   })
 })
 

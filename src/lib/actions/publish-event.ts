@@ -10,6 +10,7 @@ import { translateDbError } from '@/lib/actions/db-error-message'
 import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { logQueryError } from '@/lib/db/query-error'
 import { translateActionError as tError } from '@/lib/actions/action-error'
+import { adminEventRoutePattern } from '@/lib/events/paths'
 
 const tenantIdSchema = z.string().uuid()
 
@@ -105,8 +106,8 @@ export async function publishEvent(input: PublishEventInput): Promise<PublishEve
   // nothing to invalidate (matches pre-EVT-02 behavior).
   if (!didPublish) return {}
 
-  revalidatePath(`/${input.tenantSlug}/admin/event`)
-  revalidatePath(`/${input.tenantSlug}/admin/dashboard`)
+  revalidatePath(adminEventRoutePattern('event'), 'page')
+  revalidatePath(adminEventRoutePattern('dashboard'), 'page')
 
   // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): publishing only changes
   // events.status, which event-info and admin/event both read (workstations

@@ -1,5 +1,5 @@
 import { test, expect, clickWhenInteractive } from './fixtures/auth'
-import { SEED_TENANT_SLUG } from './fixtures/users'
+import { SEED_TENANT_SLUG, EVENT_SEGMENT } from './fixtures/users'
 
 // EVT-01 Event dashboard and EVT-02 Event configuration.
 // Role: tenant admin (a system admin reaches these too — access-control.spec.ts
@@ -46,11 +46,11 @@ test.describe('EVT-01 dashboard', () => {
   // The six nav tiles are the dashboard's job as a hub: every admin screen has
   // to be reachable from here without typing a URL.
   const TILES: [string, string][] = [
-    ['Event configuration', '/admin/event'],
-    ['Work areas', '/admin/workstations'],
-    ['Officials', '/admin/officials'],
-    ['Scheduling', '/admin/scheduling'],
-    ['Communication', '/admin/communication'],
+    ['Event configuration', `/admin/${EVENT_SEGMENT}/event`],
+    ['Work areas', `/admin/${EVENT_SEGMENT}/workstations`],
+    ['Officials', `/admin/${EVENT_SEGMENT}/officials`],
+    ['Scheduling', `/admin/${EVENT_SEGMENT}/scheduling`],
+    ['Communication', `/admin/${EVENT_SEGMENT}/communication`],
     ['Account', '/admin/account'],
   ]
 
@@ -183,13 +183,13 @@ test.describe('EVT-02 event configuration', () => {
 
     // Staying keeps both the page and the edit.
     await dialog.getByRole('button', { name: 'Stay' }).click()
-    await expect(page).toHaveURL(new RegExp(`${EVENT_CONFIG}$`))
+    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/admin/${EVENT_SEGMENT}/event$`))
     await expect(name).toHaveValue(`${original} unsaved`)
 
     // Leaving discards it — and the value is untouched on the server, so no
     // cleanup is needed here.
     await page.getByRole('link', { name: 'Dashboard' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Leave anyway' }).click()
-    await expect(page).toHaveURL(new RegExp('/admin/dashboard$'))
+    await expect(page).toHaveURL(new RegExp(`/admin/${EVENT_SEGMENT}/dashboard$`))
   })
 })

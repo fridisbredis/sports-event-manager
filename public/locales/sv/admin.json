@@ -652,5 +652,9 @@
         "running": "pågår"
       }
     }
+  },
+  "events": {
+    "noEventsTitle": "Inga event än",
+    "noEventsBody": "Den här organisatören har inga event. En systemadministratör kan skapa ett."
   }
 }

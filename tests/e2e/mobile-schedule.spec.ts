@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/auth'
-import { SEED_TENANT_SLUG } from './fixtures/users'
+import { SEED_TENANT_SLUG, EVENT_SEGMENT } from './fixtures/users'
 import { serviceClient, tenantIdBySlug } from './fixtures/invites'
 
 // N18: the read-only coverage view an admin opens on a phone while standing at
@@ -173,7 +173,9 @@ test.describe('admin navigation on a phone', () => {
     const drawer = page.getByRole('dialog')
     await drawer.getByRole('link', { name: 'Officials' }).click()
 
-    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/admin/officials`))
+    await expect(page).toHaveURL(
+      new RegExp(`/${SEED_TENANT_SLUG}/admin/${EVENT_SEGMENT}/officials`)
+    )
     // Closed explicitly on tap rather than by a route-change effect, so that
     // tapping the current page's own link cannot leave it open over nothing.
     await expect(drawer).toBeHidden()

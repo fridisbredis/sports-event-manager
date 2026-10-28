@@ -13,6 +13,11 @@
 
 export const SEED_TENANT_SLUG = 'seed-klubben'
 
+// N23: event-scoped admin screens live at /[tenantSlug]/admin/events/[eventId]/…
+// The seed's event id is generated, so URL assertions match it as a pattern;
+// page.goto can keep using the pre-N23 paths, which redirect to the event.
+export const EVENT_SEGMENT = 'events/[0-9a-f-]+'
+
 // A tenant that exists only to be switched off. SYS-02's deactivation test
 // needs a tenant it can toggle, and doing that to the seed tenant locks out
 // every admin in the suite for as long as it is off — requireTenantAdmin
@@ -52,7 +57,7 @@ export const USERS: Record<RoleKey, TestUser> = {
   // implicitly a confirmed, schedulable official on the roster.
   tenantAdmin: {
     phone: '+46709900001',
-    landingPath: `/${SEED_TENANT_SLUG}/admin/dashboard`,
+    landingPath: `/${SEED_TENANT_SLUG}/admin/${EVENT_SEGMENT}/dashboard`,
     covers: 'EVT-01, EVT-02, WS-01, WS-02, OFF-01, SCHED-01, COMM-01, ACCT-01 (admin)',
   },
 

@@ -21,7 +21,7 @@ export function AdminViewLink({ tenantSlug }: Props) {
   return (
     <div className="border-b border-edge bg-gray-50">
       <Link
-        href={`/${tenantSlug}/admin/dashboard`}
+        href={`/${tenantSlug}/admin`}
         className="flex items-center justify-center gap-1.5 px-4 py-2 text-[13px] font-medium text-ink-soft transition-colors hover:text-ink"
       >
         <LayoutDashboard className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />

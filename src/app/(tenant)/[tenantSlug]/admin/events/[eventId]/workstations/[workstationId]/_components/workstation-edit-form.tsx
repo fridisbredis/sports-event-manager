@@ -1,0 +1,412 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import { Button } from '@/components/ui/button'
+import { LinkButton } from '@/components/ui/link-button'
+import { Input, Textarea } from '@/components/ui/form-fields'
+import { useTranslation } from '@/lib/i18n/client'
+import { toastError } from '@/lib/toast'
+import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
+import ConfirmDialog from '@/components/confirm-dialog'
+import { updateWorkstation, deleteWorkstation } from '../../actions'
+import {
+  type Stage,
+  type TimeWindow,
+  getStageDays,
+  expandWindows,
+  windowDurationMin,
+  initWindowsFromStored,
+  matchStageHoursWindows,
+} from '../../_utils'
+import { getAllocableRange } from '@/lib/scheduling/allocable-range'
+import { OperatingWindowsEditor } from '../../_components/operating-windows-editor'
+import { TodosEditor, type TodoDraft } from '../../_components/todos-editor'
+import { ColorPicker, type ColorTakenBy } from '../../_components/color-picker'
+import { AppCard } from '@/components/ui/app-card'
+import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
+
+interface Props {
+  tenantSlug: string
+  tenantId: string
+  workstationId: string
+  stages: Stage[]
+  initialStageId: string | null
+  initialName: string
+  initialDescription: string
+  initialCapacity: number
+  initialColor: string | null
+  takenBy: ColorTakenBy[]
+  initialWindows: { window_start: string; window_end: string }[]
+  initialTodos: TodoDraft[]
+  schedulingGranularityMin: number
+}
+
+interface FormErrors {
+  name?: string
+  windows?: Record<number, string>
+}
+
+export default function WorkstationEditForm({
+  tenantSlug,
+  tenantId,
+  workstationId,
+  stages,
+  initialStageId,
+  initialName,
+  initialDescription,
+  initialCapacity,
+  initialColor,
+  takenBy,
+  initialWindows,
+  initialTodos,
+  schedulingGranularityMin,
+}: Props) {
+  const { t } = useTranslation('admin')
+  const eventPath = useAdminEventPath()
+  const {
+    markDirty: markUnsavedChanges,
+    markClean,
+    guardedNavigate,
+    dialogProps,
+  } = useUnsavedChanges()
+
+  const stageId = initialStageId ?? '__all__'
+  const selectedStage = stages.find((s) => s.id === stageId) ?? null
+  const stageDays = getStageDays(selectedStage)
+  const isMultiDay = stageDays.length > 1
+  // Use the buffered allocable range (±1h around a race), not the stage's raw
+  // start/end — otherwise a window couldn't be set to match what the
+  // scheduling grid actually shows around a race.
+  const allocableRange = selectedStage ? getAllocableRange(selectedStage) : null
+  const stageStartHHMM = allocableRange?.start.slice(11, 16) ?? null
+  const stageEndHHMM = allocableRange?.end.slice(11, 16) ?? null
+  const lastDay = stageDays[stageDays.length - 1] ?? null
+
+  // On a multi-day stage, a window limited to the first day is allowed to
+  // start before the stage's own start time (e.g. staffing arrives ahead of
+  // the stage officially beginning) — there's no earlier day to put that
+  // time on instead. A single-day stage has no such earlier day either, so
+  // the floor still applies there.
+  const minStartFor = stageDays.length === 1 ? (stageStartHHMM ?? undefined) : undefined
+  function maxEndFor(limitToDay: string | null) {
+    if (stageDays.length === 1 || limitToDay === lastDay) return stageEndHHMM ?? undefined
+    return undefined
+  }
+  // Only called for multi-day windows (see call sites below), so there is no
+  // first-day-of-a-single-day-stage case to clamp against here.
+  function clampToDay(win: TimeWindow, newDay: string): TimeWindow {
+    const { start } = win
+    let { end } = win
+    if (newDay === lastDay && stageEndHHMM && end && end > stageEndHHMM) end = ''
+    return { ...win, start, end, limitToDay: newDay }
+  }
+
+  const [name, setName] = useState(initialName)
+  const [description, setDescription] = useState(initialDescription)
+  const [capacity, setCapacity] = useState(initialCapacity)
+  const [color, setColor] = useState<string | null>(initialColor)
+  const [windows, setWindows] = useState<TimeWindow[]>(() =>
+    initWindowsFromStored(initialWindows, stageDays)
+  )
+  const [todos, setTodos] = useState<TodoDraft[]>(initialTodos)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isSaving, startSave] = useTransition()
+  const [isDeleting, startDelete] = useTransition()
+
+  // Every edit marks dirty through here rather than calling the hook directly:
+  // a change made after a save also has to drop the button out of its "Saved"
+  // state, and pairing those two by hand at each call site is what was missed.
+  function markDirty() {
+    markUnsavedChanges()
+    setSaveSuccess(false)
+  }
+
+  function addWindow() {
+    setWindows((prev) => [...prev, { start: '', end: '', limitToDay: null }])
+    markDirty()
+  }
+
+  function matchStageHours() {
+    const generated = matchStageHoursWindows(stageDays, stageStartHHMM, stageEndHHMM)
+    if (generated.length === 0) return
+    setWindows(generated)
+    setErrors((prev) => ({ ...prev, windows: undefined }))
+    markDirty()
+  }
+
+  function removeWindow(index: number) {
+    setWindows((prev) => prev.filter((_, i) => i !== index))
+    markDirty()
+  }
+
+  function clearWindowError(index: number) {
+    if (errors.windows?.[index]) {
+      setErrors((prev) => ({
+        ...prev,
+        windows: { ...prev.windows, [index]: undefined as unknown as string },
+      }))
+    }
+  }
+
+  function updateWindow(index: number, field: 'start' | 'end', value: string) {
+    setWindows((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)))
+    clearWindowError(index)
+    markDirty()
+  }
+
+  function toggleLimitToDay(index: number) {
+    setWindows((prev) =>
+      prev.map((win, j) =>
+        j === index
+          ? win.limitToDay !== null
+            ? { ...win, limitToDay: null }
+            : clampToDay(win, stageDays[0])
+          : win
+      )
+    )
+    markDirty()
+  }
+
+  function setLimitDay(index: number, day: string) {
+    setWindows((prev) => prev.map((win, j) => (j === index ? clampToDay(win, day) : win)))
+    clearWindowError(index)
+    markDirty()
+  }
+
+  // Wraps setTodos so any edit in either list marks the form dirty — the
+  // unsaved-changes guard has to fire for a checklist change too.
+  function handleTodosChange(next: TodoDraft[]) {
+    setTodos(next)
+    markDirty()
+  }
+
+  function validate(): boolean {
+    const newErrors: FormErrors = {}
+    if (!name.trim()) newErrors.name = t('workstations.nameRequired')
+    const windowErrors: Record<number, string> = {}
+    windows.forEach((w, i) => {
+      if (!w.start && !w.end) return
+      if (!w.start) {
+        windowErrors[i] = t('workstations.windowStartRequired')
+        return
+      }
+      if (!w.end) {
+        windowErrors[i] = t('workstations.windowEndRequired')
+        return
+      }
+      // A window limited to the stage's first day is allowed to start before
+      // the stage's own start time on a multi-day stage (see minStartFor) —
+      // the floor only applies on a single-day stage.
+      const onFirstDay = stageDays.length === 1
+      const onLastDay = stageDays.length === 1 || w.limitToDay === lastDay
+      if (onFirstDay && stageStartHHMM && w.start < stageStartHHMM) {
+        windowErrors[i] = t('workstations.windowBeforeStageStart', { time: stageStartHHMM })
+      } else if (onLastDay && stageEndHHMM && w.end > stageEndHHMM) {
+        windowErrors[i] = t('workstations.windowAfterStageEnd', { time: stageEndHHMM })
+      } else if (windowDurationMin(w.start, w.end) < schedulingGranularityMin) {
+        windowErrors[i] = t('workstations.windowTooShort', { minutes: schedulingGranularityMin })
+      }
+    })
+    if (Object.keys(windowErrors).length > 0) newErrors.windows = windowErrors
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  function handleSave() {
+    if (!validate()) return
+    setSaveSuccess(false)
+
+    startSave(async () => {
+      const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
+
+      const result = await updateWorkstation({
+        tenantSlug,
+        tenantId,
+        workstationId,
+        stageId: stageId === '__all__' ? null : stageId,
+        name,
+        description,
+        capacity,
+        color,
+        recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
+        windows: finalWindows,
+        todos: todos
+          .map((item) => ({ ...item, text: item.text.trim() }))
+          .filter((item) => item.text)
+          .map((item) => ({ instruction_text: item.text, item_type: item.itemType })),
+        schedulingGranularityMin,
+      })
+
+      if (result.error) {
+        toastError(result.error)
+      } else {
+        setSaveSuccess(true)
+        markClean()
+      }
+    })
+  }
+
+  function handleDelete() {
+    setDeleteDialogOpen(true)
+  }
+
+  function confirmDelete() {
+    setDeleteDialogOpen(false)
+    startDelete(async () => {
+      const result = await deleteWorkstation({ tenantSlug, tenantId, workstationId })
+      if (result.error) {
+        toastError(result.error)
+      } else {
+        markClean()
+        guardedNavigate(eventPath('workstations'))
+      }
+    })
+  }
+
+  const isBusy = isSaving || isDeleting
+
+  return (
+    <div>
+      <UnsavedChangesDialog {...dialogProps} />
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('workstations.delete')}
+        body={t('workstations.deleteConfirm')}
+        cancelLabel={t('actions.cancel', { ns: 'common' })}
+        confirmLabel={t('actions.delete', { ns: 'common' })}
+        onCancel={() => setDeleteDialogOpen(false)}
+        onConfirm={confirmDelete}
+        destructive
+      />
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <LinkButton
+            size="sm"
+            onPress={() => guardedNavigate(eventPath('workstations'))}
+            className="mb-1 no-underline hover:no-underline"
+            startContent={<span aria-hidden="true">←</span>}
+          >
+            {t('workstations.backToList')}
+          </LinkButton>
+          <h1 className="page-title">{name || t('workstations.namePlaceholder')}</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <LinkButton tone="danger" onPress={handleDelete} isDisabled={isBusy}>
+            {t('workstations.delete')}
+          </LinkButton>
+          <Button
+            color={saveSuccess ? 'success' : 'primary'}
+            variant={saveSuccess ? 'flat' : 'solid'}
+            onPress={handleSave}
+            isDisabled={isBusy}
+            isLoading={isSaving}
+          >
+            {isSaving
+              ? t('workstations.saving')
+              : saveSuccess
+                ? t('workstations.saved')
+                : t('workstations.save')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[3fr_2fr]">
+        {/* Left column */}
+        <AppCard bodyClassName="divide-y divide-edge p-0 [&>*]:px-6 [&>*]:py-5">
+          {/* Stage */}
+          <section>
+            <h2 className="section-label mb-4">{t('workstations.stageLabel')}</h2>
+            <div className="rounded-lg bg-status-neutral-bg px-4 py-3 text-[15px] text-ink-soft">
+              {selectedStage
+                ? `${selectedStage.name} — ${selectedStage.stage_type === 'race' ? t('eventConfig.stageTypeRace') : t('eventConfig.stageTypeNonRace')}`
+                : t('workstations.allStages')}
+            </div>
+          </section>
+
+          {/* Identity */}
+          <section>
+            <h2 className="section-label mb-4">{t('workstations.identity')}</h2>
+            <div className="space-y-4">
+              <Input
+                label={t('workstations.nameLabel')}
+                value={name}
+                onValueChange={(val) => {
+                  setName(val)
+                  markDirty()
+                  if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
+                }}
+                placeholder={t('workstations.namePlaceholder')}
+                isInvalid={!!errors.name}
+                errorMessage={errors.name}
+              />
+              <Textarea
+                label={t('workstations.descriptionLabel')}
+                value={description}
+                onValueChange={(val) => {
+                  setDescription(val)
+                  markDirty()
+                }}
+                minRows={3}
+              />
+            </div>
+          </section>
+
+          <ColorPicker
+            value={color}
+            takenBy={takenBy}
+            onChange={(next) => {
+              setColor(next)
+              markDirty()
+            }}
+          />
+
+          <OperatingWindowsEditor
+            windows={windows}
+            errors={errors.windows}
+            isMultiDay={isMultiDay}
+            stageDays={stageDays}
+            canMatchStageHours={
+              !!selectedStage &&
+              !!stageStartHHMM &&
+              !!stageEndHHMM &&
+              windows.every((w) => !w.start && !w.end)
+            }
+            onUpdateWindow={updateWindow}
+            onRemoveWindow={removeWindow}
+            onAddWindow={addWindow}
+            onToggleLimitToDay={toggleLimitToDay}
+            onSetLimitDay={setLimitDay}
+            onMatchStageHours={matchStageHours}
+            minStartFor={minStartFor}
+            maxEndFor={maxEndFor}
+          />
+        </AppCard>
+
+        {/* Right column */}
+        <div className="space-y-4">
+          {/* Capacity */}
+          <AppCard as="section">
+            <h2 className="section-label mb-4">{t('workstations.colCapacity')}</h2>
+            <Input
+              type="number"
+              label={t('workstations.capacityLabel')}
+              value={String(capacity)}
+              onValueChange={(val) => {
+                setCapacity(Math.max(1, parseInt(val) || 1))
+                markDirty()
+              }}
+              min={1}
+            />
+          </AppCard>
+
+          <TodosEditor todos={todos} onChange={handleTodosChange} />
+        </div>
+      </div>
+    </div>
+  )
+}

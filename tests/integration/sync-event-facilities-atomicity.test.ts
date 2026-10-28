@@ -7,7 +7,7 @@ import {
   serviceClient,
 } from './helpers'
 
-// REL-01: saveEvent() in src/app/(tenant)/[tenantSlug]/admin/event/actions.ts
+// REL-01: saveEvent() in src/app/(tenant)/[tenantSlug]/admin/events/[eventId]/event/actions.ts
 // replaces event_facilities via two separate operations with no surrounding
 // transaction: delete all existing facilities, then insert the new set. A
 // failure on the insert (e.g. an invalid label) leaves the delete already

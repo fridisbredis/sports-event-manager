@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useParams, usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
 import {
   LayoutDashboard,
@@ -32,12 +32,24 @@ interface Props {
   // False on Standard, where PART-01 does not exist (N21). The page and its
   // server actions enforce the same tier independently.
   showParticipants: boolean
+  // N23: the event the event-scoped links open when the URL names none (the
+  // tenant-level Account screen). null when the tenant has no events, which
+  // hides those links.
+  defaultEventId: string | null
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipants }: Props) {
+export function SidebarNav({
+  tenantSlug,
+  adminLabel,
+  showAccount,
+  showParticipants,
+  defaultEventId,
+}: Props) {
   const pathname = usePathname()
+  const { eventId: urlEventId } = useParams<{ eventId?: string }>()
+  const eventId = urlEventId ?? defaultEventId
   const { t } = useTranslation('admin')
   const [collapsed, setCollapsed] = useState(false)
   // Drawer state for the phone menu. Separate from `collapsed`, which is the
@@ -60,23 +72,38 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
     })
   }
 
-  const navItems: { segment: string; label: string; icon: LucideIcon }[] = [
-    { segment: 'admin/dashboard', label: t('navigation.dashboard'), icon: LayoutDashboard },
-    { segment: 'admin/event', label: t('navigation.eventConfig'), icon: Trophy },
-    { segment: 'admin/workstations', label: t('navigation.workstations'), icon: Flag },
-    { segment: 'admin/officials', label: t('navigation.officials'), icon: Users },
-    ...(showParticipants
-      ? [
-          {
-            segment: 'admin/participants',
-            label: t('navigation.participants'),
-            icon: ClipboardList,
-          },
-        ]
-      : []),
-    { segment: 'admin/scheduling', label: t('navigation.scheduling'), icon: CalendarClock },
-    { segment: 'admin/communication', label: t('navigation.communication'), icon: MessageSquare },
-  ]
+  const eventBase = `admin/events/${eventId}`
+  const navItems: { segment: string; label: string; icon: LucideIcon }[] = eventId
+    ? [
+        {
+          segment: `${eventBase}/dashboard`,
+          label: t('navigation.dashboard'),
+          icon: LayoutDashboard,
+        },
+        { segment: `${eventBase}/event`, label: t('navigation.eventConfig'), icon: Trophy },
+        { segment: `${eventBase}/workstations`, label: t('navigation.workstations'), icon: Flag },
+        { segment: `${eventBase}/officials`, label: t('navigation.officials'), icon: Users },
+        ...(showParticipants
+          ? [
+              {
+                segment: `${eventBase}/participants`,
+                label: t('navigation.participants'),
+                icon: ClipboardList,
+              },
+            ]
+          : []),
+        {
+          segment: `${eventBase}/scheduling`,
+          label: t('navigation.scheduling'),
+          icon: CalendarClock,
+        },
+        {
+          segment: `${eventBase}/communication`,
+          label: t('navigation.communication'),
+          icon: MessageSquare,
+        },
+      ]
+    : []
 
   // `isCollapsed` is a parameter rather than the closed-over `collapsed`: the
   // drawer always shows labels, whatever width the desktop rail is set to.
