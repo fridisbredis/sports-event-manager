@@ -208,7 +208,7 @@ export function CommunicationPanel({
         setPublishing(false)
       }
     },
-    [tenantId, t, isFirstPage]
+    [tenantId, eventId, t, isFirstPage]
   )
 
   const handlePublish = useCallback(async () => {
