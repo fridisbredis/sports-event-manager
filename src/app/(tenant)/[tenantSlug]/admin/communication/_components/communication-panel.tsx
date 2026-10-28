@@ -184,6 +184,9 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
           const newEntry: Announcement = {
             id: crypto.randomUUID(),
             tenant_id: tenantId,
+            // Filled server-side until N23's routing PR gives this panel an
+            // event; nothing here reads it.
+            event_id: null,
             channel: targetChannel,
             body,
             sms_sent: false,
