@@ -41,11 +41,18 @@
 --             If zero, re-run the constraint block from 20261026134923. If
 --             non-zero, leave the wider constraint in place rather than
 --             deleting audit rows to make a rollback possible.
---   Data:     prod snapshot PENDING — taken by hand before the push with
---             scripts/ops/snapshot-prod-db.sh 20261027143113; filename goes
---             here. No data loss expected: on apply, no existing row is
---             changed. Dropping the column on rollback loses only the sender
---             names entered since, which a system admin can re-enter.
+--   Data:     prod snapshot 20261027143113_pre-migration_2026-10-28T09-03-54Z.tar.gz
+--             (Azure Blob sportsevtmgrprodsnaps, container db-snapshots);
+--             restore with scripts/ops/restore-prod-db.sh <that filename>.
+--             Taken AFTER the migration, despite the script's
+--             "pre-migration" naming: deploy-prod.yml applied it on
+--             2026-10-28 before the snapshot was taken (its REL-04 guard
+--             only blocks `destructive`). No pre-migration data was lost by
+--             that: this migration writes no rows, so the snapshot's data
+--             equals prod's data before it — verified after apply, 3
+--             tenants, 0 with a sender, 8 audit rows. Dropping the column on
+--             rollback loses only the sender names entered since, which a
+--             system admin can re-enter.
 --   Blast:    none on apply. If the trigger condition were wrong, the worst
 --             case is a system admin unable to save a sender name (the SMS
 --             still goes out from the platform number), or a tenant admin
