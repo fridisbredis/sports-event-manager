@@ -548,6 +548,45 @@ export type Database = {
           },
         ]
       }
+      official_events: {
+        Row: {
+          created_at: string
+          event_id: string
+          official_id: string
+          seen_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          official_id: string
+          seen_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          official_id?: string
+          seen_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'official_events_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id', 'tenant_id']
+          },
+          {
+            foreignKeyName: 'official_events_official_tenant_fkey'
+            columns: ['official_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'officials'
+            referencedColumns: ['id', 'tenant_id']
+          },
+        ]
+      }
       official_unavailability: {
         Row: {
           created_at: string
@@ -1225,6 +1264,7 @@ export type Database = {
         Args: { p_rows: Json; p_stage_id: string; p_tenant_id: string }
         Returns: Json
       }
+      is_event_member: { Args: { p_event_id: string }; Returns: boolean }
       is_on_workstation_shift: {
         Args: {
           p_timeslot_end: string

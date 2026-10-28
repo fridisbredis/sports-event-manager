@@ -49,6 +49,8 @@ export type OfficialListItem = Omit<
   Official,
   'invite_token' | 'invite_token_expires_at' | 'privacy_accepted_at' | 'gdpr_warning_sent_at'
 >
+// N23: an official's membership in an event. invite_status stays on Official.
+export type OfficialEvent = DbTables['official_events']['Row']
 export type Participant = DbTables['participants']['Row']
 export type Assignment = DbTables['assignments']['Row']
 export type Announcement = DbTables['announcements']['Row']
@@ -66,6 +68,7 @@ export type WorkstationInsert = DbTables['workstations']['Insert']
 export type WorkstationOperatingWindowInsert = DbTables['workstation_operating_windows']['Insert']
 export type WorkstationTodoInsert = DbTables['workstation_todos']['Insert']
 export type OfficialInsert = DbTables['officials']['Insert']
+export type OfficialEventInsert = DbTables['official_events']['Insert']
 export type ParticipantInsert = DbTables['participants']['Insert']
 export type AssignmentInsert = DbTables['assignments']['Insert']
 export type AnnouncementInsert = DbTables['announcements']['Insert']
