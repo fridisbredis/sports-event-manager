@@ -161,5 +161,13 @@ describe('BottomTabBar', () => {
       expect(hrefs.filter((h) => h === '/seed-klubben/events')).toHaveLength(4)
       expect(hrefs).toContain('/seed-klubben/account')
     })
+
+    it('lights none of the event tabs while the picker itself is shown', () => {
+      mockPathname.mockReturnValue('/seed-klubben/events')
+      render(<BottomTabBar tenantSlug="seed-klubben" showAccount defaultEventId={null} />)
+      expect(activeHrefs()).toEqual([])
+      // One bar, five tabs — duplicate keys used to render the event tabs twice.
+      expect(screen.getAllByRole('link')).toHaveLength(5)
+    })
   })
 })

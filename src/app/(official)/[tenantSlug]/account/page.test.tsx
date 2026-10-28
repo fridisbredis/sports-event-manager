@@ -11,6 +11,12 @@ vi.mock('@/lib/supabase/server', () => ({
 // getOfficialTenant resolves the tenant only after the official-surface
 // access check passes, so a null return means either "no such tenant" or
 // "not authorized" — both are notFound() to the caller, by design.
+// N23: whether "Change event" shows is listOfficialEvents' answer, tested
+// with the picker; one event here, so the card stays hidden.
+vi.mock('@/lib/events/official-event', () => ({
+  listOfficialEvents: vi.fn(async () => [{ id: 'event-1' }]),
+}))
+
 vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getOfficialTenant: vi.fn(),

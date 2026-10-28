@@ -22,8 +22,9 @@ export function BottomTabBar({ tenantSlug, showAccount, defaultEventId }: Props)
   const pathname = usePathname()
   const { eventId: urlEventId } = useParams<{ eventId?: string }>()
   const eventId = urlEventId ?? defaultEventId
+  const picker = `/${tenantSlug}/events`
   const eventTab = (subpath: string) =>
-    eventId ? officialEventPath(tenantSlug, eventId, subpath) : `/${tenantSlug}/events`
+    eventId ? officialEventPath(tenantSlug, eventId, subpath) : picker
   const router = useRouter()
   const { t } = useTranslation('official')
   const [, startTransition] = useTransition()
@@ -42,12 +43,17 @@ export function BottomTabBar({ tenantSlug, showAccount, defaultEventId }: Props)
   const [shownPath, setShownPath] = useOptimistic(pathname)
 
   const tabs = [
-    { href: eventTab('home'), label: t('nav.home'), Icon: House },
-    { href: eventTab('event-info'), label: t('nav.eventInfo'), Icon: Info },
-    { href: eventTab('schedule'), label: t('nav.mySchedule'), Icon: Calendar },
-    { href: eventTab('announcements'), label: t('nav.announcements'), Icon: Bell },
+    { id: 'home', href: eventTab('home'), label: t('nav.home'), Icon: House },
+    { id: 'event-info', href: eventTab('event-info'), label: t('nav.eventInfo'), Icon: Info },
+    { id: 'schedule', href: eventTab('schedule'), label: t('nav.mySchedule'), Icon: Calendar },
+    {
+      id: 'announcements',
+      href: eventTab('announcements'),
+      label: t('nav.announcements'),
+      Icon: Bell,
+    },
     ...(showAccount
-      ? [{ href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User }]
+      ? [{ id: 'account', href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User }]
       : []),
   ]
 
@@ -60,15 +66,21 @@ export function BottomTabBar({ tenantSlug, showAccount, defaultEventId }: Props)
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 h-16 border-t border-edge bg-white">
       <div className="flex h-full">
-        {tabs.map(({ href, label, Icon }) => {
-          const active = shownPath === href || shownPath.startsWith(href + '/')
+        {tabs.map(({ id, href, label, Icon }) => {
+          // N23: with no single event, the event tabs all lead to the picker.
+          // None of them is the picker itself, so none is lit while it shows.
+          const leadsToPicker = href === picker
+          const active = !leadsToPicker && (shownPath === href || shownPath.startsWith(href + '/'))
           // aria-current follows the committed path, not the optimistic one:
           // announcing the new tab while the previous page is still mounted
           // would misreport where the user is.
-          const committed = pathname === href || pathname.startsWith(href + '/')
+          const committed = !leadsToPicker && (pathname === href || pathname.startsWith(href + '/'))
           return (
             <Link
-              key={href}
+              // By tab, not by href: the event tabs share one href (the
+              // picker) when there is no single event, and duplicate keys
+              // make React render the bar twice.
+              key={id}
               href={href}
               aria-current={committed ? 'page' : undefined}
               onClick={(e) => {
