@@ -9,7 +9,8 @@ interface Props {
   searchParams: Promise<{ page?: string }>
 }
 
-const ANNOUNCEMENT_FIELDS = 'id, tenant_id, channel, body, sms_sent, published_at, created_at'
+const ANNOUNCEMENT_FIELDS =
+  'id, tenant_id, event_id, channel, body, sms_sent, published_at, created_at'
 
 export default async function CommunicationPage({ params, searchParams }: Props) {
   const { tenantSlug } = await params

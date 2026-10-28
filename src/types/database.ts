@@ -13,6 +13,7 @@ export type Database = {
           body: string
           channel: string
           created_at: string
+          event_id: string | null
           id: string
           published_at: string
           sms_sent: boolean
@@ -22,6 +23,7 @@ export type Database = {
           body: string
           channel: string
           created_at?: string
+          event_id?: string | null
           id?: string
           published_at: string
           sms_sent?: boolean
@@ -31,12 +33,20 @@ export type Database = {
           body?: string
           channel?: string
           created_at?: string
+          event_id?: string | null
           id?: string
           published_at?: string
           sms_sent?: boolean
           tenant_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'announcements_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id', 'tenant_id']
+          },
           {
             foreignKeyName: 'announcements_tenant_id_fkey'
             columns: ['tenant_id']
@@ -49,6 +59,7 @@ export type Database = {
       assignments: {
         Row: {
           created_at: string
+          event_id: string | null
           id: string
           official_id: string
           slot_index: number
@@ -61,6 +72,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          event_id?: string | null
           id?: string
           official_id: string
           slot_index: number
@@ -73,6 +85,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          event_id?: string | null
           id?: string
           official_id?: string
           slot_index?: number
@@ -84,6 +97,13 @@ export type Database = {
           workstation_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'assignments_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id', 'tenant_id']
+          },
           {
             foreignKeyName: 'assignments_official_id_fkey'
             columns: ['official_id']
@@ -726,6 +746,7 @@ export type Database = {
           category: string | null
           club: string | null
           created_at: string
+          event_id: string | null
           external_id: string | null
           extra: Json
           gdpr_warning_sent_at: string | null
@@ -747,6 +768,7 @@ export type Database = {
           category?: string | null
           club?: string | null
           created_at?: string
+          event_id?: string | null
           external_id?: string | null
           extra?: Json
           gdpr_warning_sent_at?: string | null
@@ -768,6 +790,7 @@ export type Database = {
           category?: string | null
           club?: string | null
           created_at?: string
+          event_id?: string | null
           external_id?: string | null
           extra?: Json
           gdpr_warning_sent_at?: string | null
@@ -785,6 +808,13 @@ export type Database = {
           withdrawn_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'participants_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id', 'tenant_id']
+          },
           {
             foreignKeyName: 'participants_tenant_id_fkey'
             columns: ['tenant_id']
@@ -1268,6 +1298,7 @@ export type Database = {
         }
         Returns: {
           created_at: string
+          event_id: string | null
           id: string
           official_id: string
           slot_index: number

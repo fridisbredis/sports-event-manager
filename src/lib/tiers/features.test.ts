@@ -7,6 +7,7 @@ import {
   tiersWithFeature,
   featuresForTier,
   monthlySmsCap,
+  maxActiveEvents,
 } from './features'
 
 describe('hasFeature', () => {
@@ -111,5 +112,18 @@ describe('monthlySmsCap', () => {
     // silently uncap a tenant.
     expect(monthlySmsCap('enterprise')).toBe(100)
     expect(monthlySmsCap('')).toBe(100)
+  })
+})
+
+describe('maxActiveEvents', () => {
+  it('returns the cap for each tier', () => {
+    expect(maxActiveEvents('standard')).toBe(1)
+    expect(maxActiveEvents('premium')).toBe(5)
+    expect(maxActiveEvents('professional')).toBe(20)
+  })
+
+  it('gives an unrecognised tier the lowest cap, never an unlimited one', () => {
+    expect(maxActiveEvents('enterprise')).toBe(1)
+    expect(maxActiveEvents('')).toBe(1)
   })
 })
