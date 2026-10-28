@@ -134,13 +134,14 @@ describe('DashboardPage', () => {
     expect(getAdminTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('reads the dashboard summary via the cached RPC scoped by tenant_id', async () => {
+  it('reads the dashboard summary via the cached RPC scoped by tenant and event', async () => {
     const rpc = mockDashboardRpc({ data: dashboardPayload(), error: null })
 
     await DashboardPage({ params: PARAMS })
 
     expect(rpc).toHaveBeenCalledWith('get_admin_dashboard_cached', {
       p_tenant_id: TENANT_ID,
+      p_event_id: EVENT_ID,
     })
   })
 
