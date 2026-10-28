@@ -50,7 +50,7 @@ export async function setUnavailability(
     return { error: await tError(NOT_AUTHORIZED_KEY) }
   }
 
-  const { tenantSlug, tenantId, officialId, startsAt, endsAt } = parsed.data
+  const { tenantId, officialId, startsAt, endsAt } = parsed.data
 
   const supabase = await createSupabaseServerClient()
   const {
@@ -126,7 +126,7 @@ export async function clearUnavailability(
     return { error: await tError(NOT_AUTHORIZED_KEY) }
   }
 
-  const { tenantSlug, tenantId, periodId } = parsed.data
+  const { tenantId, periodId } = parsed.data
 
   const supabase = await createSupabaseServerClient()
   const {
