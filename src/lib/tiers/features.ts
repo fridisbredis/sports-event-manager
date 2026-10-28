@@ -89,6 +89,24 @@ export function monthlySmsCap(tier: string): number {
   return MONTHLY_SMS_CAP[tier]
 }
 
+// N23: how many events a tenant may have that are not archived, by tier.
+// Archiving an event frees its slot; un-archiving needs a free one. "Limits
+// may be adjusted later" (the N23 card), which is why they live here next to
+// the other per-tier limits rather than in the system-admin UI.
+//
+// Unrecognised tier gets the lowest cap, matching maxTenantAdmins.
+export const MAX_ACTIVE_EVENTS: Record<Tier, number> = {
+  standard: 1,
+  premium: 5,
+  professional: 20,
+}
+
+export function maxActiveEvents(tier: string): number {
+  if (!isTier(tier)) return MAX_ACTIVE_EVENTS[TIER_ORDER[0]]
+
+  return MAX_ACTIVE_EVENTS[tier]
+}
+
 export function isTier(value: string): value is Tier {
   return (TIER_ORDER as readonly string[]).includes(value)
 }
