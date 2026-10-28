@@ -6,7 +6,7 @@ import { workstationsCacheTag } from '@/lib/cache/tags'
 import WorkstationsList from './_components/workstations-list'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
 }
 
 interface AdminWorkstationsCached {
@@ -29,7 +29,7 @@ interface AdminWorkstationsCached {
 }
 
 export default async function WorkstationsPage({ params }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
 
   const user = await getCurrentUser()
 
@@ -50,10 +50,11 @@ export default async function WorkstationsPage({ params }: Props) {
   // cache_rpc_reader (NOBYPASSRLS), so service_role's own BYPASSRLS never
   // applies inside it.
   const getAdminWorkstationsCached = unstable_cache(
-    async (tenantId: string) => {
+    async (tenantId: string, eventId: string) => {
       const service = createSupabaseServiceClient()
       const { data, error } = await service.rpc('get_admin_workstations_cached', {
         p_tenant_id: tenantId,
+        p_event_id: eventId,
       })
       if (error) throw error
       return data as unknown as AdminWorkstationsCached
@@ -67,7 +68,7 @@ export default async function WorkstationsPage({ params }: Props) {
     }
   )
 
-  const { event, stages, workstations } = await getAdminWorkstationsCached(tenant.id)
+  const { event, stages, workstations } = await getAdminWorkstationsCached(tenant.id, eventId)
 
   if (!event) notFound()
 

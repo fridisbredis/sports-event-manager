@@ -78,10 +78,11 @@ export default async function DashboardPage({ params }: Props) {
   // only safe because the RPC is SECURITY DEFINER owned by cache_rpc_reader
   // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
   const getAdminDashboardCached = unstable_cache(
-    async (tenantId: string) => {
+    async (tenantId: string, eventId: string) => {
       const service = createSupabaseServiceClient()
       const { data, error } = await service.rpc('get_admin_dashboard_cached', {
         p_tenant_id: tenantId,
+        p_event_id: eventId,
       })
       if (error) throw error
       return data as unknown as AdminDashboardCached
@@ -105,7 +106,7 @@ export default async function DashboardPage({ params }: Props) {
     time_off_clash: timeOffClash,
     earliest_day: earliestDay,
     earliest_stage_id: earliestStageId,
-  } = await getAdminDashboardCached(tenant.id)
+  } = await getAdminDashboardCached(tenant.id, eventId)
 
   // N24: this month's SMS spend against the tenant's cap.
   //
