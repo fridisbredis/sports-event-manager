@@ -18,9 +18,10 @@ import { SMS_SENDER_ID_MAX_LENGTH, smsSenderIdSchema } from '@/lib/sms/sender'
  * change made a moment ago on the same page, which TenantDetail's local tier
  * state carries and a server-rendered section would not.
  *
- * Editable on every tier. A name entered on a lower tier is stored and simply
- * not used until the tenant is on Professional — the same gate-on-read as the
- * colour theme.
+ * Editable only on Professional. Below it the field is not shown at all: an
+ * editable box for a name that is not used read as if the name were in use.
+ * A name saved before a downgrade stays on the row (resolveSmsSender gates on
+ * read) and the section says so, since it comes back on an upgrade.
  */
 
 interface Props {
@@ -54,6 +55,20 @@ export function TenantSmsSenderSection({ tenantId, tier, smsSenderId }: Props) {
     setPending(false)
   }
 
+  if (!unlocked) {
+    return (
+      <div className="p-6">
+        <h2 className="section-label mb-4">{t('systemAdmin.smsSenderTitle')}</h2>
+        <p className="text-sm text-ink-label">{t('systemAdmin.smsSenderLockedHint')}</p>
+        {saved && (
+          <p className="mt-1 text-sm text-ink-label">
+            {t('systemAdmin.smsSenderKeptHint', { name: saved })}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="p-6">
       <h2 className="section-label mb-4">{t('systemAdmin.smsSenderTitle')}</h2>
@@ -61,7 +76,6 @@ export function TenantSmsSenderSection({ tenantId, tier, smsSenderId }: Props) {
       <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start">
         <Input
           label={t('systemAdmin.smsSenderLabel')}
-          placeholder={t('systemAdmin.smsSenderPlaceholder')}
           className="w-full sm:max-w-xs"
           value={value}
           maxLength={SMS_SENDER_ID_MAX_LENGTH}
@@ -80,14 +94,11 @@ export function TenantSmsSenderSection({ tenantId, tier, smsSenderId }: Props) {
       </div>
 
       <p className="mt-3 text-sm text-ink-label">{t('systemAdmin.smsSenderHint')}</p>
-      {/* Says what actually happens to this tenant's messages right now, so a
-          name saved on the wrong tier is not mistaken for one in use. */}
+      {/* What actually happens to this tenant's messages right now. */}
       <p className="mt-1 text-sm text-ink-label">
-        {!unlocked
-          ? t('systemAdmin.smsSenderLockedHint')
-          : saved
-            ? t('systemAdmin.smsSenderActiveHint', { name: saved })
-            : t('systemAdmin.smsSenderEmptyHint')}
+        {saved
+          ? t('systemAdmin.smsSenderActiveHint', { name: saved })
+          : t('systemAdmin.smsSenderEmptyHint')}
       </p>
     </div>
   )
