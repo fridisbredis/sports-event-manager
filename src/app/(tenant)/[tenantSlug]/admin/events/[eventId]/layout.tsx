@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getAdminEvent } from '@/lib/events/admin-event'
+import { ArchivedEventBanner } from './_components/archived-event-banner'
 
 interface Props {
   children: React.ReactNode
@@ -19,5 +20,14 @@ export default async function AdminEventLayout({ children, params }: Props) {
 
   if (!event) notFound()
 
-  return children
+  // An archived event is read-only in the database (the archive lock); the
+  // banner says so on every screen of it.
+  if (event.status !== 'archived') return children
+
+  return (
+    <>
+      <ArchivedEventBanner tenantSlug={tenantSlug} eventId={eventId} />
+      {children}
+    </>
+  )
 }

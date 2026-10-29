@@ -117,6 +117,7 @@ export default async function EventConfigPage({ params }: Props) {
           position: f.position,
         }))}
         isPublished={isPublished}
+        isArchived={event.status === 'archived'}
       />
     </div>
   )

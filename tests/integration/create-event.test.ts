@@ -60,7 +60,9 @@ describe('N23: create_event', () => {
         tenant_id: tenantId,
         name: 'Viadal 2026',
         event_type: 'Ultra',
-        status: 'archived',
+        // Archived at the end of setup: the archive lock refuses the stages
+        // and work areas below once it is.
+        status: 'draft',
         description: 'Six days on foot',
         location: 'Viadal',
         logo_url: 'https://example.test/logo.webp',
@@ -169,8 +171,19 @@ describe('N23: create_event', () => {
     memberId = members.find((m) => m.name === 'Member')!.id
     const { error: membershipError } = await admin
       .from('official_events')
-      .insert(members.map((m) => ({ official_id: m.id, event_id: sourceId, tenant_id: tenantId })))
+      // Upsert: while the source is the tenant's only active event,
+      // officials_join_sole_event has already added these memberships.
+      .upsert(
+        members.map((m) => ({ official_id: m.id, event_id: sourceId, tenant_id: tenantId })),
+        { onConflict: 'official_id,event_id', ignoreDuplicates: true }
+      )
     if (membershipError) throw membershipError
+
+    const { error: archiveError } = await admin
+      .from('events')
+      .update({ status: 'archived' })
+      .eq('id', sourceId)
+    if (archiveError) throw archiveError
 
     const created = await createUserWithRole(tenantId, 'tenant_admin')
     adminUserId = created.userId

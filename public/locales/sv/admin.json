@@ -120,7 +120,8 @@
     "cannotRemoveLastRaceStage": "Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.",
     "stageTimesInvalid": "En etapps sluttid måste vara efter dess starttid.",
     "publishPreconditionFailed": "Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.",
-    "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen."
+    "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen.",
+    "eventArchived": "Eventet är arkiverat och kan inte ändras. Återställ det först."
   },
   "workstations": {
     "title": "Arbetsområden",
@@ -717,6 +718,11 @@
       "capUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler.",
       "officialsNote": "Funktionärerna du kopierar ser det nya eventet i appen direkt, markerat som nytt – även medan det är ett utkast.",
       "nameTaken": "Det finns redan ett event med det här namnet."
+    },
+    "archivedBanner": {
+      "title": "Eventet är arkiverat",
+      "body": "Inget i det kan ändras, och funktionärerna ser det inte längre. Återställ det för att redigera igen; det kommer tillbaka som utkast.",
+      "restore": "Återställ"
     }
   },
   "settings": {
