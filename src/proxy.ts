@@ -114,6 +114,10 @@ export async function proxy(request: NextRequest) {
   return supabaseResponse
 }
 
+// manifest.webmanifest is excluded because browsers fetch it without cookies
+// (N31) — through the proxy it would be redirected to /login.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }
