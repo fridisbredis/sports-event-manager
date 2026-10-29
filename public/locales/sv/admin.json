@@ -469,6 +469,7 @@
     "shiftCount_one": "{{count}} pass",
     "shiftCount_other": "{{count}} pass",
     "viewSchedule": "Visa ditt schema",
+    "privacyHeading": "Integritet",
     "privacyPolicy": "Integritetspolicy",
     "save": "Spara",
     "saving": "Sparar…",
