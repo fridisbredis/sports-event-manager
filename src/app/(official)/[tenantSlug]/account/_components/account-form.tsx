@@ -387,11 +387,14 @@ export default function AccountForm({
             linked from sign-in and from the invite forms, but both of those
             are passed through once; this is where someone who already has an
             account can go back and read how their phone number is handled.
-            Sits with the account's own data rather than under a heading of
-            its own — it is about the same thing the fields above hold.
+            Under a heading of its own like every other card on the screen —
+            without one it read as a stray row tacked onto the section above.
 
             A plain <a> with target="_blank", matching the invite forms: the
             page is a document to read, not a step in this screen's flow. */}
+        <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+          {t('account.privacyHeading')}
+        </p>
         <a
           href="/privacy"
           target="_blank"
