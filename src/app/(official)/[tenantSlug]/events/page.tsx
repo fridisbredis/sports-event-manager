@@ -50,7 +50,7 @@ export default async function OfficialEventPickerPage({ params }: Props) {
               <li key={event.id}>
                 <Link
                   href={officialEventPath(tenantSlug, event.id, 'home')}
-                  className={`card-accent-left flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:border-tenant-primary hover:bg-tenant-primary-tint`}
+                  className={`card-accent-left flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:border-tenant-primary-edge hover:bg-tenant-primary-tint`}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 text-[17px] font-bold leading-snug text-ink">

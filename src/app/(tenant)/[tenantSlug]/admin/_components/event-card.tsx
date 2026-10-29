@@ -57,7 +57,7 @@ export async function EventCard({
     // 28% tone rather than lifting the shadow, since a hover box-shadow would
     // replace the accent's.
     <AppCard
-      className={`relative h-full transition-colors hover:border-[color-mix(in_srgb,hsl(var(--tenant-primary))_28%,white)] ${
+      className={`relative h-full transition-colors hover:border-tenant-primary-edge ${
         isArchived
           ? 'card-accent-left-themed opacity-75 [--card-accent:theme(colors.edge.DEFAULT)]'
           : 'card-accent-left'

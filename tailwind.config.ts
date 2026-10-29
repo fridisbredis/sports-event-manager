@@ -28,6 +28,9 @@ const config: Config = {
           'primary-hover': 'hsl(var(--tenant-primary-hover))',
           'primary-tint': 'hsl(var(--tenant-primary-tint))',
           'primary-tint-text': 'hsl(var(--tenant-primary-tint-text))',
+          // The card-accent-* edge tone (28% primary against white, see
+          // globals.css), for borders that should match that edge.
+          'primary-edge': 'color-mix(in srgb, hsl(var(--tenant-primary)) 28%, white)',
           secondary: 'hsl(var(--tenant-secondary))',
           'accent-tint': 'hsl(var(--tenant-accent-tint))',
           'accent-tint-text': 'hsl(var(--tenant-accent-tint-text))',
