@@ -1160,6 +1160,7 @@ export type Database = {
     }
     Functions: {
       anonymize_inactive_users: { Args: never; Returns: undefined }
+      archive_lock_event_of: { Args: { p_row: Json }; Returns: string }
       can_write_avatar_object: {
         Args: { object_name: string }
         Returns: boolean
