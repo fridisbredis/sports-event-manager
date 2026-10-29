@@ -22,7 +22,8 @@
 --                 check (status in ('draft', 'published'));
 --             If non-zero, leave the wider constraint in place rather than
 --             changing event statuses to make a rollback possible.
---   Data:     no data loss. Writes no rows.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Writes no rows.
 --   Blast:    none on apply. Widening a CHECK cannot reject an existing write.
 --   Window:   compatible. Deployed code never writes 'archived', and every
 --             reader compares status to 'published', so an archived event

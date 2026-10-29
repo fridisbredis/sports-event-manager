@@ -474,11 +474,12 @@ Att kommandot exit-ade 0 betyder ingenting.
 
 Datum, vem som körde, och vad som kom ut av del 3. Fyll på nedåt.
 
-| Datum      | Vem   | Del 1                                             | Del 2                 | Del 3: tid till fix                               | Vad som saknade dokumentation                                                                                                                                                                                                                                                       |
-| ---------- | ----- | ------------------------------------------------- | --------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-26 | Frida | **FAIL** — se fynden nedan                        | ej körd än            | ej körd än                                        | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                                                                                                                                                                   |
-| 2026-08-27 | Frida | **PASS mot prod** — 17 statements kvar, inga fynd | **PASS med två fynd** | **Kunde inte köras** — se F-REL-10                | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs.                                                                                                                                             |
-| 2026-08-27 | Frida | (ej omkörd — PASS ovan gäller)                    | (ej omkörd)           | **PASS — 28 s** (apply + verifiera, se förbehåll) | Att lokal stack saknar plattformens grants och därför inte har någon grön baslinje. Att `next dev` vägrar en andra instans i samma katalog oavsett port, och att `.env.local` pekar mot dev-molnet — både för Supabase och för `SENTRY_DSN`, så övningens fel hamnade i dev-Sentry. |
+| Datum      | Vem            | Del 1                                                                                | Del 2                                                          | Del 3: tid till fix                               | Vad som saknade dokumentation                                                                                                                                                                                                                                                       |
+| ---------- | -------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-26 | Frida          | **FAIL** — se fynden nedan                                                           | ej körd än                                                     | ej körd än                                        | CLI:n låg kvar länkad mot prod från förra sessionen. Rutinen bör börja med att verifiera länkning, inte anta dev.                                                                                                                                                                   |
+| 2026-08-27 | Frida          | **PASS mot prod** — 17 statements kvar, inga fynd                                    | **PASS med två fynd**                                          | **Kunde inte köras** — se F-REL-10                | Att `db push` matchar på nummer och inte innehåll, och därför kan rapportera framgång utan att göra något. Ledde till att Del 0 skrevs.                                                                                                                                             |
+| 2026-08-27 | Frida          | (ej omkörd — PASS ovan gäller)                                                       | (ej omkörd)                                                    | **PASS — 28 s** (apply + verifiera, se förbehåll) | Att lokal stack saknar plattformens grants och därför inte har någon grön baslinje. Att `next dev` vägrar en andra instans i samma katalog oavsett port, och att `.env.local` pekar mot dev-molnet — både för Supabase och för `SENTRY_DSN`, så övningens fel hamnade i dev-Sentry. |
+| 2026-10-29 | Frida (Claude) | **PASS mot prod** — diffen är exakt de 14 väntande N23-migrationerna + känt `pg_net` | **PASS efter tre header-fynd** — hela N23-rollbacken, se nedan | ej körd                                           | Att en `restore … from migration X` i en Rollback-rad inte tar med ägare och grants när funktionen skapas på nytt. Att hänvisningen måste peka på den _senaste_ definitionen före releasen, inte den som var aktuell när headern skrevs.                                            |
 
 ### Körning 2026-08-26 — Del 1 resultat
 
@@ -917,3 +918,48 @@ Den här övningen är precis det N25-kortet föreslog att man gör först. Den 
 konkret argument för kortets egen varning: om en per-tenant-restore hade byggts
 innan någon kört Del 6, hade automationen ärvt fynd 1 och failat tyst i samma
 ögonblick som den behövdes.
+
+### Körning 2026-10-29 — Del 1 och Del 2 inför N23-releasen
+
+Körd före prod-releasen av N23: 14 väntande migrationer, varav 11 replace eller
+destructive. Prod-snapshot `20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz`
+togs samma dag.
+
+**Del 1: PASS.** `db reset` replayade alla 113 migrationer rent.
+`db diff --db-url <prod> --schema public` mot prod (via `op read`, utan att
+länka om CLI:n, så att URL:en aldrig skrivs ut). Alla 70 objekt i diffen finns
+i de 14 väntande N23-filerna. Det enda utöver dem är `pg_net` i `public`, som
+är känt sedan 2026-08-26. Ingen drift.
+
+**Del 2, anpassad: hela N23-rollbacken i stället för en enskild additive.**
+Alla 14 Rollback-rader sattes ihop till ett skript, baklänges. Delar som "återställ
+från migration X" hämtades ordagrant ur X. Skriptet kördes i en transaktion mot
+lokal stack med `seed:dev`-data. Facit var inte "inga fel" utan att resultatet
+ska vara _identiskt med prods nuvarande schema_, jämfört med
+`supabase db dump -s public` från båda. Första körningen gick igenom utan fel
+men gav tre fynd i headrarna:
+
+1. **Säkerhet: `20261028140031` och `20261028142912`.** De återskapade
+   `get_admin_dashboard_cached(uuid)`, `get_admin_event_cached(uuid)` och
+   `get_event_info_cached(uuid)` saknade sina privilegierader, eftersom källfilerna
+   bara byter kropp. Nyskapade fick de plattformens standard: ägare `postgres`
+   och EXECUTE för `anon` och `authenticated`. Alla tre är SECURITY DEFINER och
+   tar `p_tenant_id`, så en rollback enligt headern hade gett vem som helst med
+   anon-nyckeln läsrätt till vilken tenants dashboard, event och eventinfo som
+   helst. Rättat: explicita `revoke`/`grant`/`owner to cache_rpc_reader` i båda
+   headrarna.
+2. **`20261028142912` pekade på fel källa.** Headern angav `20260929153848`, men
+   `20261013093537` definierade om `get_event_info_cached` senare (`results_url`).
+   Rättat.
+3. **`20261029085340` lämnade `archive_lock_event_of(jsonb)` kvar.** Rättat. Dessutom
+   rättades policy-hänvisningen i `20261029090324`: den nämnde en fil som inte
+   finns (`0004_fix_rls_policies.sql`), och fem av elva policyer definierades
+   senast i `0005`, `0007` och `20260930084957`.
+
+Andra körningen, mot de rättade headrarna, från ren `db reset`: rollbacken gick
+igenom på under en sekund, och diffen mot prod var en enda rad, kolumnkommentaren
+på `events.status` (kosmetisk, inte återställd).
+
+**Lärdom:** att en rollback "går igenom utan fel" bevisar nästan ingenting. Fynd 1
+gick igenom utan fel och var det allvarligaste. Jämför resultatet mot
+målschemat, inte mot exit-koden.

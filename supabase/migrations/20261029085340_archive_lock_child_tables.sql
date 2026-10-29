@@ -51,10 +51,13 @@
 -- Forward-fix: replace (enforce_event_archive_lock body replaced; new
 --   function and triggers added)
 --   Rollback: drop function if exists public.enforce_child_archive_lock() cascade;
---             (drops every z_archive_lock trigger with it), then restore
+--             (drops every z_archive_lock trigger with it);
+--             drop function if exists public.archive_lock_event_of(jsonb);
+--             then restore
 --             enforce_event_archive_lock from migration
 --             20261028103213_event_cap_archive_lock_rr_identity_per_event.sql.
---   Data:     no data loss. Writes no rows.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Writes no rows.
 --   Blast:    if the lock were wrong, edits to an event's stages, work areas,
 --             schedule, participants or announcements would be refused —
 --             for archived events by design, for active ones only through a

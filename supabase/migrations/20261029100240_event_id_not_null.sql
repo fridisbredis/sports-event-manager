@@ -33,9 +33,10 @@
 --             then recreate announcements_fill_event_id and
 --             participants_fill_event_id from migration
 --             20261028100019_event_id_on_tenant_scoped_tables.sql.
---   Data:     deleted rows are only those of tenants without events (none
---             expected on prod). Restore from the release snapshot:
---             <SNAPSHOT FILE — fill in at prod release>
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             Deleted rows are only those of tenants without events (none on
+--             prod: 3 tenants, 1 event each, re-verified 2026-10-29 at the
+--             snapshot). Restore from that snapshot.
 --   Blast:    if a writer still omitted event_id, its insert would fail with
 --             23502 (not-null): an announcement or a participant could not
 --             be saved. Covered by the integration tests of both paths.

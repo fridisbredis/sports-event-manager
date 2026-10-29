@@ -50,7 +50,8 @@
 --             20261026094609_import_participants_rpc.sql. The old index can
 --             only be recreated while no tenant has the same external_id in
 --             two events.
---   Data:     no data loss. Writes no rows; the CHECK and the new index are
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Writes no rows; the CHECK and the new index are
 --             validated against existing rows (prod: every participant got
 --             event_id from 20261028100019, one event per tenant).
 --   Blast:    if the cap trigger were wrong, creating an event or saving an

@@ -26,9 +26,18 @@
 --   mark_official_event_seen is additive)
 --   Rollback: drop function if exists public.mark_official_event_seen(uuid);
 --             drop function if exists public.get_event_info_cached(uuid, uuid);
---             then restore the (uuid) version, with its revoke/grant/owner
---             lines, from 20260929153848_event_info_cached_add_stage_date.sql.
---   Data:     no data loss. The only write is seen_at, a notice flag.
+--             then restore the (uuid) body from
+--             20261013093537_event_stages_results_url.sql (the latest before
+--             N23 -- NOT 20260929153848, which lacks results_url), and its
+--             privileges, which no restore source carries (a fresh function
+--             gets the platform defaults: owner postgres, EXECUTE to anon and
+--             authenticated -- a SECURITY DEFINER read of any tenant):
+--               revoke all on function public.get_event_info_cached(uuid) from public, anon, authenticated;
+--               grant execute on function public.get_event_info_cached(uuid) to service_role;
+--               alter function public.get_event_info_cached(uuid) owner to cache_rpc_reader;
+--             (Verified by the 2026-10-29 rollback rehearsal against prod.)
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. The only write is seen_at, a notice flag.
 --   Blast:    if get_event_info_cached were wrong, INFO-01 fails to load. If
 --             mark_official_event_seen were wrong, the "new event" badge
 --             would stay or vanish wrongly — nothing else reads seen_at.

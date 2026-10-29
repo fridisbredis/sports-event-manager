@@ -30,7 +30,8 @@
 --             drop function if exists public.guard_tenant_system_admin_columns();
 --             then restore guard_tenant_sms_sender_id and its trigger from
 --             migration 20261027143113_tenant_sms_sender_id.sql.
---   Data:     no data loss. Writes no rows.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Writes no rows.
 --   Blast:    if the allowlist were wrong, a tenant admin saving the colour
 --             theme gets a permission error (the theme stays as it was), or a
 --             system admin cannot change tier/active/sender. Both are visible
