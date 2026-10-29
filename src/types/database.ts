@@ -1239,12 +1239,15 @@ export type Database = {
         Returns: Json
       }
       get_admin_dashboard_cached: {
-        Args: { p_tenant_id: string }
+        Args: { p_event_id?: string; p_tenant_id: string }
         Returns: Json
       }
-      get_admin_event_cached: { Args: { p_tenant_id: string }; Returns: Json }
+      get_admin_event_cached: {
+        Args: { p_event_id?: string; p_tenant_id: string }
+        Returns: Json
+      }
       get_admin_workstations_cached: {
-        Args: { p_tenant_id: string }
+        Args: { p_event_id?: string; p_tenant_id: string }
         Returns: Json
       }
       get_event_info_cached: { Args: { p_tenant_id: string }; Returns: Json }
