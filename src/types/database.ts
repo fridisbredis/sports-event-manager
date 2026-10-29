@@ -1160,6 +1160,11 @@ export type Database = {
     }
     Functions: {
       anonymize_inactive_users: { Args: never; Returns: undefined }
+      archive_lock_event_of: { Args: { p_row: Json }; Returns: string }
+      can_read_event: {
+        Args: { p_event_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
       can_write_avatar_object: {
         Args: { object_name: string }
         Returns: boolean
@@ -1361,6 +1366,10 @@ export type Database = {
           over_capacity: number
           time_off_clash: number
         }[]
+      }
+      shares_event_with_caller: {
+        Args: { p_official_id: string }
+        Returns: boolean
       }
       shares_shift_with_caller: {
         Args: {
