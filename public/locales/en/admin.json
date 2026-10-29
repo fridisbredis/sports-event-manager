@@ -681,8 +681,8 @@
       "title": "Create event",
       "name": "Event name",
       "namePlaceholder": "e.g. Viadal 2027",
-      "source": "Start from",
-      "sourceBlank": "Blank event",
+      "source": "Copy from",
+      "sourceBlank": "Nothing (blank event)",
       "sourceArchived": "{{name}} (archived)",
       "copyHeading": "What to copy",
       "copy": {

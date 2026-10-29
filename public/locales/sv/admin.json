@@ -681,8 +681,8 @@
       "title": "Skapa event",
       "name": "Eventets namn",
       "namePlaceholder": "t.ex. Viadal 2027",
-      "source": "Utgå från",
-      "sourceBlank": "Tomt event",
+      "source": "Kopiera från",
+      "sourceBlank": "Inget (tomt event)",
       "sourceArchived": "{{name}} (arkiverat)",
       "copyHeading": "Vad ska kopieras",
       "copy": {
