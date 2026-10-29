@@ -689,16 +689,19 @@
         "distances": "Distanser",
         "facilities": "Faciliteter",
         "work_areas": "Arbetsområden",
-        "checklists": "Checklistor / att göra"
+        "checklists": "Checklistor / att göra",
+        "officials": "Funktionärer"
       },
       "copyNeedsStages": "Kräver etapper",
       "copyNeedsWorkAreas": "Kräver arbetsområden",
       "stageDatesHint": "Nya datum för de kopierade etapperna. Klockslagen behålls, och ändrar du den första följer resten med.",
       "stageDate": "Datum för {{name}}",
       "undatedStages": "Etapper utan tider kopieras utan datum.",
-      "draftNote": "Eventet skapas som utkast. Lägg till funktionärer under Officials när det finns.",
+      "draftNote": "Eventet skapas som utkast.",
       "capArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det för att skapa ett nytt.",
-      "capUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler."
+      "capUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler.",
+      "officialsNote": "Funktionärerna du kopierar ser det nya eventet i appen direkt, markerat som nytt – även medan det är ett utkast.",
+      "nameTaken": "Det finns redan ett event med det här namnet."
     }
   },
   "settings": {

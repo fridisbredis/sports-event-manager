@@ -9,5 +9,6 @@ export const COPY_OPTIONS = [
   'facilities',
   'work_areas',
   'checklists',
+  'officials',
 ] as const
 export type CopyOption = (typeof COPY_OPTIONS)[number]

@@ -689,16 +689,19 @@
         "distances": "Distances",
         "facilities": "Facilities",
         "work_areas": "Work areas",
-        "checklists": "Checklists / to-dos"
+        "checklists": "Checklists / to-dos",
+        "officials": "Officials"
       },
       "copyNeedsStages": "Needs stages",
       "copyNeedsWorkAreas": "Needs work areas",
       "stageDatesHint": "New dates for the copied stages. Each keeps its time of day; changing the first moves the rest along.",
       "stageDate": "Date for {{name}}",
       "undatedStages": "Stages without times are copied without a date.",
-      "draftNote": "The event is created as a draft. Add officials from Officials once it exists.",
+      "draftNote": "The event is created as a draft.",
       "capArchiveFirst": "Your plan has room for one active event. Archive it to create a new one.",
-      "capUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more."
+      "capUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more.",
+      "officialsNote": "The officials you copy see the new event in the app straight away, marked as new — even while it is a draft.",
+      "nameTaken": "An event with this name already exists."
     }
   },
   "settings": {

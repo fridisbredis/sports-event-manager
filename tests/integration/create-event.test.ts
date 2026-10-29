@@ -19,6 +19,7 @@ describe('N23: create_event', () => {
   let undatedStageId: string
   let adminUserId: string
   let adminOfficialId: string
+  let memberId: string
   let adminClient: SupabaseClient<Database>
 
   const ALL = {
@@ -28,6 +29,7 @@ describe('N23: create_event', () => {
     facilities: true,
     work_areas: true,
     checklists: true,
+    officials: true,
   }
 
   async function createEvent(args: {
@@ -154,6 +156,21 @@ describe('N23: create_event', () => {
       },
     ])
     if (todoError) throw todoError
+
+    // The source event's officials: one on the roster, one removed from it.
+    const { data: members, error: memberError } = await admin
+      .from('officials')
+      .insert([
+        { tenant_id: tenantId, name: 'Member', phone: '+46704300001', invite_status: 'confirmed' },
+        { tenant_id: tenantId, name: 'Gone', phone: '+46704300002', invite_status: 'removed' },
+      ])
+      .select('id, name')
+    if (memberError) throw memberError
+    memberId = members.find((m) => m.name === 'Member')!.id
+    const { error: membershipError } = await admin
+      .from('official_events')
+      .insert(members.map((m) => ({ official_id: m.id, event_id: sourceId, tenant_id: tenantId })))
+    if (membershipError) throw membershipError
 
     const created = await createUserWithRole(tenantId, 'tenant_admin')
     adminUserId = created.userId
@@ -286,6 +303,16 @@ describe('N23: create_event', () => {
       ['Fill the tanks', 'info'],
       ['Collect chips', 'checkbox'],
     ])
+
+    // The admin, already seen; the source's roster member, unseen so they get
+    // the notice; not the official removed from the roster.
+    const { data: memberships } = await admin
+      .from('official_events')
+      .select('official_id, seen_at')
+      .eq('event_id', eventId)
+    expect(
+      Object.fromEntries(memberships!.map((m) => [m.official_id, m.seen_at === null]))
+    ).toEqual({ [adminOfficialId]: false, [memberId]: true })
   })
 
   it('copies only what is ticked', async () => {
@@ -310,6 +337,11 @@ describe('N23: create_event', () => {
         .eq('event_id', eventId)
       expect(count).toBe(0)
     }
+    const { data: memberships } = await admin
+      .from('official_events')
+      .select('official_id')
+      .eq('event_id', eventId)
+    expect(memberships).toEqual([{ official_id: adminOfficialId }])
   })
 
   it.each([

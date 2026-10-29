@@ -117,6 +117,11 @@ export function CreateEventDialog({
   }
 
   const needsDates = !!source && copy.stages && dated.length > 0
+  // A warning, not a block: two events may share a name for good reason,
+  // but most often it is a slip.
+  const nameTaken = sources.some(
+    (s) => s.name.trim().toLowerCase() === name.trim().toLowerCase() && name.trim() !== ''
+  )
   const canSubmit =
     name.trim() !== '' && (!needsDates || dated.every((s) => dates[s.id])) && !isPending
 
@@ -179,6 +184,13 @@ export function CreateEventDialog({
               onKeyDown={(e) => e.key === 'Enter' && submit()}
               isRequired
               autoFocus
+              description={
+                nameTaken ? (
+                  <span className="text-status-pending-text">
+                    {t('events.createEvent.nameTaken')}
+                  </span>
+                ) : undefined
+              }
             />
 
             {sources.length > 0 && (
@@ -269,7 +281,10 @@ export function CreateEventDialog({
               </div>
             )}
 
-            <p className="text-sm text-ink-label">{t('events.createEvent.draftNote')}</p>
+            <p className="text-sm text-ink-label">
+              {t('events.createEvent.draftNote')}
+              {source && copy.officials && <> {t('events.createEvent.officialsNote')}</>}
+            </p>
           </ModalBody>
           <ModalFooter>
             <Button

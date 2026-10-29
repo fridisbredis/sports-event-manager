@@ -22,6 +22,12 @@
 --   work_areas  needs stages, with their operating windows moved by their
 --               stage's date shift.
 --   checklists  needs work_areas — checklist items hang on a work area.
+--   officials   the source event's members (official_events), except those
+--               removed from the roster. They join unseen, which is what
+--               shows them the in-app "added to a new event" notice (N23
+--               (b): in-app by default, no SMS). Invite status is per person,
+--               not per event, so a confirmed official needs no new
+--               acceptance and an invited one joins still invited.
 -- A dependency left unticked is refused with 22023 rather than silently
 -- dropping rows the admin asked for.
 --
@@ -44,7 +50,7 @@
 -- (official_events), so each admin's confirmed roster row joins the new
 -- event. The caller's own membership is marked seen, so the creator gets no
 -- "added to a new event" notice for the event they just made. Other
--- officials are added from OFF-01 (N23 7c).
+-- officials come with the "officials" option above, or from OFF-01 later.
 --
 -- SECURITY INVOKER: the caller's RLS decides, the tenant_admin_manage_*
 -- policies on every table written here, so a non-admin or another tenant's
@@ -84,6 +90,7 @@ declare
   v_facilities  boolean := coalesce((v_copy ->> 'facilities')::boolean, false);
   v_work_areas  boolean := coalesce((v_copy ->> 'work_areas')::boolean, false);
   v_checklists  boolean := coalesce((v_copy ->> 'checklists')::boolean, false);
+  v_officials   boolean := coalesce((v_copy ->> 'officials')::boolean, false);
   -- source stage id -> new stage id, and source stage id -> day shift
   v_stage_map   jsonb := '{}'::jsonb;
   v_stage_shift jsonb := '{}'::jsonb;
@@ -99,7 +106,8 @@ begin
   end if;
 
   if p_source_event_id is null then
-    if v_details or v_stages or v_distances or v_facilities or v_work_areas or v_checklists then
+    if v_details or v_stages or v_distances or v_facilities or v_work_areas or v_checklists
+       or v_officials then
       raise exception 'create_event: nothing can be copied without a source event'
         using errcode = '22023';
     end if;
@@ -278,6 +286,19 @@ begin
     )
   on conflict (official_id, event_id) do nothing;
 
+  -- --------------------------------------------------------------------------
+  -- The source event's officials, unseen so they get the in-app notice
+  -- --------------------------------------------------------------------------
+  if v_officials then
+    insert into public.official_events (official_id, event_id, tenant_id)
+    select m.official_id, v_event_id, p_tenant_id
+    from public.official_events m
+    join public.officials o on o.id = m.official_id
+    where m.event_id = p_source_event_id
+      and o.invite_status <> 'removed'
+    on conflict (official_id, event_id) do nothing;
+  end if;
+
   return jsonb_build_object('event_id', v_event_id);
 end;
 $$;
@@ -285,7 +306,7 @@ $$;
 comment on function public.create_event(uuid, text, uuid, jsonb, jsonb) is
   'N23 / TEN-01: creates a draft event, blank or copied from another of the '
   'tenant''s events (stages with new dates, distances, facilities, work areas, '
-  'checklists), in one transaction. SECURITY INVOKER. Returns { event_id }.';
+  'checklists, officials), in one transaction. SECURITY INVOKER. Returns { event_id }.';
 
 revoke all on function public.create_event(uuid, text, uuid, jsonb, jsonb)
   from public, anon;
