@@ -1338,7 +1338,7 @@ export type Database = {
         }
         Returns: {
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           official_id: string
           slot_index: number
