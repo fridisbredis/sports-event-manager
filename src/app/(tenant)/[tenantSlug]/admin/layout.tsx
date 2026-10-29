@@ -3,7 +3,6 @@ import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
 import { hasFeature } from '@/lib/tiers/features'
 import { SidebarNav } from './_components/sidebar-nav'
-import { getDefaultAdminEventId } from '@/lib/events/admin-event'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
@@ -37,18 +36,12 @@ export async function SidebarChrome({
   const tenant = await getAdminTenant(tenantSlug)
   const showParticipants = tenant != null && hasFeature(tenant.tier, 'participants')
 
-  // N23: on a screen whose URL names no event (Account), the event links
-  // open the default event. Memoised, so the admin index and legacy
-  // redirects that also ask for it pay nothing extra.
-  const defaultEventId = await getDefaultAdminEventId(tenantSlug)
-
   return (
     <SidebarNav
       tenantSlug={tenantSlug}
       adminLabel={adminLabel}
       showAccount={showAccount}
       showParticipants={showParticipants}
-      defaultEventId={defaultEventId}
     />
   )
 }

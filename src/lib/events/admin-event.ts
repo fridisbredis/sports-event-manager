@@ -40,12 +40,11 @@ export const getAdminEvent = cache(
   }
 )
 
-// The event an admin lands on when the URL does not name one: the old
-// /admin/dashboard-style links, the post-login redirect, the admin index.
-// Until TEN-01 lists a tenant's events this picks one — the latest
-// non-archived by start date, falling back to an archived one so a tenant
-// whose only event is archived still reaches it. null when the tenant has no
-// events at all.
+// The event a pre-N23 admin link (/admin/dashboard and the like) opens, since
+// it names no event: the latest non-archived by start date, falling back to
+// an archived one so a tenant whose only event is archived still reaches it.
+// null when the tenant has no events at all. Everything else starts from
+// TEN-01's event list at /admin.
 export const getDefaultAdminEventId = cache(async (tenantSlug: string): Promise<string | null> => {
   const tenant = await getAdminTenant(tenantSlug)
   if (!tenant) return null

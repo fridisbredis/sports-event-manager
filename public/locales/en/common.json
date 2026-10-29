@@ -51,7 +51,9 @@
     "adminCapReachedForTenant": "Your plan’s maximum number of admins is reached. Remove an admin role first.",
     "lastAdminCannotRemoveForTenant": "This is the event’s last admin. There must always be at least one.",
     "lastSystemAdminCannotRemove": "This is the last system admin. There must always be at least one.",
-    "adminRoleRequiresConfirmed": "Only a confirmed official can be made admin. Wait until they have confirmed their invite."
+    "adminRoleRequiresConfirmed": "Only a confirmed official can be made admin. Wait until they have confirmed their invite.",
+    "unarchiveArchiveFirst": "Your plan has room for one active event. Archive the active event first, then un-archive this one.",
+    "unarchiveUpgrade": "All active event slots in your plan are in use. Archive another event, or upgrade for more events."
   },
   "notFoundPage": {
     "eyebrow": "No result",
