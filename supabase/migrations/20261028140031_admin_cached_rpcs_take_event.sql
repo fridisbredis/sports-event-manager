@@ -36,7 +36,17 @@
 --             20261008133456_scheduling_warnings_time_off_clash.sql
 --             (dashboard), 20261013093537_event_stages_results_url.sql
 --             (event) and 20260930140500_admin_workstations_cached_color.sql
---             (workstations), each with its revoke/grant/owner lines;
+--             (workstations). Only the workstations source carries its
+--             privilege lines; for the other two, run them explicitly, or the
+--             fresh SECURITY DEFINER functions are owned by postgres and
+--             executable by anon (verified, 2026-10-29 rollback rehearsal):
+--               revoke all on function public.get_admin_dashboard_cached(uuid) from public, anon, authenticated;
+--               grant execute on function public.get_admin_dashboard_cached(uuid) to service_role;
+--               alter function public.get_admin_dashboard_cached(uuid) owner to cache_rpc_reader;
+--               revoke all on function public.get_admin_event_cached(uuid) from public, anon, authenticated;
+--               grant execute on function public.get_admin_event_cached(uuid) to service_role;
+--               alter function public.get_admin_event_cached(uuid) owner to cache_rpc_reader;
+--             then:
 --             drop policy if exists cache_rpc_reader_read_official_events on public.official_events;
 --             revoke select on public.official_events from cache_rpc_reader;
 --   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
