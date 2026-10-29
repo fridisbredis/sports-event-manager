@@ -652,5 +652,9 @@
         "running": "running"
       }
     }
+  },
+  "events": {
+    "noEventsTitle": "No events yet",
+    "noEventsBody": "This organizer has no events. A system admin can create one."
   }
 }

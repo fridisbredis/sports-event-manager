@@ -21,7 +21,7 @@ import path from 'node:path'
  *
  * If this fails, the fix is to destructure `error` and act on it — throw so
  * the failure surfaces, while keeping `?? []` for a genuinely empty result.
- * See src/app/(tenant)/[tenantSlug]/admin/scheduling/page.tsx for the idiom.
+ * See src/app/(tenant)/[tenantSlug]/admin/events/[eventId]/scheduling/page.tsx for the idiom.
  */
 
 /**

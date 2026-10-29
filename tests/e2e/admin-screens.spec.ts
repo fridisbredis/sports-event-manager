@@ -1,5 +1,5 @@
 import { test, expect, clickWhenInteractive } from './fixtures/auth'
-import { SEED_TENANT_SLUG } from './fixtures/users'
+import { SEED_TENANT_SLUG, EVENT_SEGMENT } from './fixtures/users'
 
 // WS-01/WS-02 work areas, OFF-01 officials, COMM-01 communication and the
 // admin half of ACCT-01. Role: tenant admin throughout.
@@ -44,7 +44,7 @@ test.describe('WS-01 work areas list', () => {
       .getByRole('rowheader', { name: 'Finish line' })
       .click()
 
-    await expect(page).toHaveURL(new RegExp(`${base}/workstations/[0-9a-f-]+$`))
+    await expect(page).toHaveURL(new RegExp(`${base}/${EVENT_SEGMENT}/workstations/[0-9a-f-]+$`))
     await expect(page.getByRole('heading', { name: 'Finish line' })).toBeVisible()
   })
 })

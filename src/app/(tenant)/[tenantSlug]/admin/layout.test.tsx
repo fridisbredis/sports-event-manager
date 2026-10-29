@@ -28,6 +28,10 @@ vi.mock('@/lib/i18n/server', () => ({
   getServerTranslation: vi.fn(async () => (key: string) => key),
 }))
 
+vi.mock('@/lib/events/admin-event', () => ({
+  getDefaultAdminEventId: vi.fn(async () => 'event-1'),
+}))
+
 vi.mock('./_components/sidebar-nav', () => ({
   SidebarNav: vi.fn(() => null),
 }))
@@ -109,6 +113,7 @@ describe('TenantLayout', () => {
     const nav = findByType(await SidebarChrome(chrome!.props as never), SidebarNav)
     expect(nav).not.toBeNull()
     expect(nav!.props.tenantSlug).toBe('viadal')
+    expect(nav!.props.defaultEventId).toBe('event-1')
 
     const flat = JSON.stringify(result)
     expect(flat).toContain('CHILD_CONTENT')

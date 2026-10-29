@@ -1,0 +1,116 @@
+import { redirect, notFound } from 'next/navigation'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
+import WorkstationEditForm from './_components/workstation-edit-form'
+
+interface Props {
+  params: Promise<{ tenantSlug: string; eventId: string; workstationId: string }>
+}
+
+export default async function EditWorkstationPage({ params }: Props) {
+  const { tenantSlug, eventId, workstationId } = await params
+
+  const supabase = await createSupabaseServerClient()
+  const user = await getCurrentUser()
+
+  if (!user) redirect('/login')
+
+  // Memoised per render pass (F-PERF-07): the layout above already
+  // resolved and authorized this tenant, so this reuses that result
+  // instead of repeating the GoTrue round trip and the access-context
+  // queries. The check still runs for this page — it is not skipped.
+  const tenant = await getAdminTenant(tenantSlug)
+
+  if (!tenant) notFound()
+
+  const { data: event } = await supabase
+    .from('events')
+    .select('id, scheduling_granularity_min')
+    .eq('id', eventId)
+    .eq('tenant_id', tenant.id)
+    .maybeSingle()
+
+  if (!event) notFound()
+
+  const [{ data: ws, error: wsError }, { data: stages, error: stagesError }] = await Promise.all([
+    supabase
+      .from('workstations')
+      .select(
+        'id, name, description, color, capacity_ceiling, stage_id, recurring, workstation_operating_windows(id, window_start, window_end), workstation_todos(id, instruction_text, position, item_type)'
+      )
+      .eq('id', workstationId)
+      .eq('tenant_id', tenant.id)
+      .single(),
+    supabase
+      .from('event_stages')
+      .select('id, name, stage_type, start_time, end_time')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true }),
+  ])
+
+  // PGRST116 is .single() finding no row — a genuine 404 for this URL, not a
+  // failed query. Anything else means the read itself broke and must surface.
+  if (wsError && wsError.code !== 'PGRST116') throw wsError
+  if (stagesError) throw stagesError
+
+  if (!ws) notFound()
+
+  // The colours other work areas on this stage already hold, for the picker's
+  // "already used" markers. Scoped to the stage because that is what shares a
+  // schedule grid; a stage-less ("all stages") area is compared against the
+  // other stage-less ones, since those are the areas it appears alongside.
+  // Read after the work area itself because it depends on its stage_id — one
+  // extra round trip on a screen that is already two, and only on the edit
+  // path.
+  const siblingsQuery = supabase
+    .from('workstations')
+    .select('id, name, color')
+    .eq('event_id', event.id)
+    .eq('tenant_id', tenant.id)
+    .neq('id', ws.id)
+    .not('color', 'is', null)
+
+  // `.eq('stage_id', null)` matches nothing in SQL — null is never equal to
+  // anything — so the stage-less case needs `is`, not `eq`.
+  const { data: siblings, error: siblingsError } =
+    ws.stage_id === null
+      ? await siblingsQuery.is('stage_id', null)
+      : await siblingsQuery.eq('stage_id', ws.stage_id)
+
+  if (siblingsError) throw siblingsError
+
+  const sortedTodos = [...(ws.workstation_todos ?? [])].sort((a, b) => a.position - b.position)
+
+  return (
+    <div className="px-4 py-6 md:px-8 md:py-8">
+      <WorkstationEditForm
+        tenantSlug={tenantSlug}
+        tenantId={tenant.id}
+        workstationId={ws.id}
+        stages={stages ?? []}
+        initialStageId={ws.stage_id}
+        initialName={ws.name}
+        initialDescription={ws.description ?? ''}
+        initialCapacity={ws.capacity_ceiling}
+        initialColor={ws.color}
+        takenBy={(siblings ?? []).map((sibling) => ({
+          color: sibling.color as string,
+          name: sibling.name,
+        }))}
+        initialWindows={(ws.workstation_operating_windows ?? []).map((w) => ({
+          window_start: w.window_start,
+          window_end: w.window_end,
+        }))}
+        initialTodos={sortedTodos.map((t) => ({
+          text: t.instruction_text,
+          // item_type is `string` off the generated Row type (a CHECK
+          // constraint, not a Postgres enum); anything unrecognised falls
+          // back to the informational default rather than rendering ticked.
+          itemType: t.item_type === 'checkbox' ? ('checkbox' as const) : ('info' as const),
+        }))}
+        schedulingGranularityMin={event.scheduling_granularity_min}
+      />
+    </div>
+  )
+}

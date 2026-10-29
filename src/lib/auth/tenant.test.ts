@@ -146,7 +146,7 @@ describe('resolvePostLoginRedirect', () => {
 
   it.each<[UserRoleWithTenant['role'], string]>([
     ['system_admin', '/admin'],
-    ['tenant_admin', '/viadal/admin/dashboard'],
+    ['tenant_admin', '/viadal/admin'],
     ['official', '/viadal/home'],
     ['participant', '/viadal/participant'],
   ])('routes a single %s role to %s', (role, expected) => {
@@ -160,7 +160,7 @@ describe('resolvePostLoginRedirect', () => {
       { role: 'tenant_admin', tenant_id: TENANT_ID, tenantSlug: 'viadal' },
       { role: 'participant', tenant_id: 'tenant-3', tenantSlug: 'third' },
     ]
-    expect(resolvePostLoginRedirect(roles)).toBe('/viadal/admin/dashboard')
+    expect(resolvePostLoginRedirect(roles)).toBe('/viadal/admin')
   })
 
   it('prefers system_admin over tenant_admin regardless of array order', () => {

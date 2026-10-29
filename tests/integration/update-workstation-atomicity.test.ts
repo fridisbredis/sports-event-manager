@@ -8,7 +8,7 @@ import {
 } from './helpers'
 
 // REL-01: updateWorkstation() in
-// src/app/(tenant)/[tenantSlug]/admin/workstations/actions.ts performs five
+// src/app/(tenant)/[tenantSlug]/admin/events/[eventId]/workstations/actions.ts performs five
 // separate operations with no surrounding transaction: update workstations,
 // delete operating windows, insert new windows, delete todos, insert new
 // todos. A failure on any later step (e.g. an invalid window) leaves the

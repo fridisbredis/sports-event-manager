@@ -195,8 +195,14 @@ describe('publishEvent', () => {
       p_event_id: EVENT_ID,
       p_tenant_id: TENANT_ID,
     })
-    expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/event')
-    expect(revalidatePath).toHaveBeenCalledWith('/viadal/admin/dashboard')
+    expect(revalidatePath).toHaveBeenCalledWith(
+      '/[tenantSlug]/admin/events/[eventId]/event',
+      'page'
+    )
+    expect(revalidatePath).toHaveBeenCalledWith(
+      '/[tenantSlug]/admin/events/[eventId]/dashboard',
+      'page'
+    )
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-event`)
     expect(updateTag).not.toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
