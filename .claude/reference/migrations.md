@@ -105,8 +105,8 @@ file.
 parallel, whichever one _merges_ second can still land with a prefix that
 sorts below one already recorded in an environment's ledger, because
 `supabase db push`'s ceiling is set by merge order onto `main`, not by
-when either migration was written. The `Migration number collision` CI job
-(`quality.yml`) has a second step for this: it compares every newly added
+when either migration was written. The `Migration guards` CI job
+(`quality.yml`) has a step for this: it compares every newly added
 migration file's prefix (`--diff-filter=A`, same as the forward-fix check)
 against the highest prefix already present on the PR's base branch, and
 fails the PR if a new file sorts at or below that floor. This only catches
@@ -278,7 +278,7 @@ every user at once instead of one local test.
 The `Window:` line in the header is where this is stated per migration. For
 `additive` it is usually one word, "compatible". For `destructive` it must
 name which release this is — expand or contract — or explain why the change
-is safe against old code without a split. The `Migration forward-fix` job in
+is safe against old code without a split. The `Migration guards` job in
 `quality.yml` requires it on every newly added migration and rejects an
 unfilled `<placeholder>`; it only inspects files added in the diff, so
 `0033` and `0034` — written before this line existed — are not retroactively
