@@ -345,6 +345,7 @@ describe('OfficialsList — phone validation timing', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -415,6 +416,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -439,6 +441,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -463,6 +466,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -493,6 +497,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -517,6 +522,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -545,6 +551,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -577,6 +584,7 @@ describe('OfficialsList — handleAdd error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -628,6 +636,7 @@ describe('OfficialsList — handleAdd success', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -658,6 +667,7 @@ describe('OfficialsList — handleAdd success', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -696,6 +706,7 @@ describe('OfficialsList — handleRemove', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -708,7 +719,7 @@ describe('OfficialsList — handleRemove', () => {
     )
     expect(screen.getByText('Jane Referee')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/officials/off-1?tenantId=tenant-1',
+      '/api/officials/off-1?tenantId=tenant-1&eventId=event-1',
       expect.objectContaining({ method: 'DELETE' })
     )
   })
@@ -727,6 +738,7 @@ describe('OfficialsList — handleRemove', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
 
@@ -751,6 +763,7 @@ describe('OfficialsList — handleResend error branches', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
   }
@@ -880,6 +893,7 @@ describe('OfficialsList — N17 expanded row', () => {
         adminUserIds={[]}
         adminCap={10}
         tier="professional"
+        candidates={[]}
       />
     )
   }
@@ -1000,6 +1014,7 @@ describe('OfficialsList — N27 admin role', () => {
         }
         adminCap={capReached ? 3 : 10}
         tier={capReached ? 'premium' : 'professional'}
+        candidates={[]}
       />
     )
   }

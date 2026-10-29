@@ -1315,6 +1315,10 @@ export type Database = {
         Args: { p_official_id: string; p_tenant_id: string }
         Returns: Json
       }
+      remove_official_from_event: {
+        Args: { p_event_id: string; p_official_id: string; p_tenant_id: string }
+        Returns: Json
+      }
       revoke_system_admin: { Args: { p_user_id: string }; Returns: Json }
       revoke_tenant_admin: {
         Args: { p_tenant_id: string; p_user_id: string }

@@ -1,11 +1,13 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { requireTenantAdmin } from '@/lib/auth/tenant'
+import { requireTenantAdmin, getAdminTenant } from '@/lib/auth/tenant'
+import { logQueryError } from '@/lib/db/query-error'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import {
   resolveAdminAuthUser,
   grantTenantAdminRole,
@@ -161,4 +163,82 @@ export async function removeTenantAdmin(input: Input): Promise<{ error?: string 
 
   revalidatePath(adminEventRoutePattern('officials'), 'page')
   return {}
+}
+
+const addSchema = z.object({
+  tenantSlug: z.string().min(1),
+  eventId: z.string().uuid(),
+  officialIds: z.array(z.string().uuid()).min(1).max(500),
+})
+
+// N23 (7c): add officials the tenant already has — from its other events —
+// to this event. A person is one officials row per tenant, so inviting the
+// same number again is refused as a duplicate; this is the way to bring them
+// in instead.
+//
+// They join unseen (seen_at NULL), which is what shows the in-app "added to
+// a new event" notice (N23 (b): in-app by default, no SMS). Invite status is
+// per person: a confirmed official needs no new acceptance, an invited one
+// joins still invited.
+//
+// One insert, so no RPC (REL-01). The ids are re-read under the tenant
+// filter and RLS, so a crafted id from another tenant, or a removed
+// official, is simply not added; the composite FK on official_events refuses
+// an event from another tenant.
+export async function addOfficialsToEvent(
+  input: z.infer<typeof addSchema>
+): Promise<{ error?: string; added?: number }> {
+  const parsed = addSchema.safeParse(input)
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
+  const { tenantSlug, eventId, officialIds } = parsed.data
+
+  const tenant = await getAdminTenant(tenantSlug)
+  if (!tenant) return { error: await tError('actionErrors.notAuthorized') }
+
+  const supabase = await createSupabaseServerClient()
+  const { data: officials, error: readError } = await supabase
+    .from('officials')
+    .select('id')
+    .eq('tenant_id', tenant.id)
+    .in('id', officialIds)
+    .neq('invite_status', 'removed')
+
+  if (readError) {
+    logQueryError(readError, {
+      op: 'addOfficialsToEvent',
+      table: 'officials',
+      kind: 'select',
+      tenantId: tenant.id,
+      extra: { eventId },
+    })
+    return { error: await tError('actionErrors.addOfficialsFailed') }
+  }
+  if (!officials || officials.length === 0) {
+    return { error: await tError('actionErrors.invalidRequest') }
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('official_events')
+    .upsert(
+      officials.map((o) => ({ official_id: o.id, event_id: eventId, tenant_id: tenant.id })),
+      { onConflict: 'official_id,event_id', ignoreDuplicates: true }
+    )
+    .select('official_id')
+
+  if (error) {
+    logQueryError(error, {
+      op: 'addOfficialsToEvent',
+      table: 'official_events',
+      kind: 'insert',
+      tenantId: tenant.id,
+      extra: { eventId, count: officials.length },
+    })
+    return { error: await tError('actionErrors.addOfficialsFailed') }
+  }
+
+  revalidatePath(adminEventRoutePattern('officials'), 'page')
+  revalidatePath(adminEventRoutePattern('scheduling'), 'page')
+  updateTag(adminDashboardCacheTag(tenant.id))
+
+  return { added: inserted?.length ?? 0 }
 }

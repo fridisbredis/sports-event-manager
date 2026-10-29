@@ -244,7 +244,9 @@ test.describe('OFF-01 officials roster', () => {
     const dialog = page.getByRole('dialog')
     await menu.getByRole('menuitem', { name: 'Remove' }).click()
 
-    await expect(dialog.getByText(/also frees any work-area assignments/)).toBeVisible()
+    // N23 (7c): Remove takes them out of this event, and the tenant only
+    // when it was their last.
+    await expect(dialog.getByText(/taken off this event and its schedule/)).toBeVisible()
 
     // Cancel, not confirm: the removal is destructive and the roster is shared
     // with every other test in this suite.

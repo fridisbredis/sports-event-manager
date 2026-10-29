@@ -213,8 +213,8 @@
     "sending": "Sending…",
     "remove": "Remove",
     "cancel": "Cancel",
-    "removeConfirmTitle": "Remove official?",
-    "removeConfirmBody": "Removing {{name}} also frees any work-area assignments they hold. This can't be undone.",
+    "removeConfirmTitle": "Remove from this event?",
+    "removeConfirmBody": "{{name}} is taken off this event and its schedule. If they are in no other event, they are removed from the organisation as well. This cannot be undone.",
     "removeConfirm": "Are you sure? This will free any assignments for this official.",
     "resendConfirmTitle": "Re-send invite?",
     "resendConfirmBody": "If {{name}} already opened their invite link and has a code, re-sending invalidates it. They'll need to use the new SMS instead.",
@@ -257,7 +257,22 @@
     "adminCapReachedHint": "All admin places are in use. Remove an admin role to give it to someone else.",
     "actionsFor": "Actions for {{name}}",
     "adminCapReachedShort": "All admin places are in use",
-    "makeAdminRequiresConfirmed": "Can be made admin once they have confirmed the invite"
+    "makeAdminRequiresConfirmed": "Can be made admin once they have confirmed the invite",
+    "fromEvents": {
+      "open": "From other events",
+      "title": "Add from other events",
+      "hint": "Officials from the organisation's other events who are not in this one yet.",
+      "search": "Search by name, number or event",
+      "noMatches": "No one matches.",
+      "notice": "They get a notice in the app that they were added. No SMS is sent, and a confirmed official does not need to accept again.",
+      "add": "Add",
+      "addCount": "Add {{n}}",
+      "duplicateHint": "If they are in another of your events, use From other events.",
+      "selectAll": "Select all",
+      "selectMatches": "Select matches",
+      "deselectAll": "Deselect all",
+      "selectedOf": "{{n}} of {{total}} selected"
+    }
   },
   "participants": {
     "title": "Participants",
