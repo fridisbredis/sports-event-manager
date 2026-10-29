@@ -13,7 +13,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "participants": "Participants",
-    "allEvents": "All events"
+    "allEvents": "All events",
+    "settings": "Settings"
   },
   "dashboard": {
     "eventName": "Untitled event",
@@ -66,12 +67,6 @@
     "logoPendingSave": "Applied when you save",
     "logoInvalidType": "Please choose an image file (JPG, PNG, SVG, etc.)",
     "logoAlt": "Event logo",
-    "colorTheme": "Color theme",
-    "colorThemeBlue": "Blue",
-    "colorThemeGreen": "Teal",
-    "colorThemePurple": "Purple",
-    "colorThemeSaved": "Theme updated",
-    "colorThemeError": "Couldn't update theme",
     "eventName": "Event name",
     "eventNamePlaceholder": "e.g. Viadal 2026",
     "eventNameRequired": "Event name",
@@ -126,8 +121,7 @@
     "cannotRemoveLastRaceStage": "Cannot remove the last Race stage from a published event.",
     "stageTimesInvalid": "A stage's end time must be after its start time.",
     "publishPreconditionFailed": "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again.",
-    "logoUploadError": "Something went wrong while uploading the logo. Please try again.",
-    "colorThemeLocked": "Available on {{tier}} and above."
+    "logoUploadError": "Something went wrong while uploading the logo. Please try again."
   },
   "workstations": {
     "title": "Work areas",
@@ -682,5 +676,19 @@
     "datesNotSet": "Dates not set",
     "officialsInvited": "+{{invited}} invited",
     "actionsFor": "Actions for {{name}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Applies to every event and to the officials' screens.",
+    "appearance": "Appearance",
+    "colorTheme": "Color theme",
+    "colorThemeBlue": "Blue",
+    "colorThemeGreen": "Teal",
+    "colorThemePurple": "Purple",
+    "colorThemeLocked": "Available on {{tier}} and above.",
+    "colorThemeError": "Couldn't update theme",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
   }
 }

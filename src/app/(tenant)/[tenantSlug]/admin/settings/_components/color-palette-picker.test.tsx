@@ -23,7 +23,7 @@ describe('ColorPalettePicker', () => {
     // no matching key renders the raw key string. Asserting on the key catches
     // a palette added to the theme but not to the locale file.
     for (const key of Object.keys(TENANT_PALETTES)) {
-      const label = `eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`
+      const label = `settings.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`
       expect(screen.getAllByText(label).length).toBeGreaterThan(0)
     }
   })
@@ -38,7 +38,7 @@ describe('ColorPalettePicker', () => {
           onSelect={vi.fn()}
         />
       )
-      const label = `eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`
+      const label = `settings.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`
       const pressed = screen
         .getAllByRole('button')
         .filter((b) => b.getAttribute('aria-pressed') === 'true')
@@ -49,8 +49,7 @@ describe('ColorPalettePicker', () => {
   })
 })
 
-// Mirrors the re-seeding EventConfigForm does: the palette is saved on click
-// and the route revalidates, so a fresh prop must win over the mounted state.
+// Mirrors the re-seeding ColorThemeForm does: a save revalidates the route, so a fresh prop must win over the mounted state.
 // Without that, the picker keeps its mount-time value and appears to snap back
 // to the previously stored colour.
 function Harness({ initial }: { initial: string }) {

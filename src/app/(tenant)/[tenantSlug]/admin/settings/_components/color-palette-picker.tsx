@@ -26,7 +26,7 @@ export function ColorPalettePicker({
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">
-        {t('eventConfig.colorTheme')}
+        {t('settings.colorTheme')}
       </label>
       <div className="flex items-center gap-3">
         {(Object.keys(TENANT_PALETTES) as TenantPaletteKey[]).map((key) => {
@@ -42,7 +42,7 @@ export function ColorPalettePicker({
               onClick={() => onSelect(key)}
               disabled={isDisabled}
               aria-pressed={isSelected}
-              aria-label={t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
+              aria-label={t(`settings.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
               className={`group flex flex-col items-center gap-1.5 rounded-lg border-2 px-3 py-2.5 transition-colors ${
                 isSelected ? '' : `border-gray-200 ${isLocked ? '' : 'hover:border-gray-300'}`
               } ${isDisabled ? 'opacity-60' : ''} ${isLocked ? 'cursor-not-allowed' : ''}`}
@@ -81,7 +81,7 @@ export function ColorPalettePicker({
               <span
                 className={`text-xs text-gray-500 ${isLocked ? '' : 'group-hover:text-gray-700'}`}
               >
-                {t(`eventConfig.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
+                {t(`settings.colorTheme${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
               </span>
             </button>
           )
@@ -89,7 +89,7 @@ export function ColorPalettePicker({
       </div>
       {isLocked && (
         <p className="mt-1.5 text-xs text-gray-500">
-          {t('eventConfig.colorThemeLocked', {
+          {t('settings.colorThemeLocked', {
             tier: t(`systemAdmin.${TIER_FEATURES.colorTheme}`),
           })}
         </p>

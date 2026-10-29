@@ -13,7 +13,8 @@
     "openMenu": "Öppna meny",
     "closeMenu": "Stäng meny",
     "participants": "Deltagare",
-    "allEvents": "Alla event"
+    "allEvents": "Alla event",
+    "settings": "Inställningar"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",
@@ -66,12 +67,6 @@
     "logoPendingSave": "Tillämpas när du sparar",
     "logoInvalidType": "Välj en bildfil (JPG, PNG, SVG med mera)",
     "logoAlt": "Evenemangets logotyp",
-    "colorTheme": "Färgtema",
-    "colorThemeBlue": "Blå",
-    "colorThemeGreen": "Turkos",
-    "colorThemePurple": "Lila",
-    "colorThemeSaved": "Temat uppdaterat",
-    "colorThemeError": "Kunde inte uppdatera temat",
     "eventName": "Evenemangsnamn",
     "eventNamePlaceholder": "t.ex. Viadal 2026",
     "eventNameRequired": "Evenemangsnamn",
@@ -126,8 +121,7 @@
     "cannotRemoveLastRaceStage": "Kan inte ta bort den sista tävlingsetappen från ett publicerat evenemang.",
     "stageTimesInvalid": "En etapps sluttid måste vara efter dess starttid.",
     "publishPreconditionFailed": "Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.",
-    "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen.",
-    "colorThemeLocked": "Tillgängligt från {{tier}} och uppåt."
+    "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen."
   },
   "workstations": {
     "title": "Arbetsområden",
@@ -682,5 +676,19 @@
     "datesNotSet": "Datum ej angivna",
     "officialsInvited": "+{{invited}} inbjudna",
     "actionsFor": "Åtgärder för {{name}}"
+  },
+  "settings": {
+    "title": "Inställningar",
+    "subtitle": "Gäller alla event och funktionärernas vyer.",
+    "appearance": "Utseende",
+    "colorTheme": "Färgtema",
+    "colorThemeBlue": "Blå",
+    "colorThemeGreen": "Turkos",
+    "colorThemePurple": "Lila",
+    "colorThemeLocked": "Tillgängligt från {{tier}} och uppåt.",
+    "colorThemeError": "Kunde inte uppdatera temat",
+    "save": "Spara",
+    "saving": "Sparar…",
+    "saved": "Sparat"
   }
 }
