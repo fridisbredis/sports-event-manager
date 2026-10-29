@@ -295,7 +295,7 @@ någon override-flagga.
       gissar aldrig på den).
 - [ ] Ta en riktig snapshot av prod: `scripts/ops/snapshot-prod-db.sh 9999`
       (ett testnummer som inte kolliderar med en riktig migration — se
-      `Migration number collision`-jobbet i `quality.yml` för varför
+      `Migration guards`-jobbet i `quality.yml` för varför
       kollisioner är farliga). Notera blob-namnet som skrivs ut på slutet.
 - [ ] Verifiera i Azure att blobben faktiskt landade:
       `az storage blob list --account-name sportsevtmgrprodsnaps --container-name db-snapshots --output table`
