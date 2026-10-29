@@ -174,7 +174,6 @@ export function CreateEventDialog({
           <ModalBody className="gap-4">
             <Input
               label={t('events.createEvent.name')}
-              placeholder={t('events.createEvent.namePlaceholder')}
               value={name}
               onValueChange={setName}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
