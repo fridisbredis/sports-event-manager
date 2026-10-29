@@ -173,6 +173,28 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
     expect(payloadA.facilities.some((f) => f.label.startsWith('Tenant B'))).toBe(false)
   })
 
+  // N23 (migration 20261029094424): with several events, the stages and
+  // facilities are the requested event's, not every event's in the tenant.
+  it("returns only the requested event's stages and facilities", async () => {
+    const admin = serviceClient()
+    const tenant = await createTenant('Event Info Two Editions')
+    createdTenantIds.push(tenant.id)
+    await seedTenantEvent(admin, tenant.id, 'Edition 2026')
+    const later = await seedTenantEvent(admin, tenant.id, 'Edition 2027')
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (admin.rpc as any)('get_event_info_cached', {
+      p_tenant_id: tenant.id,
+      p_event_id: later.id,
+    })
+    expect(error).toBeNull()
+    const payload = data as unknown as EventInfoCached
+
+    expect(payload.event?.name).toBe('Edition 2027')
+    expect(payload.stages.map((s) => s.name)).toEqual(['Edition 2027 Stage 1'])
+    expect(payload.facilities.map((f) => f.label)).toEqual(['Edition 2027 Water Station'])
+  })
+
   describe('access control: anon/authenticated must be denied', () => {
     const anon: SupabaseClient<Database> = createClient<Database>(
       process.env.SUPABASE_URL!,
