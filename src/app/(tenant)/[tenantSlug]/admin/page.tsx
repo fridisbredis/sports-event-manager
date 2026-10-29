@@ -9,6 +9,7 @@ import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { EmptyState, EmptyStateCard } from '@/components/ui/empty-state'
 import { EventCard } from './_components/event-card'
+import { CreateEventDialog, type CopySource } from './_components/create-event-dialog'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -38,12 +39,34 @@ export default async function TenantDashboardPage({ params, searchParams }: Prop
   // The whole list, filtered here rather than in the query: the active count
   // in the header has to count every event, not just the filtered ones, and
   // a tenant has at most a few dozen.
-  const allEvents = await readTenantEvents(supabase, tenant.id)
+  const [allEvents, { data: stages, error: stagesError }] = await Promise.all([
+    readTenantEvents(supabase, tenant.id),
+    // For "Create event": what each event's stages are, so the dialog can ask
+    // for their new dates. Same tenant filter, same RLS.
+    supabase
+      .from('event_stages')
+      .select('id, event_id, name, start_time')
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true }),
+  ])
+  if (stagesError) throw stagesError
   const events = status ? allEvents.filter((e) => e.status === status) : allEvents
 
   const activeCount = allEvents.filter((e) => e.status !== 'archived').length
   const cap = maxActiveEvents(tenant.tier)
   const showParticipants = hasFeature(tenant.tier, 'participants')
+
+  const sources: CopySource[] = allEvents.map((e) => ({
+    id: e.id,
+    name: e.name,
+    status: e.status,
+    stages: (stages ?? []).filter((s) => s.event_id === e.id),
+  }))
+  // The button stays visible at the cap, disabled, with the way forward.
+  const capMessage =
+    activeCount >= cap
+      ? t(cap === 1 ? 'events.createEvent.capArchiveFirst' : 'events.createEvent.capUpgrade')
+      : undefined
 
   const filters = [
     { value: undefined, label: t('events.filterAll') },
@@ -52,11 +75,14 @@ export default async function TenantDashboardPage({ params, searchParams }: Prop
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">
-      <div className="mb-6 border-b border-edge pb-5">
-        <h1 className="page-title">{t('events.title')}</h1>
-        <p className="mt-1.5 text-[14.5px] text-ink-muted">
-          {t('events.activeOfCap', { active: activeCount, cap })}
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-edge pb-5">
+        <div>
+          <h1 className="page-title">{t('events.title')}</h1>
+          <p className="mt-1.5 text-[14.5px] text-ink-muted">
+            {t('events.activeOfCap', { active: activeCount, cap })}
+          </p>
+        </div>
+        <CreateEventDialog tenantSlug={tenantSlug} sources={sources} capMessage={capMessage} />
       </div>
 
       {allEvents.length === 0 ? (

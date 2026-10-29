@@ -13,7 +13,16 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({ default: () => null }))
 
 vi.mock('@/lib/auth/tenant', () => ({ getAdminTenant: vi.fn() }))
-vi.mock('@/lib/supabase/server', () => ({ createSupabaseServerClient: vi.fn(async () => ({})) }))
+// readTenantEvents is mocked below; the page's own read is the stages query
+// for the create-event dialog.
+vi.mock('@/lib/supabase/server', () => {
+  const chain: Record<string, unknown> = {}
+  for (const method of ['select', 'eq']) chain[method] = () => chain
+  chain.order = async () => ({ data: [], error: null })
+  return { createSupabaseServerClient: vi.fn(async () => ({ from: () => chain })) }
+})
+// A client component; the page test only cares what it is handed.
+vi.mock('./_components/create-event-dialog', () => ({ CreateEventDialog: () => null }))
 vi.mock('@/lib/events/tenant-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/events/tenant-events')>()),
   readTenantEvents: vi.fn(),
@@ -101,6 +110,16 @@ describe('TenantDashboardPage', () => {
     vi.mocked(readTenantEvents).mockResolvedValue([])
     const none = JSON.stringify(await TenantDashboardPage({ params, searchParams: search() }))
     expect(none).toContain('events.noEventsTitle')
+  })
+
+  // Premium allows 5 and EVENTS has 2 active: room left. Standard allows 1.
+  it.each([
+    ['premium', false],
+    ['standard', true],
+  ])('on %s, disables Create event at the cap: %s', async (tier, atCap) => {
+    vi.mocked(getAdminTenant).mockResolvedValue(tenant(tier))
+    const tree = JSON.stringify(await TenantDashboardPage({ params, searchParams: search() }))
+    expect(tree.includes('"capMessage":"events.createEvent.capArchiveFirst"')).toBe(atCap)
   })
 
   it.each([

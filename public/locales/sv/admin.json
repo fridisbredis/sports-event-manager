@@ -68,7 +68,6 @@
     "logoInvalidType": "Välj en bildfil (JPG, PNG, SVG med mera)",
     "logoAlt": "Evenemangets logotyp",
     "eventName": "Evenemangsnamn",
-    "eventNamePlaceholder": "t.ex. Viadal 2026",
     "eventNameRequired": "Evenemangsnamn",
     "type": "Typ",
     "typePlaceholder": "t.ex. Landsvägslopp i etapper",
@@ -675,7 +674,35 @@
     "archiveConfirmBody": "Ett arkiverat event låses för redigering och försvinner från funktionärernas eventlista. Det frigör en av era platser för aktiva event. Du kan återställa det senare om en plats är ledig.",
     "datesNotSet": "Datum ej angivna",
     "officialsInvited": "+{{invited}} inbjudna",
-    "actionsFor": "Åtgärder för {{name}}"
+    "actionsFor": "Åtgärder för {{name}}",
+    "createEvent": {
+      "create": "Skapa event",
+      "title": "Skapa event",
+      "name": "Eventets namn",
+      "source": "Kopiera från",
+      "sourceBlank": "Inget (tomt event)",
+      "sourceArchived": "{{name}} (arkiverat)",
+      "copyHeading": "Vad ska kopieras",
+      "copy": {
+        "details": "Beskrivning",
+        "stages": "Etapper",
+        "distances": "Distanser",
+        "facilities": "Faciliteter",
+        "work_areas": "Arbetsområden",
+        "checklists": "Checklistor / att göra",
+        "officials": "Funktionärer"
+      },
+      "copyNeedsStages": "Kräver etapper",
+      "copyNeedsWorkAreas": "Kräver arbetsområden",
+      "stageDatesHint": "Nya datum för de kopierade etapperna. Klockslagen behålls, och ändrar du den första följer resten med.",
+      "stageDate": "Datum för {{name}}",
+      "undatedStages": "Etapper utan tider kopieras utan datum.",
+      "draftNote": "Eventet skapas som utkast.",
+      "capArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det för att skapa ett nytt.",
+      "capUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler.",
+      "officialsNote": "Funktionärerna du kopierar ser det nya eventet i appen direkt, markerat som nytt – även medan det är ett utkast.",
+      "nameTaken": "Det finns redan ett event med det här namnet."
+    }
   },
   "settings": {
     "title": "Inställningar",

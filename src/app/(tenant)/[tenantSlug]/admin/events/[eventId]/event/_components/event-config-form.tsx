@@ -402,7 +402,6 @@ export default function EventConfigForm({
                 markDirty()
                 if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
               }}
-              placeholder={t('eventConfig.eventNamePlaceholder')}
               isInvalid={!!errors.name}
               errorMessage={errors.name}
             />

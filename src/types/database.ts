@@ -1210,6 +1210,16 @@ export type Database = {
         }
         Returns: Json
       }
+      create_event: {
+        Args: {
+          p_copy: Json
+          p_name: string
+          p_source_event_id: string
+          p_stage_dates: Json
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       create_official_in_event: {
         Args: {
           p_event_id: string

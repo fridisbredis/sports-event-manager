@@ -5,11 +5,13 @@ import {
   Textarea as HeroTextarea,
   Select as HeroSelect,
   TimeInput as HeroTimeInput,
+  DatePicker as HeroDatePicker,
   DateRangePicker as HeroDateRangePicker,
   type InputProps,
   type TextAreaProps,
   type SelectProps,
   type TimeInputProps,
+  type DatePickerProps,
   type DateRangePickerProps,
 } from '@heroui/react'
 
@@ -150,6 +152,26 @@ export function DateRangePicker(props: DateRangePickerProps) {
 
   return (
     <HeroDateRangePicker
+      variant="faded"
+      {...props}
+      aria-label={groupLabel}
+      classNames={{
+        ...props.classNames,
+        label: `${FIELD_LABEL} ${props.classNames?.label ?? ''}`,
+        inputWrapper: `${WHITE_FIELD} ${props.classNames?.inputWrapper ?? ''}`,
+      }}
+    />
+  )
+}
+
+// A single date. Same treatment as DateRangePicker above, including the
+// group's aria-label, for the same reason.
+export function DatePicker(props: DatePickerProps) {
+  const groupLabel =
+    props['aria-label'] ?? (typeof props.label === 'string' ? props.label : undefined)
+
+  return (
+    <HeroDatePicker
       variant="faded"
       {...props}
       aria-label={groupLabel}

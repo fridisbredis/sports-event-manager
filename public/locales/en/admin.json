@@ -68,7 +68,6 @@
     "logoInvalidType": "Please choose an image file (JPG, PNG, SVG, etc.)",
     "logoAlt": "Event logo",
     "eventName": "Event name",
-    "eventNamePlaceholder": "e.g. Viadal 2026",
     "eventNameRequired": "Event name",
     "type": "Type",
     "typePlaceholder": "e.g. Multi-stage road race",
@@ -675,7 +674,35 @@
     "archiveConfirmBody": "An archived event is locked for editing and disappears from the officials' event list. It frees one of your active event slots. You can un-archive it later if a slot is free.",
     "datesNotSet": "Dates not set",
     "officialsInvited": "+{{invited}} invited",
-    "actionsFor": "Actions for {{name}}"
+    "actionsFor": "Actions for {{name}}",
+    "createEvent": {
+      "create": "Create event",
+      "title": "Create event",
+      "name": "Event name",
+      "source": "Copy from",
+      "sourceBlank": "Nothing (blank event)",
+      "sourceArchived": "{{name}} (archived)",
+      "copyHeading": "What to copy",
+      "copy": {
+        "details": "Description",
+        "stages": "Stages",
+        "distances": "Distances",
+        "facilities": "Facilities",
+        "work_areas": "Work areas",
+        "checklists": "Checklists / to-dos",
+        "officials": "Officials"
+      },
+      "copyNeedsStages": "Needs stages",
+      "copyNeedsWorkAreas": "Needs work areas",
+      "stageDatesHint": "New dates for the copied stages. Each keeps its time of day; changing the first moves the rest along.",
+      "stageDate": "Date for {{name}}",
+      "undatedStages": "Stages without times are copied without a date.",
+      "draftNote": "The event is created as a draft.",
+      "capArchiveFirst": "Your plan has room for one active event. Archive it to create a new one.",
+      "capUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more.",
+      "officialsNote": "The officials you copy see the new event in the app straight away, marked as new — even while it is a draft.",
+      "nameTaken": "An event with this name already exists."
+    }
   },
   "settings": {
     "title": "Settings",
