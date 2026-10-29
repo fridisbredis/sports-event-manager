@@ -12,7 +12,9 @@
     "logOut": "Log out",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "participants": "Participants"
+    "participants": "Participants",
+    "allEvents": "All events",
+    "settings": "Settings"
   },
   "dashboard": {
     "eventName": "Untitled event",
@@ -65,14 +67,7 @@
     "logoPendingSave": "Applied when you save",
     "logoInvalidType": "Please choose an image file (JPG, PNG, SVG, etc.)",
     "logoAlt": "Event logo",
-    "colorTheme": "Color theme",
-    "colorThemeBlue": "Blue",
-    "colorThemeGreen": "Teal",
-    "colorThemePurple": "Purple",
-    "colorThemeSaved": "Theme updated",
-    "colorThemeError": "Couldn't update theme",
     "eventName": "Event name",
-    "eventNamePlaceholder": "e.g. Viadal 2026",
     "eventNameRequired": "Event name",
     "type": "Type",
     "typePlaceholder": "e.g. Multi-stage road race",
@@ -126,7 +121,7 @@
     "stageTimesInvalid": "A stage's end time must be after its start time.",
     "publishPreconditionFailed": "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again.",
     "logoUploadError": "Something went wrong while uploading the logo. Please try again.",
-    "colorThemeLocked": "Available on {{tier}} and above."
+    "eventArchived": "This event is archived and can't be changed. Restore it first."
   },
   "workstations": {
     "title": "Work areas",
@@ -219,8 +214,8 @@
     "sending": "Sending…",
     "remove": "Remove",
     "cancel": "Cancel",
-    "removeConfirmTitle": "Remove official?",
-    "removeConfirmBody": "Removing {{name}} also frees any work-area assignments they hold. This can't be undone.",
+    "removeConfirmTitle": "Remove from this event?",
+    "removeConfirmBody": "{{name}} is taken off this event and its schedule. If they are in no other event, they are removed from the organisation as well. This cannot be undone.",
     "removeConfirm": "Are you sure? This will free any assignments for this official.",
     "resendConfirmTitle": "Re-send invite?",
     "resendConfirmBody": "If {{name}} already opened their invite link and has a code, re-sending invalidates it. They'll need to use the new SMS instead.",
@@ -263,7 +258,22 @@
     "adminCapReachedHint": "All admin places are in use. Remove an admin role to give it to someone else.",
     "actionsFor": "Actions for {{name}}",
     "adminCapReachedShort": "All admin places are in use",
-    "makeAdminRequiresConfirmed": "Can be made admin once they have confirmed the invite"
+    "makeAdminRequiresConfirmed": "Can be made admin once they have confirmed the invite",
+    "fromEvents": {
+      "open": "From other events",
+      "title": "Add from other events",
+      "hint": "Officials from the organisation's other events who are not in this one yet.",
+      "search": "Search by name, number or event",
+      "noMatches": "No one matches.",
+      "notice": "They get a notice in the app that they were added. No SMS is sent, and a confirmed official does not need to accept again.",
+      "add": "Add",
+      "addCount": "Add {{n}}",
+      "duplicateHint": "If they are in another of your events, use From other events.",
+      "selectAll": "Select all",
+      "selectMatches": "Select matches",
+      "deselectAll": "Deselect all",
+      "selectedOf": "{{n}} of {{total}} selected"
+    }
   },
   "participants": {
     "title": "Participants",
@@ -656,6 +666,78 @@
   },
   "events": {
     "noEventsTitle": "No events yet",
-    "noEventsBody": "This organizer has no events. A system admin can create one."
+    "noEventsBody": "This organizer has no events yet.",
+    "title": "Events",
+    "activeOfCap": "{{active}} of {{cap}} active events",
+    "filterLabel": "Filter by status",
+    "filterAll": "All",
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "noMatching": {
+      "draft": "No draft events",
+      "published": "No published events",
+      "archived": "No archived events"
+    },
+    "stages": "Stages",
+    "officials": "Officials",
+    "participants": "Participants",
+    "archive": "Archive",
+    "unarchive": "Un-archive",
+    "cancel": "Cancel",
+    "archiveConfirmTitle": "Archive {{name}}?",
+    "archiveConfirmBody": "An archived event is locked for editing and disappears from the officials' event list. It frees one of your active event slots. You can un-archive it later if a slot is free.",
+    "datesNotSet": "Dates not set",
+    "officialsInvited": "+{{invited}} invited",
+    "actionsFor": "Actions for {{name}}",
+    "createEvent": {
+      "create": "Create event",
+      "title": "Create event",
+      "name": "Event name",
+      "source": "Copy from",
+      "sourceBlank": "Nothing (blank event)",
+      "sourceArchived": "{{name}} (archived)",
+      "copyHeading": "What to copy",
+      "copy": {
+        "details": "Description",
+        "stages": "Stages",
+        "distances": "Distances",
+        "facilities": "Facilities",
+        "work_areas": "Work areas",
+        "checklists": "Checklists / to-dos",
+        "officials": "Officials"
+      },
+      "copyNeedsStages": "Needs stages",
+      "copyNeedsWorkAreas": "Needs work areas",
+      "stageDatesHint": "New dates for the copied stages. Each keeps its time of day; changing the first moves the rest along.",
+      "stageDate": "Date for {{name}}",
+      "undatedStages": "Stages without times are copied without a date.",
+      "draftNote": "The event is created as a draft.",
+      "capArchiveFirst": "Your plan has room for one active event. Archive it to create a new one.",
+      "capUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more.",
+      "officialsNote": "The officials you copy see the new event in the app straight away, marked as new — even while it is a draft.",
+      "nameTaken": "An event with this name already exists."
+    },
+    "archivedBanner": {
+      "title": "This event is archived",
+      "body": "Nothing in it can be changed, and officials no longer see it. Restore it to edit it again; it comes back as a draft.",
+      "restore": "Restore"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Applies to every event and to the officials' screens.",
+    "appearance": "Appearance",
+    "colorTheme": "Color theme",
+    "colorThemeBlue": "Blue",
+    "colorThemeGreen": "Teal",
+    "colorThemePurple": "Purple",
+    "colorThemeLocked": "Available on {{tier}} and above.",
+    "colorThemeError": "Couldn't update theme",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
   }
 }

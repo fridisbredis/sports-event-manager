@@ -126,7 +126,7 @@ describe('N23: archived event lock', () => {
 
   it('refuses edits to an archived event', async () => {
     const { error } = await client.from('events').update({ name: 'Renamed' }).eq('id', eventId)
-    expect(error?.code).toBe('42501')
+    expect(error?.code).toBe('P0004')
   })
 
   it('refuses an edit smuggled in alongside un-archiving', async () => {
@@ -134,7 +134,7 @@ describe('N23: archived event lock', () => {
       .from('events')
       .update({ status: 'draft', name: 'Renamed' })
       .eq('id', eventId)
-    expect(error?.code).toBe('42501')
+    expect(error?.code).toBe('P0004')
   })
 
   it('allows un-archiving, and then editing', async () => {
@@ -225,14 +225,7 @@ describe('N23: Race Results identity is per event', () => {
     expect(data?.[1].withdrawn_at).not.toBeNull()
   })
 
-  it('refuses a race_results participant without an event', async () => {
-    const { error } = await serviceClient().from('participants').insert({
-      tenant_id: tenantId,
-      source: 'race_results',
-      external_id: '99',
-      name: 'Nobody',
-    })
-    // Two events in this tenant, so the fill trigger cannot choose one.
-    expect(error?.code).toBe('23514')
-  })
+  // A race_results participant without an event used to hit
+  // participants_rr_has_event; event_id is NOT NULL since 20261029100240, so
+  // that refusal is covered in event-id-fill.test.ts.
 })

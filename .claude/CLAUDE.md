@@ -114,6 +114,8 @@ Policies MUST follow the pattern established in migration 0004:
 - `tenant_admin_manage_<table>` (FOR ALL): `USING (public.get_user_role(tenant_id) = 'tenant_admin' OR public.is_system_admin())`
 - `tenant_member_read_<table>` (FOR SELECT): `USING (public.get_user_role(tenant_id) IS NOT NULL OR public.is_system_admin())`
 
+**Event-scoped tables (N23)** — anything that belongs to one event (has `event_id`, or reaches one through a work area) — use `event_member_read_<table>` instead of `tenant_member_read_<table>`: `USING (public.can_read_event(tenant_id, event_id))`. Admins still read every event; an official reads only events they are a member of (`official_events`). Officials must not see another event's data in the same tenant (migration `20261029090324`).
+
 The `is_system_admin()` OR clause is **mandatory**. Without it, system_admins cannot access tenants where they don't have an explicit `user_roles` row. Direct subqueries on `user_roles` (the 0003 style) and `IN ('tenant_admin', 'system_admin')` lists (the 0005-pre-fix style) are obsolete.
 
 Use `DROP POLICY IF EXISTS` + `CREATE POLICY` for defensive re-runs. Avoid `DO $$ IF NOT EXISTS $$` blocks for policies.

@@ -49,6 +49,28 @@ export default async function OfficialsPage({ params }: Props) {
 
   if (error) throw error
 
+  // N23 (7c): the tenant's other officials, with the events they are in, for
+  // "From other events". Everyone not removed and not already in this event.
+  const { data: tenantOfficials, error: candidatesError } = await supabase
+    .from('officials')
+    .select('id, name, phone, invite_status, official_events(event_id, events(name))')
+    .eq('tenant_id', tenant.id)
+    .neq('invite_status', 'removed')
+    .order('name', { ascending: true })
+    .range(0, OFFICIALS_CEILING)
+
+  if (candidatesError) throw candidatesError
+
+  const candidates = (tenantOfficials ?? [])
+    .filter((o) => !o.official_events.some((m) => m.event_id === eventId))
+    .map((o) => ({
+      id: o.id,
+      name: o.name,
+      phone: o.phone,
+      invite_status: o.invite_status,
+      events: o.official_events.flatMap((m) => (m.events ? [m.events.name] : [])),
+    }))
+
   const rows = checkReadCeiling(officials ?? [], {
     ceiling: OFFICIALS_CEILING,
     page: 'admin/officials',
@@ -101,6 +123,7 @@ export default async function OfficialsPage({ params }: Props) {
         adminUserIds={adminUserIds}
         adminCap={adminCap}
         tier={tenant.tier}
+        candidates={candidates}
       />
     </div>
   )

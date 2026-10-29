@@ -78,7 +78,7 @@ Go through in this order — security and data integrity before style.
       with the code already running during the deploy window (see the "What's
       safe in one release" table in CLAUDE.md) — otherwise require an
       expand/contract split
-- [ ] CI's `migration-number-collision` job (`quality.yml`, PR #74) catches a
+- [ ] CI's `migration-guards` job (`quality.yml`, PR #74) catches a
       shared numeric prefix under `supabase/migrations/` automatically —
       the prefix-extraction regex matches a 14-digit timestamp exactly as
       well as a 4-digit number, so this already covers timestamped filenames

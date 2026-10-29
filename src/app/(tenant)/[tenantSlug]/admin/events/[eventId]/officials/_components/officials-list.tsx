@@ -43,6 +43,7 @@ import type { OfficialListItem } from '@/types/app'
 import type { OfficialDetail } from '@/lib/scheduling/official-detail'
 import { formatStageDate, formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
 import { makeTenantAdmin, removeTenantAdmin } from '../actions'
+import { AddFromEventsModal, type OfficialCandidate } from './add-from-events-modal'
 
 interface Props {
   tenantSlug: string
@@ -61,6 +62,8 @@ interface Props {
   adminCap: number
   /** N27: the tenant's tier, named in the cap explanation. */
   tier: string
+  /** N23 (7c): the tenant's officials from other events, not yet in this one. */
+  candidates: OfficialCandidate[]
 }
 
 type AdminRoleChange = { official: OfficialListItem; action: 'make' | 'remove' }
@@ -88,10 +91,20 @@ export default function OfficialsList({
   adminUserIds,
   adminCap,
   tier,
+  candidates,
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
   const [officials, setOfficials] = useState<OfficialListItem[]>(initialOfficials)
+  // Re-seeded from a fresh server payload: useState keeps its mount-time
+  // value, so after router.refresh() — adding officials from other events,
+  // an admin role change — the list would not show the server's new rows.
+  const [renderedOfficials, setRenderedOfficials] = useState(initialOfficials)
+  if (renderedOfficials !== initialOfficials) {
+    setRenderedOfficials(initialOfficials)
+    setOfficials(initialOfficials)
+  }
+  const [fromEventsOpen, setFromEventsOpen] = useState(false)
   // N17: which rows are expanded. A set rather than a single id — comparing
   // two officials' shifts means having both open at once.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -147,7 +160,12 @@ export default function OfficialsList({
         }
       } else if (res.status === 409) {
         // Same number as an active official in this tenant. Names may repeat, numbers may not.
-        const message = t('officials.duplicatePhone')
+        // Most often the person is already on another of the tenant's events,
+        // and "From other events" is the way to bring them in.
+        const message =
+          candidates.length > 0
+            ? `${t('officials.duplicatePhone')} ${t('officials.fromEvents.duplicateHint')}`
+            : t('officials.duplicatePhone')
         setAddError(message)
         toastError(message)
       } else if (res.status === 400) {
@@ -187,11 +205,17 @@ export default function OfficialsList({
     if (!removeTarget) return
     setPending(true)
     try {
-      const res = await fetch(`/api/officials/${removeTarget.id}?tenantId=${tenantId}`, {
-        method: 'DELETE',
-      })
+      // N23: with the event, Remove takes them out of this event only.
+      const res = await fetch(
+        `/api/officials/${removeTarget.id}?tenantId=${tenantId}&eventId=${eventId}`,
+        {
+          method: 'DELETE',
+        }
+      )
       if (res.ok) {
         setOfficials((prev) => prev.filter((o) => o.id !== removeTarget.id))
+        // Someone still in another event becomes a candidate to add back.
+        router.refresh()
         setRemoveTarget(null)
       } else {
         toastError(t('officials.removeError', { name: removeTarget.name }))
@@ -296,10 +320,29 @@ export default function OfficialsList({
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="page-title">{t('officials.title')}</h1>
-        <Button color="primary" onPress={() => setAddModalOpen(true)}>
-          {t('officials.add')}
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {candidates.length > 0 && (
+            <Button
+              variant="bordered"
+              className="rounded-control border-edge-field bg-white"
+              onPress={() => setFromEventsOpen(true)}
+            >
+              {t('officials.fromEvents.open')}
+            </Button>
+          )}
+          <Button color="primary" onPress={() => setAddModalOpen(true)}>
+            {t('officials.add')}
+          </Button>
+        </div>
       </div>
+
+      <AddFromEventsModal
+        open={fromEventsOpen}
+        onClose={() => setFromEventsOpen(false)}
+        tenantSlug={tenantSlug}
+        eventId={eventId}
+        candidates={candidates}
+      />
 
       {/* The admin limit, stated before it is hit rather than discovered
           through a greyed-out menu item. */}

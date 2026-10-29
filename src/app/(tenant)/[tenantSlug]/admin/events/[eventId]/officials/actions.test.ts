@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextResponse } from 'next/server'
 
-import { makeTenantAdmin, removeTenantAdmin } from './actions'
+import { makeTenantAdmin, removeTenantAdmin, addOfficialsToEvent } from './actions'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
-import { requireTenantAdmin } from '@/lib/auth/tenant'
+import { requireTenantAdmin, getAdminTenant } from '@/lib/auth/tenant'
 import {
   resolveAdminAuthUser,
   grantTenantAdminRole,
@@ -19,6 +19,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
+  getAdminTenant: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant-admins', () => ({
@@ -35,6 +36,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
+  updateTag: vi.fn(),
 }))
 
 vi.mock('@/lib/logger', () => ({
@@ -267,5 +269,63 @@ describe('removeTenantAdmin', () => {
     vi.mocked(revokeTenantAdminRole).mockResolvedValue({ ok: false, reason: 'failed' })
 
     expect(await removeTenantAdmin(input)).toEqual({ error: 'actionErrors.revokeAdminFailed' })
+  })
+})
+
+// N23 (7c)
+describe('addOfficialsToEvent', () => {
+  const EVENT_ID = '33333333-3333-3333-3333-333333333333'
+  const OTHER_ID = '44444444-4444-4444-4444-444444444444'
+  const addInput = { tenantSlug: 'acme', eventId: EVENT_ID, officialIds: [OFFICIAL_ID, OTHER_ID] }
+
+  // officials re-read, then the official_events upsert.
+  function mockClient(found: unknown, upsertResult: unknown = { data: [{}], error: null }) {
+    const read: Record<string, unknown> = {}
+    for (const m of ['select', 'eq', 'in']) read[m] = vi.fn(() => read)
+    read.neq = vi.fn(() => Promise.resolve(found))
+    const upsert = vi.fn(() => ({ select: vi.fn(() => Promise.resolve(upsertResult)) }))
+    const from = vi.fn((table: string) => (table === 'officials' ? read : { upsert }))
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from } as never)
+    return { read, upsert }
+  }
+
+  beforeEach(() => {
+    vi.mocked(getAdminTenant).mockResolvedValue({ id: TENANT_ID } as never)
+  })
+
+  it('refuses a caller who is not this tenant’s admin', async () => {
+    vi.mocked(getAdminTenant).mockResolvedValue(null)
+    const { upsert } = mockClient({ data: [], error: null })
+    expect(await addOfficialsToEvent(addInput)).toEqual({ error: 'actionErrors.notAuthorized' })
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it('refuses an empty selection', async () => {
+    expect(await addOfficialsToEvent({ ...addInput, officialIds: [] })).toEqual({
+      error: 'actionErrors.invalidRequest',
+    })
+  })
+
+  // A crafted id from another tenant, or a removed official, is not re-read,
+  // so it is not added.
+  it('adds only the officials the tenant-filtered read returns, unseen', async () => {
+    const { read, upsert } = mockClient({ data: [{ id: OFFICIAL_ID }], error: null })
+
+    expect(await addOfficialsToEvent(addInput)).toEqual({ added: 1 })
+    expect(read.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(read.neq).toHaveBeenCalledWith('invite_status', 'removed')
+    expect(upsert).toHaveBeenCalledWith(
+      [{ official_id: OFFICIAL_ID, event_id: EVENT_ID, tenant_id: TENANT_ID }],
+      { onConflict: 'official_id,event_id', ignoreDuplicates: true }
+    )
+    expect(revalidatePath).toHaveBeenCalled()
+  })
+
+  it('reports a failed insert without revalidating', async () => {
+    mockClient({ data: [{ id: OFFICIAL_ID }], error: null }, { data: null, error: { code: 'x' } })
+    expect(await addOfficialsToEvent(addInput)).toEqual({
+      error: 'actionErrors.addOfficialsFailed',
+    })
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

@@ -9,7 +9,6 @@ import {
   saveEvent,
   uploadEventLogo,
   removeEventLogo,
-  updateTenantColorPalette,
   type StageInput,
   type LabelInput,
   type SaveEventInput,
@@ -23,12 +22,9 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
 import { LogoUploadField } from './logo-upload-field'
-import { ColorPalettePicker } from './color-palette-picker'
 import { DatesAndGranularitySection } from './dates-and-granularity-section'
 import { FacilitiesEditor } from './facilities-editor'
 import { derivedDateRange } from '../_utils'
-import type { TenantPaletteKey } from '@/lib/theme/tenant-colors'
-import { tenantThemeVars } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
   tenantSlug: string
@@ -39,12 +35,12 @@ interface Props {
   initialDescription: string
   initialLocation: string
   initialLogoUrl: string
-  initialColorPalette: string
-  canChooseColorTheme: boolean
   initialGranularity: number
   initialStages: StageInput[]
   initialFacilities: LabelInput[]
   isPublished: boolean
+  // N23: read-only in the database; the layout's banner explains it.
+  isArchived?: boolean
 }
 
 interface FormErrors {
@@ -61,23 +57,15 @@ export default function EventConfigForm({
   initialDescription,
   initialLocation,
   initialLogoUrl,
-  initialColorPalette,
-  canChooseColorTheme,
   initialGranularity,
   initialStages,
   initialFacilities,
   isPublished,
+  isArchived = false,
 }: Props) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
-  // Leaving with an unsaved palette has to put the theme back. Picking a colour
-  // writes the CSS variables straight onto :root for an immediate preview, and
-  // unlike every other field here that lives in component state, those survive
-  // the navigation — the abandoned colour would follow the user to the next
-  // page and read as saved.
-  const { markDirty, markClean, dialogProps } = useUnsavedChanges({
-    onDiscard: () => paintTheme(savedPalette),
-  })
+  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
 
   const [name, setName] = useState(initialName)
   const [eventType, setEventType] = useState(initialEventType)
@@ -110,10 +98,9 @@ export default function EventConfigForm({
   }
   useEffect(() => () => setPreview(null), [])
 
-  // Re-seeded from the server payload for the same reason as the palette
-  // below: useState keeps its mount-time value, so after a revalidate of this
-  // route the form would keep showing — and sending back — whatever logo it
-  // was built with.
+  // Re-seeded from the server payload: useState keeps its mount-time value,
+  // so after a revalidate of this route the form would keep showing — and
+  // sending back — whatever logo it was built with.
   const [renderedLogoUrl, setRenderedLogoUrl] = useState(initialLogoUrl)
   if (renderedLogoUrl !== initialLogoUrl) {
     setRenderedLogoUrl(initialLogoUrl)
@@ -125,30 +112,6 @@ export default function EventConfigForm({
       setLogoError(false)
     }
   }
-  const [colorPalette, setColorPalette] = useState(initialColorPalette)
-
-  // The palette saves on click and the server then revalidates this route, so
-  // a fresh `initialColorPalette` arrives as a prop on the next render. Without
-  // this, `useState` keeps whatever it was seeded with at mount and the picker
-  // drifts out of step with both the database and the theme the layout paints
-  // — the selection appears to snap back to the previously stored colour.
-  // Re-seeding during render (rather than in an effect) applies the new value
-  // before the user ever sees a frame with the stale one.
-  // What the database currently holds, as opposed to what is being previewed.
-  // Save compares the two to decide whether the tenant row needs writing at
-  // all, and a failed palette write rolls the preview back to this.
-  const [savedPalette, setSavedPalette] = useState(initialColorPalette)
-
-  // A fresh server payload (after a save, or any revalidate of this route)
-  // re-seeds both: useState alone keeps its mount-time value forever, which
-  // would leave the picker showing a palette the database no longer holds.
-  const [renderedPalette, setRenderedPalette] = useState(initialColorPalette)
-  if (renderedPalette !== initialColorPalette) {
-    setRenderedPalette(initialColorPalette)
-    setSavedPalette(initialColorPalette)
-    setColorPalette(initialColorPalette)
-  }
-  const [paletteError, setPaletteError] = useState<string | undefined>()
   // Fixed at 60 min in v1 — see DatesAndGranularitySection for why. Read from the
   // event row rather than hardcoded, so an older row keeps rendering its own value.
   const [granularity] = useState(initialGranularity)
@@ -260,31 +223,6 @@ export default function EventConfigForm({
     return { ok: true }
   }
 
-  // Repaint the theme straight onto :root. TenantThemeStyle is a server
-  // component — it emits its <style> when the layout renders, so on its own the
-  // colour could not change until the server re-rendered, which meant waiting
-  // on a round trip to see the choice. Setting the variables here makes the
-  // preview immediate; the server's own <style> takes over unchanged on the
-  // next render, because it resolves to exactly these values.
-  function paintTheme(key: string) {
-    const root = document.documentElement
-    for (const [name, value] of tenantThemeVars(key)) {
-      root.style.setProperty(name, value)
-    }
-  }
-
-  // Picking a palette only previews it. The choice is written when the form is
-  // saved, like every other field here — so a palette tried on and abandoned
-  // leaves nothing behind, and the unsaved-changes guard can warn about it.
-  function handleColorPaletteSelect(key: TenantPaletteKey) {
-    if (key === colorPalette) return
-    setColorPalette(key)
-    paintTheme(key)
-    setPaletteError(undefined)
-    setSaveSuccess(false)
-    markDirty()
-  }
-
   function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return
     e.preventDefault()
@@ -344,28 +282,6 @@ export default function EventConfigForm({
         return
       }
 
-      // The palette lives on the tenant, not the event, so it is a separate
-      // write — but it belongs to the same Save press. Only sent when it
-      // actually changed, to keep an unrelated save off the tenants table.
-      if (colorPalette !== savedPalette) {
-        const paletteResult = await updateTenantColorPalette(
-          tenantSlug,
-          tenantId,
-          colorPalette as TenantPaletteKey
-        )
-        if (paletteResult.error) {
-          // The event saved; only the theme did not. Put the preview back to
-          // what is actually stored so the page does not claim a colour the
-          // database never took.
-          setColorPalette(savedPalette)
-          paintTheme(savedPalette)
-          setPaletteError(t('eventConfig.colorThemeError'))
-          toastError(t('eventConfig.colorThemeError'))
-          return
-        }
-        setSavedPalette(colorPalette)
-      }
-
       setSaveSuccess(true)
       markClean()
     })
@@ -401,16 +317,22 @@ export default function EventConfigForm({
             // Exact published/draft colours from the design handoff; HeroUI's
             // success/warning palettes are a different green and amber.
             className={
-              isPublished
-                ? 'bg-status-ok-bg text-status-ok-text'
-                : 'bg-status-pending-bg text-status-pending-text'
+              isArchived
+                ? 'bg-status-neutral-bg text-status-neutral-text'
+                : isPublished
+                  ? 'bg-status-ok-bg text-status-ok-text'
+                  : 'bg-status-pending-bg text-status-pending-text'
             }
           >
-            {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
+            {isArchived
+              ? t('events.status.archived')
+              : isPublished
+                ? t('eventConfig.published')
+                : t('eventConfig.draft')}
           </Chip>
         </div>
         <div className="flex items-center gap-3">
-          {!isPublished && (
+          {!isPublished && !isArchived && (
             // Secondary, and placed before Save: two solid primary buttons
             // side by side give the row no clear primary action, and the
             // primary one belongs last in the row.
@@ -479,14 +401,6 @@ export default function EventConfigForm({
               onRemove={handleLogoRemove}
             />
 
-            <ColorPalettePicker
-              colorPalette={colorPalette}
-              isSavingPalette={isSaving}
-              paletteError={paletteError}
-              onSelect={handleColorPaletteSelect}
-              isLocked={!canChooseColorTheme}
-            />
-
             <Input
               label={t('eventConfig.eventName')}
               isRequired
@@ -497,7 +411,6 @@ export default function EventConfigForm({
                 markDirty()
                 if (val.trim()) setErrors((prev) => ({ ...prev, name: undefined }))
               }}
-              placeholder={t('eventConfig.eventNamePlaceholder')}
               isInvalid={!!errors.name}
               errorMessage={errors.name}
             />

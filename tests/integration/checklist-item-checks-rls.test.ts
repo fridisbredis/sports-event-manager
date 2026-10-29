@@ -115,6 +115,7 @@ describe('checklist_item_checks RLS (WS-02)', () => {
     for (const row of assignmentRows) {
       const { error: assignError } = await admin.from('assignments').insert({
         tenant_id: tenantId,
+        event_id: event.id,
         official_id: await officialIdFor(row.userId),
         workstation_id: workstationId,
         slot_index: row.slot,
@@ -309,6 +310,7 @@ describe('checklist_item_events RLS (WS-02)', () => {
     const { error: auditAssignError } = await admin.from('assignments').insert([
       {
         tenant_id: tenantId,
+        event_id: event!.id,
         official_id: await officialIdFor(actorUserId),
         workstation_id: workstationId,
         slot_index: 0,

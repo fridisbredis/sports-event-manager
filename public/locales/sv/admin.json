@@ -12,7 +12,9 @@
     "logOut": "Logga ut",
     "openMenu": "Öppna meny",
     "closeMenu": "Stäng meny",
-    "participants": "Deltagare"
+    "participants": "Deltagare",
+    "allEvents": "Alla event",
+    "settings": "Inställningar"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",
@@ -65,14 +67,7 @@
     "logoPendingSave": "Tillämpas när du sparar",
     "logoInvalidType": "Välj en bildfil (JPG, PNG, SVG med mera)",
     "logoAlt": "Evenemangets logotyp",
-    "colorTheme": "Färgtema",
-    "colorThemeBlue": "Blå",
-    "colorThemeGreen": "Turkos",
-    "colorThemePurple": "Lila",
-    "colorThemeSaved": "Temat uppdaterat",
-    "colorThemeError": "Kunde inte uppdatera temat",
     "eventName": "Evenemangsnamn",
-    "eventNamePlaceholder": "t.ex. Viadal 2026",
     "eventNameRequired": "Evenemangsnamn",
     "type": "Typ",
     "typePlaceholder": "t.ex. Landsvägslopp i etapper",
@@ -126,7 +121,7 @@
     "stageTimesInvalid": "En etapps sluttid måste vara efter dess starttid.",
     "publishPreconditionFailed": "Evenemanget kan inte publiceras än. Se till att det har ett namn och minst en tävlingsetapp, och försök sedan igen.",
     "logoUploadError": "Något gick fel när logotypen skulle laddas upp. Försök igen.",
-    "colorThemeLocked": "Tillgängligt från {{tier}} och uppåt."
+    "eventArchived": "Eventet är arkiverat och kan inte ändras. Återställ det först."
   },
   "workstations": {
     "title": "Arbetsområden",
@@ -219,8 +214,8 @@
     "sending": "Skickar…",
     "remove": "Ta bort",
     "cancel": "Avbryt",
-    "removeConfirmTitle": "Ta bort funktionär?",
-    "removeConfirmBody": "Att ta bort {{name}} frigör även alla inplaneringar på arbetsområden. Det går inte att ångra.",
+    "removeConfirmTitle": "Ta bort från eventet?",
+    "removeConfirmBody": "{{name}} tas bort från det här eventet och dess schema. Är personen inte med i något annat event tas den bort från organisationen också. Det går inte att ångra.",
     "removeConfirm": "Är du säker? Det här frigör alla inplaneringar för den här funktionären.",
     "resendConfirmTitle": "Skicka inbjudan igen?",
     "resendConfirmBody": "Om {{name}} redan har öppnat sin inbjudningslänk och har en kod blir den ogiltig när du skickar igen. Hen behöver då använda det nya SMS:et i stället.",
@@ -263,7 +258,22 @@
     "adminCapReachedHint": "Alla adminplatser är använda. Ta bort en adminroll för att kunna ge den till någon annan.",
     "actionsFor": "Åtgärder för {{name}}",
     "adminCapReachedShort": "Alla adminplatser används",
-    "makeAdminRequiresConfirmed": "Kan bli admin när inbjudan är bekräftad"
+    "makeAdminRequiresConfirmed": "Kan bli admin när inbjudan är bekräftad",
+    "fromEvents": {
+      "open": "Från andra event",
+      "title": "Lägg till från andra event",
+      "hint": "Funktionärer från organisationens andra event som inte är med i det här än.",
+      "search": "Sök på namn, nummer eller event",
+      "noMatches": "Ingen matchar.",
+      "notice": "De får en notis i appen om att de lagts till. Inget SMS skickas, och en bekräftad funktionär behöver inte tacka ja igen.",
+      "add": "Lägg till",
+      "addCount": "Lägg till {{n}}",
+      "duplicateHint": "Är personen med i ett av era andra event, använd Från andra event.",
+      "selectAll": "Markera alla",
+      "selectMatches": "Markera träffarna",
+      "deselectAll": "Avmarkera alla",
+      "selectedOf": "{{n}} av {{total}} markerade"
+    }
   },
   "participants": {
     "title": "Deltagare",
@@ -656,6 +666,78 @@
   },
   "events": {
     "noEventsTitle": "Inga event än",
-    "noEventsBody": "Den här organisatören har inga event. En systemadministratör kan skapa ett."
+    "noEventsBody": "Den här arrangören har inga event än.",
+    "title": "Event",
+    "activeOfCap": "{{active}} av {{cap}} aktiva event",
+    "filterLabel": "Filtrera på status",
+    "filterAll": "Alla",
+    "status": {
+      "draft": "Utkast",
+      "published": "Publicerat",
+      "archived": "Arkiverat"
+    },
+    "noMatching": {
+      "draft": "Inga utkast",
+      "published": "Inga publicerade event",
+      "archived": "Inga arkiverade event"
+    },
+    "stages": "Etapper",
+    "officials": "Funktionärer",
+    "participants": "Deltagare",
+    "archive": "Arkivera",
+    "unarchive": "Återställ",
+    "cancel": "Avbryt",
+    "archiveConfirmTitle": "Arkivera {{name}}?",
+    "archiveConfirmBody": "Ett arkiverat event låses för redigering och försvinner från funktionärernas eventlista. Det frigör en av era platser för aktiva event. Du kan återställa det senare om en plats är ledig.",
+    "datesNotSet": "Datum ej angivna",
+    "officialsInvited": "+{{invited}} inbjudna",
+    "actionsFor": "Åtgärder för {{name}}",
+    "createEvent": {
+      "create": "Skapa event",
+      "title": "Skapa event",
+      "name": "Eventets namn",
+      "source": "Kopiera från",
+      "sourceBlank": "Inget (tomt event)",
+      "sourceArchived": "{{name}} (arkiverat)",
+      "copyHeading": "Vad ska kopieras",
+      "copy": {
+        "details": "Beskrivning",
+        "stages": "Etapper",
+        "distances": "Distanser",
+        "facilities": "Faciliteter",
+        "work_areas": "Arbetsområden",
+        "checklists": "Checklistor / att göra",
+        "officials": "Funktionärer"
+      },
+      "copyNeedsStages": "Kräver etapper",
+      "copyNeedsWorkAreas": "Kräver arbetsområden",
+      "stageDatesHint": "Nya datum för de kopierade etapperna. Klockslagen behålls, och ändrar du den första följer resten med.",
+      "stageDate": "Datum för {{name}}",
+      "undatedStages": "Etapper utan tider kopieras utan datum.",
+      "draftNote": "Eventet skapas som utkast.",
+      "capArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det för att skapa ett nytt.",
+      "capUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler.",
+      "officialsNote": "Funktionärerna du kopierar ser det nya eventet i appen direkt, markerat som nytt – även medan det är ett utkast.",
+      "nameTaken": "Det finns redan ett event med det här namnet."
+    },
+    "archivedBanner": {
+      "title": "Eventet är arkiverat",
+      "body": "Inget i det kan ändras, och funktionärerna ser det inte längre. Återställ det för att redigera igen; det kommer tillbaka som utkast.",
+      "restore": "Återställ"
+    }
+  },
+  "settings": {
+    "title": "Inställningar",
+    "subtitle": "Gäller alla event och funktionärernas vyer.",
+    "appearance": "Utseende",
+    "colorTheme": "Färgtema",
+    "colorThemeBlue": "Blå",
+    "colorThemeGreen": "Turkos",
+    "colorThemePurple": "Lila",
+    "colorThemeLocked": "Tillgängligt från {{tier}} och uppåt.",
+    "colorThemeError": "Kunde inte uppdatera temat",
+    "save": "Spara",
+    "saving": "Sparar…",
+    "saved": "Sparat"
   }
 }

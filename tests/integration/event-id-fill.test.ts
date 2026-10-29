@@ -8,12 +8,16 @@ import {
   cleanupTenant,
 } from './helpers'
 
-// N23 expand step (migration 20261028100019): assignments, announcements and
-// participants gained a nullable event_id. Deployed code does not write it
-// yet, so fill_event_id fills it on insert — from the workstation for an
-// assignment, otherwise from the tenant's only event — and the composite FK
-// keeps it inside the row's own tenant.
-describe('N23: event_id fill on tenant-scoped tables', () => {
+// N23: event_id on assignments, announcements and participants. The expand
+// step (20261028100019) added it nullable with fill triggers; the contract
+// step (20261029100240) made it NOT NULL and dropped the announcement and
+// participant fills, since the app writes it. An assignment's event is its
+// work area's, so that fill stays. The composite FK keeps every event_id
+// inside the row's own tenant.
+//
+// The inserts that leave event_id out do so on purpose, past the generated
+// type that now requires it — hence the casts.
+describe('N23: event_id on tenant-scoped tables', () => {
   let tenant: { id: string }
   let otherTenant: { id: string }
   let twoEventTenant: { id: string }
@@ -94,34 +98,28 @@ describe('N23: event_id fill on tenant-scoped tables', () => {
     }
   }
 
-  it("fills an announcement from the tenant's only event", async () => {
+  it('refuses an announcement without an event, even in a one-event tenant', async () => {
+    const { error } = await clientAdmin
+      .from('announcements')
+      .insert(announcement(tenant.id) as never)
+    expect(error?.code).toBe('23502')
+  })
+
+  it('refuses a participant without an event', async () => {
+    const { error } = await serviceClient()
+      .from('participants')
+      .insert({ tenant_id: tenant.id, name: 'Runner' } as never)
+    expect(error?.code).toBe('23502')
+  })
+
+  it('accepts an announcement for its event', async () => {
     const { data, error } = await clientAdmin
       .from('announcements')
-      .insert(announcement(tenant.id))
+      .insert(announcement(tenant.id, { event_id: eventId }) as never)
       .select('event_id')
       .single()
     expect(error).toBeNull()
     expect(data?.event_id).toBe(eventId)
-  })
-
-  it("fills a participant from the tenant's only event", async () => {
-    const { data, error } = await serviceClient()
-      .from('participants')
-      .insert({ tenant_id: tenant.id, name: 'Runner' })
-      .select('event_id')
-      .single()
-    expect(error).toBeNull()
-    expect(data?.event_id).toBe(eventId)
-  })
-
-  it('leaves event_id NULL when the tenant has several events', async () => {
-    const { data, error } = await serviceClient()
-      .from('announcements')
-      .insert(announcement(twoEventTenant.id))
-      .select('event_id')
-      .single()
-    expect(error).toBeNull()
-    expect(data?.event_id).toBeNull()
   })
 
   it("fills an assignment from its workstation's event, even with several events", async () => {
@@ -135,7 +133,7 @@ describe('N23: event_id fill on tenant-scoped tables', () => {
         status: 'assigned',
         timeslot_start: new Date(0).toISOString(),
         timeslot_end: new Date(3600_000).toISOString(),
-      })
+      } as never)
       .select('event_id')
       .single()
     expect(error).toBeNull()
@@ -151,7 +149,7 @@ describe('N23: event_id fill on tenant-scoped tables', () => {
       .single()
     const { data, error } = await serviceClient()
       .from('announcements')
-      .insert(announcement(twoEventTenant.id, { event_id: extraEvent!.id }))
+      .insert(announcement(twoEventTenant.id, { event_id: extraEvent!.id }) as never)
       .select('event_id')
       .single()
     expect(error).toBeNull()
@@ -161,7 +159,7 @@ describe('N23: event_id fill on tenant-scoped tables', () => {
   it('rejects an event_id from another tenant', async () => {
     const { error } = await serviceClient()
       .from('announcements')
-      .insert(announcement(tenant.id, { event_id: otherEventId }))
+      .insert(announcement(tenant.id, { event_id: otherEventId }) as never)
     expect(error?.code).toBe('23503')
   })
 })

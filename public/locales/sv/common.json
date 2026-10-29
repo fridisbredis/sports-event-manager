@@ -51,7 +51,12 @@
     "adminCapReachedForTenant": "Ert abonnemang har nått max antal admins. Ta bort en adminroll först.",
     "lastAdminCannotRemoveForTenant": "Det här är evenemangets sista admin. Det måste alltid finnas minst en.",
     "lastSystemAdminCannotRemove": "Det här är den sista systemadministratören. Det måste alltid finnas minst en.",
-    "adminRoleRequiresConfirmed": "Bara en bekräftad funktionär kan bli admin. Vänta tills personen har bekräftat sin inbjudan."
+    "adminRoleRequiresConfirmed": "Bara en bekräftad funktionär kan bli admin. Vänta tills personen har bekräftat sin inbjudan.",
+    "unarchiveArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det aktiva eventet först och återställ sedan det här.",
+    "unarchiveUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett annat event eller uppgradera för fler event.",
+    "createEventArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det aktiva eventet först och skapa sedan det nya.",
+    "createEventUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler event.",
+    "addOfficialsFailed": "Funktionärerna kunde inte läggas till. Försök igen."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

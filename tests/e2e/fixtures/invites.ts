@@ -169,6 +169,29 @@ export async function seedInvite(
     .single()
   if (error) throw error
 
+  // N23: an invite is always into one event (create_official_in_event), and
+  // an official sees only the events they are in. officials_join_sole_event
+  // only covers a tenant with exactly one active event, so join the oldest
+  // active one explicitly — what OFF-01 would have done.
+  const { data: event, error: eventError } = await admin
+    .from('events')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .neq('status', 'archived')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (eventError) throw eventError
+  if (event) {
+    const { error: memberError } = await admin
+      .from('official_events')
+      .upsert(
+        { official_id: data.id, event_id: event.id, tenant_id: tenantId },
+        { onConflict: 'official_id,event_id', ignoreDuplicates: true }
+      )
+    if (memberError) throw memberError
+  }
+
   return { officialId: data.id, tenantId, token }
 }
 

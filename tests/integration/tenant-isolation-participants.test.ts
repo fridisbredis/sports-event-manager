@@ -15,6 +15,7 @@ import {
 describe('SEC-01: tenant isolation on participants', () => {
   let tenantA: { id: string }
   let tenantB: { id: string }
+  let eventB: string
   let participantB: { id: string }
   let ownParticipantA: { id: string; userId: string }
   let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
@@ -24,22 +25,41 @@ describe('SEC-01: tenant isolation on participants', () => {
     tenantA = await createTenant('Tenant A Participants')
     tenantB = await createTenant('Tenant B Participants')
 
+    // participants.event_id is NOT NULL, so each tenant needs an event.
+    const admin = serviceClient()
+    const eventIdFor = async (tenantId: string) => {
+      const { data, error } = await admin
+        .from('events')
+        .insert({ tenant_id: tenantId, name: 'Participants Race', event_type: 'race' })
+        .select('id')
+        .single()
+      if (error) throw error
+      return data.id
+    }
+    const eventA = await eventIdFor(tenantA.id)
+    eventB = await eventIdFor(tenantB.id)
+
     const adminA = await createUserWithRole(tenantA.id, 'tenant_admin')
     clientAdminA = await signInAsClient(adminA.phone, '000000')
 
     const participantUserA = await createUserWithRole(tenantA.id, 'participant')
     const linkedA = await createParticipantLinkedToUser(
       tenantA.id,
+      eventA,
       participantUserA.userId,
       'Own Participant A'
     )
     ownParticipantA = { id: linkedA.id, userId: participantUserA.userId }
     clientParticipantA = await signInAsClient(participantUserA.phone, '000000')
 
-    const admin = serviceClient()
     const { data, error } = await admin
       .from('participants')
-      .insert({ tenant_id: tenantB.id, name: 'Tenant B Participant', phone: '+46709100001' })
+      .insert({
+        tenant_id: tenantB.id,
+        event_id: eventB,
+        name: 'Tenant B Participant',
+        phone: '+46709100001',
+      })
       .select()
       .single()
     if (error) throw error
@@ -85,9 +105,12 @@ describe('SEC-01: tenant isolation on participants', () => {
   })
 
   it('admin cannot create a participant under tenant B', async () => {
-    const { error } = await clientAdminA
-      .from('participants')
-      .insert({ tenant_id: tenantB.id, name: 'Forged participant', phone: '+46709100002' })
+    const { error } = await clientAdminA.from('participants').insert({
+      tenant_id: tenantB.id,
+      event_id: eventB,
+      name: 'Forged participant',
+      phone: '+46709100002',
+    })
     expect(error).not.toBeNull()
   })
 

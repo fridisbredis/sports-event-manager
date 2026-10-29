@@ -23,11 +23,12 @@ vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
 }))
 
-function makeRequest(tenantId?: string) {
-  const url = tenantId
-    ? `http://localhost/api/officials/off-1?tenantId=${encodeURIComponent(tenantId)}`
-    : 'http://localhost/api/officials/off-1'
-  return new NextRequest(url, { method: 'DELETE' })
+function makeRequest(tenantId?: string, eventId?: string) {
+  const params = new URLSearchParams()
+  if (tenantId) params.set('tenantId', tenantId)
+  if (eventId) params.set('eventId', eventId)
+  const query = params.size > 0 ? `?${params}` : ''
+  return new NextRequest(`http://localhost/api/officials/off-1${query}`, { method: 'DELETE' })
 }
 
 function makeParams(id: string) {
@@ -47,6 +48,7 @@ function mockRpc(result: { data: unknown; error: unknown }) {
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+const EVENT_ID = '22222222-2222-2222-2222-222222222222'
 const OFFICIAL_ID = 'off-1'
 
 beforeEach(() => {
@@ -96,7 +98,7 @@ describe('DELETE /api/officials/[id]', () => {
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body).toEqual({ ok: true })
+    expect(body).toEqual({ ok: true, removedFromTenant: true })
     expect(rpc).toHaveBeenCalledWith('remove_official', {
       p_official_id: OFFICIAL_ID,
       p_tenant_id: TENANT_ID,
@@ -224,5 +226,58 @@ describe('DELETE /api/officials/[id]', () => {
     await DELETE(makeRequest(TENANT_ID), makeParams(OFFICIAL_ID))
 
     expect(logAuditEvent).not.toHaveBeenCalled()
+  })
+
+  // N23: with an event, Remove takes the official out of that event only.
+  describe('with an eventId', () => {
+    beforeEach(() => {
+      vi.mocked(requireTenantAdmin).mockResolvedValue({
+        user: { id: 'admin-1' },
+        role: 'tenant_admin',
+      } as never)
+    })
+
+    it('calls remove_official_from_event with the event', async () => {
+      const rpc = mockRpc({ data: { removed_from_tenant: false, user_id: null }, error: null })
+
+      const res = await DELETE(makeRequest(TENANT_ID, EVENT_ID), makeParams(OFFICIAL_ID))
+
+      expect(rpc).toHaveBeenCalledWith('remove_official_from_event', {
+        p_official_id: OFFICIAL_ID,
+        p_event_id: EVENT_ID,
+        p_tenant_id: TENANT_ID,
+      })
+      expect(await res.json()).toEqual({ ok: true, removedFromTenant: false })
+    })
+
+    it('logs no role revocation when the official stays in another event', async () => {
+      mockRpc({ data: { removed_from_tenant: false, user_id: null }, error: null })
+
+      await DELETE(makeRequest(TENANT_ID, EVENT_ID), makeParams(OFFICIAL_ID))
+
+      expect(logAuditEvent).not.toHaveBeenCalled()
+      expect(revalidateTag).toHaveBeenCalledWith(adminDashboardCacheTag(TENANT_ID), { expire: 0 })
+    })
+
+    it('audits and clears HOME-01 when it was their last event', async () => {
+      mockRpc({ data: { removed_from_tenant: true, user_id: 'user-1' }, error: null })
+
+      const res = await DELETE(makeRequest(TENANT_ID, EVENT_ID), makeParams(OFFICIAL_ID))
+
+      expect(await res.json()).toEqual({ ok: true, removedFromTenant: true })
+      expect(logAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'role_revoked', targetId: 'user-1' })
+      )
+      expect(revalidateTag).toHaveBeenCalledWith(officialHomeCacheTag(TENANT_ID, 'user-1'), {
+        expire: 0,
+      })
+    })
+
+    it('returns 400 for an eventId that is not a uuid', async () => {
+      const rpc = mockRpc({ data: null, error: null })
+      const res = await DELETE(makeRequest(TENANT_ID, 'nope'), makeParams(OFFICIAL_ID))
+      expect(res.status).toBe(400)
+      expect(rpc).not.toHaveBeenCalled()
+    })
   })
 })

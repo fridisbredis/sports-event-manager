@@ -53,6 +53,22 @@ describe('SEC-01: tenant isolation on workstations and children', () => {
       .single()
     if (eventAError) throw eventAError
 
+    // N23 (6c-2): an official reads an event's work areas only as a member
+    // of that event. The official was created before the event existed, so
+    // nothing joined them to it.
+    const { data: officialARow } = await admin
+      .from('officials')
+      .select('id')
+      .eq('user_id', officialA.userId)
+      .single()
+    const { error: memberError } = await admin
+      .from('official_events')
+      .upsert(
+        { official_id: officialARow!.id, event_id: eventAData.id, tenant_id: tenantA.id },
+        { onConflict: 'official_id,event_id', ignoreDuplicates: true }
+      )
+    if (memberError) throw memberError
+
     const { data: wsAData, error: wsAError } = await admin
       .from('workstations')
       .insert({

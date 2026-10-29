@@ -13,7 +13,7 @@ export type Database = {
           body: string
           channel: string
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           published_at: string
           sms_sent: boolean
@@ -23,7 +23,7 @@ export type Database = {
           body: string
           channel: string
           created_at?: string
-          event_id?: string | null
+          event_id: string
           id?: string
           published_at: string
           sms_sent?: boolean
@@ -33,7 +33,7 @@ export type Database = {
           body?: string
           channel?: string
           created_at?: string
-          event_id?: string | null
+          event_id?: string
           id?: string
           published_at?: string
           sms_sent?: boolean
@@ -59,7 +59,7 @@ export type Database = {
       assignments: {
         Row: {
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           official_id: string
           slot_index: number
@@ -72,7 +72,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          event_id?: string | null
+          event_id: string
           id?: string
           official_id: string
           slot_index: number
@@ -85,7 +85,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          event_id?: string | null
+          event_id?: string
           id?: string
           official_id?: string
           slot_index?: number
@@ -746,7 +746,7 @@ export type Database = {
           category: string | null
           club: string | null
           created_at: string
-          event_id: string | null
+          event_id: string
           external_id: string | null
           extra: Json
           gdpr_warning_sent_at: string | null
@@ -768,7 +768,7 @@ export type Database = {
           category?: string | null
           club?: string | null
           created_at?: string
-          event_id?: string | null
+          event_id: string
           external_id?: string | null
           extra?: Json
           gdpr_warning_sent_at?: string | null
@@ -790,7 +790,7 @@ export type Database = {
           category?: string | null
           club?: string | null
           created_at?: string
-          event_id?: string | null
+          event_id?: string
           external_id?: string | null
           extra?: Json
           gdpr_warning_sent_at?: string | null
@@ -1160,6 +1160,11 @@ export type Database = {
     }
     Functions: {
       anonymize_inactive_users: { Args: never; Returns: undefined }
+      archive_lock_event_of: { Args: { p_row: Json }; Returns: string }
+      can_read_event: {
+        Args: { p_event_id: string; p_tenant_id: string }
+        Returns: boolean
+      }
       can_write_avatar_object: {
         Args: { object_name: string }
         Returns: boolean
@@ -1207,6 +1212,16 @@ export type Database = {
           p_tenant_id?: string
           p_user_id: string
           p_user_phone: string
+        }
+        Returns: Json
+      }
+      create_event: {
+        Args: {
+          p_copy: Json
+          p_name: string
+          p_source_event_id: string
+          p_stage_dates: Json
+          p_tenant_id: string
         }
         Returns: Json
       }
@@ -1305,6 +1320,10 @@ export type Database = {
         Args: { p_official_id: string; p_tenant_id: string }
         Returns: Json
       }
+      remove_official_from_event: {
+        Args: { p_event_id: string; p_official_id: string; p_tenant_id: string }
+        Returns: Json
+      }
       revoke_system_admin: { Args: { p_user_id: string }; Returns: Json }
       revoke_tenant_admin: {
         Args: { p_tenant_id: string; p_user_id: string }
@@ -1319,7 +1338,7 @@ export type Database = {
         }
         Returns: {
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           official_id: string
           slot_index: number
@@ -1347,6 +1366,10 @@ export type Database = {
           over_capacity: number
           time_off_clash: number
         }[]
+      }
+      shares_event_with_caller: {
+        Args: { p_official_id: string }
+        Returns: boolean
       }
       shares_shift_with_caller: {
         Args: {

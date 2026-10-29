@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useParams, usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
 import {
+  CalendarRange,
+  Settings,
   LayoutDashboard,
   Trophy,
   Flag,
@@ -32,24 +34,17 @@ interface Props {
   // False on Standard, where PART-01 does not exist (N21). The page and its
   // server actions enforce the same tier independently.
   showParticipants: boolean
-  // N23: the event the event-scoped links open when the URL names none (the
-  // tenant-level Account screen). null when the tenant has no events, which
-  // hides those links.
-  defaultEventId: string | null
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({
-  tenantSlug,
-  adminLabel,
-  showAccount,
-  showParticipants,
-  defaultEventId,
-}: Props) {
+export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipants }: Props) {
   const pathname = usePathname()
-  const { eventId: urlEventId } = useParams<{ eventId?: string }>()
-  const eventId = urlEventId ?? defaultEventId
+  // N23: the event-scoped links follow the event in the URL. On a
+  // tenant-level screen (TEN-01's event list, Settings, Account) there is no
+  // event to point them at, so only the tenant links show; the list is the
+  // way in.
+  const { eventId } = useParams<{ eventId?: string }>()
   const { t } = useTranslation('admin')
   const [collapsed, setCollapsed] = useState(false)
   // Drawer state for the phone menu. Separate from `collapsed`, which is the
@@ -111,10 +106,16 @@ export function SidebarNav({
     segment: string,
     label: string,
     Icon: LucideIcon,
-    { isCollapsed = false, onNavigate }: { isCollapsed?: boolean; onNavigate?: () => void } = {}
+    {
+      isCollapsed = false,
+      onNavigate,
+      exact = false,
+    }: { isCollapsed?: boolean; onNavigate?: () => void; exact?: boolean } = {}
   ) => {
     const href = `/${tenantSlug}/${segment}`
-    const isActive = pathname === href || pathname.startsWith(href + '/')
+    // `exact` for "All events": /admin is a prefix of every admin screen, so
+    // a prefix match would light it up everywhere.
+    const isActive = pathname === href || (!exact && pathname.startsWith(href + '/'))
     return (
       <Link
         key={segment}
@@ -160,6 +161,9 @@ export function SidebarNav({
   const navBody = (opts: { isCollapsed?: boolean; onNavigate?: () => void } = {}) => (
     <div className="flex flex-col flex-1 min-h-0">
       <nav className="py-2 flex-1 overflow-y-auto">
+        {navLink('admin', t('navigation.allEvents'), CalendarRange, { ...opts, exact: true })}
+        {navLink('admin/settings', t('navigation.settings'), Settings, opts)}
+        {navItems.length > 0 && <div className="mx-6 my-2 border-t border-gray-100" />}
         {navItems.map((item) => navLink(item.segment, item.label, item.icon, opts))}
       </nav>
       <div className="border-t border-gray-100 py-2">
