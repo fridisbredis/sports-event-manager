@@ -534,6 +534,7 @@ async function main() {
 
   const { error: participantError } = await admin.from('participants').insert({
     tenant_id: tenant.id,
+    event_id: event.id,
     name: 'Seed Participant',
     phone: '+46709900010',
     bib: '101',
@@ -561,6 +562,7 @@ async function main() {
   const { error: assignmentError } = await admin.from('assignments').insert([
     {
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: confirmedOfficial.id,
       workstation_id: finishLineDay1.id,
       todo_id: todoFor(finishLineDay1.id, 0).id,
@@ -571,6 +573,7 @@ async function main() {
     },
     {
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: confirmedOfficial.id,
       workstation_id: waterStationDay1.id,
       todo_id: todoFor(waterStationDay1.id, 0).id,
@@ -581,6 +584,7 @@ async function main() {
     },
     {
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: confirmedOfficial.id,
       workstation_id: finishLineDay2.id,
       todo_id: todoFor(finishLineDay2.id, 0).id,
@@ -591,6 +595,7 @@ async function main() {
     },
     {
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: confirmedOfficial.id,
       workstation_id: waterStationDay3.id,
       todo_id: todoFor(waterStationDay3.id, 0).id,
@@ -601,6 +606,7 @@ async function main() {
     },
     {
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: singleDayOfficial.id,
       workstation_id: finishLineDay1.id,
       todo_id: todoFor(finishLineDay1.id, 0).id,
@@ -618,6 +624,7 @@ async function main() {
 
   const { error: announcementError } = await admin.from('announcements').insert({
     tenant_id: tenant.id,
+    event_id: event.id,
     channel: 'officials',
     body: 'Welcome to Seed Race 2026 — briefing at 07:30.',
     sms_sent: false,

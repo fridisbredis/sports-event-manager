@@ -70,8 +70,17 @@ describe('scheduling_warning_counts RPC', () => {
     timeslotEnd?: string
   }) {
     const admin = serviceClient()
+    // An assignment's event is its workstation's, and the fixtures span
+    // several events, so read it rather than threading it through every call.
+    const { data: ws, error: wsError } = await admin
+      .from('workstations')
+      .select('event_id')
+      .eq('id', fields.workstationId)
+      .single()
+    if (wsError) throw wsError
     const { error } = await admin.from('assignments').insert({
       tenant_id: fields.tenantId,
+      event_id: ws.event_id,
       official_id: fields.officialId,
       workstation_id: fields.workstationId,
       timeslot_start: fields.timeslotStart ?? T1,

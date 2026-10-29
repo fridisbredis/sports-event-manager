@@ -13,7 +13,7 @@ export type Database = {
           body: string
           channel: string
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           published_at: string
           sms_sent: boolean
@@ -23,7 +23,7 @@ export type Database = {
           body: string
           channel: string
           created_at?: string
-          event_id?: string | null
+          event_id: string
           id?: string
           published_at: string
           sms_sent?: boolean
@@ -33,7 +33,7 @@ export type Database = {
           body?: string
           channel?: string
           created_at?: string
-          event_id?: string | null
+          event_id?: string
           id?: string
           published_at?: string
           sms_sent?: boolean
@@ -59,7 +59,7 @@ export type Database = {
       assignments: {
         Row: {
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           official_id: string
           slot_index: number
@@ -72,7 +72,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          event_id?: string | null
+          event_id: string
           id?: string
           official_id: string
           slot_index: number
@@ -85,7 +85,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          event_id?: string | null
+          event_id?: string
           id?: string
           official_id?: string
           slot_index?: number
@@ -746,7 +746,7 @@ export type Database = {
           category: string | null
           club: string | null
           created_at: string
-          event_id: string | null
+          event_id: string
           external_id: string | null
           extra: Json
           gdpr_warning_sent_at: string | null
@@ -768,7 +768,7 @@ export type Database = {
           category?: string | null
           club?: string | null
           created_at?: string
-          event_id?: string | null
+          event_id: string
           external_id?: string | null
           extra?: Json
           gdpr_warning_sent_at?: string | null
@@ -790,7 +790,7 @@ export type Database = {
           category?: string | null
           club?: string | null
           created_at?: string
-          event_id?: string | null
+          event_id?: string
           external_id?: string | null
           extra?: Json
           gdpr_warning_sent_at?: string | null
@@ -1338,7 +1338,7 @@ export type Database = {
         }
         Returns: {
           created_at: string
-          event_id: string | null
+          event_id: string
           id: string
           official_id: string
           slot_index: number

@@ -34,6 +34,8 @@ describe('PERF-02: save_assignments_batch', () => {
 
   let tenantA: { id: string }
   let tenantB: { id: string }
+  let eventAId: string
+  let eventBId: string
   let workstationA: { id: string }
   let workstationB: { id: string }
   let officialA1: { id: string }
@@ -46,7 +48,9 @@ describe('PERF-02: save_assignments_batch', () => {
 
   // Assignment rows are per-test, since every test mutates or asserts on
   // them. Created via the service client so RLS is not part of what is under
-  // test here.
+  // test here. event_id is the row's tenant's event (each tenant has one), not
+  // the workstation's: the foreign-row fixture pairs tenant B with workstation
+  // A, and event_id must belong to the row's own tenant.
   async function seedAssignment(fields: {
     tenantId: string
     officialId: string
@@ -61,6 +65,7 @@ describe('PERF-02: save_assignments_batch', () => {
       .from('assignments')
       .insert({
         tenant_id: fields.tenantId,
+        event_id: fields.tenantId === tenantA.id ? eventAId : eventBId,
         official_id: fields.officialId,
         workstation_id: fields.workstationId,
         timeslot_start: fields.timeslotStart,
@@ -122,6 +127,7 @@ describe('PERF-02: save_assignments_batch', () => {
       .select()
       .single()
     if (eventError) throw eventError
+    eventAId = event.id
 
     const { data: ws, error: wsError } = await admin
       .from('workstations')
@@ -146,6 +152,7 @@ describe('PERF-02: save_assignments_batch', () => {
       .select()
       .single()
     if (eventBError) throw eventBError
+    eventBId = eventB.id
 
     const { data: wsB, error: wsBError } = await admin
       .from('workstations')

@@ -39,6 +39,7 @@ function row(
 
 describe('import_participants (N21)', () => {
   let tenantId: string
+  let eventId: string
   let otherTenantId: string
   let stageAId: string
   let stageBId: string
@@ -78,6 +79,7 @@ describe('import_participants (N21)', () => {
       .select('id')
       .single()
     if (eventError) throw eventError
+    eventId = event.id
 
     const { data: stages, error: stageError } = await admin
       .from('event_stages')
@@ -212,7 +214,7 @@ describe('import_participants (N21)', () => {
     const admin = serviceClient()
     const { data: manualRow, error: manualError } = await admin
       .from('participants')
-      .insert({ tenant_id: tenantId, name: 'Manuell Person', source: 'manual' })
+      .insert({ tenant_id: tenantId, event_id: eventId, name: 'Manuell Person', source: 'manual' })
       .select('id')
       .single()
     expect(manualError).toBeNull()
@@ -335,12 +337,12 @@ describe('import_participants (N21)', () => {
 
     const first = await admin
       .from('participants')
-      .insert({ tenant_id: tenantId, name: 'Linked A', user_id: userId })
+      .insert({ tenant_id: tenantId, event_id: eventId, name: 'Linked A', user_id: userId })
     expect(first.error).toBeNull()
 
     const second = await admin
       .from('participants')
-      .insert({ tenant_id: tenantId, name: 'Linked B', user_id: userId })
+      .insert({ tenant_id: tenantId, event_id: eventId, name: 'Linked B', user_id: userId })
     expect(second.error).not.toBeNull()
 
     await admin.from('participants').delete().eq('user_id', userId)
@@ -350,6 +352,7 @@ describe('import_participants (N21)', () => {
   it('refuses a user_id with no matching auth user', async () => {
     const { error } = await serviceClient().from('participants').insert({
       tenant_id: tenantId,
+      event_id: eventId,
       name: 'Ghost',
       user_id: '00000000-0000-0000-0000-0000000000ff',
     })
@@ -370,7 +373,13 @@ describe('import_participants (N21)', () => {
 
     const { data: inserted } = await admin
       .from('participants')
-      .insert({ tenant_id: tenantId, name: 'Survives', bib: '999', user_id: userId })
+      .insert({
+        tenant_id: tenantId,
+        event_id: eventId,
+        name: 'Survives',
+        bib: '999',
+        user_id: userId,
+      })
       .select('id')
       .single()
 
@@ -393,8 +402,8 @@ describe('import_participants (N21)', () => {
     const { error } = await serviceClient()
       .from('participants')
       .insert([
-        { tenant_id: tenantId, name: 'Unlinked A' },
-        { tenant_id: tenantId, name: 'Unlinked B' },
+        { tenant_id: tenantId, event_id: eventId, name: 'Unlinked A' },
+        { tenant_id: tenantId, event_id: eventId, name: 'Unlinked B' },
       ])
 
     expect(error).toBeNull()

@@ -45,10 +45,25 @@ describe('SEC-01: tenant isolation on assignments', () => {
 
     const admin = serviceClient()
 
+    // assignments.event_id is NOT NULL and these rows have no workstation to
+    // derive it from, so each tenant needs an event to pass explicitly.
+    const eventIdFor = async (tenantId: string) => {
+      const { data, error } = await admin
+        .from('events')
+        .insert({ tenant_id: tenantId, name: 'Assignments Race', event_type: 'race' })
+        .select('id')
+        .single()
+      if (error) throw error
+      return data.id
+    }
+    const eventAId = await eventIdFor(tenantA.id)
+    const eventBId = await eventIdFor(tenantB.id)
+
     const { data: assignmentA1, error: assignmentA1Error } = await admin
       .from('assignments')
       .insert({
         tenant_id: tenantA.id,
+        event_id: eventAId,
         official_id: linkedOfficialA1.id,
         slot_index: 0,
         status: 'available',
@@ -62,6 +77,7 @@ describe('SEC-01: tenant isolation on assignments', () => {
 
     const { error: assignmentA2Error } = await admin.from('assignments').insert({
       tenant_id: tenantA.id,
+      event_id: eventAId,
       official_id: linkedOfficialA2.id,
       slot_index: 0,
       status: 'available',
@@ -80,6 +96,7 @@ describe('SEC-01: tenant isolation on assignments', () => {
       .from('assignments')
       .insert({
         tenant_id: tenantB.id,
+        event_id: eventBId,
         official_id: linkedOfficialB.id,
         slot_index: 0,
         status: 'available',
