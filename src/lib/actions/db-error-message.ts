@@ -27,6 +27,9 @@ interface DbErrorLike {
 const DB_ERROR_KEYS: Record<string, string> = {
   P0002: 'eventConfig.eventNotFound',
   P0003: 'eventConfig.cannotRemoveLastRaceStage',
+  // N23: the archive lock (migration 20261029085340) on an archived event's
+  // row, setup and schedule.
+  P0004: 'eventConfig.eventArchived',
   '23514': 'eventConfig.stageTimesInvalid',
 }
 

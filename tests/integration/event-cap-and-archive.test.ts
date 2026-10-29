@@ -126,7 +126,7 @@ describe('N23: archived event lock', () => {
 
   it('refuses edits to an archived event', async () => {
     const { error } = await client.from('events').update({ name: 'Renamed' }).eq('id', eventId)
-    expect(error?.code).toBe('42501')
+    expect(error?.code).toBe('P0004')
   })
 
   it('refuses an edit smuggled in alongside un-archiving', async () => {
@@ -134,7 +134,7 @@ describe('N23: archived event lock', () => {
       .from('events')
       .update({ status: 'draft', name: 'Renamed' })
       .eq('id', eventId)
-    expect(error?.code).toBe('42501')
+    expect(error?.code).toBe('P0004')
   })
 
   it('allows un-archiving, and then editing', async () => {

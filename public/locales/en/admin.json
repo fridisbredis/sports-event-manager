@@ -120,7 +120,8 @@
     "cannotRemoveLastRaceStage": "Cannot remove the last Race stage from a published event.",
     "stageTimesInvalid": "A stage's end time must be after its start time.",
     "publishPreconditionFailed": "This event can't be published yet. Make sure it has a name and at least one Race stage, then try again.",
-    "logoUploadError": "Something went wrong while uploading the logo. Please try again."
+    "logoUploadError": "Something went wrong while uploading the logo. Please try again.",
+    "eventArchived": "This event is archived and can't be changed. Restore it first."
   },
   "workstations": {
     "title": "Work areas",
@@ -717,6 +718,11 @@
       "capUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more.",
       "officialsNote": "The officials you copy see the new event in the app straight away, marked as new — even while it is a draft.",
       "nameTaken": "An event with this name already exists."
+    },
+    "archivedBanner": {
+      "title": "This event is archived",
+      "body": "Nothing in it can be changed, and officials no longer see it. Restore it to edit it again; it comes back as a draft.",
+      "restore": "Restore"
     }
   },
   "settings": {

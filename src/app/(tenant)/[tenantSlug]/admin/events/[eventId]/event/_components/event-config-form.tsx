@@ -39,6 +39,8 @@ interface Props {
   initialStages: StageInput[]
   initialFacilities: LabelInput[]
   isPublished: boolean
+  // N23: read-only in the database; the layout's banner explains it.
+  isArchived?: boolean
 }
 
 interface FormErrors {
@@ -59,6 +61,7 @@ export default function EventConfigForm({
   initialStages,
   initialFacilities,
   isPublished,
+  isArchived = false,
 }: Props) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
@@ -314,16 +317,22 @@ export default function EventConfigForm({
             // Exact published/draft colours from the design handoff; HeroUI's
             // success/warning palettes are a different green and amber.
             className={
-              isPublished
-                ? 'bg-status-ok-bg text-status-ok-text'
-                : 'bg-status-pending-bg text-status-pending-text'
+              isArchived
+                ? 'bg-status-neutral-bg text-status-neutral-text'
+                : isPublished
+                  ? 'bg-status-ok-bg text-status-ok-text'
+                  : 'bg-status-pending-bg text-status-pending-text'
             }
           >
-            {isPublished ? t('eventConfig.published') : t('eventConfig.draft')}
+            {isArchived
+              ? t('events.status.archived')
+              : isPublished
+                ? t('eventConfig.published')
+                : t('eventConfig.draft')}
           </Chip>
         </div>
         <div className="flex items-center gap-3">
-          {!isPublished && (
+          {!isPublished && !isArchived && (
             // Secondary, and placed before Save: two solid primary buttons
             // side by side give the row no clear primary action, and the
             // primary one belongs last in the row.
