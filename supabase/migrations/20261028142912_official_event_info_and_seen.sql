@@ -28,7 +28,8 @@
 --             drop function if exists public.get_event_info_cached(uuid, uuid);
 --             then restore the (uuid) version, with its revoke/grant/owner
 --             lines, from 20260929153848_event_info_cached_add_stage_date.sql.
---   Data:     no data loss. The only write is seen_at, a notice flag.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. The only write is seen_at, a notice flag.
 --   Blast:    if get_event_info_cached were wrong, INFO-01 fails to load. If
 --             mark_official_event_seen were wrong, the "new event" badge
 --             would stay or vanish wrongly — nothing else reads seen_at.

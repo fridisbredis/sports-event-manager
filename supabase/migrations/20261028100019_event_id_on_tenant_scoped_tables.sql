@@ -47,7 +47,8 @@
 --             alter table public.assignments drop column if exists event_id;
 --             alter table public.announcements drop column if exists event_id;
 --             alter table public.participants drop column if exists event_id;
---   Data:     no data loss. The backfill writes only the new columns, so
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. The backfill writes only the new columns, so
 --             dropping them returns every row to its prior state.
 --   Blast:    if the fill trigger raised, inserts into the three tables
 --             would fail (scheduling saves, announcements, participant

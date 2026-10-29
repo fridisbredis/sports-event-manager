@@ -21,7 +21,8 @@
 -- Forward-fix: replace (get_event_info_cached body replaced)
 --   Rollback: restore the body from migration
 --             20261028142912_official_event_info_and_seen.sql.
---   Data:     no data loss. Reads only.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Reads only.
 --   Blast:    if the filter were wrong, INFO-01 would show no programme or
 --             facilities.
 --   Window:   compatible. Same arguments and the same keys.

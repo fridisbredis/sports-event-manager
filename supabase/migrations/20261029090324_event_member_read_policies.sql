@@ -55,7 +55,8 @@
 --             expression), then drop function if exists
 --             public.can_read_event(uuid, uuid),
 --             public.shares_event_with_caller(uuid).
---   Data:     no data loss. Writes no rows.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Writes no rows.
 --   Blast:    if a policy were too narrow, an official would see an empty
 --             screen (no stages, no work areas) for an event they ARE in, or
 --             a missing colleague name. Admin screens are unaffected (the

@@ -44,7 +44,8 @@
 --             drop function if exists public.is_event_member(uuid);
 --             drop table if exists public.official_events;
 --             alter table public.officials drop constraint if exists officials_id_tenant_id_key;
---   Data:     no data loss on rollback before any second event exists: every
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss on rollback before any second event exists: every
 --             row is derivable again from officials + the sole event. Once
 --             admins add officials to other events, dropping the table loses
 --             those memberships.

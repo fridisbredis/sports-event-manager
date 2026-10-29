@@ -39,7 +39,8 @@
 --             (workstations), each with its revoke/grant/owner lines;
 --             drop policy if exists cache_rpc_reader_read_official_events on public.official_events;
 --             revoke select on public.official_events from cache_rpc_reader;
---   Data:     no data loss. Writes no rows.
+--   Data:     prod snapshot 20261028095200_pre-migration_2026-10-29T12-48-16Z.tar.gz (N23 release).
+--             no data loss. Writes no rows.
 --   Blast:    if a body were wrong, EVT-01, the dashboard or WS-01 fails to
 --             load (each throws to the admin error boundary); no data is
 --             touched. The dashboard's official counts would be wrong if
