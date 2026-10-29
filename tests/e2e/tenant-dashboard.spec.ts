@@ -13,11 +13,11 @@ test.describe('TEN-01 tenant dashboard', () => {
     await page.goto(LIST)
 
     await expect(page.getByRole('heading', { name: 'Events', exact: true })).toBeVisible()
-    const card = page.getByRole('link', { name: /Seed Race 2026/ })
-    await expect(card).toBeVisible()
+    const card = page.getByRole('listitem').filter({ hasText: 'Seed Race 2026' })
     await expect(card.getByText('Published')).toBeVisible()
+    await expect(card.getByRole('button', { name: 'Actions for Seed Race 2026' })).toBeVisible()
 
-    await card.click()
+    await card.getByRole('link', { name: 'Seed Race 2026' }).click()
     await expect(page).toHaveURL(new RegExp(`/admin/${EVENT_SEGMENT}/dashboard$`))
   })
 

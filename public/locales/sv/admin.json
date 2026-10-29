@@ -673,13 +673,14 @@
     },
     "stages": "Etapper",
     "officials": "Funktionärer",
-    "officialsValue": "{{confirmed}} bekräftade · {{invited}} inbjudna",
     "participants": "Deltagare",
     "archive": "Arkivera",
     "unarchive": "Återställ",
     "cancel": "Avbryt",
     "archiveConfirmTitle": "Arkivera {{name}}?",
     "archiveConfirmBody": "Ett arkiverat event låses för redigering och försvinner från funktionärernas eventlista. Det frigör en av era platser för aktiva event. Du kan återställa det senare om en plats är ledig.",
-    "datesNotSet": "Datum ej angivna"
+    "datesNotSet": "Datum ej angivna",
+    "officialsInvited": "+{{invited}} inbjudna",
+    "actionsFor": "Åtgärder för {{name}}"
   }
 }

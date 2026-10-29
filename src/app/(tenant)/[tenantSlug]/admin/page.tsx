@@ -94,7 +94,7 @@ export default async function TenantDashboardPage({ params, searchParams }: Prop
           ) : (
             <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {events.map((event) => (
-                <li key={event.id}>
+                <li key={event.id} className="h-full">
                   <EventCard
                     tenantSlug={tenantSlug}
                     event={event}

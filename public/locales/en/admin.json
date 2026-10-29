@@ -673,13 +673,14 @@
     },
     "stages": "Stages",
     "officials": "Officials",
-    "officialsValue": "{{confirmed}} confirmed · {{invited}} invited",
     "participants": "Participants",
     "archive": "Archive",
     "unarchive": "Un-archive",
     "cancel": "Cancel",
     "archiveConfirmTitle": "Archive {{name}}?",
     "archiveConfirmBody": "An archived event is locked for editing and disappears from the officials' event list. It frees one of your active event slots. You can un-archive it later if a slot is free.",
-    "datesNotSet": "Dates not set"
+    "datesNotSet": "Dates not set",
+    "officialsInvited": "+{{invited}} invited",
+    "actionsFor": "Actions for {{name}}"
   }
 }
