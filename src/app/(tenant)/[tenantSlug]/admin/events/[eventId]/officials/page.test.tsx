@@ -79,8 +79,13 @@ const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 
 function mockServerClient(userId: string | null, tenant: unknown, officialsResult?: unknown) {
+  let officialsCalls = 0
   const fromMock = vi.fn((table: string) => {
-    if (table === 'officials') return chain(officialsResult ?? { data: null })
+    // The roster first, then N23's "from other events" candidates, which
+    // these tests leave empty.
+    if (table === 'officials') {
+      return officialsCalls++ === 0 ? chain(officialsResult ?? { data: null }) : chain({ data: [] })
+    }
     // N17 reads these two per official for the expanded row. They are not
     // what these tests are about — the roster's own ceiling is — so they
     // return empty rather than being asserted on here. Their own behaviour
@@ -148,6 +153,7 @@ describe('OfficialsPage', () => {
       eventId: 'event-1',
       officials,
       currentUserId: 'user-1',
+      candidates: [],
       // One entry per visible official, each empty because the mocked
       // assignment and unavailability reads return no rows (N17).
       details: { 'off-1': { shifts: [], timeOff: [] } },

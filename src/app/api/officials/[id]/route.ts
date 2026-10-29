@@ -10,6 +10,10 @@ import { logQueryError } from '@/lib/db/query-error'
 
 const deleteSchema = z.object({
   tenantId: z.string().uuid(),
+  // N23: the event the admin is removing the official from. Optional only so
+  // a client deployed before it keeps working; without it the official
+  // leaves the tenant, as Remove always did.
+  eventId: z.string().uuid().optional(),
 })
 
 export async function DELETE(
@@ -18,8 +22,9 @@ export async function DELETE(
 ) {
   const { id } = await params
   const tenantId = request.nextUrl.searchParams.get('tenantId')
+  const eventId = request.nextUrl.searchParams.get('eventId') ?? undefined
 
-  const parsed = deleteSchema.safeParse({ tenantId })
+  const parsed = deleteSchema.safeParse({ tenantId, eventId })
   if (!parsed.success) {
     return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
   }
@@ -45,10 +50,20 @@ export async function DELETE(
   //      admin access. A surviving row here would otherwise keep steering
   //      this phone's post-login redirect to this tenant forever, since
   //      resolvePostLoginRedirect reads user_roles alone.
-  const { data, error } = await supabase.rpc('remove_official', {
-    p_official_id: id,
-    p_tenant_id: parsed.data.tenantId,
-  })
+  //
+  // N23: with an event, remove_official_from_event takes them out of that
+  // event only (membership and its assignments), and calls remove_official
+  // itself when that was their last event.
+  const { data, error } = parsed.data.eventId
+    ? await supabase.rpc('remove_official_from_event', {
+        p_official_id: id,
+        p_event_id: parsed.data.eventId,
+        p_tenant_id: parsed.data.tenantId,
+      })
+    : await supabase.rpc('remove_official', {
+        p_official_id: id,
+        p_tenant_id: parsed.data.tenantId,
+      })
 
   if (error) {
     // not_found is the RPC's own signal for an id that isn't a live official
@@ -73,7 +88,13 @@ export async function DELETE(
   // made redundant. Optional key + null-safe access: on a database where
   // 0048 has not been applied, user_id is absent from the jsonb response
   // rather than present-and-null.
-  const revokedUserId = (data as unknown as { user_id?: string | null } | null)?.user_id ?? null
+  const result = data as unknown as {
+    user_id?: string | null
+    removed_from_tenant?: boolean
+  } | null
+  const revokedUserId = result?.user_id ?? null
+  // remove_official always leaves the tenant; remove_official_from_event says.
+  const leftTenant = result?.removed_from_tenant ?? true
 
   if (revokedUserId) {
     // PERF-06 / F-PERF-04 Phase 1: { expire: 0 }, not profile="max" — a
@@ -93,6 +114,10 @@ export async function DELETE(
   // dashboard's officials counts change either way.
   revalidateTag(adminDashboardCacheTag(parsed.data.tenantId), { expire: 0 })
 
+  // The audit row records the role revocation, which only happens when the
+  // official left the tenant. Leaving one of several events revokes nothing.
+  if (!leftTenant) return NextResponse.json({ ok: true, removedFromTenant: false })
+
   await logAuditEvent({
     tenantId: parsed.data.tenantId,
     actorUserId: auth.user.id,
@@ -105,5 +130,5 @@ export async function DELETE(
     detail: { officialId: id },
   })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, removedFromTenant: true })
 }

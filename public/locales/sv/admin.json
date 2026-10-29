@@ -213,8 +213,8 @@
     "sending": "Skickar…",
     "remove": "Ta bort",
     "cancel": "Avbryt",
-    "removeConfirmTitle": "Ta bort funktionär?",
-    "removeConfirmBody": "Att ta bort {{name}} frigör även alla inplaneringar på arbetsområden. Det går inte att ångra.",
+    "removeConfirmTitle": "Ta bort från eventet?",
+    "removeConfirmBody": "{{name}} tas bort från det här eventet och dess schema. Är personen inte med i något annat event tas den bort från organisationen också. Det går inte att ångra.",
     "removeConfirm": "Är du säker? Det här frigör alla inplaneringar för den här funktionären.",
     "resendConfirmTitle": "Skicka inbjudan igen?",
     "resendConfirmBody": "Om {{name}} redan har öppnat sin inbjudningslänk och har en kod blir den ogiltig när du skickar igen. Hen behöver då använda det nya SMS:et i stället.",
@@ -257,7 +257,22 @@
     "adminCapReachedHint": "Alla adminplatser är använda. Ta bort en adminroll för att kunna ge den till någon annan.",
     "actionsFor": "Åtgärder för {{name}}",
     "adminCapReachedShort": "Alla adminplatser används",
-    "makeAdminRequiresConfirmed": "Kan bli admin när inbjudan är bekräftad"
+    "makeAdminRequiresConfirmed": "Kan bli admin när inbjudan är bekräftad",
+    "fromEvents": {
+      "open": "Från andra event",
+      "title": "Lägg till från andra event",
+      "hint": "Funktionärer från organisationens andra event som inte är med i det här än.",
+      "search": "Sök på namn, nummer eller event",
+      "noMatches": "Ingen matchar.",
+      "notice": "De får en notis i appen om att de lagts till. Inget SMS skickas, och en bekräftad funktionär behöver inte tacka ja igen.",
+      "add": "Lägg till",
+      "addCount": "Lägg till {{n}}",
+      "duplicateHint": "Är personen med i ett av era andra event, använd Från andra event.",
+      "selectAll": "Markera alla",
+      "selectMatches": "Markera träffarna",
+      "deselectAll": "Avmarkera alla",
+      "selectedOf": "{{n}} av {{total}} markerade"
+    }
   },
   "participants": {
     "title": "Deltagare",
