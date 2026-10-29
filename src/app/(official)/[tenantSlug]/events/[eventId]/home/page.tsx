@@ -29,7 +29,7 @@ function NavCard({
   return (
     <Link
       href={href}
-      className={`card-accent-left flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:border-tenant-primary hover:bg-tenant-primary-tint`}
+      className={`card-accent-left flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:border-tenant-primary-edge hover:bg-tenant-primary-tint`}
     >
       {/* The bubble takes the tenant's tint rather than HeroUI's own primary,
           so these follow the palette like every other tinted surface in the

@@ -51,21 +51,19 @@ export async function EventCard({
   ]
 
   return (
+    // The leading edge is the shared card-accent-left utility, so it curves
+    // with the card's radius and matches the other themed lists; greyed out
+    // once the event is archived. Hover tints the border in the accent's own
+    // 28% tone rather than lifting the shadow, since a hover box-shadow would
+    // replace the accent's.
     <AppCard
-      className={`relative h-full transition-shadow hover:shadow-[0_6px_20px_-8px_rgba(17,24,39,0.18)] ${
-        isArchived ? 'opacity-75' : ''
+      className={`relative h-full transition-colors hover:border-tenant-primary-edge ${
+        isArchived
+          ? 'card-accent-left-themed opacity-75 [--card-accent:theme(colors.edge.DEFAULT)]'
+          : 'card-accent-left'
       }`}
       bodyClassName="p-6 pl-7"
     >
-      {/* The tenant's colour as a thin edge, so the list carries the theme;
-          greyed out once the event is archived. */}
-      <span
-        aria-hidden
-        className={`absolute inset-y-0 left-0 w-[3px] ${
-          isArchived ? 'bg-edge-field' : 'bg-tenant-primary'
-        }`}
-      />
-
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[17px] font-semibold text-ink">
