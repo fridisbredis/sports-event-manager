@@ -194,6 +194,7 @@ describe('SEC-03: write migration readiness', () => {
 
       await admin.from('assignments').insert({
         tenant_id: tenantA.id,
+        event_id: event.id,
         official_id: official.id,
         workstation_id: ws.id,
         timeslot_start: new Date().toISOString(),
@@ -382,11 +383,31 @@ describe('SEC-03: write migration readiness', () => {
   // --- #19: announcements insert ---
 
   describe('row #19: announcements publish write', () => {
+    // announcements.event_id is NOT NULL, so each tenant needs its own event.
+    let eventAId: string
+    let eventBId: string
+
+    beforeAll(async () => {
+      const admin = serviceClient()
+      const eventIdFor = async (tenantId: string) => {
+        const { data, error } = await admin
+          .from('events')
+          .insert({ tenant_id: tenantId, name: 'Announcements Event', event_type: 'race' })
+          .select('id')
+          .single()
+        if (error) throw error
+        return data.id
+      }
+      eventAId = await eventIdFor(tenantA.id)
+      eventBId = await eventIdFor(tenantB.id)
+    })
+
     it('tenant_admin can insert an announcement under its own tenant', async () => {
       const { data, error } = await clientAdminA
         .from('announcements')
         .insert({
           tenant_id: tenantA.id,
+          event_id: eventAId,
           channel: 'officials',
           body: 'Test announcement via RLS',
           sms_sent: false,
@@ -402,6 +423,7 @@ describe('SEC-03: write migration readiness', () => {
     it('tenant_admin cannot insert an announcement under a different tenant', async () => {
       const { error } = await clientAdminA.from('announcements').insert({
         tenant_id: tenantB.id,
+        event_id: eventBId,
         channel: 'officials',
         body: 'Forged',
         sms_sent: false,

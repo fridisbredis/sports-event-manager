@@ -10,6 +10,8 @@ import {
 describe('SEC-01: tenant isolation on announcements', () => {
   let tenantA: { id: string }
   let tenantB: { id: string }
+  let eventAId: string
+  let eventBId: string
   let announcementB: { id: string }
   let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
 
@@ -20,11 +22,25 @@ describe('SEC-01: tenant isolation on announcements', () => {
     const adminA = await createUserWithRole(tenantA.id, 'tenant_admin')
     clientAdminA = await signInAsClient(adminA.phone, '000000')
 
+    // announcements.event_id is NOT NULL, so each tenant needs an event.
     const admin = serviceClient()
+    const eventIdFor = async (tenantId: string) => {
+      const { data, error } = await admin
+        .from('events')
+        .insert({ tenant_id: tenantId, name: 'Announcements Race', event_type: 'race' })
+        .select('id')
+        .single()
+      if (error) throw error
+      return data.id
+    }
+    eventAId = await eventIdFor(tenantA.id)
+    eventBId = await eventIdFor(tenantB.id)
+
     const { data, error } = await admin
       .from('announcements')
       .insert({
         tenant_id: tenantB.id,
+        event_id: eventBId,
         channel: 'officials',
         body: 'Tenant B announcement',
         published_at: new Date(0).toISOString(),
@@ -88,6 +104,7 @@ describe('SEC-01: tenant isolation on announcements', () => {
   it('cannot create an announcement under tenant B', async () => {
     const { error } = await clientAdminA.from('announcements').insert({
       tenant_id: tenantB.id,
+      event_id: eventBId,
       channel: 'officials',
       body: 'Forged announcement',
       published_at: new Date(0).toISOString(),
@@ -100,6 +117,7 @@ describe('SEC-01: tenant isolation on announcements', () => {
       .from('announcements')
       .insert({
         tenant_id: tenantA.id,
+        event_id: eventAId,
         channel: 'officials',
         body: 'Tenant A announcement',
         published_at: new Date(0).toISOString(),

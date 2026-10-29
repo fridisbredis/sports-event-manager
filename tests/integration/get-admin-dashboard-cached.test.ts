@@ -153,6 +153,7 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
     const timeslotEnd = '2026-09-20T10:30:00.000Z'
     const { error: assign1Error } = await admin.from('assignments').insert({
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: officialConfirmed1.data.id,
       workstation_id: workstation.id,
       timeslot_start: timeslotStart,
@@ -163,6 +164,7 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
     if (assign1Error) throw assign1Error
     const { error: assign2Error } = await admin.from('assignments').insert({
       tenant_id: tenant.id,
+      event_id: event.id,
       official_id: officialConfirmed2.data.id,
       workstation_id: workstation.id,
       timeslot_start: timeslotStart,
@@ -269,6 +271,7 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
       .from('assignments')
       .insert({
         tenant_id: tenant.id,
+        event_id: event!.id,
         official_id: official!.id,
         workstation_id: workstation!.id,
         timeslot_start: timeslotStart,
@@ -396,6 +399,7 @@ describe('get_admin_dashboard_cached RPC (PERF-06 Phase 3 fail-closed boundary)'
       for (let i = 0; i < 2; i++) {
         const { error: assignError } = await admin.from('assignments').insert({
           tenant_id: tenantId,
+          event_id: event.id,
           official_id: officialIds[i],
           workstation_id: workstation.id,
           timeslot_start: '2026-09-20T10:00:00.000Z',

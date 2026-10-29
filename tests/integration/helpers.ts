@@ -247,6 +247,7 @@ export async function createOfficialLinkedToUser(
 // `participant_read_own` (user_id = auth.uid()) resolves to this participant.
 export async function createParticipantLinkedToUser(
   tenantId: string,
+  eventId: string,
   userId: string,
   name: string
 ) {
@@ -255,6 +256,7 @@ export async function createParticipantLinkedToUser(
     .from('participants')
     .insert({
       tenant_id: tenantId,
+      event_id: eventId,
       user_id: userId,
       name,
       phone: `+46702${Math.floor(Math.random() * 1_000_000)}`,
