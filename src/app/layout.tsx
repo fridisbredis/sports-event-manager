@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { heading } from '@/fonts/manrope'
 import { I18nProvider } from '@/components/i18n-provider'
@@ -8,6 +8,14 @@ import { Providers } from '@/components/providers'
 export const metadata: Metadata = {
   title: 'Sports Event Manager',
   description: 'Plan and execute your sport event',
+  // iOS reads its home screen title from here rather than the manifest's
+  // short_name. The icon comes from src/app/apple-icon.png.
+  appleWebApp: { capable: true, title: 'Event Manager', statusBarStyle: 'default' },
+}
+
+// Matches theme_color in manifest.ts: tints the browser and standalone chrome.
+export const viewport: Viewport = {
+  themeColor: '#006FEE',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
