@@ -311,16 +311,26 @@ jobs:
         if: always()
         run: supabase stop
 
-  migration-forward-fix:
-    name: Migration forward-fix
+  # Every migration/SQL guard as one job with one step each. They take
+  # seconds apiece, so as separate jobs they spent more on runner start-up
+  # and checkout than on checking. Steps after the first run even when an
+  # earlier guard failed (!cancelled()), so one PR run still reports every
+  # guard's result and the failing step's name says which one it was.
+  migration-guards:
+    name: Migration guards
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          # Full history so the merge-base diff below can resolve.
+          # Full history so the base-ref diffs below can resolve.
           fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Check new migrations document a forward-fix plan
         env:
@@ -397,145 +407,8 @@ jobs:
             exit 1
           fi
 
-  rpc-return-shape:
-    name: RPC return-shape check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          # Full history so the base-ref diff below can resolve.
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Check no RPC silently drops a jsonb return key
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-
-          if [ -n "${BASE_SHA:-}" ]; then
-            base="$BASE_SHA"
-          else
-            # push/workflow_dispatch: compare against the previous commit.
-            base="HEAD^"
-          fi
-
-          node scripts/check-rpc-shape.mjs "$base" HEAD
-
-  guc-transaction-local:
-    name: Transaction-local app.* GUCs
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      # Whole-tree scan, so no base-ref diff and no fetch-depth needed
-      # (unlike the RPC return-shape check above, which has to compare two
-      # versions of the same function). ADR-0003 rule 5: an `app.*` GUC set
-      # session-scoped survives its transaction on a pooled PostgREST
-      # connection and misapplies tenant scoping to a later request.
-      - name: Check every app.* GUC is set transaction-locally
-        run: node scripts/check-guc-transaction-local.mjs
-
-  migration-snapshot-warning:
-    name: Migration snapshot (advisory)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          # Full history so the merge-base diff below can resolve.
-          fetch-depth: 0
-
-      - name: Warn about destructive migrations with no snapshot (REL-04)
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -euo pipefail
-
-          # ADVISORY ONLY — this step never fails the build, by design.
-          #
-          # The blocking gate lives in deploy-prod.yml, and it has to: only
-          # prod's own migration ledger knows which migrations are actually
-          # pending, and a snapshot has to be taken immediately before the
-          # push to be worth anything (one taken at PR time is stale by the
-          # time the PR merges). Neither fact is knowable here.
-          #
-          # What this step is for is timing. Without it the first sign that
-          # a destructive migration has no snapshot is a failed prod deploy,
-          # which is where it was found on 2026-09-11. Surfacing it on the
-          # PR costs nothing and moves that discovery days earlier.
-          #
-          # Only ADDED files (--diff-filter=A), same as the forward-fix and
-          # sort-order jobs: editing an existing migration's body must not
-          # start warning about it.
-          if [ -n "${BASE_SHA:-}" ]; then
-            base="$BASE_SHA"
-          else
-            base="HEAD^"
-          fi
-
-          new_migrations=$(git diff --name-only --diff-filter=A "$base" HEAD \
-            -- 'supabase/migrations/*.sql')
-
-          if [ -z "$new_migrations" ]; then
-            echo "No new migrations in this change."
-            exit 0
-          fi
-
-          pending=""
-          for file in $new_migrations; do
-            grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*destructive\b' "$file" || continue
-
-            if scripts/check-snapshot-claim.sh "$file"; then
-              : # message already printed by the script
-            else
-              pending="$pending $file"
-            fi
-          done
-
-          if [ -n "$pending" ]; then
-            cat <<'EOF'
-
-          NOTE — not a failure. One or more destructive migrations in this PR
-          reference no prod snapshot and claim no constraint-only exemption.
-          The prod deploy WILL block on this later (deploy-prod.yml, REL-04).
-
-          Before cutting the release, either run
-            scripts/ops/snapshot-prod-db.sh <migration version>
-          and paste the printed filename into that migration's 'Data:' line, or
-          — if it writes no rows at all — claim the verified exemption:
-            -- Data:     no snapshot required (constraint-only): <why>
-
-          Deliberately advisory: the snapshot must be taken immediately before
-          the push to be useful, so taking one now would go stale anyway.
-          EOF
-          fi
-
-  migration-number-collision:
-    name: Migration number collision
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Check for duplicate migration number prefixes
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
 
@@ -574,6 +447,7 @@ jobs:
           echo "No migration number collisions."
 
       - name: Check new migrations sort above base branch
+        if: ${{ !cancelled() }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -590,7 +464,7 @@ jobs:
           # way the PR it's meant to catch does.
           #
           # Only ADDED files count (--diff-filter=A), same as the forward-fix
-          # job above — editing an existing 00NN file's body must not trip
+          # step above — editing an existing 00NN file's body must not trip
           # this, and legacy 00NN prefixes always sort below every timestamp
           # prefix anyway, so they can't threaten the floor.
           if [ -n "${BASE_SHA:-}" ]; then
@@ -645,6 +519,97 @@ jobs:
           fi
 
           echo "All new migrations sort above the base branch floor."
+
+      - name: Check no RPC silently drops a jsonb return key
+        if: ${{ !cancelled() }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${BASE_SHA:-}" ]; then
+            base="$BASE_SHA"
+          else
+            # push/workflow_dispatch: compare against the previous commit.
+            base="HEAD^"
+          fi
+
+          node scripts/check-rpc-shape.mjs "$base" HEAD
+
+      # Whole-tree scan, so no base-ref diff needed
+      # (unlike the RPC return-shape step above, which has to compare two
+      # versions of the same function). ADR-0003 rule 5: an `app.*` GUC set
+      # session-scoped survives its transaction on a pooled PostgREST
+      # connection and misapplies tenant scoping to a later request.
+      - name: Check every app.* GUC is set transaction-locally
+        if: ${{ !cancelled() }}
+        run: node scripts/check-guc-transaction-local.mjs
+
+      - name: Warn about destructive migrations with no snapshot (REL-04)
+        if: ${{ !cancelled() }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # ADVISORY ONLY — this step never fails the build, by design.
+          #
+          # The blocking gate lives in deploy-prod.yml, and it has to: only
+          # prod's own migration ledger knows which migrations are actually
+          # pending, and a snapshot has to be taken immediately before the
+          # push to be worth anything (one taken at PR time is stale by the
+          # time the PR merges). Neither fact is knowable here.
+          #
+          # What this step is for is timing. Without it the first sign that
+          # a destructive migration has no snapshot is a failed prod deploy,
+          # which is where it was found on 2026-09-11. Surfacing it on the
+          # PR costs nothing and moves that discovery days earlier.
+          #
+          # Only ADDED files (--diff-filter=A), same as the forward-fix and
+          # sort-order steps: editing an existing migration's body must not
+          # start warning about it.
+          if [ -n "${BASE_SHA:-}" ]; then
+            base="$BASE_SHA"
+          else
+            base="HEAD^"
+          fi
+
+          new_migrations=$(git diff --name-only --diff-filter=A "$base" HEAD \
+            -- 'supabase/migrations/*.sql')
+
+          if [ -z "$new_migrations" ]; then
+            echo "No new migrations in this change."
+            exit 0
+          fi
+
+          pending=""
+          for file in $new_migrations; do
+            grep -qE '^--[[:space:]]*Forward-fix:[[:space:]]*destructive\b' "$file" || continue
+
+            if scripts/check-snapshot-claim.sh "$file"; then
+              : # message already printed by the script
+            else
+              pending="$pending $file"
+            fi
+          done
+
+          if [ -n "$pending" ]; then
+            cat <<'EOF'
+
+          NOTE — not a failure. One or more destructive migrations in this PR
+          reference no prod snapshot and claim no constraint-only exemption.
+          The prod deploy WILL block on this later (deploy-prod.yml, REL-04).
+
+          Before cutting the release, either run
+            scripts/ops/snapshot-prod-db.sh <migration version>
+          and paste the printed filename into that migration's 'Data:' line, or
+          — if it writes no rows at all — claim the verified exemption:
+            -- Data:     no snapshot required (constraint-only): <why>
+
+          Deliberately advisory: the snapshot must be taken immediately before
+          the push to be useful, so taking one now would go stale anyway.
+          EOF
+          fi
 
   build:
     name: Production build
