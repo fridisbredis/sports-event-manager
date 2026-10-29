@@ -57,7 +57,8 @@ export const USERS: Record<RoleKey, TestUser> = {
   // implicitly a confirmed, schedulable official on the roster.
   tenantAdmin: {
     phone: '+46709900001',
-    landingPath: `/${SEED_TENANT_SLUG}/admin/${EVENT_SEGMENT}/dashboard`,
+    // N23 / TEN-01: the tenant's event list, not one event's dashboard.
+    landingPath: `/${SEED_TENANT_SLUG}/admin`,
     covers: 'EVT-01, EVT-02, WS-01, WS-02, OFF-01, SCHED-01, COMM-01, ACCT-01 (admin)',
   },
 

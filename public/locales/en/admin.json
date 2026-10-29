@@ -12,7 +12,8 @@
     "logOut": "Log out",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "participants": "Participants"
+    "participants": "Participants",
+    "allEvents": "All events"
   },
   "dashboard": {
     "eventName": "Untitled event",
@@ -655,6 +656,31 @@
   },
   "events": {
     "noEventsTitle": "No events yet",
-    "noEventsBody": "This organizer has no events. A system admin can create one."
+    "noEventsBody": "This organizer has no events yet.",
+    "title": "Events",
+    "activeOfCap": "{{active}} of {{cap}} active events",
+    "filterLabel": "Filter by status",
+    "filterAll": "All",
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "noMatching": {
+      "draft": "No draft events",
+      "published": "No published events",
+      "archived": "No archived events"
+    },
+    "stages": "Stages",
+    "officials": "Officials",
+    "participants": "Participants",
+    "archive": "Archive",
+    "unarchive": "Un-archive",
+    "cancel": "Cancel",
+    "archiveConfirmTitle": "Archive {{name}}?",
+    "archiveConfirmBody": "An archived event is locked for editing and disappears from the officials' event list. It frees one of your active event slots. You can un-archive it later if a slot is free.",
+    "datesNotSet": "Dates not set",
+    "officialsInvited": "+{{invited}} invited",
+    "actionsFor": "Actions for {{name}}"
   }
 }
