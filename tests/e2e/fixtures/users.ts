@@ -65,7 +65,7 @@ export const USERS: Record<RoleKey, TestUser> = {
   // for every official surface.
   officialConfirmed: {
     phone: '+46709900002',
-    landingPath: `/${SEED_TENANT_SLUG}/home`,
+    landingPath: `/${SEED_TENANT_SLUG}/${EVENT_SEGMENT}/home`,
     covers: 'HOME-01, INFO-01, MYSCH-01 (populated), ANN-01, ACCT-01 (official)',
   },
 
@@ -73,7 +73,7 @@ export const USERS: Record<RoleKey, TestUser> = {
   // selector when only one of the three days has anything in it.
   officialSingleDay: {
     phone: '+46709900005',
-    landingPath: `/${SEED_TENANT_SLUG}/home`,
+    landingPath: `/${SEED_TENANT_SLUG}/${EVENT_SEGMENT}/home`,
     covers: 'MYSCH-01 single-day case',
   },
 
@@ -81,7 +81,7 @@ export const USERS: Record<RoleKey, TestUser> = {
   // the spec never documented but which real officials will hit.
   officialNoShifts: {
     phone: '+46709900006',
-    landingPath: `/${SEED_TENANT_SLUG}/home`,
+    landingPath: `/${SEED_TENANT_SLUG}/${EVENT_SEGMENT}/home`,
     covers: 'MYSCH-01 empty state, ACCT-01 without a schedule section',
   },
 }

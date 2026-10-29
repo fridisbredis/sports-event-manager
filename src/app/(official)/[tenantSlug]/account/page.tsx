@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import { listOfficialEvents } from '@/lib/events/official-event'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -49,6 +50,8 @@ export default async function OfficialAccountPage({ params }: Props) {
     officialId: official.id,
   })
 
+  const hasSeveralEvents = (await listOfficialEvents(tenantSlug)).length > 1
+
   return (
     <div>
       {/* page-title like every other heading in the app. This was the one
@@ -71,6 +74,7 @@ export default async function OfficialAccountPage({ params }: Props) {
         tenantSlug={tenantSlug}
         shiftCount={shiftCount}
         i18nNamespace="official"
+        changeEventHref={hasSeveralEvents ? `/${tenantSlug}/events` : null}
         language={language}
       />
     </div>

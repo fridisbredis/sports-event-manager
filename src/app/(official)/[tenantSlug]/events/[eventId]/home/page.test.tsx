@@ -50,7 +50,7 @@ function chain(result: unknown) {
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
+const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 
 function mockUser(userId: string | null, fromMock: ReturnType<typeof vi.fn> = vi.fn()) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
@@ -128,4 +128,29 @@ describe('OfficialHomePage', () => {
 
     expect(result).toBeTruthy()
   })
+
+  // ACCT-01 needs an officials row. A system admin looking at the official
+  // view has none, and the card used to lead them to a 404.
+  it.each([
+    ['shows', 'off-1', true],
+    ['hides', null, false],
+  ])(
+    '%s the account card when the caller has an officials row: %s',
+    async (_v, officialId, shown) => {
+      vi.mocked(getOfficialTenant).mockResolvedValue({
+        id: TENANT_ID,
+        slug: 'viadal',
+        color_palette: 'default',
+        tier: 'professional',
+        is_active: true,
+        officialId,
+      })
+      mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
+      mockOfficialHomeRpc({ data: { name: null }, error: null })
+
+      const flat = JSON.stringify(await OfficialHomePage({ params: PARAMS }))
+
+      expect(flat.includes('/viadal/account')).toBe(shown)
+    }
+  )
 })

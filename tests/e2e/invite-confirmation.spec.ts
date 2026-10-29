@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../src/types/database'
-import { OTP_CODE, SEED_TENANT_SLUG } from './fixtures/users'
+import { OTP_CODE, SEED_TENANT_SLUG, EVENT_SEGMENT } from './fixtures/users'
 import {
   INVITE_PHONES,
   SECOND_TENANT_SLUG,
@@ -166,7 +166,7 @@ test.describe('AUTH-02 via the SMS token link (/invite/[token])', () => {
 
     // '/' resolves the role the confirm just granted. Landing on the tenant's
     // official home is the end-to-end proof that the grant took effect.
-    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/home`))
+    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/${EVENT_SEGMENT}/home`))
   })
 
   test('an unknown token shows the invalid-link screen and reveals no tenant', async ({ page }) => {
@@ -242,7 +242,7 @@ test.describe('AUTH-02 via the phone fallback (/confirm-invite)', () => {
     await expect(continueButton).toBeEnabled()
     await continueButton.click()
 
-    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/home`))
+    await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/${EVENT_SEGMENT}/home`))
 
     const official = await readOfficialByPhone(admin, INVITE_PHONES.phoneFallback, tenantId)
     expect(official?.invite_status).toBe('confirmed')
@@ -298,7 +298,7 @@ test.describe('AUTH-02 multi-tenant and expiry states on /confirm-invite', () =>
     await expect(page.getByRole('button', { name: 'Continue' })).toBeEnabled()
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    await expect(page).toHaveURL(new RegExp(`/${SECOND_TENANT_SLUG}/home`))
+    await expect(page).toHaveURL(new RegExp(`/${SECOND_TENANT_SLUG}/${EVENT_SEGMENT}/home`))
 
     const chosen = await readOfficialByPhone(admin, INVITE_PHONES.multiTenant, secondTenantId)
     expect(chosen?.invite_status).toBe('confirmed')

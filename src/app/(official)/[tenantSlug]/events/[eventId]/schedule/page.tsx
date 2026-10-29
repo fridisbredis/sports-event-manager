@@ -17,7 +17,7 @@ import { periodsOverlap, type UnavailabilityPeriod } from '@/lib/scheduling/unav
 import { getEventDateRange, type StageDates } from '@/lib/scheduling/period-bounds'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
   searchParams: Promise<{ day?: string }>
 }
 
@@ -46,11 +46,13 @@ const SCHEDULE_CEILING = 500
 // everything else.
 async function loadEventDates(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  tenantId: string
+  tenantId: string,
+  eventId: string
 ): Promise<{ min: string; max: string } | null> {
   const { data: event, error: eventError } = await supabase
     .from('events')
     .select('id')
+    .eq('id', eventId)
     .eq('tenant_id', tenantId)
     .maybeSingle()
 
@@ -83,7 +85,7 @@ async function loadEventDates(
 }
 
 export default async function SchedulePage({ params, searchParams }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const { day: requestedDay } = await searchParams
   const t = await getServerTranslation(await getUserLanguage(), 'official')
 
@@ -111,7 +113,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
   // the await at the bottom can throw, and a rejection nobody has awaited yet
   // would become an unhandled rejection instead of the intended 500.
   const eventDatesPromise = officialId
-    ? loadEventDates(supabase, tenant.id).catch((cause: unknown) => {
+    ? loadEventDates(supabase, tenant.id, eventId).catch((cause: unknown) => {
         logger.error('Official schedule: event dates failed to load', cause, {
           tenantId: tenant.id,
         })
@@ -155,6 +157,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
         .select('timeslot_start')
         .eq('official_id', officialId)
         .eq('tenant_id', tenant.id)
+        .eq('event_id', eventId)
         .eq('status', 'assigned')
         .not('workstation_id', 'is', null)
         .order('timeslot_start')
@@ -238,6 +241,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       )
       .eq('official_id', officialId)
       .eq('tenant_id', tenant.id)
+      .eq('event_id', eventId)
       .eq('status', 'assigned')
       .not('workstation_id', 'is', null)
       .gte('timeslot_start', start)
@@ -288,6 +292,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
           .from('assignments')
           .select('workstation_id, timeslot_start, officials ( id, name )')
           .eq('tenant_id', tenant.id)
+          .eq('event_id', eventId)
           .eq('status', 'assigned')
           .not('workstation_id', 'is', null)
           .gte('timeslot_start', dayWindow(selectedDay).start)

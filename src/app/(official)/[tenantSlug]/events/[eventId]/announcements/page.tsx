@@ -11,7 +11,7 @@ import { AnnouncementCard } from './_components/announcement-card'
 import { dateLocaleFor, EVENT_TIME_ZONE } from '@/lib/i18n/date-locale'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
   searchParams: Promise<{ page?: string }>
 }
 
@@ -60,7 +60,7 @@ function formatAnnouncementTime(ts: string, language: string, t: (key: string) =
 }
 
 export default async function AnnouncementsPage({ params, searchParams }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const { page: pageParam } = await searchParams
   const page = parsePageParam(pageParam)
   const language = await getUserLanguage()
@@ -87,6 +87,8 @@ export default async function AnnouncementsPage({ params, searchParams }: Props)
     .from('announcements')
     .select('id, body, published_at')
     .eq('tenant_id', tenant.id)
+    // N23: this event's announcements.
+    .eq('event_id', eventId)
     .eq('channel', 'officials')
     .order('published_at', { ascending: false })
     .range(from, to)

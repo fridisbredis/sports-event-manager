@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 import { AdminViewLink } from './_components/admin-view-link'
 import { BottomTabBar } from './_components/bottom-tab-bar'
+import { getSoleOfficialEventId } from '@/lib/events/official-event'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
 interface Props {
@@ -49,6 +50,8 @@ export default async function OfficialLayout({ children, params }: Props) {
   // them — so the tab would lead nowhere. Reuses the resolution above rather
   // than asking again (F-PERF-07).
   const showAccount = tenant.officialId != null
+  // N23: where the event tabs point on a screen without an event in its URL.
+  const defaultEventId = await getSoleOfficialEventId(tenantSlug)
 
   return (
     <>
@@ -61,7 +64,11 @@ export default async function OfficialLayout({ children, params }: Props) {
           <AdminLinkChrome tenantSlug={tenantSlug} />
         </Suspense>
         <div className="flex-1 pb-16">{children}</div>
-        <BottomTabBar tenantSlug={tenantSlug} showAccount={showAccount} />
+        <BottomTabBar
+          tenantSlug={tenantSlug}
+          showAccount={showAccount}
+          defaultEventId={defaultEventId}
+        />
       </div>
     </>
   )

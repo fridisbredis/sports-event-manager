@@ -43,9 +43,15 @@ async function expectNotFound(page: import('@playwright/test').Page, path: strin
 // URL is matched as that pattern. Account is tenant-level and did not move.
 function landingPattern(path: string): string {
   const tenantAdmin = `/${SEED_TENANT_SLUG}/admin/`
-  return path.startsWith(tenantAdmin) && !path.endsWith('/admin/account')
-    ? path.replace(tenantAdmin, `${tenantAdmin}${EVENT_SEGMENT}/`)
-    : path
+  if (path.startsWith(tenantAdmin) && !path.endsWith('/admin/account')) {
+    return path.replace(tenantAdmin, `${tenantAdmin}${EVENT_SEGMENT}/`)
+  }
+  // The official screens moved the same way, under /[tenantSlug]/events/[id]/.
+  const official = `/${SEED_TENANT_SLUG}/`
+  if (OFFICIAL_PATHS.includes(path) && !path.endsWith('/account')) {
+    return path.replace(official, `${official}${EVENT_SEGMENT}/`)
+  }
+  return path
 }
 
 async function expectReachable(page: import('@playwright/test').Page, path: string) {

@@ -11,9 +11,10 @@ import { OfficialsCard } from './_components/officials-card'
 import { SchedulingWarningsCard } from './_components/scheduling-warnings-card'
 import { SmsUsageCard } from './_components/sms-usage-card'
 import { AdminAreasGrid } from './_components/admin-areas-grid'
-import { dateLocaleFor, formatMoney } from '@/lib/i18n/date-locale'
+import { formatMoney } from '@/lib/i18n/date-locale'
 import { readSmsCapStatus } from '@/lib/sms/cap'
 import { adminEventPath } from '@/lib/events/paths'
+import { formatDateRange } from '@/lib/i18n/date-range'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -38,20 +39,6 @@ interface AdminDashboardCached {
   time_off_clash: number
   earliest_day: string | null
   earliest_stage_id: string | null
-}
-
-function formatDateRange(start: string | null, end: string | null, language: string) {
-  if (!start || !end) return null
-  const s = new Date(start)
-  const e = new Date(end)
-  const sDay = s.getUTCDate()
-  const eDay = e.getUTCDate()
-  const locale = dateLocaleFor(language)
-  const sMonth = s.toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })
-  const eMonth = e.toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })
-  const year = e.getUTCFullYear()
-  if (sMonth === eMonth) return `${sDay}–${eDay} ${sMonth} ${year}`
-  return `${sDay} ${sMonth} – ${eDay} ${eMonth} ${year}`
 }
 
 export default async function DashboardPage({ params }: Props) {

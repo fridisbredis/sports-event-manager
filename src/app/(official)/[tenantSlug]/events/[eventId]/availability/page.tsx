@@ -10,7 +10,7 @@ import { getEventDateRange, type StageDates } from '@/lib/scheduling/period-boun
 import { AvailabilityManager } from './_components/availability-manager'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
 }
 
 // A guard-rail, not pagination. Scoped to one official within one tenant: a
@@ -20,7 +20,7 @@ interface Props {
 const PERIOD_CEILING = 200
 
 export default async function AvailabilityPage({ params }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const t = await getServerTranslation(await getUserLanguage(), 'official')
 
   const supabase = await createSupabaseServerClient()
@@ -72,6 +72,7 @@ export default async function AvailabilityPage({ params }: Props) {
   const { data: event } = await supabase
     .from('events')
     .select('id')
+    .eq('id', eventId)
     .eq('tenant_id', tenant.id)
     .maybeSingle()
 

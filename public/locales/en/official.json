@@ -134,5 +134,15 @@
     "sectionLabel": "Time off",
     "setByOrganisers": "Set by organisers",
     "notOwned": "The organisers set this — only they can remove it."
+  },
+  "events": {
+    "title": "Your events",
+    "subtitle": "Choose the event you want to open.",
+    "new": "New",
+    "emptyTitle": "No events yet",
+    "emptyBody": "You have not been added to an event in this organization yet.",
+    "changeEvent": "Change event",
+    "changeEventSub": "Switch to another of your events",
+    "sectionHeading": "Event"
   }
 }

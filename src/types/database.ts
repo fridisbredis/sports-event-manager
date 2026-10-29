@@ -1261,7 +1261,10 @@ export type Database = {
         Args: { p_event_id?: string; p_tenant_id: string }
         Returns: Json
       }
-      get_event_info_cached: { Args: { p_tenant_id: string }; Returns: Json }
+      get_event_info_cached: {
+        Args: { p_event_id?: string; p_tenant_id: string }
+        Returns: Json
+      }
       get_last_sign_in_at: { Args: { p_user_id: string }; Returns: string }
       get_official_home_cached: {
         Args: { p_tenant_id: string; p_user_id: string }
@@ -1289,6 +1292,10 @@ export type Database = {
       }
       is_own_official_row: { Args: { p_official_id: string }; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
+      mark_official_event_seen: {
+        Args: { p_event_id: string }
+        Returns: undefined
+      }
       publish_event: {
         Args: { p_event_id: string; p_tenant_id: string }
         Returns: boolean

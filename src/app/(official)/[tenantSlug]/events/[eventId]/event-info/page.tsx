@@ -36,7 +36,7 @@ interface EventInfoCached {
 }
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
 }
 
 // A stage carries either a full start timestamp or just a date (stage_date,
@@ -63,7 +63,7 @@ function stageDetails(
 }
 
 export default async function EventInfoPage({ params }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const language = await getUserLanguage()
   const t = await getServerTranslation(language, 'official')
 
@@ -83,10 +83,11 @@ export default async function EventInfoPage({ params }: Props) {
   // because the RPC is SECURITY DEFINER owned by cache_rpc_reader
   // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
   const getEventInfoCached = unstable_cache(
-    async (tenantId: string) => {
+    async (tenantId: string, eventId: string) => {
       const service = createSupabaseServiceClient()
       const { data, error } = await service.rpc('get_event_info_cached', {
         p_tenant_id: tenantId,
+        p_event_id: eventId,
       })
       if (error) throw error
       return data as unknown as EventInfoCached
@@ -100,7 +101,7 @@ export default async function EventInfoPage({ params }: Props) {
     }
   )
 
-  const { event, stages, facilities } = await getEventInfoCached(tenant.id)
+  const { event, stages, facilities } = await getEventInfoCached(tenant.id, eventId)
 
   const stageList = stages
   const facilityList = facilities

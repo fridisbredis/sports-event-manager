@@ -10,6 +10,7 @@ import { I18nProvider } from '@/components/i18n-provider'
 const push = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useParams: () => ({ tenantSlug: 'testklubben', eventId: 'e1' }),
 }))
 
 const STRINGS = {
@@ -491,7 +492,9 @@ describe('ScheduleView day label', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'tors 13 aug.' }))
 
-    expect(push).toHaveBeenCalledWith('/testklubben/schedule?day=2026-08-13', { scroll: false })
+    expect(push).toHaveBeenCalledWith('/testklubben/events/e1/schedule?day=2026-08-13', {
+      scroll: false,
+    })
   })
 
   it('leaves modified clicks to the browser so a tab can be opened', () => {

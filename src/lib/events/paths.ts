@@ -23,3 +23,15 @@ export function adminEventPath(tenantSlug: string, eventId: string, subpath = ''
 export function adminEventRoutePattern(subpath: string): string {
   return `/[tenantSlug]/admin/events/[eventId]/${subpath.replace(/^\/+/, '')}`
 }
+
+// N23: the official surfaces of one event live under
+// /[tenantSlug]/events/[eventId]/… (home, event-info, schedule,
+// announcements, availability); the picker is /[tenantSlug]/events.
+export function officialEventPath(tenantSlug: string, eventId: string, subpath = ''): string {
+  const base = `/${tenantSlug}/events/${eventId}`
+  return subpath ? `${base}/${subpath.replace(/^\/+/, '')}` : base
+}
+
+export function officialEventRoutePattern(subpath: string): string {
+  return `/[tenantSlug]/events/[eventId]/${subpath.replace(/^\/+/, '')}`
+}

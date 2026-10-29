@@ -68,7 +68,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
+const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 
 // Fixed so the "default to today" branch is deterministic. 2026-08-12 is a
 // day present in DAY_ROWS below; 2026-08-13 is the other.
@@ -362,7 +362,7 @@ describe('SchedulePage', () => {
   // and official id happen to collide in shape (both plausible uuid-looking
   // strings) — pins that official_id and tenant_id are always two independent
   // .eq() calls, not a single combined filter satisfiable by either alone.
-  it('filters by both official_id and tenant_id independently, not by either alone', async () => {
+  it('filters by official_id, tenant_id and event_id independently, not by any alone', async () => {
     mockResolvedTenant('off-1')
     const { dayBuilder, windowBuilder, fromMock } = mockQueries({ data: DAY_ROWS })
     mockUser('user-1', fromMock)
@@ -374,7 +374,9 @@ describe('SchedulePage', () => {
       expect(eqCalls).toContainEqual(['official_id', 'off-1'])
       expect(eqCalls).toContainEqual(['tenant_id', TENANT_ID])
       expect(eqCalls).toContainEqual(['status', 'assigned'])
-      expect(eqCalls.length).toBe(3)
+      // N23: the official's shifts in this event only.
+      expect(eqCalls).toContainEqual(['event_id', 'event-1'])
+      expect(eqCalls.length).toBe(4)
     }
   })
 
