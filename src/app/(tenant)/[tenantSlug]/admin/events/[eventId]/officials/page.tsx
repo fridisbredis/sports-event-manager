@@ -9,7 +9,7 @@ import { listTenantAdmins } from '@/lib/auth/tenant-admins'
 import { maxTenantAdmins } from '@/lib/tiers/features'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
 }
 
 // A guard-rail, not pagination. A confirmed typical tenant runs 10-15
@@ -19,7 +19,7 @@ interface Props {
 const OFFICIALS_CEILING = 500
 
 export default async function OfficialsPage({ params }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
 
   const supabase = await createSupabaseServerClient()
   const user = await getCurrentUser()
@@ -36,10 +36,13 @@ export default async function OfficialsPage({ params }: Props) {
 
   const { data: officials, error } = await supabase
     .from('officials')
+    // N23: this event's officials — members in official_events — not the
+    // whole tenant's. The embedded membership is only a filter.
     .select(
-      'id, name, phone, invite_status, user_id, created_at, tenant_id, sms_opt_out, avatar_url'
+      'id, name, phone, invite_status, user_id, created_at, tenant_id, sms_opt_out, avatar_url, official_events!inner(event_id)'
     )
     .eq('tenant_id', tenant.id)
+    .eq('official_events.event_id', eventId)
     .neq('invite_status', 'removed')
     .order('created_at', { ascending: true })
     .range(0, OFFICIALS_CEILING)
@@ -79,7 +82,7 @@ export default async function OfficialsPage({ params }: Props) {
         async (o) =>
           [
             o.id,
-            await fetchOfficialDetail(supabase, { tenantId: tenant.id, officialId: o.id }),
+            await fetchOfficialDetail(supabase, { tenantId: tenant.id, eventId, officialId: o.id }),
           ] as const
       )
     )
@@ -90,6 +93,7 @@ export default async function OfficialsPage({ params }: Props) {
       <OfficialsList
         tenantSlug={tenantSlug}
         tenantId={tenant.id}
+        eventId={eventId}
         officials={rows}
         currentUserId={user.id}
         details={Object.fromEntries(details)}

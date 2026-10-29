@@ -1210,6 +1210,17 @@ export type Database = {
         }
         Returns: Json
       }
+      create_official_in_event: {
+        Args: {
+          p_event_id: string
+          p_invite_token_expires_at: string
+          p_name: string
+          p_phone: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       create_tenant_with_defaults: {
         Args: {
           p_admin_name?: string

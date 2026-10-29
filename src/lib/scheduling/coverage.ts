@@ -78,10 +78,13 @@ export async function fetchDayCoverage(
   supabase: SupabaseClient,
   {
     tenantId,
+    eventId,
     day,
     workstations,
   }: {
     tenantId: string
+    /** N23: the event on screen; other events' shifts that day are not its coverage. */
+    eventId: string
     /** UTC calendar day, `YYYY-MM-DD`. */
     day: string
     /** The day's work areas, already read and ordered by the page. */
@@ -99,6 +102,7 @@ export async function fetchDayCoverage(
     .from('assignments')
     .select('timeslot_start, timeslot_end, workstation_id, official_id, officials ( id, name )')
     .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
     .eq('status', 'assigned')
     .not('workstation_id', 'is', null)
     .gte('timeslot_start', dayStart.toISOString())
@@ -110,7 +114,7 @@ export async function fetchDayCoverage(
     .order('timeslot_start')
 
   if (error) {
-    logger.error('N18: day coverage failed to load', error, { tenantId, day })
+    logger.error('N18: day coverage failed to load', error, { tenantId, eventId, day })
     return { areas: emptyAreas(workstations), ok: false }
   }
 

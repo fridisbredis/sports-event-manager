@@ -78,7 +78,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 const TENANT = { id: TENANT_ID, name: 'Viadal', slug: 'viadal' }
-const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
+const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 const NO_SEARCH = Promise.resolve({})
 
 function search(page: string) {

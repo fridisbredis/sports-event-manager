@@ -56,6 +56,7 @@ export interface StageOption {
 interface Props {
   tenantSlug: string
   tenantId: string
+  eventId: string
   participants: ParticipantRow[]
   stages: StageOption[]
   page: number
@@ -67,6 +68,7 @@ interface Props {
 export default function ParticipantsList({
   tenantSlug,
   tenantId,
+  eventId,
   participants,
   stages,
   page,
@@ -128,6 +130,7 @@ export default function ParticipantsList({
         const result = await addParticipant({
           tenantSlug,
           tenantId,
+          eventId,
           name: String(formData.get('name') ?? ''),
           bib: String(formData.get('bib') ?? ''),
           category: String(formData.get('category') ?? ''),

@@ -11,7 +11,7 @@ import { parseRaceResultsEventId } from '@/lib/race-results/parse-url'
 import ParticipantsList from './_components/participants-list'
 
 interface Props {
-  params: Promise<{ tenantSlug: string }>
+  params: Promise<{ tenantSlug: string; eventId: string }>
   searchParams: Promise<{ page?: string; stage?: string; withdrawn?: string }>
 }
 
@@ -29,7 +29,7 @@ const PARTICIPANTS_PAGE_SIZE = 50
 const PARTICIPANTS_CEILING = 2000
 
 export default async function ParticipantsPage({ params, searchParams }: Props) {
-  const { tenantSlug } = await params
+  const { tenantSlug, eventId } = await params
   const { page: pageParam, stage: stageParam, withdrawn: withdrawnParam } = await searchParams
 
   const user = await getCurrentUser()
@@ -61,6 +61,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     .from('event_stages')
     .select('id, name, stage_type, results_url, position')
     .eq('tenant_id', tenant.id)
+    .eq('event_id', eventId)
     .eq('stage_type', 'race')
     .order('position', { ascending: true })
 
@@ -97,6 +98,8 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
         : 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, participant_stages(stage_id)'
     )
     .eq('tenant_id', tenant.id)
+    // N23: this event's participants.
+    .eq('event_id', eventId)
 
   if (selectedStageId) {
     query = query.eq('participant_stages.stage_id', selectedStageId)
@@ -160,6 +163,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
       <ParticipantsList
         tenantSlug={tenantSlug}
         tenantId={tenant.id}
+        eventId={eventId}
         participants={participants}
         stages={stages}
         page={page}

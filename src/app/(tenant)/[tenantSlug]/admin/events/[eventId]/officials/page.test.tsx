@@ -76,7 +76,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
+const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 
 function mockServerClient(userId: string | null, tenant: unknown, officialsResult?: unknown) {
   const fromMock = vi.fn((table: string) => {
@@ -145,6 +145,7 @@ describe('OfficialsPage', () => {
     expect(list!.props).toEqual({
       tenantSlug: 'viadal',
       tenantId: TENANT_ID,
+      eventId: 'event-1',
       officials,
       currentUserId: 'user-1',
       // One entry per visible official, each empty because the mocked

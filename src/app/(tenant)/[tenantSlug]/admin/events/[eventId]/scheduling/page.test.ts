@@ -21,7 +21,7 @@ describe('fetchAssignmentsForDay', () => {
   it('scopes the query to [day 00:00 UTC, next day 00:00 UTC) and the given tenant', async () => {
     const { supabase, builder, from } = mockSupabase({ data: [] })
 
-    await fetchAssignmentsForDay(supabase, 'tenant-1', '2026-08-02')
+    await fetchAssignmentsForDay(supabase, 'tenant-1', 'event-1', '2026-08-02')
 
     expect(from).toHaveBeenCalledWith('assignments')
     expect(builder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-1')
@@ -32,7 +32,7 @@ describe('fetchAssignmentsForDay', () => {
   it('rolls over the month/year boundary correctly', async () => {
     const { supabase, builder } = mockSupabase({ data: [] })
 
-    await fetchAssignmentsForDay(supabase, 'tenant-1', '2026-12-31')
+    await fetchAssignmentsForDay(supabase, 'tenant-1', 'event-1', '2026-12-31')
 
     expect(builder.gte).toHaveBeenCalledWith('timeslot_start', '2026-12-31T00:00:00.000Z')
     expect(builder.lt).toHaveBeenCalledWith('timeslot_start', '2027-01-01T00:00:00.000Z')
@@ -52,7 +52,7 @@ describe('fetchAssignmentsForDay', () => {
     ]
     const { supabase } = mockSupabase({ data: rows })
 
-    const result = await fetchAssignmentsForDay(supabase, 'tenant-1', '2026-08-02')
+    const result = await fetchAssignmentsForDay(supabase, 'tenant-1', 'event-1', '2026-08-02')
 
     expect(result).toEqual(rows)
   })
@@ -60,12 +60,14 @@ describe('fetchAssignmentsForDay', () => {
   it('returns an empty array when data is null', async () => {
     const { supabase } = mockSupabase({ data: null })
 
-    expect(await fetchAssignmentsForDay(supabase, 'tenant-1', '2026-08-02')).toEqual([])
+    expect(await fetchAssignmentsForDay(supabase, 'tenant-1', 'event-1', '2026-08-02')).toEqual([])
   })
 
   it('throws when the query errors', async () => {
     const { supabase } = mockSupabase({ data: null, error: new Error('boom') })
 
-    await expect(fetchAssignmentsForDay(supabase, 'tenant-1', '2026-08-02')).rejects.toThrow('boom')
+    await expect(
+      fetchAssignmentsForDay(supabase, 'tenant-1', 'event-1', '2026-08-02')
+    ).rejects.toThrow('boom')
   })
 })

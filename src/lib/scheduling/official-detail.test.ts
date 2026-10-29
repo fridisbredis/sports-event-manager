@@ -71,6 +71,7 @@ describe('fetchOfficialDetail — shifts', () => {
 
     const { shifts } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 
@@ -97,6 +98,7 @@ describe('fetchOfficialDetail — shifts', () => {
 
     const { shifts } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 
@@ -119,6 +121,7 @@ describe('fetchOfficialDetail — shifts', () => {
 
     const { shifts } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 
@@ -132,7 +135,11 @@ describe('fetchOfficialDetail — shifts', () => {
   it('scopes the read to the tenant, the official, and assigned work-area rows', async () => {
     const { client, calls } = makeClient({ assignments: { data: [] } })
 
-    await fetchOfficialDetail(client, { tenantId: TENANT, officialId: OFFICIAL })
+    await fetchOfficialDetail(client, {
+      tenantId: TENANT,
+      eventId: 'event-1',
+      officialId: OFFICIAL,
+    })
 
     expect(calls.assignments).toMatchObject({
       tenant_id: TENANT,
@@ -152,6 +159,7 @@ describe('fetchOfficialDetail — shifts', () => {
 
     const { shifts } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 
@@ -178,6 +186,7 @@ describe('fetchOfficialDetail — time off', () => {
 
     const { timeOff } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 
@@ -195,7 +204,11 @@ describe('fetchOfficialDetail — time off', () => {
   it('scopes the read to the tenant and the official', async () => {
     const { client, calls } = makeClient({ official_unavailability: { data: [] } })
 
-    await fetchOfficialDetail(client, { tenantId: TENANT, officialId: OFFICIAL })
+    await fetchOfficialDetail(client, {
+      tenantId: TENANT,
+      eventId: 'event-1',
+      officialId: OFFICIAL,
+    })
 
     expect(calls.official_unavailability).toMatchObject({
       tenant_id: TENANT,
@@ -211,6 +224,7 @@ describe('fetchOfficialDetail — time off', () => {
 
     const { timeOff } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 
@@ -229,6 +243,7 @@ describe('fetchOfficialDetail — time off', () => {
 
     const { shifts, timeOff } = await fetchOfficialDetail(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       officialId: OFFICIAL,
     })
 

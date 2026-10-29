@@ -18,6 +18,7 @@ type ByChannel<T> = Record<AnnouncementChannel, T>
 
 interface Props {
   tenantId: string
+  eventId: string
   page: number
   announcements: ByChannel<Announcement[]>
   hasMore: ByChannel<boolean>
@@ -111,7 +112,13 @@ function AnnouncementGuardDialog({
   )
 }
 
-export function CommunicationPanel({ tenantId, page, announcements: initial, hasMore }: Props) {
+export function CommunicationPanel({
+  tenantId,
+  eventId,
+  page,
+  announcements: initial,
+  hasMore,
+}: Props) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
   const router = useRouter()
@@ -170,7 +177,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
         const res = await fetch('/api/announcements', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantId, channel: targetChannel, body }),
+          body: JSON.stringify({ tenantId, eventId, channel: targetChannel, body }),
         })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
@@ -184,9 +191,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
           const newEntry: Announcement = {
             id: crypto.randomUUID(),
             tenant_id: tenantId,
-            // Filled server-side until N23's routing PR gives this panel an
-            // event; nothing here reads it.
-            event_id: null,
+            event_id: eventId,
             channel: targetChannel,
             body,
             sms_sent: false,
@@ -203,7 +208,7 @@ export function CommunicationPanel({ tenantId, page, announcements: initial, has
         setPublishing(false)
       }
     },
-    [tenantId, t, isFirstPage]
+    [tenantId, eventId, t, isFirstPage]
   )
 
   const handlePublish = useCallback(async () => {

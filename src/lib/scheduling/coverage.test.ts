@@ -90,6 +90,7 @@ describe('fetchDayCoverage — folding', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH],
     })
@@ -112,6 +113,7 @@ describe('fetchDayCoverage — folding', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH],
     })
@@ -135,6 +137,7 @@ describe('fetchDayCoverage — folding', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH],
     })
@@ -155,6 +158,7 @@ describe('fetchDayCoverage — folding', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH],
     })
@@ -174,6 +178,7 @@ describe('fetchDayCoverage — work areas', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH, WATER],
     })
@@ -192,6 +197,7 @@ describe('fetchDayCoverage — work areas', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [WATER, FINISH],
     })
@@ -206,6 +212,7 @@ describe('fetchDayCoverage — work areas', () => {
 
     const { areas } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH],
     })
@@ -218,7 +225,12 @@ describe('fetchDayCoverage — query shape', () => {
   it('scopes to the tenant, the day, and assigned work-area rows only', async () => {
     const { client, filters } = makeClient({ data: [] })
 
-    await fetchDayCoverage(client, { tenantId: TENANT, day: DAY, workstations: [FINISH] })
+    await fetchDayCoverage(client, {
+      tenantId: TENANT,
+      eventId: 'event-1',
+      day: DAY,
+      workstations: [FINISH],
+    })
 
     expect(filters['tenant_id']).toBe(TENANT)
     expect(filters['status']).toBe('assigned')
@@ -234,7 +246,12 @@ describe('fetchDayCoverage — query shape', () => {
   it('orders by official then time, so one person’s slots stay contiguous', async () => {
     const { client, filters } = makeClient({ data: [] })
 
-    await fetchDayCoverage(client, { tenantId: TENANT, day: DAY, workstations: [FINISH] })
+    await fetchDayCoverage(client, {
+      tenantId: TENANT,
+      eventId: 'event-1',
+      day: DAY,
+      workstations: [FINISH],
+    })
 
     expect(filters['order:0']).toBe('official_id')
     expect(filters['order:1']).toBe('timeslot_start')
@@ -249,6 +266,7 @@ describe('fetchDayCoverage — failure', () => {
 
     const { areas, ok } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH, WATER],
     })
@@ -261,12 +279,17 @@ describe('fetchDayCoverage — failure', () => {
   it('logs the failure rather than swallowing it (F-REL-10)', async () => {
     const { client } = makeClient({ error: { message: 'boom' } })
 
-    await fetchDayCoverage(client, { tenantId: TENANT, day: DAY, workstations: [FINISH] })
+    await fetchDayCoverage(client, {
+      tenantId: TENANT,
+      eventId: 'event-1',
+      day: DAY,
+      workstations: [FINISH],
+    })
 
     expect(logger.error).toHaveBeenCalledWith(
       'N18: day coverage failed to load',
       expect.anything(),
-      expect.objectContaining({ tenantId: TENANT, day: DAY })
+      expect.objectContaining({ tenantId: TENANT, eventId: 'event-1', day: DAY })
     )
   })
 
@@ -275,6 +298,7 @@ describe('fetchDayCoverage — failure', () => {
 
     const { ok } = await fetchDayCoverage(client, {
       tenantId: TENANT,
+      eventId: 'event-1',
       day: DAY,
       workstations: [FINISH],
     })

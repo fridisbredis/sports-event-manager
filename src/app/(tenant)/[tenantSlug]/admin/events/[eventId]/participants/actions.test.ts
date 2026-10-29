@@ -13,6 +13,11 @@ vi.mock('@/lib/auth/tenant', () => ({
   hasAdminAccessToTenant: vi.fn(),
 }))
 
+// N23: resolveRequestEventId is tested on its own; here the event resolves.
+vi.mock('@/lib/events/request-event', () => ({
+  resolveRequestEventId: vi.fn(async () => 'event-1'),
+}))
+
 vi.mock('@/lib/race-results/client', () => ({
   fetchParticipants: vi.fn(),
 }))
@@ -297,7 +302,12 @@ describe('addParticipant', () => {
     const stub = supabaseStub({ tier: 'standard' })
     vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
 
-    const result = await addParticipant({ tenantSlug: 't', tenantId: TENANT_ID, name: 'Anna' })
+    const result = await addParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      name: 'Anna',
+    })
 
     expect(result.error).toBe('actionErrors.participantsNotInTier')
     expect(stub.participantsBuilder.insert).not.toHaveBeenCalled()
@@ -314,6 +324,7 @@ describe('addParticipant', () => {
     const result = await addParticipant({
       tenantSlug: 't',
       tenantId: TENANT_ID,
+      eventId: 'event-1',
       name: 'Anna Svensson',
       bib: '42',
     })
@@ -337,6 +348,7 @@ describe('addParticipant', () => {
     await addParticipant({
       tenantSlug: 't',
       tenantId: TENANT_ID,
+      eventId: 'event-1',
       name: 'Anna',
       bib: '',
       club: '',
@@ -352,7 +364,13 @@ describe('addParticipant', () => {
     const stub = supabaseStub()
     vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
 
-    await addParticipant({ tenantSlug: 't', tenantId: TENANT_ID, name: 'Anna', nation: 'se' })
+    await addParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      name: 'Anna',
+      nation: 'se',
+    })
 
     expect(stub.participantsBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ nation: 'SE' })
@@ -363,7 +381,12 @@ describe('addParticipant', () => {
     const stub = supabaseStub()
     vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
 
-    const result = await addParticipant({ tenantSlug: 't', tenantId: TENANT_ID, name: '   ' })
+    const result = await addParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      name: '   ',
+    })
 
     expect(result.error).toBe('actionErrors.invalidRequest')
     expect(stub.participantsBuilder.insert).not.toHaveBeenCalled()

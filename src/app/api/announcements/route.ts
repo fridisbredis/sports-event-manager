@@ -6,9 +6,14 @@ import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
 import { logQueryError } from '@/lib/db/query-error'
+import { resolveRequestEventId } from '@/lib/events/request-event'
 
 const publishSchema = z.object({
   tenantId: z.string().uuid(),
+  // N23: the event whose officials or participants receive it. Optional only
+  // for clients loaded before the event moved into the URL; see
+  // resolveRequestEventId.
+  eventId: z.string().uuid().optional(),
   channel: z.enum(['officials', 'participants']),
   body: z.string().min(1).max(1600),
 })
@@ -26,7 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { tenantId, channel, body } = parsed.data
+  const { tenantId, eventId: requestedEventId, channel, body } = parsed.data
 
   // Auth + tenant authorization in one call
   const auth = await requireTenantAdmin(tenantId)
@@ -34,6 +39,11 @@ export async function POST(request: NextRequest) {
 
   // ...rest of the handler unchanged (fetch recipients, insert announcement, send SMS)
   const supabase = await createSupabaseServerClient()
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, requestedEventId)
+  if (!eventId) {
+    return NextResponse.json({ error: 'Unknown or ambiguous event' }, { status: 400 })
+  }
 
   // Officials keep their row (and phone number) after being removed, so the
   // officials channel must also exclude anyone who isn't a confirmed
@@ -45,8 +55,11 @@ export async function POST(request: NextRequest) {
     channel === 'officials'
       ? await supabase
           .from('officials')
-          .select('phone')
+          // N23: the event's officials only. An official of another event in
+          // the same tenant must not receive this event's announcements.
+          .select('phone, official_events!inner(event_id)')
           .eq('tenant_id', tenantId)
+          .eq('official_events.event_id', eventId)
           .eq('sms_opt_out', false)
           .eq('invite_status', 'confirmed')
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
@@ -62,6 +75,7 @@ export async function POST(request: NextRequest) {
           .from('participants')
           .select('phone')
           .eq('tenant_id', tenantId)
+          .eq('event_id', eventId)
           .eq('sms_opt_out', false)
           .not('phone', 'is', null)
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
@@ -96,6 +110,7 @@ export async function POST(request: NextRequest) {
     .from('announcements')
     .insert({
       tenant_id: tenantId,
+      event_id: eventId,
       channel,
       body,
       sms_sent: false,
