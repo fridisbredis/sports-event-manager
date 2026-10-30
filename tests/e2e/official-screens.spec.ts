@@ -149,7 +149,7 @@ test.describe('MYSCH-01 my schedule', () => {
 
     await expect(page.getByText('No shifts yet')).toBeVisible()
     await expect(
-      page.getByText("Your schedule will appear here once you've been assigned.")
+      page.getByText("Your schedule will appear here once you've been scheduled.")
     ).toBeVisible()
 
     // days.length === 0, so the day selector is not rendered at all.
