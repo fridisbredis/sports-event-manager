@@ -13,6 +13,11 @@ describe('proxy — matcher', () => {
     expect(unstable_doesMiddlewareMatch({ config, url: '/manifest.webmanifest' })).toBe(false)
   })
 
+  // A redirect on the service worker script fetch makes registration fail.
+  it('does not run on /sw.js', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/sw.js' })).toBe(false)
+  })
+
   it('does not run on the manifest icons', () => {
     expect(unstable_doesMiddlewareMatch({ config, url: '/icon-512.png' })).toBe(false)
   })

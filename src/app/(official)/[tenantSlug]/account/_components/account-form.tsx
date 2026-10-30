@@ -22,6 +22,7 @@ import { formatPhoneForDisplay } from '@/lib/phone'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n/config'
 import { AvatarPicker } from './avatar-picker'
+import { PushToggle } from './push-toggle'
 
 interface AccountFormProps {
   name: string
@@ -36,6 +37,11 @@ interface AccountFormProps {
   layout?: 'mobile' | 'desktop'
   /** N23: the event picker, for an official with more than one event. */
   changeEventHref?: string | null
+  /**
+   * N31: VAPID public key. Only the official account page passes it, since
+   * announcements go to officials; absent, the push row is not rendered.
+   */
+  vapidPublicKey?: string | null
 }
 
 export default function AccountForm({
@@ -50,6 +56,7 @@ export default function AccountForm({
   language,
   layout = 'mobile',
   changeEventHref = null,
+  vapidPublicKey = null,
 }: AccountFormProps) {
   const { t } = useTranslation(i18nNamespace)
   // The section heading is shared with every other language control in the
@@ -288,6 +295,7 @@ export default function AccountForm({
               aria-label={t('account.smsUpdatesLabel')}
             />
           </div>
+          {vapidPublicKey && <PushToggle vapidPublicKey={vapidPublicKey} />}
         </AppCard>
 
         {/* Language. Saves on click through its own endpoint rather than

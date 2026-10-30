@@ -54,6 +54,8 @@ export type OfficialEvent = DbTables['official_events']['Row']
 export type Participant = DbTables['participants']['Row']
 export type Assignment = DbTables['assignments']['Row']
 export type Announcement = DbTables['announcements']['Row']
+// N31: one Web Push subscription per device. Sent in addition to SMS.
+export type PushSubscriptionRow = DbTables['push_subscriptions']['Row']
 // status is plain text at the DB level (CHECK constraint, not a Postgres
 // enum), so the generated Row type has it as `string` — narrow it here.
 export type SmsQueueItem = Omit<DbTables['sms_queue']['Row'], 'status'> & {

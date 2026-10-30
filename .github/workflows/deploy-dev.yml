@@ -113,6 +113,7 @@ jobs:
               "SENTRY_API_TOKEN=${{ secrets.DEV_SENTRY_API_TOKEN }}" \
               "CRON_SECRET=${{ secrets.CRON_SECRET }}" \
               "SMS_COST_PER_SEGMENT=${{ secrets.DEV_SMS_COST_PER_SEGMENT }}" \
+              "VAPID_PUBLIC_KEY=${{ secrets.DEV_VAPID_PUBLIC_KEY }}" \
               "AZURE_HEALTH_TENANT_ID=${{ secrets.AZURE_HEALTH_TENANT_ID }}" \
               "AZURE_HEALTH_CLIENT_ID=${{ secrets.AZURE_HEALTH_CLIENT_ID }}" \
               "AZURE_HEALTH_CLIENT_SECRET=${{ secrets.AZURE_HEALTH_CLIENT_SECRET }}"

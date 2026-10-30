@@ -180,7 +180,24 @@ describe('OfficialAccountPage', () => {
       changeEventHref: null,
       language: 'en',
       avatarUrl: undefined,
+      vapidPublicKey: null,
     })
+  })
+
+  // N31: the key is read at request time from the container's env, not baked
+  // in at build time — and with it unset the push row stays hidden.
+  it('passes VAPID_PUBLIC_KEY through to the form', async () => {
+    vi.stubEnv('VAPID_PUBLIC_KEY', 'BKey')
+    mockResolvedTenant()
+    const official = { id: 'off-1', name: 'Anna', phone: '0701234567', sms_opt_out: false }
+    const fromMock = vi.fn()
+    fromMock.mockReturnValueOnce(chain({ data: official })).mockReturnValueOnce(chain({ data: [] }))
+    mockUser('user-1', fromMock)
+
+    const result = await OfficialAccountPage({ params: PARAMS })
+
+    expect(findByType(result, AccountForm)!.props.vapidPublicKey).toBe('BKey')
+    vi.unstubAllEnvs()
   })
 
   it('shows 0 shifts when the count read fails', async () => {

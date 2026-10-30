@@ -322,3 +322,18 @@ describe('AccountForm autosave', () => {
     expect(screen.getByText('account.saveError')).toBeTruthy()
   })
 })
+
+describe('AccountForm push row (N31)', () => {
+  // Only the official account page passes a key; the admin page and an
+  // environment without VAPID configured must not show a row that cannot work.
+  it('is absent without a VAPID key', () => {
+    render(<AccountForm {...baseProps} />)
+    expect(screen.queryByText('account.pushLabel')).toBeNull()
+  })
+
+  it('is rendered in the notifications card when a key is passed', async () => {
+    render(<AccountForm {...baseProps} vapidPublicKey="BAAA" />)
+    // jsdom has no Push API, so the row resolves to the unsupported hint.
+    expect(await screen.findByText('account.pushHintUnsupported')).toBeTruthy()
+  })
+})

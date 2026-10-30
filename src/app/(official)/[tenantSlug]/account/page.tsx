@@ -76,6 +76,11 @@ export default async function OfficialAccountPage({ params }: Props) {
         i18nNamespace="official"
         changeEventHref={hasSeveralEvents ? `/${tenantSlug}/events` : null}
         language={language}
+        // N31: read at request time and handed down, rather than a
+        // NEXT_PUBLIC_ variable. Those are baked in at build time and need a
+        // Dockerfile ARG plus a build-arg in every deploy workflow; a runtime
+        // env var on the Container App needs neither.
+        vapidPublicKey={process.env.VAPID_PUBLIC_KEY ?? null}
       />
     </div>
   )

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { toastError } from '@/lib/toast'
 import { useTranslation } from '@/lib/i18n/client'
+import { forgetPushOnLogout } from '@/lib/push/client'
 
 interface Props {
   className?: string
@@ -20,6 +21,9 @@ export function LogoutButton({ className, title, children }: Props) {
   async function handleLogout() {
     setIsSigningOut(true)
     try {
+      // N31: while the session still exists, so the row delete is authorised.
+      // Best-effort and time-boxed — never blocks the sign-out below.
+      await forgetPushOnLogout()
       const response = await fetch('/api/auth/signout', { method: 'POST' })
       if (!response.ok) {
         toastError(t('actionErrors.signOutFailed'))
