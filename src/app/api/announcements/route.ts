@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
@@ -7,6 +7,7 @@ import type { AuditActorRole } from '@/types/app'
 import { z } from 'zod'
 import { logQueryError } from '@/lib/db/query-error'
 import { resolveRequestEventId } from '@/lib/events/request-event'
+import { sendAnnouncementPush } from '@/lib/push/send'
 
 const publishSchema = z.object({
   tenantId: z.string().uuid(),
@@ -186,6 +187,15 @@ export async function POST(request: NextRequest) {
 
   if (queueError) {
     return NextResponse.json({ error: 'Failed to queue SMS delivery' }, { status: 500 })
+  }
+
+  // N31: push to the devices of this event's officials, in addition to the
+  // SMS queued above. Only once the queue write succeeded: on a 500 the admin
+  // retries, which publishes a second announcement, and that one pushes.
+  // after() sends it once the response has gone, so the publish never waits
+  // on a push service; sendAnnouncementPush never throws.
+  if (channel === 'officials') {
+    after(() => sendAnnouncementPush({ tenantId, eventId, body }))
   }
 
   return NextResponse.json(

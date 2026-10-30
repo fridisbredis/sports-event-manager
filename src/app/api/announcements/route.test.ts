@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, after } from 'next/server'
 import { POST } from './route'
 import { requireTenantAdmin } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { logAuditEvent } from '@/lib/audit/log-audit-event'
 import { resolveRequestEventId } from '@/lib/events/request-event'
+import { sendAnnouncementPush } from '@/lib/push/send'
 
 vi.mock('@/lib/auth/tenant', () => ({
   requireTenantAdmin: vi.fn(),
@@ -23,6 +24,24 @@ vi.mock('@/lib/events/request-event', () => ({
 vi.mock('@/lib/audit/log-audit-event', () => ({
   logAuditEvent: vi.fn(),
 }))
+
+// after() needs a live request scope that a unit test does not have, so it is
+// captured instead: a test runs the scheduled callback itself to see what it
+// would send.
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: vi.fn(),
+}))
+
+vi.mock('@/lib/push/send', () => ({
+  sendAnnouncementPush: vi.fn(),
+}))
+
+async function runScheduledWork() {
+  for (const [task] of vi.mocked(after).mock.calls) {
+    if (typeof task === 'function') await task()
+  }
+}
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
@@ -473,5 +492,65 @@ describe('POST /api/announcements', () => {
         detail: { channel: 'officials', recipientCount: 1, queued: false },
       })
     )
+  })
+
+  // N31: push goes in addition to the SMS, to the event's officials only.
+  describe('push (N31)', () => {
+    function publishWith(queueResult: unknown) {
+      vi.mocked(requireTenantAdmin).mockResolvedValue({
+        user: { id: 'admin-1' },
+        role: 'tenant_admin',
+      } as never)
+      const fromMock = vi
+        .fn()
+        .mockReturnValueOnce(chain({ data: [{ phone: '46701111111' }], error: null }))
+        .mockReturnValueOnce(chain({ data: { id: 'ann-1' }, error: null }))
+        .mockReturnValueOnce(chain(queueResult))
+      vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+    }
+
+    it("pushes an officials announcement to the event's devices after responding", async () => {
+      publishWith({ error: null })
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' })
+      )
+      expect(res.status).toBe(202)
+      // Scheduled, not awaited: the response must not wait on a push service.
+      expect(sendAnnouncementPush).not.toHaveBeenCalled()
+
+      await runScheduledWork()
+      expect(sendAnnouncementPush).toHaveBeenCalledWith({
+        tenantId: TENANT_ID,
+        eventId: 'event-1',
+        body: 'Hej!',
+      })
+    })
+
+    // Participants cannot sign in, so they have no devices to push to.
+    it('does not push a participants announcement', async () => {
+      publishWith({ error: null })
+
+      await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
+      await runScheduledWork()
+
+      expect(sendAnnouncementPush).not.toHaveBeenCalled()
+    })
+
+    // The admin retries a 500, which publishes again; pushing here as well
+    // would deliver the same announcement twice.
+    it('does not push when the SMS enqueue fails', async () => {
+      publishWith({ error: { message: 'boom' } })
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      restoreConsoleError = () => consoleErrorSpy.mockRestore()
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' })
+      )
+      await runScheduledWork()
+
+      expect(res.status).toBe(500)
+      expect(sendAnnouncementPush).not.toHaveBeenCalled()
+    })
   })
 })
