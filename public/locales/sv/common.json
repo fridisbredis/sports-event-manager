@@ -39,6 +39,7 @@
     "adminCapReached": "Den här tenanten har nått det högsta antalet administratörer för sin nivå. Höj nivån eller ta bort en administratör först.",
     "lastAdminCannotRemove": "Det här är tenantens sista administratör. En tenant måste ha minst en — inaktivera tenanten i stället.",
     "participantsNotInTier": "Deltagare ingår inte i den här kundens abonnemang.",
+    "participantNotFound": "Deltagaren kunde inte hittas. Ladda om sidan och försök igen.",
     "noStagesSelected": "Välj minst en tävlingsetapp.",
     "participantsNoResultsLink": "Den här etappen har ingen Race Results-länk än.",
     "participantsFetch_network": "Race Results gick inte att nå.",

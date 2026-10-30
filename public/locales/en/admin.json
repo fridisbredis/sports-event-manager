@@ -279,6 +279,7 @@
     "title": "Participants",
     "subtitle": "The start list for this event's Race stages.",
     "withdrawn": "Withdrawn",
+    "hidden": "Hidden",
     "manual": "Added by hand",
     "pagination": "Participant list pages",
     "previous": "Previous",
@@ -297,7 +298,8 @@
     "filters": {
       "stage": "Race stage",
       "allStages": "All stages",
-      "showWithdrawn": "Show withdrawn"
+      "showWithdrawn": "Show withdrawn",
+      "showHidden": "Show hidden"
     },
     "empty": {
       "title": "No participants yet",
@@ -324,6 +326,21 @@
       "success": "Participant added.",
       "phoneHint": "Optional. Race Results does not supply phone numbers.",
       "genericError": "The participant could not be added."
+    },
+    "actions": {
+      "column": "Actions",
+      "menuFor": "Actions for {{name}}",
+      "hide": "Hide",
+      "hideDescription": "Still entered and still gets announcements",
+      "unhide": "Show again",
+      "remove": "Remove",
+      "hideSuccess": "{{name}} is hidden",
+      "unhideSuccess": "{{name}} is shown again",
+      "removeSuccess": "{{name}} was removed",
+      "removeConfirmTitle": "Remove participant?",
+      "removeConfirmBody": "{{name}} will be removed from this event. This cannot be undone.",
+      "cancel": "Cancel",
+      "genericError": "Could not update the participant. Try again."
     }
   },
   "scheduling": {

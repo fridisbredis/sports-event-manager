@@ -39,6 +39,7 @@
     "adminCapReached": "This tenant has reached the maximum number of admins for its tier. Raise the tier or remove an admin first.",
     "lastAdminCannotRemove": "This is the tenant’s last admin. A tenant must keep at least one admin — deactivate the tenant instead.",
     "participantsNotInTier": "Participants are not included in this tenant's plan.",
+    "participantNotFound": "That participant could not be found. Refresh the page and try again.",
     "noStagesSelected": "Choose at least one Race stage.",
     "participantsNoResultsLink": "This stage has no Race Results link yet.",
     "participantsFetch_network": "Race Results could not be reached.",

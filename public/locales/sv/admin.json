@@ -279,6 +279,7 @@
     "title": "Deltagare",
     "subtitle": "Startlistan för eventets tävlingsetapper.",
     "withdrawn": "Struken",
+    "hidden": "Dold",
     "manual": "Tillagd för hand",
     "pagination": "Sidor i deltagarlistan",
     "previous": "Föregående",
@@ -297,7 +298,8 @@
     "filters": {
       "stage": "Tävlingsetapp",
       "allStages": "Alla etapper",
-      "showWithdrawn": "Visa strukna"
+      "showWithdrawn": "Visa strukna",
+      "showHidden": "Visa dolda"
     },
     "empty": {
       "title": "Inga deltagare än",
@@ -324,6 +326,21 @@
       "success": "Deltagaren lades till.",
       "phoneHint": "Valfritt. Race Results tillhandahåller inga telefonnummer.",
       "genericError": "Deltagaren kunde inte läggas till."
+    },
+    "actions": {
+      "column": "Åtgärder",
+      "menuFor": "Åtgärder för {{name}}",
+      "hide": "Dölj",
+      "hideDescription": "Är fortfarande anmäld och får utskick",
+      "unhide": "Visa igen",
+      "remove": "Ta bort",
+      "hideSuccess": "{{name}} är dold",
+      "unhideSuccess": "{{name}} visas igen",
+      "removeSuccess": "{{name}} togs bort",
+      "removeConfirmTitle": "Ta bort deltagare?",
+      "removeConfirmBody": "{{name}} tas bort från det här eventet. Det går inte att ångra.",
+      "cancel": "Avbryt",
+      "genericError": "Kunde inte uppdatera deltagaren. Försök igen."
     }
   },
   "scheduling": {

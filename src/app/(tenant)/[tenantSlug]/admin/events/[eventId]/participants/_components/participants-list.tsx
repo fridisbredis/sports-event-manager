@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ClipboardList, TriangleAlert } from 'lucide-react'
+import { Check, ClipboardList, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import {
   Chip,
   Table,
@@ -18,10 +18,15 @@ import {
   ModalFooter,
   Checkbox,
   SelectItem,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react'
 
 import { Button } from '@/components/ui/button'
-import { Input, Select } from '@/components/ui/form-fields'
+import ConfirmDialog from '@/components/confirm-dialog'
+import { Input, Select, LISTBOX_ITEM } from '@/components/ui/form-fields'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
@@ -29,7 +34,13 @@ import { toastError, toastSuccess, extractErrorMessage } from '@/lib/toast'
 import { logger } from '@/lib/logger'
 import { formatEnteredPhoneForDisplay } from '@/lib/phone'
 
-import { importParticipants, addParticipant, type StageImportOutcome } from '../actions'
+import {
+  importParticipants,
+  addParticipant,
+  setParticipantHidden,
+  removeParticipant,
+  type StageImportOutcome,
+} from '../actions'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 
 export interface ParticipantRow {
@@ -44,6 +55,7 @@ export interface ParticipantRow {
   source: string
   extra: Record<string, string>
   withdrawnAt: string | null
+  hiddenAt: string | null
   stageIds: string[]
 }
 
@@ -63,6 +75,7 @@ interface Props {
   hasMore: boolean
   selectedStageId: string | null
   showWithdrawn: boolean
+  showHidden: boolean
 }
 
 export default function ParticipantsList({
@@ -75,6 +88,7 @@ export default function ParticipantsList({
   hasMore,
   selectedStageId,
   showWithdrawn,
+  showHidden,
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
@@ -85,6 +99,9 @@ export default function ParticipantsList({
   const [outcomes, setOutcomes] = useState<StageImportOutcome[] | null>(null)
   const [selectedStages, setSelectedStages] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
+  const [removeTarget, setRemoveTarget] = useState<ParticipantRow | null>(null)
+  // The row whose hide/remove is in flight, so only its ⋯ button spins.
+  const [rowPendingId, setRowPendingId] = useState<string | null>(null)
 
   const importableStages = stages.filter((s) => s.hasResultsLink)
 
@@ -155,6 +172,62 @@ export default function ParticipantsList({
     })
   }
 
+  async function toggleHidden(participant: ParticipantRow) {
+    const hide = participant.hiddenAt === null
+    const name = participant.name ?? '—'
+    setRowPendingId(participant.id)
+    try {
+      const result = await setParticipantHidden({
+        tenantSlug,
+        tenantId,
+        eventId,
+        participantId: participant.id,
+        hidden: hide,
+      })
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
+      toastSuccess(
+        t(hide ? 'participants.actions.hideSuccess' : 'participants.actions.unhideSuccess', {
+          name,
+        })
+      )
+      router.refresh()
+    } catch (err) {
+      logger.error('Hiding a participant failed', err)
+      toastError(extractErrorMessage(err, t('participants.actions.genericError')))
+    } finally {
+      setRowPendingId(null)
+    }
+  }
+
+  async function confirmRemove() {
+    if (!removeTarget) return
+    const target = removeTarget
+    setRemoveTarget(null)
+    setRowPendingId(target.id)
+    try {
+      const result = await removeParticipant({
+        tenantSlug,
+        tenantId,
+        eventId,
+        participantId: target.id,
+      })
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
+      toastSuccess(t('participants.actions.removeSuccess', { name: target.name ?? '—' }))
+      router.refresh()
+    } catch (err) {
+      logger.error('Removing a participant failed', err)
+      toastError(extractErrorMessage(err, t('participants.actions.genericError')))
+    } finally {
+      setRowPendingId(null)
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -195,6 +268,14 @@ export default function ParticipantsList({
           classNames={{ label: 'text-[15px] text-ink-soft' }}
         >
           {t('participants.filters.showWithdrawn')}
+        </Checkbox>
+
+        <Checkbox
+          isSelected={showHidden}
+          onValueChange={(checked) => setParam('hidden', checked ? '1' : null)}
+          classNames={{ label: 'text-[15px] text-ink-soft' }}
+        >
+          {t('participants.filters.showHidden')}
         </Checkbox>
       </div>
 
@@ -238,10 +319,18 @@ export default function ParticipantsList({
             <TableColumn>{t('participants.columns.gender')}</TableColumn>
             <TableColumn>{t('participants.columns.phone')}</TableColumn>
             <TableColumn>{t('participants.columns.stages')}</TableColumn>
+            {/* Same ⋯ column as the officials roster (N27): narrow,
+                right-aligned, labelled only for screen readers. */}
+            <TableColumn width={64} align="end">
+              <span className="sr-only">{t('participants.actions.column')}</span>
+            </TableColumn>
           </TableHeader>
           <TableBody>
             {participants.map((p) => (
-              <TableRow key={p.id} className={p.withdrawnAt ? 'opacity-60' : undefined}>
+              <TableRow
+                key={p.id}
+                className={p.withdrawnAt || p.hiddenAt ? 'opacity-60' : undefined}
+              >
                 <TableCell className="text-[15px] tabular-nums text-ink-soft">
                   {p.bib ?? '—'}
                 </TableCell>
@@ -255,6 +344,15 @@ export default function ParticipantsList({
                         className="bg-status-pending-bg text-status-pending-text"
                       >
                         {t('participants.withdrawn')}
+                      </Chip>
+                    )}
+                    {p.hiddenAt && (
+                      <Chip
+                        size="sm"
+                        variant="flat"
+                        className="bg-status-neutral-bg text-status-neutral-text"
+                      >
+                        {t('participants.hidden')}
                       </Chip>
                     )}
                     {p.source === 'manual' && (
@@ -287,6 +385,15 @@ export default function ParticipantsList({
                         .filter((s) => p.stageIds.includes(s.id))
                         .map((s) => s.name)
                         .join(', ')}
+                </TableCell>
+                <TableCell>
+                  <ParticipantActionsMenu
+                    participant={p}
+                    busy={rowPendingId === p.id}
+                    t={t}
+                    onToggleHidden={() => toggleHidden(p)}
+                    onRemove={() => setRemoveTarget(p)}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -492,6 +599,92 @@ export default function ParticipantsList({
           </form>
         </ModalContent>
       </Modal>
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={t('participants.actions.removeConfirmTitle')}
+        body={t('participants.actions.removeConfirmBody', { name: removeTarget?.name ?? '—' })}
+        cancelLabel={t('participants.actions.cancel')}
+        confirmLabel={t('participants.actions.remove')}
+        destructive
+        onCancel={() => setRemoveTarget(null)}
+        onConfirm={confirmRemove}
+      />
     </div>
+  )
+}
+
+/**
+ * N34: a participant row's actions behind one ⋯ button, as on the officials
+ * roster.
+ *
+ * Hide is offered for every row and is reversible, so it needs no
+ * confirmation. Remove is offered only for a row added by hand — Peter
+ * answered for those; the imported list belongs to Race Results, and a
+ * removed imported row would come back on the next import anyway. It sits
+ * last, under a divider, and asks first, because it cannot be undone.
+ */
+function ParticipantActionsMenu({
+  participant,
+  busy,
+  t,
+  onToggleHidden,
+  onRemove,
+}: {
+  participant: ParticipantRow
+  busy: boolean
+  t: ReturnType<typeof useTranslation>['t']
+  onToggleHidden: () => void
+  onRemove: () => void
+}) {
+  const isHidden = participant.hiddenAt !== null
+  const isManual = participant.source === 'manual'
+  const label = t('participants.actions.menuFor', { name: participant.name ?? '—' })
+
+  // Built as an array: HeroUI's DropdownMenu reads its children as a
+  // collection, and a `false` from a conditional would not be a valid item.
+  const items = [
+    isHidden ? (
+      <DropdownItem key="toggleHidden" showDivider={isManual}>
+        {t('participants.actions.unhide')}
+      </DropdownItem>
+    ) : (
+      // The description answers the question an admin will have: does
+      // hiding take them out of the race? It does not (Peter, N26).
+      <DropdownItem
+        key="toggleHidden"
+        showDivider={isManual}
+        description={t('participants.actions.hideDescription')}
+      >
+        {t('participants.actions.hide')}
+      </DropdownItem>
+    ),
+    ...(isManual
+      ? [
+          <DropdownItem key="remove" className="text-destructive" color="danger">
+            {t('participants.actions.remove')}
+          </DropdownItem>,
+        ]
+      : []),
+  ]
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <Button isIconOnly variant="light" size="sm" isLoading={busy} aria-label={label}>
+          <MoreHorizontal className="size-5 text-ink-soft" aria-hidden="true" />
+        </Button>
+      </DropdownTrigger>
+      <DropdownMenu
+        aria-label={label}
+        itemClasses={{ base: LISTBOX_ITEM }}
+        onAction={(key) => {
+          if (key === 'toggleHidden') onToggleHidden()
+          else if (key === 'remove') onRemove()
+        }}
+      >
+        {items}
+      </DropdownMenu>
+    </Dropdown>
   )
 }
