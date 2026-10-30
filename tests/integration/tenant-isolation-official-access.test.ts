@@ -167,9 +167,8 @@ describe('SEC-02: hasAdminAccessToTenant tenant isolation', () => {
     adminA = (await createUserWithRole(tenantA.id, 'tenant_admin')).userId
     adminB = (await createUserWithRole(tenantB.id, 'tenant_admin')).userId
 
-    // user_roles.tenant_id is NOT NULL, so a system_admin always sits in some
-    // tenant. This one is anchored in B precisely so its access to A proves the
-    // global bypass rather than a per-tenant row.
+    // Anchored in B so the N33 tests below can show that a system_admin row
+    // grants no admin access to A — nor to B, since it is not tenant_admin.
     systemAdminInB = (await createUserWithRole(tenantB.id, 'system_admin')).userId
 
     // Multi-tenant user: participant in A, tenant_admin in B. If the `.or()`
@@ -207,12 +206,22 @@ describe('SEC-02: hasAdminAccessToTenant tenant isolation', () => {
     expect(await hasAdminAccessToTenant(adminB, tenantA.id)).toBe(false)
   })
 
-  it('allows a system admin in a tenant where they hold no role row', async () => {
-    expect(await hasAdminAccessToTenant(systemAdminInB, tenantA.id)).toBe(true)
+  // N33: no global bypass on the admin surfaces any more (ADR 0004). A
+  // system_admin row — wherever it is anchored — is not a tenant_admin row.
+  it('denies a system admin in a tenant where they hold no role row', async () => {
+    expect(await hasAdminAccessToTenant(systemAdminInB, tenantA.id)).toBe(false)
   })
 
-  it('allows a system admin in their own tenant', async () => {
-    expect(await hasAdminAccessToTenant(systemAdminInB, tenantB.id)).toBe(true)
+  it('denies a system admin in the tenant their system_admin row is anchored in', async () => {
+    expect(await hasAdminAccessToTenant(systemAdminInB, tenantB.id)).toBe(false)
+  })
+
+  it('allows a system admin who also holds tenant_admin in that tenant', async () => {
+    const supportAdmin = (await createUserWithRole(tenantB.id, 'system_admin')).userId
+    await addRoleInTenant(supportAdmin, tenantA.id, 'tenant_admin')
+
+    expect(await hasAdminAccessToTenant(supportAdmin, tenantA.id)).toBe(true)
+    expect(await hasAdminAccessToTenant(supportAdmin, tenantB.id)).toBe(false)
   })
 
   it('denies a user whose admin role is in a different tenant than the one requested', async () => {

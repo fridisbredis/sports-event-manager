@@ -631,14 +631,45 @@ describe('hasAdminAccessToTenant', () => {
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
   })
 
-  it('allows a global system_admin even when the tenant has been deactivated', async () => {
+  // N33: the global system_admin exception is gone from the admin pages.
+  it('denies a global system_admin with no tenant_admin row in this tenant', async () => {
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
-      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
-      officials: { data: null, error: null },
+      user_roles: { data: [{ role: 'system_admin', tenant_id: null }], error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
+  })
+
+  it('allows a system_admin who has granted themselves tenant_admin in this tenant', async () => {
+    mockServiceClientByTable({
+      user_roles: {
+        data: [
+          { role: 'system_admin', tenant_id: null, user_id: 'user-1' },
+          { role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' },
+        ],
+        error: null,
+      },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
+      officials: { data: [], error: null },
     })
 
     expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(true)
+  })
+
+  it('denies a system_admin holding tenant_admin once the tenant has been deactivated', async () => {
+    mockServiceClientByTable({
+      user_roles: {
+        data: [
+          { role: 'system_admin', tenant_id: null, user_id: 'user-1' },
+          { role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' },
+        ],
+        error: null,
+      },
+      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
+    })
+
+    expect(await hasAdminAccessToTenant('user-1', TENANT_ID)).toBe(false)
   })
 
   it('returns false when the caller has no role rows at all', async () => {
@@ -993,16 +1024,36 @@ describe('requireTenantAdmin', () => {
     expect(result).toEqual({ user: { id: 'user-1' }, role: 'tenant_admin' })
   })
 
-  it('authorizes a global system_admin without a row for this tenant, even if the tenant is inactive', async () => {
+  // N33: the API routes follow the admin pages — no global system_admin pass.
+  it('returns a 403 error for a global system_admin with no tenant_admin row in this tenant', async () => {
     mockServerClient({ id: 'user-1' })
     mockServiceClientByTable({
-      user_roles: { data: [{ role: 'system_admin', tenant_id: OTHER_TENANT_ID }], error: null },
-      tenants: { data: { is_active: false, tier: 'professional' }, error: null },
+      user_roles: { data: [{ role: 'system_admin', tenant_id: null }], error: null },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
     })
 
     const result = await requireTenantAdmin(TENANT_ID)
 
-    expect(result).toEqual({ user: { id: 'user-1' }, role: 'system_admin' })
+    expect((result as { error: { status: number } }).error.status).toBe(403)
+  })
+
+  it('authorizes a system_admin who has granted themselves tenant_admin, as tenant_admin', async () => {
+    mockServerClient({ id: 'user-1' })
+    mockServiceClientByTable({
+      user_roles: {
+        data: [
+          { role: 'system_admin', tenant_id: null, user_id: 'user-1' },
+          { role: 'tenant_admin', tenant_id: TENANT_ID, user_id: 'user-1' },
+        ],
+        error: null,
+      },
+      tenants: { data: { is_active: true, tier: 'professional' }, error: null },
+      officials: { data: [], error: null },
+    })
+
+    const result = await requireTenantAdmin(TENANT_ID)
+
+    expect(result).toEqual({ user: { id: 'user-1' }, role: 'tenant_admin' })
   })
 })
 

@@ -306,16 +306,19 @@ function hasTenantScopedRole(
   return roleRows.some((row) => row.tenant_id === tenantId && allowedRoles.includes(row.role))
 }
 
-// system_admin access is global — no per-tenant row required. A suspended
-// (is_active = false) tenant stays administrable by a global system_admin so
-// it can be reactivated, but a tenant-scoped tenant_admin loses access.
+// N33: a tenant's admin pages need a tenant_admin row in THAT tenant — a
+// global system_admin gets no exception here (decided by Peter on N29, see
+// docs/adr/0004-system-admin-tenant-access.md). Support goes through SYS-02:
+// the system admin grants themselves tenant_admin in the one tenant, which is
+// audited and visible in the customer's admin list, and removes it after.
+// A suspended (is_active = false) tenant is closed to every admin; it is
+// reactivated from SYS-02, which does not go through this check.
 export async function hasAdminAccessToTenant(userId: string, tenantId: string): Promise<boolean> {
   if (!tenantIdSchema.safeParse(tenantId).success) return false
 
   const context = await fetchAccessContext(userId, tenantId)
   if (!context) return false
 
-  if (isGlobalSystemAdmin(context.roleRows)) return true
   if (!context.tenantIsActive) return false
 
   if (!hasTenantScopedRole(context.roleRows, tenantId, ['tenant_admin'])) return false
@@ -326,8 +329,9 @@ export async function hasAdminAccessToTenant(userId: string, tenantId: string): 
   // having to pick who to delete.
   //
   // Checked last, after the cheap in-memory checks, because it costs two more
-  // queries. A global system_admin never reaches it: they return above, so
-  // support access survives a downgrade and the tenant can always be fixed.
+  // queries. Since N33 a system admin's self-granted tenant_admin row counts
+  // toward the cap like any other — a known limit on a full Standard tenant,
+  // recorded in ADR 0004.
   //
   // A tenant whose tier could not be read (tenantTier null, meaning the row
   // vanished between the two queries) fails closed here rather than falling
@@ -383,7 +387,9 @@ async function resolveOfficialSurfaceAccess(
 
   // Role-based access, resolved before the roster lookup. A system_admin
   // passes globally and is exempt from the is_active check; a tenant_admin
-  // passes for their own active tenant. Neither verdict depends on an
+  // passes for their own active tenant. N33 deliberately left this
+  // system_admin exception in place: Peter's decision covers the admin pages,
+  // not the official surfaces (ADR 0004). Neither verdict depends on an
   // officials row — but both still need one looked up, because it carries the
   // officialId their own schedule is keyed on.
   const isSystemAdmin = isGlobalSystemAdmin(context.roleRows)
@@ -486,7 +492,8 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
 
   // Use service client to look up role — bypasses RLS, which is fine
   // because we're using user.id from the verified session, not from input.
-  // system_admin access is global — no per-tenant row required, same as hasAdminAccessToTenant.
+  // N33: same rule as hasAdminAccessToTenant — a system_admin needs a
+  // tenant_admin row in this tenant like anyone else.
   const service = createSupabaseServiceClient()
   const [roleResult, tenantResult] = await Promise.all([
     service.from('user_roles').select('role, tenant_id').eq('user_id', user.id),
@@ -505,16 +512,12 @@ export async function requireTenantAdmin(tenantId: string): Promise<AuthSuccess 
 
   const roleRows = (roleResult.data ?? []) as RoleRow[]
 
-  if (isGlobalSystemAdmin(roleRows)) {
-    return { user, role: 'system_admin' }
-  }
-
   const tenantScopedAdminRow = roleRows.find(
     (r) => r.tenant_id === tenantId && r.role === 'tenant_admin'
   )
 
   if (!tenantResult.data?.is_active || !tenantScopedAdminRow) {
-    // No admin role in this active tenant and not a system_admin — could be a
+    // No admin role in this active tenant — could be a
     // malicious cross-tenant attempt, a suspended tenant, or a stale UI.
     // Either way, 403 is correct.
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
