@@ -1,5 +1,3 @@
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
@@ -54,14 +52,7 @@ export default async function SystemHealthPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pb-16 pt-8 md:px-10">
-      <Link
-        href="/admin"
-        className="-ml-1 inline-flex items-center gap-1 text-sm font-medium text-ink-label transition-colors hover:text-ink"
-      >
-        <ChevronLeft className="size-4" strokeWidth={2} />
-        {t('health.backToTenants')}
-      </Link>
-      <h1 className="page-title mb-2 mt-3">{t('health.title')}</h1>
+      <h1 className="page-title mb-2">{t('health.title')}</h1>
       <p className="mb-6 max-w-[62ch] text-sm leading-relaxed text-ink-label">
         {t('health.subtitle')}
       </p>

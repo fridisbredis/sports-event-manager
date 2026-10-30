@@ -601,7 +601,6 @@
     "cannotRemoveSelfHint": "You cannot remove yourself. Ask another system admin."
   },
   "health": {
-    "backToTenants": "Tenants",
     "title": "System status",
     "subtitle": "Live status across the services this platform runs on. Each card links out to the service's own console for full detail.",
     "status": {
