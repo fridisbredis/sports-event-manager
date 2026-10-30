@@ -129,6 +129,23 @@ If a route handler or server action performs two or more sequential
 an earlier one already committed, see `docs/patterns/atomic-multi-table-writes.md`
 (REL-01) before adding more — wrap the sequence in one RPC instead.
 
+### Scheduling terminology (B12)
+
+One concept, one word, in both locales. New user-facing strings must use these:
+
+| Concept                                                                    | EN         | SV          |
+| -------------------------------------------------------------------------- | ---------- | ----------- |
+| One hour × one work area — a grid cell                                     | slot       | tidslucka   |
+| One capacity position inside a slot (`slot_index`)                         | position   | plats       |
+| One person in one position for one slot — the `assignments` row            | assignment | inplanering |
+| One person's continuous run of assignments in one work area (`foldShifts`) | shift      | pass        |
+
+- Official surfaces never say assignment/inplanering or uppdrag: an official has shifts.
+- Admin surfaces say assignment when they mean rows being created, removed or counted, and shift only where they show a person's folded runs (by-person view, official detail, mobile coverage).
+- "Slot" in plan-capacity copy ("active event slots") is a separate, non-scheduling meaning and is left alone.
+
+A grep cannot enforce this — the same word is right on one surface and wrong on another — so it lives here, where parallel sessions read it.
+
 ### Deployment
 
 - Tag Docker images with `github.sha`, never `latest` — Azure doesn't detect updates on unchanged tags
