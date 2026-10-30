@@ -875,6 +875,41 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_cap_warnings: {
+        Row: {
+          created_at: string
+          failed_count: number | null
+          month: string
+          segments: number | null
+          sent_count: number | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_count?: number | null
+          month: string
+          segments?: number | null
+          sent_count?: number | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_count?: number | null
+          month?: string
+          segments?: number | null
+          sent_count?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'sms_cap_warnings_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       sms_queue: {
         Row: {
           announcement_id: string
