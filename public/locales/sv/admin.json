@@ -605,7 +605,6 @@
     "save": "Spara"
   },
   "health": {
-    "backToTenants": "Kunder",
     "title": "Systemstatus",
     "subtitle": "Live-status för tjänsterna plattformen körs på. Varje kort länkar vidare till tjänstens egen konsol för fullständig information.",
     "status": {
