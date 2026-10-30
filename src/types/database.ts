@@ -1293,6 +1293,7 @@ export type Database = {
         }
         Returns: string
       }
+      delete_inactive_push_subscriptions: { Args: never; Returns: number }
       ensure_admin_roster_row: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: Json
