@@ -4,6 +4,7 @@ import { POST } from './route'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { recordSmsUsage } from '@/lib/sms/usage'
+import { sendSmsCapWarnings } from '@/lib/sms/cap-warning'
 import twilio from 'twilio'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -17,6 +18,12 @@ vi.mock('twilio', () => ({
 
 vi.mock('@/lib/sms/usage', () => ({
   recordSmsUsage: vi.fn(),
+}))
+
+// N32's warning has its own tests in src/lib/sms/cap-warning.test.ts. Here it
+// is only checked that the worker calls it, on every tick.
+vi.mock('@/lib/sms/cap-warning', () => ({
+  sendSmsCapWarnings: vi.fn(async () => 0),
 }))
 
 // The failure paths below assert on the *shape* logQueryError writes
@@ -156,7 +163,7 @@ describe('POST /api/cron/sms-worker', () => {
       from: '+15550001111',
       to: '+46701111111',
     })
-    expect(body).toEqual({ sent: 2, failed: 0, retried: 0, deferred: 0 })
+    expect(body).toEqual({ sent: 2, failed: 0, retried: 0, deferred: 0, capWarnings: 0 })
   })
 
   it('returns zero counts without sending when the queue is empty', async () => {
@@ -169,8 +176,43 @@ describe('POST /api/cron/sms-worker', () => {
     const res = await POST(makeRequest(AUTHED))
     const body = await res.json()
 
-    expect(body).toEqual({ sent: 0, failed: 0, retried: 0, deferred: 0 })
+    expect(body).toEqual({ sent: 0, failed: 0, retried: 0, deferred: 0, capWarnings: 0 })
     expect(messagesCreate).not.toHaveBeenCalled()
+  })
+
+  // N32: invites, resends and the other senders add spend without queueing
+  // anything, so an empty queue must not skip the 90% warning.
+  it('runs the N32 cap warning on an empty tick and reports it', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [], error: null })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ from: vi.fn(), rpc } as never)
+    vi.mocked(sendSmsCapWarnings).mockResolvedValueOnce(1)
+
+    const res = await POST(makeRequest(AUTHED))
+
+    expect(sendSmsCapWarnings).toHaveBeenCalledTimes(1)
+    expect(sendSmsCapWarnings).toHaveBeenCalledWith(
+      expect.objectContaining({ fromNumber: '+15550001111' })
+    )
+    expect((await res.json()).capWarnings).toBe(1)
+  })
+
+  it('runs the N32 cap warning after the batch has been sent', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [queueRow()], error: null })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({
+        rpc,
+        announcements: [chain({ data: [{ id: 'ann-1', body: 'Hej!' }], error: null })],
+      }) as never
+    )
+    vi.mocked(sendSmsCapWarnings).mockImplementationOnce(async () => {
+      // This tick's send has already happened, so its spend counts.
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+      return 0
+    })
+
+    await POST(makeRequest(AUTHED))
+
+    expect(sendSmsCapWarnings).toHaveBeenCalledTimes(1)
   })
 
   it('retries a row under MAX_ATTEMPTS by resetting status to pending', async () => {
@@ -190,7 +232,7 @@ describe('POST /api/cron/sms-worker', () => {
     const res = await POST(makeRequest(AUTHED))
     const body = await res.json()
 
-    expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
+    expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0, capWarnings: 0 })
     expect(queueUpdateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'pending', attempts: 1 })
     )
@@ -213,7 +255,7 @@ describe('POST /api/cron/sms-worker', () => {
     const res = await POST(makeRequest(AUTHED))
     const body = await res.json()
 
-    expect(body).toEqual({ sent: 0, failed: 1, retried: 0, deferred: 0 })
+    expect(body).toEqual({ sent: 0, failed: 1, retried: 0, deferred: 0, capWarnings: 0 })
     expect(queueUpdateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'failed', attempts: 3 })
     )
@@ -366,7 +408,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await res.json()
 
       expect(messagesCreate).not.toHaveBeenCalled()
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0, capWarnings: 0 })
       // Follows the ordinary failure path: attempts incremented, back to
       // pending for the next tick, last_error 'none' because this is our own
       // error rather than a Twilio one with a numeric code.
@@ -390,7 +432,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       expect(messagesCreate).not.toHaveBeenCalled()
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0, capWarnings: 0 })
     })
   })
 
@@ -417,7 +459,7 @@ describe('POST /api/cron/sms-worker', () => {
 
       expect(messagesCreate).toHaveBeenCalledTimes(1)
       // Counted as sent: the SMS did go out, whatever the row says.
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0, capWarnings: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: update on sms_queue failed',
         markSentError,
@@ -457,7 +499,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       // The counters track what this tick did, not what the table records.
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 1, deferred: 0, capWarnings: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: update on sms_queue failed',
         markFailedError,
@@ -504,7 +546,7 @@ describe('POST /api/cron/sms-worker', () => {
       // alone rather than written from a count we do not have.
       expect(announcementUpdateBuilder.update).not.toHaveBeenCalled()
       // The tick itself still succeeds — the send already happened.
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0, capWarnings: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: select on sms_queue failed',
         countError,
@@ -538,7 +580,7 @@ describe('POST /api/cron/sms-worker', () => {
 
       // Reconcile is bookkeeping after the fact — a failure there must not
       // change the tick's reported counts.
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0, capWarnings: 0 })
       expect(logger.error).toHaveBeenCalledWith(
         'GET /api/cron/sms-worker: update on announcements failed',
         reconcileError,
@@ -576,7 +618,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       expect(messagesCreate).not.toHaveBeenCalled()
-      expect(body).toEqual({ sent: 0, failed: 0, retried: 0, deferred: 1 })
+      expect(body).toEqual({ sent: 0, failed: 0, retried: 0, deferred: 1, capWarnings: 0 })
     })
 
     it('releases held rows to pending WITHOUT burning an attempt', async () => {
@@ -632,7 +674,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       expect(messagesCreate).toHaveBeenCalledTimes(1)
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 1 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 1, capWarnings: 0 })
     })
 
     it('FAILS OPEN: sends when usage cannot be read', async () => {
@@ -651,7 +693,7 @@ describe('POST /api/cron/sms-worker', () => {
       const body = await (await POST(makeRequest(AUTHED))).json()
 
       expect(messagesCreate).toHaveBeenCalledTimes(1)
-      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0 })
+      expect(body).toEqual({ sent: 1, failed: 0, retried: 0, deferred: 0, capWarnings: 0 })
     })
   })
 

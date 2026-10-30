@@ -7,6 +7,7 @@ import type { SmsQueueItem } from '@/types/app'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { readSmsCapStatus } from '@/lib/sms/cap'
+import { sendSmsCapWarnings } from '@/lib/sms/cap-warning'
 import { resolveSmsSender } from '@/lib/sms/sender'
 
 // PERF-04: triggered every minute by the sms-queue-worker-trigger pg_cron job
@@ -56,7 +57,10 @@ export async function POST(request: NextRequest) {
 
   const batch = (claimed ?? []) as SmsQueueItem[]
   if (batch.length === 0) {
-    return NextResponse.json({ sent: 0, failed: 0, retried: 0, deferred: 0 })
+    // N32: run on empty ticks too. Invites, resends and the other senders add
+    // to a tenant's spend without ever putting a row in this queue.
+    const capWarnings = await sendSmsCapWarnings({ service, client, fromNumber })
+    return NextResponse.json({ sent: 0, failed: 0, retried: 0, deferred: 0, capWarnings })
   }
 
   // Prefetch each distinct announcement's body once, rather than re-querying
@@ -341,7 +345,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // N32: after this tick's sends, so spend they added counts towards the 90%
+  // warning straight away rather than on the next tick. Never throws.
+  const capWarnings = await sendSmsCapWarnings({ service, client, fromNumber })
+
   // `deferred` counts rows held back by a tenant's monthly cap (N24). They are
   // still queued and will go out once the cap clears — distinct from `failed`.
-  return NextResponse.json({ sent, failed, retried, deferred })
+  // `capWarnings` is how many tenants were sent the N32 90% warning.
+  return NextResponse.json({ sent, failed, retried, deferred, capWarnings })
 }
