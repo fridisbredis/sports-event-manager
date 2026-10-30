@@ -481,7 +481,7 @@ test.describe('SCHED-01 by work area', () => {
     // Collapsed: the summary row shows counts, but the numbered slot rows that
     // accept edits are not rendered at all — isExpanded gates them entirely.
     await expect(row.getByRole('button', { name: 'Expand' })).toBeVisible()
-    // The numbered rows are labelled '#1', '#2' … — 'Slot #' is the modal's
+    // The numbered rows are labelled '#1', '#2' … — 'Position n' is the modal's
     // wording, not the row's.
     await expect(page.getByRole('cell', { name: '#1', exact: true })).toHaveCount(0)
 

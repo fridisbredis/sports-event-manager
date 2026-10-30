@@ -147,7 +147,7 @@ test.describe('MYSCH-01 my schedule', () => {
   }) => {
     await page.goto(`${base}/schedule`)
 
-    await expect(page.getByText('No assignments yet')).toBeVisible()
+    await expect(page.getByText('No shifts yet')).toBeVisible()
     await expect(
       page.getByText("Your schedule will appear here once you've been assigned.")
     ).toBeVisible()
