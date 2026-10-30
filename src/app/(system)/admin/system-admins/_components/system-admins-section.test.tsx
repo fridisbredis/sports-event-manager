@@ -15,11 +15,15 @@ vi.mock('@/lib/i18n/client', () => ({
 
 vi.mock('@/lib/toast', () => ({ toastError: vi.fn() }))
 
-const { revokeSystemAdmin } = vi.hoisted(() => ({ revokeSystemAdmin: vi.fn() }))
+const { revokeSystemAdmin, updateOwnSystemAdminName } = vi.hoisted(() => ({
+  revokeSystemAdmin: vi.fn(),
+  updateOwnSystemAdminName: vi.fn(),
+}))
 
 vi.mock('../../actions', () => ({
   grantSystemAdmin: vi.fn(),
   revokeSystemAdmin,
+  updateOwnSystemAdminName,
 }))
 
 const SELF: SystemAdmin = {
@@ -131,5 +135,61 @@ describe('SystemAdminsSection', () => {
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith('There must always be at least one.')
     )
+  })
+
+  it("offers a name edit on the signed-in admin's row only", () => {
+    render(
+      <SystemAdminsSection admins={[SELF, OTHER]} currentUserId="self" formattedDates={DATES} />
+    )
+
+    const ownRow = screen.getByText('Frida').closest('li')!
+    const otherRow = screen.getByText('Peter').closest('li')!
+    expect(within(ownRow).getByRole('button', { name: 'systemAdmin.editOwnName' })).toBeEnabled()
+    expect(within(otherRow).queryByRole('button', { name: 'systemAdmin.editOwnName' })).toBeNull()
+  })
+
+  it('saves the edited own name, trimmed', async () => {
+    updateOwnSystemAdminName.mockResolvedValue({})
+    render(
+      <SystemAdminsSection admins={[SELF, OTHER]} currentUserId="self" formattedDates={DATES} />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'systemAdmin.editOwnName' }))
+    const field = await screen.findByLabelText('systemAdmin.addAdminName')
+    expect(field).toHaveValue('Frida')
+    fireEvent.change(field, { target: { value: ' Frida Bredberg ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'systemAdmin.save' }))
+
+    await waitFor(() => expect(updateOwnSystemAdminName).toHaveBeenCalledWith('Frida Bredberg'))
+  })
+
+  it('starts an unnamed admin from an empty field and blocks saving it blank', async () => {
+    render(
+      <SystemAdminsSection
+        admins={[{ ...SELF, name: null }, OTHER]}
+        currentUserId="self"
+        formattedDates={DATES}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'systemAdmin.editOwnName' }))
+    expect(await screen.findByLabelText('systemAdmin.addAdminName')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'systemAdmin.save' })).toBeDisabled()
+  })
+
+  it('shows a refused rename as a toast and keeps the dialog open', async () => {
+    updateOwnSystemAdminName.mockResolvedValue({ error: 'Could not save your name.' })
+    render(
+      <SystemAdminsSection admins={[SELF, OTHER]} currentUserId="self" formattedDates={DATES} />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'systemAdmin.editOwnName' }))
+    fireEvent.change(await screen.findByLabelText('systemAdmin.addAdminName'), {
+      target: { value: 'Frida B' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'systemAdmin.save' }))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Could not save your name.'))
+    expect(screen.getByLabelText('systemAdmin.addAdminName')).toBeInTheDocument()
   })
 })

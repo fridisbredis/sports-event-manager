@@ -6,6 +6,7 @@ import {
   setTenantSmsSenderId,
   grantSystemAdmin,
   revokeSystemAdmin,
+  updateOwnSystemAdminName,
 } from './actions'
 import { grantSystemAdminRole, revokeSystemAdminRole } from '@/lib/auth/system-admins'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
@@ -513,6 +514,56 @@ describe('revokeSystemAdmin (N28)', () => {
 
     expect((await revokeSystemAdmin(TARGET)).error).toBe(
       'This is the last system admin. There must always be at least one.'
+    )
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateOwnSystemAdminName (N28)', () => {
+  it('refuses a caller who is not a system admin', async () => {
+    const updateUserById = vi.fn()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+    } as never)
+    vi.mocked(createSupabaseServiceClient).mockResolvedValue({
+      from: vi.fn().mockReturnValueOnce(chain({ data: null })),
+      auth: { admin: { updateUserById } },
+    } as never)
+
+    const result = await updateOwnSystemAdminName('Frida Bredberg')
+
+    expect(result.error).toBeDefined()
+    expect(updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('rejects a blank name', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    const service = await createSupabaseServiceClient()
+
+    expect((await updateOwnSystemAdminName('   ')).error).toBeDefined()
+    expect(service.auth.admin.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it("writes the trimmed name to the caller's own metadata and revalidates", async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    const service = await createSupabaseServiceClient()
+
+    expect(await updateOwnSystemAdminName('  Peter Thörn ')).toEqual({})
+    expect(service.auth.admin.updateUserById).toHaveBeenCalledWith('admin-1', {
+      user_metadata: { name: 'Peter Thörn' },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/system-admins')
+  })
+
+  it('returns an error and skips revalidation when the update fails', async () => {
+    mockAuthedSystemAdmin(vi.fn())
+    const service = await createSupabaseServiceClient()
+    vi.mocked(service.auth.admin.updateUserById).mockResolvedValueOnce({
+      error: new Error('boom'),
+    } as never)
+
+    expect((await updateOwnSystemAdminName('Peter Thörn')).error).toBe(
+      'Could not save your name. Try again.'
     )
     expect(revalidatePath).not.toHaveBeenCalled()
   })

@@ -57,6 +57,10 @@ const revokeSystemAdminSchema = z.object({
   userId: z.string().uuid(),
 })
 
+const ownSystemAdminNameSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+})
+
 const createTenantWithAdminSchema = z.object({
   name: z.string().trim().min(1),
   adminName: z.string().trim().min(1),
@@ -454,6 +458,33 @@ export async function revokeSystemAdmin(targetUserId: string): Promise<{ error?:
           : 'actionErrors.revokeAdminFailed'
       ),
     }
+  }
+
+  revalidatePath('/admin/system-admins')
+  return {}
+}
+
+// N28: a system admin names themselves. Their name lives in auth
+// user_metadata — they have no officials roster row to hold it, which is why
+// ACCT-01 has nothing to offer them. Only the caller's own user is ever
+// written: there is no target id to tamper with, so no audit event either,
+// matching ACCT-01's own name edit.
+export async function updateOwnSystemAdminName(name: string): Promise<{ error?: string }> {
+  const check = await assertSystemAdmin()
+  if (!check.ok) return { error: check.error }
+  const { userId } = check
+
+  const parsed = ownSystemAdminNameSchema.safeParse({ name })
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  // GoTrue merges user_metadata keys, so other metadata survives.
+  const service = await createSupabaseServiceClient()
+  const { error } = await service.auth.admin.updateUserById(userId, {
+    user_metadata: { name: parsed.data.name },
+  })
+  if (error) {
+    logger.error('System admin name update failed', error)
+    return { error: await tError('actionErrors.updateNameFailed') }
   }
 
   revalidatePath('/admin/system-admins')

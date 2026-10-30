@@ -14,7 +14,7 @@ import {
   PHONE_COUNTRIES,
   formatPhoneForDisplay,
 } from '@/lib/phone'
-import { grantSystemAdmin, revokeSystemAdmin } from '../../actions'
+import { grantSystemAdmin, revokeSystemAdmin, updateOwnSystemAdminName } from '../../actions'
 import type { SystemAdmin } from '@/lib/auth/system-admins'
 
 interface Props {
@@ -39,6 +39,11 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
   const [addError, setAddError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<SystemAdmin | null>(null)
   const [removePending, setRemovePending] = useState(false)
+  // Own-name edit. Seeded from the stored name when the dialog opens, so an
+  // unnamed admin starts from an empty field rather than the placeholder text.
+  const [editingName, setEditingName] = useState<string | null>(null)
+  const [renamePending, setRenamePending] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   const phoneIsValid = phone.trim() !== '' && isValidPhoneForCountry(phone, phoneCountry)
   const canSubmit = name.trim() !== '' && phoneIsValid
@@ -69,6 +74,26 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
     if (result.error) toastError(result.error)
     setRemovePending(false)
     setRemoving(null)
+  }
+
+  async function handleRename() {
+    if (editingName === null || editingName.trim() === '' || renamePending) return
+    setRenamePending(true)
+    setRenameError(null)
+    const result = await updateOwnSystemAdminName(editingName.trim())
+    if (result.error) {
+      setRenameError(result.error)
+      toastError(result.error)
+    } else {
+      setEditingName(null)
+    }
+    setRenamePending(false)
+  }
+
+  function closeRename() {
+    if (renamePending) return
+    setEditingName(null)
+    setRenameError(null)
   }
 
   function closeAdd() {
@@ -124,17 +149,28 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
                   {t('systemAdmin.adminAddedOn', { date: formattedDates[admin.userId] ?? '' })}
                 </p>
               </div>
-              <Button
-                variant="bordered"
-                size="sm"
-                onPress={() => setRemoving(admin)}
-                isDisabled={disabledReason !== undefined}
-                // The repo's `destructive` token, as on SYS-02.
-                className="shrink-0 border-destructive text-destructive"
-                title={disabledReason}
-              >
-                {t('systemAdmin.removeAdmin')}
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                {isSelf && (
+                  <Button
+                    variant="bordered"
+                    size="sm"
+                    onPress={() => setEditingName(admin.name ?? '')}
+                  >
+                    {t('systemAdmin.editOwnName')}
+                  </Button>
+                )}
+                <Button
+                  variant="bordered"
+                  size="sm"
+                  onPress={() => setRemoving(admin)}
+                  isDisabled={disabledReason !== undefined}
+                  // The repo's `destructive` token, as on SYS-02.
+                  className="border-destructive text-destructive"
+                  title={disabledReason}
+                >
+                  {t('systemAdmin.removeAdmin')}
+                </Button>
+              </div>
             </li>
           )
         })}
@@ -197,6 +233,38 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
             </Button>
             <SystemButton onPress={handleAdd} isDisabled={!canSubmit} isLoading={pending}>
               {t('systemAdmin.addSystemAdmin')}
+            </SystemButton>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={editingName !== null} onOpenChange={closeRename} size="lg">
+        <ModalContent>
+          <ModalHeader>{t('systemAdmin.editOwnNameTitle')}</ModalHeader>
+          <ModalBody>
+            <Input
+              label={t('systemAdmin.addAdminName')}
+              value={editingName ?? ''}
+              onValueChange={(value) => {
+                setEditingName(value)
+                setRenameError(null)
+              }}
+              placeholder={t('systemAdmin.addAdminNamePlaceholder')}
+              autoFocus
+            />
+            <p className="text-sm text-ink-label">{t('systemAdmin.editOwnNameHint')}</p>
+            {renameError && <p className="text-sm text-destructive">{renameError}</p>}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={closeRename} isDisabled={renamePending}>
+              {t('systemAdmin.cancel')}
+            </Button>
+            <SystemButton
+              onPress={handleRename}
+              isDisabled={(editingName ?? '').trim() === ''}
+              isLoading={renamePending}
+            >
+              {t('systemAdmin.save')}
             </SystemButton>
           </ModalFooter>
         </ModalContent>
