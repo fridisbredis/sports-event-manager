@@ -49,20 +49,12 @@ export function TenantList({ tenants, smsUsage }: Props) {
       <div className="mx-auto max-w-[1240px] px-4 pb-16 pt-8 md:px-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <h1 className="page-title">{t('systemAdmin.tenants')}</h1>
-          <div className="flex items-center gap-6">
-            {/* Graphite, not blue: the system surface carries no tenant theme,
-                and the design pairs this with the dark primary button rather
-                than making it the one saturated element on the page. */}
-            <Link
-              href="/admin/health"
-              className="text-sm font-medium text-ink transition-colors hover:text-ink-muted"
-            >
-              {t('systemAdmin.systemStatus')}
-            </Link>
-            <SystemButton onPress={() => setModalOpen(true)}>
-              {t('systemAdmin.createTenant')}
-            </SystemButton>
-          </div>
+          {/* System status moved to the sidebar: it's a page of its own, not
+              an action on this list, and should be reachable from every
+              system-admin route. */}
+          <SystemButton onPress={() => setModalOpen(true)}>
+            {t('systemAdmin.createTenant')}
+          </SystemButton>
         </div>
 
         {tenants.length === 0 ? (
