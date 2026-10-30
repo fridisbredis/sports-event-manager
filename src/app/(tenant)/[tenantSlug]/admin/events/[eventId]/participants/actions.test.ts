@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { importParticipants, addParticipant } from './actions'
+import {
+  importParticipants,
+  addParticipant,
+  setParticipantHidden,
+  removeParticipant,
+} from './actions'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { fetchParticipants } from '@/lib/race-results/client'
@@ -390,5 +395,146 @@ describe('addParticipant', () => {
 
     expect(result.error).toBe('actionErrors.invalidRequest')
     expect(stub.participantsBuilder.insert).not.toHaveBeenCalled()
+  })
+})
+
+const PARTICIPANT_ID = '33333333-3333-3333-3333-333333333333'
+
+describe('setParticipantHidden', () => {
+  it('sets hidden_at, never withdrawn_at', async () => {
+    // withdrawn_at belongs to the import, which clears it for everyone in
+    // the Race Results response — a hide written there would not survive
+    // the next import (migration 20261030091721).
+    const stub = supabaseStub({ insertResult: { data: [{ id: PARTICIPANT_ID }], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await setParticipantHidden({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+      hidden: true,
+    })
+
+    expect(result.error).toBeUndefined()
+    const updateMock = stub.participantsBuilder.update as ReturnType<typeof vi.fn>
+    const written = updateMock.mock.calls[0][0] as Record<string, unknown>
+    expect(Object.keys(written)).toEqual(['hidden_at'])
+    expect(typeof written.hidden_at).toBe('string')
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('event_id', 'event-1')
+  })
+
+  it('clears hidden_at to show the participant again', async () => {
+    const stub = supabaseStub({ insertResult: { data: [{ id: PARTICIPANT_ID }], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    await setParticipantHidden({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+      hidden: false,
+    })
+
+    expect(stub.participantsBuilder.update).toHaveBeenCalledWith({ hidden_at: null })
+  })
+
+  it('reports a participant that matched no row instead of claiming success', async () => {
+    const stub = supabaseStub({ insertResult: { data: [], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await setParticipantHidden({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+      hidden: true,
+    })
+
+    expect(result.error).toBe('actionErrors.participantNotFound')
+  })
+
+  it('refuses a tenant whose tier does not include participants', async () => {
+    const stub = supabaseStub({ tier: 'standard' })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await setParticipantHidden({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+      hidden: true,
+    })
+
+    expect(result.error).toBe('actionErrors.participantsNotInTier')
+    expect(stub.participantsBuilder.update).not.toHaveBeenCalled()
+  })
+
+  it('rejects a participant id that is not a uuid', async () => {
+    const stub = supabaseStub()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await setParticipantHidden({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: 'not-a-uuid',
+      hidden: true,
+    })
+
+    expect(result.error).toBe('actionErrors.invalidRequest')
+    expect(stub.participantsBuilder.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('removeParticipant', () => {
+  it('deletes only a manually added row in this event', async () => {
+    const stub = supabaseStub({ insertResult: { data: [{ id: PARTICIPANT_ID }], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await removeParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(stub.participantsBuilder.delete).toHaveBeenCalled()
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('source', 'manual')
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('event_id', 'event-1')
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+  })
+
+  it('reports an imported or unknown participant as not found', async () => {
+    // The source filter makes an imported row match nothing; the caller
+    // must hear that rather than see a success that removed no one.
+    const stub = supabaseStub({ insertResult: { data: [], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await removeParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBe('actionErrors.participantNotFound')
+  })
+
+  it('refuses a caller without admin access to the tenant', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const stub = supabaseStub()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await removeParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBe('actionErrors.notAuthorized')
+    expect(stub.participantsBuilder.delete).not.toHaveBeenCalled()
   })
 })

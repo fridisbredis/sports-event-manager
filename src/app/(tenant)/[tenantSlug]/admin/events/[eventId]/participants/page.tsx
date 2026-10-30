@@ -12,7 +12,7 @@ import ParticipantsList from './_components/participants-list'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
-  searchParams: Promise<{ page?: string; stage?: string; withdrawn?: string }>
+  searchParams: Promise<{ page?: string; stage?: string; withdrawn?: string; hidden?: string }>
 }
 
 /**
@@ -30,7 +30,12 @@ const PARTICIPANTS_CEILING = 2000
 
 export default async function ParticipantsPage({ params, searchParams }: Props) {
   const { tenantSlug, eventId } = await params
-  const { page: pageParam, stage: stageParam, withdrawn: withdrawnParam } = await searchParams
+  const {
+    page: pageParam,
+    stage: stageParam,
+    withdrawn: withdrawnParam,
+    hidden: hiddenParam,
+  } = await searchParams
 
   const user = await getCurrentUser()
   if (!user) redirect('/login')
@@ -51,6 +56,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
   const page = parsePageParam(pageParam)
   const { from, to } = pageRange(page, PARTICIPANTS_PAGE_SIZE)
   const showWithdrawn = withdrawnParam === '1'
+  const showHidden = hiddenParam === '1'
 
   // Race stages, for the stage filter and for the import dialog. Which of
   // them actually has a Race Results link decides what can be imported, so
@@ -94,8 +100,8 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     .from('participants')
     .select(
       selectedStageId
-        ? 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, participant_stages!inner(stage_id)'
-        : 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, participant_stages(stage_id)'
+        ? 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, participant_stages!inner(stage_id)'
+        : 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, participant_stages(stage_id)'
     )
     .eq('tenant_id', tenant.id)
     // N23: this event's participants.
@@ -110,6 +116,14 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
   // staffing decisions against people who are no longer racing.
   if (!showWithdrawn) {
     query = query.is('withdrawn_at', null)
+  }
+
+  // N34: hidden by an admin. A separate filter from withdrawn because the two
+  // mean different things — withdrawn is the import saying "no longer on the
+  // start list", hidden is an admin tidying the view of someone who is still
+  // racing.
+  if (!showHidden) {
+    query = query.is('hidden_at', null)
   }
 
   const { data: participantRows, error } = await query
@@ -153,6 +167,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     source: p.source,
     extra: (p.extra ?? {}) as Record<string, string>,
     withdrawnAt: p.withdrawn_at,
+    hiddenAt: p.hidden_at,
     stageIds: ((p.participant_stages ?? []) as unknown as Array<{ stage_id: string }>).map(
       (link) => link.stage_id
     ),
@@ -170,6 +185,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
         hasMore={hasMore}
         selectedStageId={selectedStageId ?? null}
         showWithdrawn={showWithdrawn}
+        showHidden={showHidden}
       />
     </div>
   )

@@ -751,6 +751,7 @@ export type Database = {
           extra: Json
           gdpr_warning_sent_at: string | null
           gender: string | null
+          hidden_at: string | null
           id: string
           name: string | null
           nation: string | null
@@ -773,6 +774,7 @@ export type Database = {
           extra?: Json
           gdpr_warning_sent_at?: string | null
           gender?: string | null
+          hidden_at?: string | null
           id?: string
           name?: string | null
           nation?: string | null
@@ -795,6 +797,7 @@ export type Database = {
           extra?: Json
           gdpr_warning_sent_at?: string | null
           gender?: string | null
+          hidden_at?: string | null
           id?: string
           name?: string | null
           nation?: string | null

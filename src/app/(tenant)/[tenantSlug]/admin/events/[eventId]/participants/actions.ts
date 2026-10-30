@@ -324,3 +324,136 @@ export async function addParticipant(input: {
 
   return {}
 }
+
+const participantIdSchema = z.string().uuid()
+
+export interface ParticipantRowActionResult {
+  error?: string
+}
+
+/**
+ * Hide a participant from the roster, or show them again (N34).
+ *
+ * HIDE ONLY, per Peter on N26: the person is still entered and still
+ * receives participant announcements — which is why nothing but the roster
+ * query reads hidden_at.
+ *
+ * hidden_at, not withdrawn_at: the import clears withdrawn_at for everyone
+ * in the Race Results response, so reusing it would let the next import
+ * undo the admin's hide (migration 20261030091721). Works the same for
+ * imported and manual rows.
+ */
+export async function setParticipantHidden(input: {
+  tenantSlug: string
+  tenantId: string
+  eventId: string
+  participantId: string
+  hidden: boolean
+}): Promise<ParticipantRowActionResult> {
+  const auth = await authorize(input.tenantId)
+  if (!auth.ok) return { error: auth.error }
+  const { supabase, tenantId } = auth
+
+  const participantId = participantIdSchema.safeParse(input.participantId)
+  if (!participantId.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, input.eventId)
+  if (!eventId) return { error: await tError('actionErrors.invalidRequest') }
+
+  // .select('id') so a row that did not match — another event's id, or one
+  // RLS hides — comes back as zero rows instead of a silent success.
+  const { data, error } = await supabase
+    .from('participants')
+    .update({ hidden_at: input.hidden ? new Date().toISOString() : null })
+    .eq('id', participantId.data)
+    .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
+    .select('id')
+
+  if (error) {
+    return {
+      error: await translateDbError(
+        'setParticipantHidden: update failed',
+        error,
+        'participants.actions.genericError'
+      ),
+    }
+  }
+
+  if (!data || data.length === 0) {
+    logger.warn('setParticipantHidden: no matching participant', {
+      tenantId,
+      eventId,
+      participantId: participantId.data,
+    })
+    return { error: await tError('actionErrors.participantNotFound') }
+  }
+
+  revalidatePath(adminEventRoutePattern('participants'), 'page')
+
+  return {}
+}
+
+/**
+ * Remove a manually added participant (N34).
+ *
+ * MANUAL ONLY. Peter answered for hand-typed entries; the imported list is
+ * Race Results' to own, and an imported row deleted here would simply come
+ * back on the next import. The `source = 'manual'` filter is what enforces
+ * that — an imported id matches no row and the caller gets "not found".
+ *
+ * A HARD DELETE, not a soft one. Hiding already covers "keep the row but
+ * stop showing it"; a manual row being removed is a typo or someone who was
+ * never entered, and nothing else points at it. Its participant_stages
+ * links go with it (ON DELETE CASCADE, migration 20261026084206), and the
+ * SMS queue stores phone numbers rather than participant ids, so an
+ * announcement already sent is unaffected.
+ */
+export async function removeParticipant(input: {
+  tenantSlug: string
+  tenantId: string
+  eventId: string
+  participantId: string
+}): Promise<ParticipantRowActionResult> {
+  const auth = await authorize(input.tenantId)
+  if (!auth.ok) return { error: auth.error }
+  const { supabase, tenantId } = auth
+
+  const participantId = participantIdSchema.safeParse(input.participantId)
+  if (!participantId.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, input.eventId)
+  if (!eventId) return { error: await tError('actionErrors.invalidRequest') }
+
+  const { data, error } = await supabase
+    .from('participants')
+    .delete()
+    .eq('id', participantId.data)
+    .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
+    .eq('source', 'manual')
+    .select('id')
+
+  if (error) {
+    return {
+      error: await translateDbError(
+        'removeParticipant: delete failed',
+        error,
+        'participants.actions.genericError'
+      ),
+    }
+  }
+
+  if (!data || data.length === 0) {
+    logger.warn('removeParticipant: no matching manual participant', {
+      tenantId,
+      eventId,
+      participantId: participantId.data,
+    })
+    return { error: await tError('actionErrors.participantNotFound') }
+  }
+
+  revalidatePath(adminEventRoutePattern('participants'), 'page')
+
+  return {}
+}
