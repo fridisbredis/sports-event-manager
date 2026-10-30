@@ -57,7 +57,8 @@
     "unarchiveUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett annat event eller uppgradera för fler event.",
     "createEventArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det aktiva eventet först och skapa sedan det nya.",
     "createEventUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler event.",
-    "addOfficialsFailed": "Funktionärerna kunde inte läggas till. Försök igen."
+    "addOfficialsFailed": "Funktionärerna kunde inte läggas till. Försök igen.",
+    "updateNameFailed": "Kunde inte spara ditt namn. Försök igen."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

@@ -57,7 +57,8 @@
     "unarchiveUpgrade": "All active event slots in your plan are in use. Archive another event, or upgrade for more events.",
     "createEventArchiveFirst": "Your plan has room for one active event. Archive the active event first, then create the new one.",
     "createEventUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more events.",
-    "addOfficialsFailed": "The officials could not be added. Please try again."
+    "addOfficialsFailed": "The officials could not be added. Please try again.",
+    "updateNameFailed": "Could not save your name. Try again."
   },
   "notFoundPage": {
     "eyebrow": "No result",

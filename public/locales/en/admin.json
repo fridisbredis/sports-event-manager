@@ -598,7 +598,11 @@
     "removeSystemAdminConfirmBody": "{{name}} loses access to the system admin view, and with it to every tenant. Any admin or official role they hold in a tenant stays. You can add them back later.",
     "removeSystemAdminConfirmBodyUnnamed": "This system admin loses access to the system admin view, and with it to every tenant. Any admin or official role they hold in a tenant stays. You can add them back later.",
     "lastSystemAdminHint": "There must always be at least one system admin.",
-    "cannotRemoveSelfHint": "You cannot remove yourself. Ask another system admin."
+    "cannotRemoveSelfHint": "You cannot remove yourself. Ask another system admin.",
+    "editOwnName": "Edit name",
+    "editOwnNameTitle": "Edit your name",
+    "editOwnNameHint": "Shown to the other system admins in this list.",
+    "save": "Save"
   },
   "health": {
     "title": "System status",

@@ -598,7 +598,11 @@
     "removeSystemAdminConfirmBody": "{{name}} förlorar åtkomsten till systemadminvyn och därmed till alla tenants. Roller som personen har i en enskild tenant ligger kvar. Du kan lägga till personen igen senare.",
     "removeSystemAdminConfirmBodyUnnamed": "Systemadministratören förlorar åtkomsten till systemadminvyn och därmed till alla tenants. Roller som personen har i en enskild tenant ligger kvar. Du kan lägga till personen igen senare.",
     "lastSystemAdminHint": "Det måste alltid finnas minst en systemadministratör.",
-    "cannotRemoveSelfHint": "Du kan inte ta bort dig själv. Be en annan systemadministratör."
+    "cannotRemoveSelfHint": "Du kan inte ta bort dig själv. Be en annan systemadministratör.",
+    "editOwnName": "Ändra namn",
+    "editOwnNameTitle": "Ändra ditt namn",
+    "editOwnNameHint": "Visas för de andra systemadministratörerna i den här listan.",
+    "save": "Spara"
   },
   "health": {
     "title": "Systemstatus",
