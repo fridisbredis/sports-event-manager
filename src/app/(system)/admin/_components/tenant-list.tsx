@@ -74,6 +74,10 @@ export function TenantList({ tenants, smsUsage }: Props) {
         ) : (
           <Table
             aria-label={t('systemAdmin.tenants')}
+            // HeroUI's wrapper adds its own shadow-small, which wins over
+            // CARD_SURFACE's lighter shadow-card and reads as a heavier border
+            // than every other card. Same reason AppCard passes shadow="none".
+            shadow="none"
             classNames={{
               wrapper: `${CARD_SURFACE} p-4`,
               th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
