@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { publishEvent } from './publish-event'
+import { publishEvent, unpublishEvent } from './publish-event'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
@@ -29,10 +29,19 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-function mockClient(rpcMock: ReturnType<typeof vi.fn>) {
+// N36: publishEvent reads the tenant's tier before calling the RPC.
+function tenantsTable(tier: string | null, error: unknown = null) {
+  const maybeSingle = vi.fn().mockResolvedValue({ data: tier ? { tier } : null, error })
+  const eq = vi.fn(() => ({ maybeSingle }))
+  const select = vi.fn(() => ({ eq }))
+  return { select }
+}
+
+function mockClient(rpcMock: ReturnType<typeof vi.fn>, tier: string | null = 'premium') {
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
     rpc: rpcMock,
+    from: vi.fn(() => tenantsTable(tier)),
   } as never)
 }
 
@@ -228,5 +237,134 @@ describe('publishEvent', () => {
     })
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
+  })
+
+  // N36 / PB5: publishing is Premium and up, checked on the server and not
+  // only by greying out the button.
+  it('refuses a Standard tenant without calling the RPC', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const rpcMock = vi.fn()
+    mockClient(rpcMock, 'standard')
+
+    const result = await publishEvent(INPUT)
+
+    expect(result).toEqual({ error: 'Publishing needs the Premium tier or higher.' })
+    expect(rpcMock).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('refuses when the tenant row cannot be read (fails closed)', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const rpcMock = vi.fn()
+    mockClient(rpcMock, null)
+
+    const result = await publishEvent(INPUT)
+
+    expect(result).toEqual({ error: 'Publishing needs the Premium tier or higher.' })
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it("maps the RPC's own tier refusal (P0005) to the same message", async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockClient(
+      vi.fn().mockResolvedValue({ data: null, error: { code: 'P0005', message: 'tier' } }),
+      'premium'
+    )
+
+    const result = await publishEvent(INPUT)
+
+    expect(result).toEqual({ error: 'Publishing needs the Premium tier or higher.' })
+  })
+
+  it('revalidates the tenant events list too, whose cards show the status', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockClient(vi.fn().mockResolvedValue({ data: true, error: null }))
+
+    await publishEvent(INPUT)
+
+    expect(revalidatePath).toHaveBeenCalledWith('/[tenantSlug]/admin', 'page')
+  })
+})
+
+// N36 / PB3: unpublish is one guarded status update; nothing is deleted.
+describe('unpublishEvent', () => {
+  function mockEventsUpdate(result: { data: unknown; error: unknown }) {
+    const calls: { method: string; args: unknown[] }[] = []
+    const builder: Record<string, unknown> = {}
+    for (const method of ['update', 'eq']) {
+      builder[method] = vi.fn((...args: unknown[]) => {
+        calls.push({ method, args })
+        return builder
+      })
+    }
+    builder.select = vi.fn(() => Promise.resolve(result))
+    const from = vi.fn(() => builder)
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+      from,
+    } as never)
+    return { calls, from }
+  }
+
+  it('sets a published event back to draft and touches nothing else', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const { calls, from } = mockEventsUpdate({ data: [{ id: EVENT_ID }], error: null })
+
+    const result = await unpublishEvent(INPUT)
+
+    expect(result).toEqual({})
+    // Only the events table is written — participants, claims and accounts
+    // are left exactly as they are.
+    expect(from).toHaveBeenCalledTimes(1)
+    expect(from).toHaveBeenCalledWith('events')
+    expect(calls).toEqual([
+      { method: 'update', args: [{ status: 'draft' }] },
+      { method: 'eq', args: ['id', EVENT_ID] },
+      { method: 'eq', args: ['tenant_id', TENANT_ID] },
+      { method: 'eq', args: ['status', 'published'] },
+    ])
+    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
+    expect(revalidatePath).toHaveBeenCalledWith('/[tenantSlug]/admin', 'page')
+  })
+
+  it('is a no-op without revalidation when the event was not published', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockEventsUpdate({ data: [], error: null })
+
+    const result = await unpublishEvent(INPUT)
+
+    expect(result).toEqual({})
+    expect(revalidatePath).not.toHaveBeenCalled()
+    expect(updateTag).not.toHaveBeenCalled()
+  })
+
+  it('refuses a caller without admin access to the tenant', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const { from } = mockEventsUpdate({ data: [], error: null })
+
+    const result = await unpublishEvent(INPUT)
+
+    expect(result).toEqual({ error: 'Not authorized' })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('rejects a malformed event id before touching the database', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    const { from } = mockEventsUpdate({ data: [], error: null })
+
+    const result = await unpublishEvent({ ...INPUT, eventId: 'not-a-uuid' })
+
+    expect(result).toEqual({ error: 'Invalid request' })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('returns a translated error, never the raw message, when the update fails', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
+    mockEventsUpdate({ data: null, error: { code: 'XXXXX', message: 'db is down' } })
+
+    const result = await unpublishEvent(INPUT)
+
+    expect(result).toEqual({ error: 'Something went wrong while saving. Please try again.' })
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
