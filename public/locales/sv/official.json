@@ -153,6 +153,10 @@
     "emptyBody": "Du har inte lagts till i något event hos den här arrangören än.",
     "changeEvent": "Byt event",
     "changeEventSub": "Växla till ett annat av dina event",
-    "sectionHeading": "Event"
+    "sectionHeading": "Event",
+    "role": {
+      "official": "Funktionär",
+      "participant": "Deltagare"
+    }
   }
 }
