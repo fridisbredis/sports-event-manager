@@ -13,7 +13,7 @@ import {
   type LabelInput,
   type SaveEventInput,
 } from '../actions'
-import { publishEvent } from '@/lib/actions/publish-event'
+import { publishEvent, unpublishEvent } from '@/lib/actions/publish-event'
 import { useTranslation } from '@/lib/i18n/client'
 import { useLanguage } from '@/components/i18n-provider'
 import { resizeImage } from '@/lib/image/resize-image'
@@ -38,7 +38,10 @@ interface Props {
   initialGranularity: number
   initialStages: StageInput[]
   initialFacilities: LabelInput[]
+  // As the admin should see it (displayedEventStatus): never true on Standard.
   isPublished: boolean
+  // N36 / PB5: the tenant's tier includes publishing (Premium and up).
+  tierAllowsPublish: boolean
   // N23: read-only in the database; the layout's banner explains it.
   isArchived?: boolean
 }
@@ -61,6 +64,7 @@ export default function EventConfigForm({
   initialStages,
   initialFacilities,
   isPublished,
+  tierAllowsPublish,
   isArchived = false,
 }: Props) {
   const { t } = useTranslation('admin')
@@ -304,6 +308,16 @@ export default function EventConfigForm({
     })
   }
 
+  // N36 / PB3: closes the participant side; every record is kept.
+  function handleUnpublish() {
+    startPublish(async () => {
+      const result = await unpublishEvent({ tenantSlug, tenantId, eventId })
+      if (result.error) {
+        toastError(result.error)
+      }
+    })
+  }
+
   return (
     <div>
       <UnsavedChangesDialog {...dialogProps} />
@@ -332,7 +346,36 @@ export default function EventConfigForm({
           </Chip>
         </div>
         <div className="flex items-center gap-3">
-          {!isPublished && !isArchived && (
+          {!isArchived && !tierAllowsPublish && (
+            // N36 / PB5: Standard sees Publish greyed out with the tier that
+            // unlocks it, rather than no button at all.
+            <span className="flex items-center gap-2" title={t('eventConfig.publishNeedsPremium')}>
+              <Button
+                variant="bordered"
+                isDisabled
+                className="rounded-control border-edge-field bg-white"
+              >
+                {t('eventConfig.publish')}
+              </Button>
+              <span className="rounded-full bg-status-neutral-bg px-2.5 py-0.5 text-xs font-medium text-status-neutral-text">
+                {t('dashboard.premiumBadge')}
+              </span>
+            </span>
+          )}
+          {isPublished && !isArchived && tierAllowsPublish && (
+            // N36: published events stay fully editable (PB4); Unpublish sits
+            // where Publish was, as the same secondary button.
+            <Button
+              variant="bordered"
+              onPress={handleUnpublish}
+              isDisabled={isSaving || isPublishing}
+              isLoading={isPublishing}
+              className="rounded-control border-edge-field bg-white"
+            >
+              {isPublishing ? t('eventConfig.unpublishing') : t('eventConfig.unpublish')}
+            </Button>
+          )}
+          {!isPublished && !isArchived && tierAllowsPublish && (
             // Secondary, and placed before Save: two solid primary buttons
             // side by side give the row no clear primary action, and the
             // primary one belongs last in the row.
@@ -442,6 +485,9 @@ export default function EventConfigForm({
               dateRangeLabel={derivedDateRange(stages, language)}
               granularity={granularity}
             />
+            {isPublished && (
+              <p className="text-xs text-gray-400 -mt-2">{t('eventConfig.editableAfterPublish')}</p>
+            )}
 
             <FacilitiesEditor
               facilities={facilities}

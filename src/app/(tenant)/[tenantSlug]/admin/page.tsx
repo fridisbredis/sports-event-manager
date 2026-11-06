@@ -5,6 +5,7 @@ import { getAdminTenant } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { readTenantEvents, isEventStatus, EVENT_STATUSES } from '@/lib/events/tenant-events'
 import { hasFeature, maxActiveEvents } from '@/lib/tiers/features'
+import { canPublish, displayedEventStatus } from '@/lib/events/participant-side'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { EmptyState, EmptyStateCard } from '@/components/ui/empty-state'
@@ -39,7 +40,7 @@ export default async function TenantDashboardPage({ params, searchParams }: Prop
   // The whole list, filtered here rather than in the query: the active count
   // in the header has to count every event, not just the filtered ones, and
   // a tenant has at most a few dozen.
-  const [allEvents, { data: stages, error: stagesError }] = await Promise.all([
+  const [tenantEvents, { data: stages, error: stagesError }] = await Promise.all([
     readTenantEvents(supabase, tenant.id),
     // For "Create event": what each event's stages are, so the dialog can ask
     // for their new dates. Same tenant filter, same RLS.
@@ -50,6 +51,12 @@ export default async function TenantDashboardPage({ params, searchParams }: Prop
       .order('position', { ascending: true }),
   ])
   if (stagesError) throw stagesError
+  // N36 / PB11: a Standard tenant's events always read as Draft — in the dot,
+  // the filter and the counts alike — whatever the stored status.
+  const allEvents = tenantEvents.map((e) => ({
+    ...e,
+    status: displayedEventStatus(e.status, tenant.tier),
+  }))
   const events = status ? allEvents.filter((e) => e.status === status) : allEvents
 
   const activeCount = allEvents.filter((e) => e.status !== 'archived').length
@@ -70,7 +77,11 @@ export default async function TenantDashboardPage({ params, searchParams }: Prop
 
   const filters = [
     { value: undefined, label: t('events.filterAll') },
-    ...EVENT_STATUSES.map((value) => ({ value, label: t(`events.status.${value}`) })),
+    // No "Published" filter where publishing is not in the plan: it could
+    // only ever be empty.
+    ...EVENT_STATUSES.filter((value) => value !== 'published' || canPublish(tenant.tier)).map(
+      (value) => ({ value, label: t(`events.status.${value}`) })
+    ),
   ]
 
   return (

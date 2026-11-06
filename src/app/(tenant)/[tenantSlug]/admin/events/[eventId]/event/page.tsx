@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { adminEventCacheTag } from '@/lib/cache/tags'
 import EventConfigForm from './_components/event-config-form'
+import { canPublish, displayedEventStatus } from '@/lib/events/participant-side'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -78,7 +79,10 @@ export default async function EventConfigPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const isPublished = event.status === 'published'
+  // N36: Standard events always read as Draft (PB11); publishing is Premium
+  // and up (PB5). Nothing on this page locks after publishing (PB4).
+  const isPublished = displayedEventStatus(event.status, tenant.tier) === 'published'
+  const tierAllowsPublish = canPublish(tenant.tier)
 
   // Build per-stage distances map (stage_id → distances[])
   const distancesByStageId: Record<string, { label: string; position: number }[]> = {}
@@ -117,6 +121,7 @@ export default async function EventConfigPage({ params }: Props) {
           position: f.position,
         }))}
         isPublished={isPublished}
+        tierAllowsPublish={tierAllowsPublish}
         isArchived={event.status === 'archived'}
       />
     </div>
