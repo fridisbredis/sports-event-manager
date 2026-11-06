@@ -121,7 +121,7 @@
   },
   "participantSide": {
     "notAvailable": "Inte tillgänglig",
-    "claimNotOpen": "Det går inte att ta över deltagarkonton i det här evenemanget just nu.",
+    "claimNotOpen": "Det går inte att registrera sig som deltagare i det här evenemanget just nu.",
     "eventNotAvailable": "Det här evenemanget är inte tillgängligt just nu. Titta in igen senare."
   }
 }
