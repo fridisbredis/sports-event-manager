@@ -38,7 +38,7 @@ describe('claimParticipant', () => {
     })
   })
 
-  it.each(['not_found', 'already_claimed', 'phone_mismatch', 'already_in_event'])(
+  it.each(['not_found', 'already_claimed', 'already_in_event'])(
     'returns the RPC refusal %s as its own error',
     async (code) => {
       rpc.mockResolvedValue({ data: null, error: { message: code, code: 'P0001' } })

@@ -1392,7 +1392,6 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: undefined
       }
-      phone_match_key: { Args: { p_phone: string }; Returns: string }
       publish_event: {
         Args: { p_event_id: string; p_tenant_id: string }
         Returns: boolean

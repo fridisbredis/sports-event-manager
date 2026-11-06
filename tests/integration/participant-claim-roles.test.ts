@@ -26,12 +26,9 @@ describe('N35: one account, official and participant', () => {
   let officialId: string
   let adminClient: SupabaseClient<Database>
 
-  // '+46700000003' → '070-000 00 03': the national, hand-typed shape PART-01
-  // stores, so the claim has to normalise to match auth.users.phone.
-  const national = (phone: string) => {
-    const d = phone.replace('+46', '0')
-    return `${d.slice(0, 3)}-${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}`
-  }
+  // How officials.phone and auth.users.phone store a number: E.164 without
+  // the '+' (normalizePhoneToE164, SEC-04). The claim writes this shape.
+  const stored = (phone: string) => phone.replace(/^\+/, '')
 
   async function addParticipant(event: string, phone: string | null, tenant = tenantId) {
     const { data, error } = await serviceClient()
@@ -62,13 +59,17 @@ describe('N35: one account, official and participant', () => {
   }
 
   async function linkedUser(participantId: string) {
+    return (await participantRow(participantId)).user_id
+  }
+
+  async function participantRow(participantId: string) {
     const { data, error } = await serviceClient()
       .from('participants')
-      .select('user_id')
+      .select('user_id, phone')
       .eq('id', participantId)
       .single()
     if (error) throw error
-    return data.user_id
+    return data
   }
 
   beforeAll(async () => {
@@ -113,10 +114,12 @@ describe('N35: one account, official and participant', () => {
     await cleanupTenant(otherTenantId)
   })
 
-  it('lets an official claim a participant record in their own event and keeps one role row', async () => {
+  it('lets an official claim an imported (phone-less) participant record in their own event', async () => {
     const usersBefore = (await serviceClient().auth.admin.listUsers({ perPage: 1000 })).data.users
       .length
-    const participantId = await addParticipant(eventA, national(official.phone))
+    // Imported from Race Results: no phone. The record's phone is not a
+    // credential — the SMS-verified login is.
+    const participantId = await addParticipant(eventA, null)
 
     const { data, error } = await claim(official.userId, participantId)
     expect(error).toBeNull()
@@ -124,7 +127,11 @@ describe('N35: one account, official and participant', () => {
     // cannot see inside it.
     expect(data).toEqual({ participant_id: participantId, event_id: eventA, role_granted: false })
 
-    expect(await linkedUser(participantId)).toBe(official.userId)
+    // Linked, and the verified phone filled in (N41).
+    expect(await participantRow(participantId)).toEqual({
+      user_id: official.userId,
+      phone: stored(official.phone),
+    })
     // Still exactly one tenant tier row — the higher one — and no new user.
     expect(await rolesOf(official.userId)).toEqual(['official'])
     const usersAfter = (await serviceClient().auth.admin.listUsers({ perPage: 1000 })).data.users
@@ -160,12 +167,18 @@ describe('N35: one account, official and participant', () => {
     expect(await linkedUser(participantId)).toBeNull()
   })
 
-  it('refuses a record whose phone does not match, or has none', async () => {
-    const other = await addParticipant(eventA, '070-999 99 99')
-    const none = await addParticipant(eventA, null)
-    expect((await claim(official.userId, other)).error?.message).toBe('phone_mismatch')
-    expect((await claim(official.userId, none)).error?.message).toBe('phone_mismatch')
-    expect(await linkedUser(other)).toBeNull()
+  it('claims a record whose typed-in phone differs, replacing it with the verified one', async () => {
+    // An admin typed a number on PART-01 (wrong, or an old one). First claim
+    // wins; the SMS-verified number is the better fact, so it replaces it.
+    const runner = await createUserWithRole(otherTenantId, 'tenant_admin')
+    const participantId = await addParticipant(eventA, '070-999 99 99')
+
+    const { error } = await claim(runner.userId, participantId)
+    expect(error).toBeNull()
+    expect(await participantRow(participantId)).toEqual({
+      user_id: runner.userId,
+      phone: stored(runner.phone),
+    })
   })
 
   it('refuses a record in another tenant', async () => {

@@ -9,7 +9,6 @@ const uuid = z.string().uuid()
 export const CLAIM_PARTICIPANT_ERRORS = [
   'not_found',
   'already_claimed',
-  'phone_mismatch',
   'already_in_event',
 ] as const
 
@@ -23,10 +22,11 @@ export type ClaimParticipantResult =
  * N35 (L5): link the signed-in account to a participant record in a tenant.
  *
  * The server-side half of the claim; the UI is N40. `userId` must come from
- * the verified session, never from the client — the RPC reads that user's
- * phone from auth.users and refuses a record whose phone does not match, so
- * the phone the person signed in with is the security boundary. The RPC is
- * granted to service_role only, hence the service client.
+ * the verified session, never from the client: the SMS-verified phone the
+ * person signed in with is the proof of who they are, and the RPC writes it
+ * into participants.phone. The record's own phone is not checked — imported
+ * participants have none — and the first claim wins (conflicts are N42).
+ * The RPC is granted to service_role only, hence the service client.
  *
  * An official who claims keeps their single tenant role row and gains the
  * participant membership; someone with no role in the tenant gets

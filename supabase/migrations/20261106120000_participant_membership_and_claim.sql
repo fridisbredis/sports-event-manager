@@ -47,13 +47,23 @@
 --    L26: a user whose last membership goes keeps the auth account (nothing
 --    here deletes auth.users) and simply has no role row and no event.
 --
--- 3. claim_participant: links an account to a participant record whose phone
---    matches the account's own phone, in one transaction. The participant
---    tier follows from the trigger, so an official who claims keeps their
---    single 'official' row and no second user is ever created. The claim UI
---    is N40; this is the server-side half. Service-role only, like
---    confirm_official_invite_by_phone: the phone it checks is read from
---    auth.users for p_user_id, never taken from the caller.
+-- 3. claim_participant: links an account to a participant record, in one
+--    transaction. The participant tier follows from the trigger, so an
+--    official who claims keeps their single 'official' row and no second
+--    user is ever created. The claim UI is N40; this is the server-side half.
+--
+--    The record's phone is NOT a credential. Imported participants have no
+--    phone at all (Race Results carries none, 20261026084206). In Peter's
+--    flow (N39/N40, L6/L9) the runner picks their row from the open claim
+--    list and verifies THEIR phone by SMS code: the SMS-verified auth phone
+--    is the proof, and the first claim wins (conflicts are N42). So the
+--    claim writes the account's phone into participants.phone (N41: PART-01's
+--    phone column fills in on claim), overwriting whatever an admin typed —
+--    the verified number is the better fact. Stored like officials.phone:
+--    E.164 without '+', exactly as auth.users holds it (normalizePhoneToE164,
+--    SEC-04). Service-role only, like confirm_official_invite_by_phone: the
+--    phone is read from auth.users for p_user_id, never taken from the
+--    caller.
 --
 -- 4. A participant can read the events row of an event they are entered in
 --    (event_participant_read_events), so the event picker can name it.
@@ -72,7 +82,6 @@
 --             drop function if exists public.user_roles_sync_participant_role();
 --             drop function if exists public.claim_participant(uuid, uuid, uuid);
 --             drop function if exists public.sync_participant_role(uuid, uuid);
---             drop function if exists public.phone_match_key(text);
 --             drop policy if exists event_participant_read_events on public.events;
 --             drop function if exists public.is_event_participant(uuid);
 --             drop index if exists public.participants_event_id_user_id_key;
@@ -115,37 +124,7 @@ drop index if exists public.participants_user_id_key;
 -- is_event_participant filter on user_id alone.
 
 -- ----------------------------------------------------------------------------
--- 2. Phone match key
--- ----------------------------------------------------------------------------
---
--- auth.users.phone is E.164 without '+' ("46701234567"); participants.phone
--- is free text an admin typed ("070-123 45 67", "+46 70 …") or NULL. This
--- reduces both to E.164 digits so they compare. A national number ("0…") is
--- read in Sweden, the same default the app uses (DEFAULT_PHONE_COUNTRY,
--- formatEnteredPhoneForDisplay in src/lib/phone.ts).
-
-create or replace function public.phone_match_key(p_phone text)
-returns text
-language sql
-immutable
-set search_path = ''
-as $$
-  select case
-    when d = '' then null
-    when btrim(p_phone) like '+%' then d
-    when d like '00%' then substr(d, 3)
-    when d like '0%' then '46' || substr(d, 2)
-    else d
-  end
-  from (select regexp_replace(coalesce(p_phone, ''), '\D', '', 'g') as d) s;
-$$;
-
-comment on function public.phone_match_key(text) is
-  'N35: E.164 digits (no +) for comparing a stored phone with auth.users.phone. '
-  'National numbers (leading 0) are read as Swedish. NULL for no digits.';
-
--- ----------------------------------------------------------------------------
--- 3. The participant tier in user_roles, derived from the links
+-- 2. The participant tier in user_roles, derived from the links
 -- ----------------------------------------------------------------------------
 
 create or replace function public.sync_participant_role(p_user_id uuid, p_tenant_id uuid)
@@ -238,7 +217,7 @@ create trigger user_roles_sync_participant_role
   execute function public.user_roles_sync_participant_role();
 
 -- ----------------------------------------------------------------------------
--- 4. claim_participant
+-- 3. claim_participant
 -- ----------------------------------------------------------------------------
 
 create or replace function public.claim_participant(
@@ -283,11 +262,6 @@ begin
     raise exception 'already_claimed' using errcode = 'P0001';
   end if;
 
-  if public.phone_match_key(v_user_phone) is null
-     or public.phone_match_key(v_participant.phone) is distinct from public.phone_match_key(v_user_phone) then
-    raise exception 'phone_mismatch' using errcode = 'P0001';
-  end if;
-
   if exists (
     select 1 from participants
     where event_id = v_participant.event_id and user_id = p_user_id
@@ -300,7 +274,12 @@ begin
   );
 
   -- The participants trigger grants 'participant' if the user had no role.
-  update participants set user_id = p_user_id where id = v_participant.id;
+  -- The verified phone replaces the record's; an account without one (not
+  -- possible with SMS login, but auth.users allows it) keeps what is there.
+  update participants
+  set user_id = p_user_id,
+      phone = coalesce(nullif(ltrim(v_user_phone, '+'), ''), phone)
+  where id = v_participant.id;
 
   v_role_granted := not v_had_role and exists (
     select 1 from user_roles where user_id = p_user_id and tenant_id = p_tenant_id
@@ -315,15 +294,15 @@ end;
 $$;
 
 comment on function public.claim_participant(uuid, uuid, uuid) is
-  'N35: links an account to a participant record in the tenant when the '
-  'record''s phone matches the account''s phone (auth.users). The participant '
-  'tier follows from the trigger; an existing official/admin row is kept. '
-  'Idempotent for the same user. Raises not_found / already_claimed / '
-  'phone_mismatch / already_in_event (P0001). Returns { participant_id, '
+  'N35: links an account to a participant record in the tenant (first claim '
+  'wins) and writes the account''s verified phone (auth.users, E.164 without '
+  '+) into participants.phone. The participant tier follows from the trigger; '
+  'an existing official/admin row is kept. Idempotent for the same user. '
+  'Raises not_found / already_claimed / already_in_event (P0001). Returns { participant_id, '
   'event_id, role_granted }. Service role only.';
 
 -- ----------------------------------------------------------------------------
--- 5. A participant reads the events they are entered in
+-- 4. A participant reads the events they are entered in
 -- ----------------------------------------------------------------------------
 
 create or replace function public.is_event_participant(p_event_id uuid)
@@ -347,12 +326,11 @@ create policy event_participant_read_events on public.events
   for select to authenticated using (public.is_event_participant(id));
 
 -- ----------------------------------------------------------------------------
--- 6. Grants. New functions in public get EXECUTE for anon and authenticated
+-- 5. Grants. New functions in public get EXECUTE for anon and authenticated
 --    from the schema's default ACL; revoking from PUBLIC alone does not
 --    remove those.
 -- ----------------------------------------------------------------------------
 
-revoke all on function public.phone_match_key(text) from public, anon, authenticated;
 revoke all on function public.sync_participant_role(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.participants_sync_participant_role() from public, anon, authenticated;
 revoke all on function public.user_roles_sync_participant_role() from public, anon, authenticated;
