@@ -240,4 +240,25 @@ describe('DashboardPage', () => {
     expect(section).not.toBeNull()
     expect(section!.props.eventId).toBeNull()
   })
+
+  // N36: PB5 (publish is Premium and up) and PB11 (Standard always reads as
+  // Draft), as the dashboard hands them to the publish card.
+  it.each([
+    ['standard', 'published', false, false],
+    ['standard', 'draft', false, false],
+    ['premium', 'published', true, true],
+    ['professional', 'draft', true, false],
+  ])(
+    'on %s with a %s event: tierAllowsPublish=%s, isPublished=%s',
+    async (tier, status, tierAllowsPublish, isPublished) => {
+      vi.mocked(getAdminTenant).mockResolvedValue({ ...TENANT, tier } as never)
+      mockDashboardRpc({ data: dashboardPayload({ event: { ...EVENT, status } }), error: null })
+
+      const result = await DashboardPage({ params: PARAMS })
+
+      const section = findByType(result, PublishSection)
+      expect(section!.props.tierAllowsPublish).toBe(tierAllowsPublish)
+      expect(section!.props.isPublished).toBe(isPublished)
+    }
+  )
 })

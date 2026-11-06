@@ -39,6 +39,7 @@
     "adminCapReached": "Den här tenanten har nått det högsta antalet administratörer för sin nivå. Höj nivån eller ta bort en administratör först.",
     "lastAdminCannotRemove": "Det här är tenantens sista administratör. En tenant måste ha minst en — inaktivera tenanten i stället.",
     "participantsNotInTier": "Deltagare ingår inte i den här kundens abonnemang.",
+    "publishNeedsPremium": "Publicering kräver nivån Premium eller högre.",
     "participantNotFound": "Deltagaren kunde inte hittas. Ladda om sidan och försök igen.",
     "noStagesSelected": "Välj minst en tävlingsetapp.",
     "participantsNoResultsLink": "Den här etappen har ingen Race Results-länk än.",
@@ -117,5 +118,10 @@
   "language": {
     "label": "Språk",
     "saveFailed": "Kunde inte spara ditt språk. Försök igen."
+  },
+  "participantSide": {
+    "notAvailable": "Inte tillgänglig",
+    "claimNotOpen": "Det går inte att registrera sig som deltagare i det här evenemanget just nu.",
+    "eventNotAvailable": "Det här evenemanget är inte tillgängligt just nu. Titta in igen senare."
   }
 }

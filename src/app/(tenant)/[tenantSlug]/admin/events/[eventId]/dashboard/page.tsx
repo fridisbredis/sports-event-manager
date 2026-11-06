@@ -15,6 +15,10 @@ import { formatMoney } from '@/lib/i18n/date-locale'
 import { readSmsCapStatus } from '@/lib/sms/cap'
 import { adminEventPath } from '@/lib/events/paths'
 import { formatDateRange } from '@/lib/i18n/date-range'
+import {
+  canPublish as tierAllowsPublishing,
+  displayedEventStatus,
+} from '@/lib/events/participant-side'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -117,7 +121,11 @@ export default async function DashboardPage({ params }: Props) {
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = raceStageCount > 0
   const canPublish = hasName && hasRaceStage
-  const isPublished = event?.status === 'published'
+  // N36: Standard events always read as Draft (PB11), and publishing is
+  // Premium and up (PB5).
+  const tierAllowsPublish = tierAllowsPublishing(tenant.tier)
+  const isPublished =
+    event != null && displayedEventStatus(event.status, tenant.tier) === 'published'
 
   // Jump straight to where the earliest warning is, rather than the grid's
   // own default (getCurrentStage/today) — otherwise an admin has to hunt for
@@ -159,6 +167,7 @@ export default async function DashboardPage({ params }: Props) {
           lines and clipped the officials counts at the right edge. */}
       <div className="grid grid-cols-1 gap-5 mb-5 md:grid-cols-[3fr_2fr]">
         <PublishSection
+          tierAllowsPublish={tierAllowsPublish}
           canPublish={canPublish}
           isPublished={isPublished}
           hasName={hasName}

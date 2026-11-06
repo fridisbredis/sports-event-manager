@@ -39,6 +39,7 @@
     "adminCapReached": "This tenant has reached the maximum number of admins for its tier. Raise the tier or remove an admin first.",
     "lastAdminCannotRemove": "This is the tenant’s last admin. A tenant must keep at least one admin — deactivate the tenant instead.",
     "participantsNotInTier": "Participants are not included in this tenant's plan.",
+    "publishNeedsPremium": "Publishing needs the Premium tier or higher.",
     "participantNotFound": "That participant could not be found. Refresh the page and try again.",
     "noStagesSelected": "Choose at least one Race stage.",
     "participantsNoResultsLink": "This stage has no Race Results link yet.",
@@ -117,5 +118,10 @@
   "language": {
     "label": "Language",
     "saveFailed": "Could not save your language. Please try again."
+  },
+  "participantSide": {
+    "notAvailable": "Not available",
+    "claimNotOpen": "Claiming is not open for this event.",
+    "eventNotAvailable": "This event is not available right now. Please check back later."
   }
 }

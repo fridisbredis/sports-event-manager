@@ -130,4 +130,20 @@ describe('TenantDashboardPage', () => {
     const tree = JSON.stringify(await TenantDashboardPage({ params, searchParams: search() }))
     expect(tree).toContain(`"showParticipants":${shown}`)
   })
+
+  // N36 / PB11: a Standard tenant's events always read as Draft, and there is
+  // no "Published" filter that could only ever be empty.
+  it('shows a Standard tenant’s stored-published event as a draft', async () => {
+    vi.mocked(getAdminTenant).mockResolvedValue(tenant('standard'))
+    const tree = await TenantDashboardPage({ params, searchParams: search('draft') })
+    expect(listedIds(tree)).toEqual(['e-2027', 'e-2026'])
+    const json = JSON.stringify(tree)
+    expect(json).not.toContain('"status":"published"')
+    expect(json).not.toContain('events.status.published')
+  })
+
+  it('keeps the Published filter where publishing is in the plan', async () => {
+    const json = JSON.stringify(await TenantDashboardPage({ params, searchParams: search() }))
+    expect(json).toContain('events.status.published')
+  })
 })

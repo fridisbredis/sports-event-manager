@@ -27,6 +27,11 @@ export const TIER_FEATURES = {
   // "Premium and Professional. No participants in Standard" — which the
   // cumulative rule expresses exactly.
   participants: 'premium',
+  // N36: publishing an event, which opens its participant side (claim list
+  // and participant pages). Standard events stay Draft. The SQL half of this
+  // gate is in publish_event (migration 20261106123522), which spells out the
+  // same tiers — features.test.ts keeps the two in step.
+  publish: 'premium',
   // N13's alphanumeric SMS sender name ("Viadal" instead of the platform
   // number). Lower tiers send from the platform number; see
   // resolveSmsSender in src/lib/sms/sender.ts.

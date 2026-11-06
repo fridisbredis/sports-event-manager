@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   TIER_ORDER,
   TIER_FEATURES,
@@ -125,5 +127,26 @@ describe('maxActiveEvents', () => {
   it('gives an unrecognised tier the lowest cap, never an unlimited one', () => {
     expect(maxActiveEvents('enterprise')).toBe(1)
     expect(maxActiveEvents('')).toBe(1)
+  })
+})
+
+describe('publish (N36)', () => {
+  it('is Premium and up', () => {
+    expect(tiersWithFeature('publish')).toEqual(['premium', 'professional'])
+  })
+
+  // publish_event spells the same tiers out in SQL (it cannot import this
+  // module). Read the migration that defines it and fail if the two drift —
+  // a tier change here that forgets the SQL would let the UI and the
+  // database disagree about who may publish.
+  it('matches the tier list publish_event checks in SQL', () => {
+    const sql = readFileSync(
+      join(process.cwd(), 'supabase/migrations/20261106123522_publish_event_tier_gate.sql'),
+      'utf8'
+    )
+    const match = sql.match(/v_tier NOT IN \(([^)]*)\)/)
+    expect(match).not.toBeNull()
+    const sqlTiers = match![1].split(',').map((s) => s.trim().replace(/'/g, ''))
+    expect(sqlTiers).toEqual(tiersWithFeature('publish'))
   })
 })
