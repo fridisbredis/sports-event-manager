@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
 
 const eventIdSchema = z.string().uuid()
 
@@ -62,6 +62,76 @@ export const listOfficialEvents = cache(
     }))
   }
 )
+
+// N35 (L5): the role a person holds in one event. Roles belong to the event
+// membership, not to the user — official_events for an official, a linked
+// participants row for a participant — so one account can be an official in
+// one event and a participant in another, or both in the same event.
+export type EventRole = 'official' | 'participant'
+
+export type MemberEventSummary = OfficialEventSummary & {
+  roles: EventRole[]
+  // Whether the event has screens this caller can open. Participant screens
+  // come with N43; until then a participant-only membership is listed but
+  // not linked.
+  canOpen: boolean
+}
+
+function byStartDateDesc(a: MemberEventSummary, b: MemberEventSummary): number {
+  if (a.start_date === b.start_date) return 0
+  if (a.start_date === null) return 1
+  if (b.start_date === null) return -1
+  return a.start_date < b.start_date ? 1 : -1
+}
+
+// N35: every event the caller is a member of in this tenant, with the role(s)
+// they hold in each — what the event picker lists. The official events are
+// listOfficialEvents' answer unchanged; the participant ones are the caller's
+// own linked participants rows (participant_read_own), and the events row is
+// readable to them through event_participant_read_events (migration
+// 20261106120000). Archived events are left out, as for officials.
+export const listMemberEvents = cache(async (tenantSlug: string): Promise<MemberEventSummary[]> => {
+  const tenant = await getOfficialTenant(tenantSlug)
+  if (!tenant) return []
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const officialEvents = await listOfficialEvents(tenantSlug)
+
+  const supabase = await createSupabaseServerClient()
+  const { data: entries, error } = await supabase
+    .from('participants')
+    .select('event_id')
+    .eq('tenant_id', tenant.id)
+    .eq('user_id', user.id)
+  if (error) throw error
+
+  const participantEventIds = new Set((entries ?? []).map((p) => p.event_id))
+
+  const members: MemberEventSummary[] = officialEvents.map((event) => ({
+    ...event,
+    roles: participantEventIds.has(event.id) ? ['official', 'participant'] : ['official'],
+    canOpen: true,
+  }))
+
+  const participantOnlyIds = [...participantEventIds].filter(
+    (id) => !officialEvents.some((event) => event.id === id)
+  )
+  if (participantOnlyIds.length > 0) {
+    const { data: events, error: eventsError } = await supabase
+      .from('events')
+      .select('id, name, start_date, end_date, status')
+      .eq('tenant_id', tenant.id)
+      .in('id', participantOnlyIds)
+      .neq('status', 'archived')
+    if (eventsError) throw eventsError
+    for (const event of events ?? []) {
+      members.push({ ...event, isNew: false, roles: ['participant'], canOpen: false })
+    }
+  }
+
+  return members.sort(byStartDateDesc)
+})
 
 // The event named in an official URL, or null when the caller may not open
 // it. The layout at /[tenantSlug]/events/[eventId] turns null into a 404.
