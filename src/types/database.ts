@@ -1247,6 +1247,14 @@ export type Database = {
           retry_after_ms: number
         }[]
       }
+      claim_participant: {
+        Args: {
+          p_participant_id: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       claim_sms_queue_batch: {
         Args: { p_batch_size: number }
         Returns: {
@@ -1369,6 +1377,7 @@ export type Database = {
         Returns: Json
       }
       is_event_member: { Args: { p_event_id: string }; Returns: boolean }
+      is_event_participant: { Args: { p_event_id: string }; Returns: boolean }
       is_on_workstation_shift: {
         Args: {
           p_timeslot_end: string
@@ -1457,6 +1466,10 @@ export type Database = {
       }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
+        Returns: undefined
+      }
+      sync_participant_role: {
+        Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
       }
       update_workstation: {
