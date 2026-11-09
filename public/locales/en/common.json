@@ -123,5 +123,14 @@
     "notAvailable": "Not available",
     "claimNotOpen": "Claiming is not open for this event.",
     "eventNotAvailable": "This event is not available right now. Please check back later."
+  },
+  "iceContact": {
+    "heading": "ICE contact",
+    "phoneLabel": "Phone",
+    "nameLabel": "Name",
+    "relationLabel": "Relation",
+    "groupLabel": "Emergency (ICE) contact",
+    "visibilityNote": "Only the organisers can see this.",
+    "invalidPhone": "Enter a valid phone number, e.g. 070 123 45 67 or +46 70 123 45 67."
   }
 }

@@ -4,6 +4,7 @@ import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import AccountForm from '@/app/(official)/[tenantSlug]/account/_components/account-form'
 import { countOfficialShifts } from '@/lib/scheduling/shift-count'
+import { fetchOwnIceContact } from '@/lib/ice-contact-read'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -54,6 +55,10 @@ export default async function AdminAccountPage({ params }: Props) {
     officialId: official.id,
   })
 
+  // N37: admins give an ICE contact too (decided 2026-11-09, though the admin
+  // ACCT-01 wireframe has none) — they are on the roster and in the field.
+  const iceContact = await fetchOwnIceContact(supabase, user.id, 'admin/account')
+
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">
       <AccountForm
@@ -67,6 +72,7 @@ export default async function AdminAccountPage({ params }: Props) {
         i18nNamespace="admin"
         language={language}
         layout="desktop"
+        iceContact={iceContact}
       />
     </div>
   )

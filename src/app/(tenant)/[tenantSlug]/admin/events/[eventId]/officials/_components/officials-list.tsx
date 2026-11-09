@@ -1,6 +1,6 @@
 'use client'
 
-import { Users, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { Users, ChevronRight, MoreHorizontal, Phone } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -38,7 +38,9 @@ import {
   PHONE_COUNTRIES,
   DEFAULT_PHONE_COUNTRY,
   formatPhoneForDisplay,
+  toTwilioE164,
 } from '@/lib/phone'
+import { isIceContactEmpty, type IceContact } from '@/lib/ice-contact'
 import type { OfficialListItem } from '@/types/app'
 import type { OfficialDetail } from '@/lib/scheduling/official-detail'
 import { formatStageDate, formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
@@ -64,6 +66,8 @@ interface Props {
   tier: string
   /** N23 (7c): the tenant's officials from other events, not yet in this one. */
   candidates: OfficialCandidate[]
+  /** N37: ICE contacts keyed by user id; absent means none given. */
+  iceContacts?: Record<string, IceContact>
 }
 
 type AdminRoleChange = { official: OfficialListItem; action: 'make' | 'remove' }
@@ -92,6 +96,7 @@ export default function OfficialsList({
   adminCap,
   tier,
   candidates,
+  iceContacts = {},
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
@@ -402,6 +407,8 @@ export default function OfficialsList({
               const isAdmin = official.user_id !== null && adminIds.has(official.user_id)
               const isResending = resendingId === official.id
               const isExpanded = expanded.has(official.id)
+              const ice = official.user_id ? (iceContacts[official.user_id] ?? null) : null
+              const hasIce = !isIceContactEmpty(ice)
 
               // Two rows per official: the roster row, and the detail panel
               // beneath it when open. Returned as an array rather than a
@@ -443,6 +450,20 @@ export default function OfficialsList({
                       {isCurrentUser
                         ? `${official.name} — ${t('officials.youLabel')}`
                         : official.name}
+                      {/* N37: tells the admin which rows to open in an
+                          emergency without opening every one. Visual text
+                          "ICE" is jargon to a screen reader, so it carries a
+                          spelled-out label instead. */}
+                      {hasIce && (
+                        <span
+                          role="img"
+                          aria-label={t('officials.iceBadgeLabel')}
+                          title={t('officials.iceBadgeLabel')}
+                          className="ml-1 inline-flex shrink-0 items-center rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold leading-none tracking-wider text-white"
+                        >
+                          {t('officials.iceBadge')}
+                        </span>
+                      )}
                     </button>
                   </TableCell>
                   <TableCell className="text-[15px] text-ink-soft">
@@ -515,6 +536,7 @@ export default function OfficialsList({
                         >
                           <OfficialDetailPanel
                             detail={details[official.id]}
+                            ice={ice}
                             language={language}
                             t={t}
                           />
@@ -744,10 +766,12 @@ function OfficialActionsMenu({
  */
 function OfficialDetailPanel({
   detail,
+  ice,
   language,
   t,
 }: {
   detail: OfficialDetail | undefined
+  ice: IceContact | null
   language: string
   t: ReturnType<typeof useTranslation>['t']
 }) {
@@ -755,7 +779,10 @@ function OfficialDetailPanel({
   const timeOff = detail?.timeOff ?? []
 
   return (
-    <div className="grid gap-6 px-4 pb-5 pt-1 sm:grid-cols-2">
+    <div className="grid gap-6 px-4 pb-5 pt-1 sm:grid-cols-2 lg:grid-cols-3">
+      {/* N37: first, because this is the section someone opens the row for in
+          a hurry. Read only — the contact is the official's to edit. */}
+      <IceContactSection ice={ice} t={t} />
       <section>
         <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
           {t('officials.detailShifts', { count: shifts.length })}
@@ -820,5 +847,66 @@ function OfficialDetailPanel({
         )}
       </section>
     </div>
+  )
+}
+
+/**
+ * N37: the ICE block of OFF-01's expanded row — phone, name and relation as
+ * key/value rows (OFF-01 row-expanded-ice), or "No ICE contact given".
+ *
+ * The phone is a tel: link so an admin on a phone taps it to call (L22, L27).
+ * Built from the stored E.164 with its '+' restored, which is what a dialler
+ * needs whatever country the number is in.
+ */
+function IceContactSection({
+  ice,
+  t,
+}: {
+  ice: IceContact | null
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  const { t: tCommon } = useTranslation('common')
+
+  return (
+    <section>
+      <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+        {t('officials.detailIce')}
+      </h3>
+      {isIceContactEmpty(ice) || !ice ? (
+        <p className="text-[14px] text-ink-soft">{t('officials.detailNoIce')}</p>
+      ) : (
+        <dl className="space-y-1.5 text-[14px]">
+          {ice.phone && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.phoneLabel')}</dt>
+              <dd>
+                <a
+                  href={`tel:${toTwilioE164(ice.phone)}`}
+                  aria-label={t('officials.detailIceCall', {
+                    name: ice.name ?? formatPhoneForDisplay(ice.phone),
+                  })}
+                  className="inline-flex items-center gap-1.5 font-medium text-tenant-primary underline-offset-2 hover:underline"
+                >
+                  <Phone className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+                  <span className="tabular-nums">{formatPhoneForDisplay(ice.phone)}</span>
+                </a>
+              </dd>
+            </div>
+          )}
+          {ice.name && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.nameLabel')}</dt>
+              <dd className="text-ink">{ice.name}</dd>
+            </div>
+          )}
+          {ice.relation && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.relationLabel')}</dt>
+              <dd className="text-ink">{ice.relation}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+    </section>
   )
 }

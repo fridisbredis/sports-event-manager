@@ -1115,3 +1115,78 @@ describe('OfficialsList — N27 admin role', () => {
     })
   })
 })
+
+describe('OfficialsList — N37 ICE contact', () => {
+  // Jane gets a user so an ICE contact can attach to her; Me Admin has none.
+  const withUsers = officials.map((o) => (o.id === 'off-1' ? { ...o, user_id: 'user-jane' } : o))
+
+  function renderList(
+    iceContacts: Record<
+      string,
+      { phone: string | null; name: string | null; relation: string | null }
+    >
+  ) {
+    return render(
+      <OfficialsList
+        tenantSlug="acme"
+        tenantId="tenant-1"
+        eventId="event-1"
+        officials={withUsers}
+        currentUserId={currentUserId}
+        details={{}}
+        language="en"
+        adminUserIds={[]}
+        adminCap={10}
+        tier="professional"
+        candidates={[]}
+        iceContacts={iceContacts}
+      />
+    )
+  }
+
+  const ICE = { phone: '46701234567', name: 'Göran Berg', relation: 'Spouse/partner' }
+
+  it('badges the rows that have an ICE contact, and only those', () => {
+    renderList({ 'user-jane': ICE })
+
+    const badges = screen.getAllByRole('img', { name: 'officials.iceBadgeLabel' })
+    expect(badges).toHaveLength(1)
+    expect(within(screen.getByRole('button', { name: /Jane Referee/ })).getByRole('img')).toBe(
+      badges[0]
+    )
+  })
+
+  it('shows the contact with a tap-to-call link when the row is expanded', () => {
+    renderList({ 'user-jane': ICE })
+
+    fireEvent.click(screen.getByRole('button', { name: /Jane Referee/ }))
+
+    expect(screen.getByText('officials.detailIce')).toBeInTheDocument()
+    const call = screen.getByRole('link', {
+      name: fakeT('officials.detailIceCall', { name: 'Göran Berg' }),
+    })
+    // The '+' restored: a dialler needs the international form.
+    expect(call).toHaveAttribute('href', 'tel:+46701234567')
+    expect(screen.getByText('Göran Berg')).toBeInTheDocument()
+    expect(screen.getByText('Spouse/partner')).toBeInTheDocument()
+  })
+
+  it('says so when no ICE contact was given', () => {
+    renderList({})
+
+    fireEvent.click(screen.getByRole('button', { name: /Jane Referee/ }))
+
+    expect(screen.getByText('officials.detailNoIce')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'officials.iceBadgeLabel' })).not.toBeInTheDocument()
+  })
+
+  it('shows only the fields that were given', () => {
+    renderList({ 'user-jane': { phone: null, name: 'Göran Berg', relation: null } })
+
+    fireEvent.click(screen.getByRole('button', { name: /Jane Referee/ }))
+
+    expect(screen.getByText('Göran Berg')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /detailIceCall/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('officials.detailNoIce')).not.toBeInTheDocument()
+  })
+})

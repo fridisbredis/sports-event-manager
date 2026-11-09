@@ -123,5 +123,14 @@
     "notAvailable": "Inte tillgänglig",
     "claimNotOpen": "Det går inte att registrera sig som deltagare i det här evenemanget just nu.",
     "eventNotAvailable": "Det här evenemanget är inte tillgängligt just nu. Titta in igen senare."
+  },
+  "iceContact": {
+    "heading": "ICE-kontakt",
+    "phoneLabel": "Telefon",
+    "nameLabel": "Namn",
+    "relationLabel": "Relation",
+    "groupLabel": "Kontakt vid nödfall (ICE)",
+    "visibilityNote": "Bara arrangörerna kan se detta.",
+    "invalidPhone": "Ange ett giltigt telefonnummer, t.ex. 070 123 45 67 eller +46 70 123 45 67."
   }
 }

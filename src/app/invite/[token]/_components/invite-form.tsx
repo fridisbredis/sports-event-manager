@@ -8,6 +8,13 @@ import { defaultLocale, locales, type Locale } from '@/lib/i18n/config'
 import { toastError } from '@/lib/toast'
 import { logger } from '@/lib/logger'
 import { authErrorKey, isExpectedAuthError } from '@/lib/auth/auth-error-keys'
+import { IceContactFields } from '@/components/ice-contact-fields'
+import {
+  EMPTY_ICE_CONTACT_INPUT,
+  isIceContactEmpty,
+  normalizeIceContact,
+  type IceContactInput,
+} from '@/lib/ice-contact'
 
 const RESEND_COOLDOWN_SECONDS = 30
 
@@ -60,6 +67,24 @@ export default function InviteForm({
   // user_preferences row keeps meaning "never chose" rather than "was shown
   // English once" — same rule as the sign-in page.
   const [languageChosen, setLanguageChosen] = useState(false)
+  // N37: optional ICE contact. Like the language, it cannot be stored while
+  // the invitee is signed out, so it rides along on the confirm call.
+  const [ice, setIce] = useState<IceContactInput>(EMPTY_ICE_CONTACT_INPUT)
+  const [icePhoneError, setIcePhoneError] = useState<string | null>(null)
+
+  function handleIceChange(next: IceContactInput) {
+    if (next.phone !== ice.phone) setIcePhoneError(null)
+    setIce(next)
+  }
+
+  // Checked on blur and again before the OTP is sent. Catching a bad number
+  // here, while the form is still on screen, is the whole point: once the
+  // code is verified the invitee is past the step where it can be fixed.
+  function validateIce(): boolean {
+    if (normalizeIceContact(ice).ok) return true
+    setIcePhoneError(t('iceContact.invalidPhone', { ns: 'common' }))
+    return false
+  }
 
   function handleLanguageChange(next: Locale) {
     if (next === language) return
@@ -81,6 +106,7 @@ export default function InviteForm({
 
   async function handleConfirmAvailability() {
     if (!available || !privacyAccepted || !initialPhone) return
+    if (!validateIce()) return
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({ phone: initialPhone })
     setLoading(false)
@@ -121,6 +147,13 @@ export default function InviteForm({
     setResendCooldown(RESEND_COOLDOWN_SECONDS)
   }
 
+  // Only a contact with something in it is sent; three empty strings would
+  // tell the server nothing it does not already assume.
+  function iceToSend(): boolean {
+    const normalized = normalizeIceContact(ice)
+    return normalized.ok && !isIceContactEmpty(normalized.contact)
+  }
+
   async function handleVerifyOtp() {
     if (!initialPhone) return
     setLoading(true)
@@ -151,6 +184,7 @@ export default function InviteForm({
         name: name.trim(),
         privacyAccepted,
         ...(languageChosen ? { language } : {}),
+        ...(iceToSend() ? { ice } : {}),
       }),
     })
     setLoading(false)
@@ -387,6 +421,23 @@ export default function InviteForm({
             <p className="mt-2 text-xs text-gray-400 leading-relaxed">
               {t('confirmation.languageHint')}
             </p>
+          </div>
+
+          {/* N37: after the person's own details and before the availability
+              commitment, so the form still reads as "who you are" first and
+              "what you agree to" last. Optional — nothing here gates the
+              Confirm button. */}
+          <div>
+            <p className="block text-xs font-semibold text-gray-700 mb-2">
+              {t('iceContact.heading', { ns: 'common' })}
+            </p>
+            <IceContactFields
+              value={ice}
+              onChange={handleIceChange}
+              onBlur={validateIce}
+              phoneError={icePhoneError}
+              idPrefix="invite-ice"
+            />
           </div>
 
           <div>

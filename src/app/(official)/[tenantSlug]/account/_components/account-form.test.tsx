@@ -33,21 +33,27 @@ vi.mock('@/components/ui/form-fields', () => ({
     onValueChange,
     onBlur,
     isReadOnly,
+    'aria-label': ariaLabel,
+    errorMessage,
   }: {
     label?: string
     value?: string
     onValueChange?: (v: string) => void
     onBlur?: () => void
     isReadOnly?: boolean
+    'aria-label'?: string
+    errorMessage?: string
   }) => (
     <label>
       {label}
       <input
+        aria-label={ariaLabel}
         value={value ?? ''}
         readOnly={isReadOnly}
         onChange={(e) => onValueChange?.(e.target.value)}
         onBlur={onBlur}
       />
+      {errorMessage && <span>{errorMessage}</span>}
     </label>
   ),
 }))
@@ -335,5 +341,93 @@ describe('AccountForm push row (N31)', () => {
     render(<AccountForm {...baseProps} vapidPublicKey="BAAA" />)
     // jsdom has no Push API, so the row resolves to the unsupported hint.
     expect(await screen.findByText('account.pushHintUnsupported')).toBeTruthy()
+  })
+})
+
+describe('AccountForm ICE contact (N37)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    vi.stubGlobal('fetch', fetchMock)
+    toastError.mockClear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function iceCalls() {
+    return fetchMock.mock.calls.filter(([url]) => url === '/api/account/ice')
+  }
+
+  it('prefills a stored contact, phone formatted for display', () => {
+    render(
+      <AccountForm
+        {...baseProps}
+        iceContact={{ phone: '46701234567', name: 'Göran', relation: 'Partner' }}
+      />
+    )
+
+    expect((screen.getByLabelText('iceContact.phoneLabel') as HTMLInputElement).value).toBe(
+      '+46 70 123 45 67'
+    )
+    expect((screen.getByLabelText('iceContact.nameLabel') as HTMLInputElement).value).toBe('Göran')
+    expect(screen.getByText('iceContact.visibilityNote')).toBeInTheDocument()
+  })
+
+  it('saves the raw input to /api/account/ice when a field loses focus', async () => {
+    render(<AccountForm {...baseProps} />)
+
+    const name = screen.getByLabelText('iceContact.nameLabel')
+    fireEvent.change(name, { target: { value: 'Göran' } })
+    fireEvent.blur(name)
+
+    await waitFor(() => expect(iceCalls()).toHaveLength(1))
+    const [, init] = iceCalls()[0]
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(init.body)).toEqual({ phone: '', name: 'Göran', relation: '' })
+  })
+
+  it('writes nothing when focus leaves without a change', async () => {
+    render(
+      <AccountForm
+        {...baseProps}
+        iceContact={{ phone: '46701234567', name: 'Göran', relation: null }}
+      />
+    )
+
+    fireEvent.blur(screen.getByLabelText('iceContact.phoneLabel'))
+    fireEvent.blur(screen.getByLabelText('iceContact.nameLabel'))
+
+    await act(async () => {})
+    expect(iceCalls()).toHaveLength(0)
+  })
+
+  it('shows an error and does not save an invalid phone', async () => {
+    render(<AccountForm {...baseProps} />)
+
+    const phone = screen.getByLabelText('iceContact.phoneLabel')
+    fireEvent.change(phone, { target: { value: '12' } })
+    fireEvent.blur(phone)
+
+    expect(screen.getByText('iceContact.invalidPhone')).toBeInTheDocument()
+    await act(async () => {})
+    expect(iceCalls()).toHaveLength(0)
+
+    // Editing the phone clears the error until the next check.
+    fireEvent.change(phone, { target: { value: '070 123 45 67' } })
+    expect(screen.queryByText('iceContact.invalidPhone')).not.toBeInTheDocument()
+  })
+
+  it('toasts when the save fails', async () => {
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({}) })
+    render(<AccountForm {...baseProps} />)
+
+    const relation = screen.getByLabelText('iceContact.relationLabel')
+    fireEvent.change(relation, { target: { value: 'Parent' } })
+    fireEvent.blur(relation)
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('account.saveError'))
   })
 })

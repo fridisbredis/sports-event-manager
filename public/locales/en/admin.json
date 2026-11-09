@@ -281,7 +281,12 @@
       "selectMatches": "Select matches",
       "deselectAll": "Deselect all",
       "selectedOf": "{{n}} of {{total}} selected"
-    }
+    },
+    "detailIce": "ICE contact",
+    "detailNoIce": "No ICE contact given",
+    "detailIceCall": "Call {{name}}",
+    "iceBadge": "ICE",
+    "iceBadgeLabel": "Has an ICE contact"
   },
   "participants": {
     "title": "Participants",

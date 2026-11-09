@@ -7,6 +7,7 @@ import { fetchOfficialDetail, type OfficialDetail } from '@/lib/scheduling/offic
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { listTenantAdmins } from '@/lib/auth/tenant-admins'
 import { maxTenantAdmins } from '@/lib/tiers/features'
+import { fetchIceContactsByUserId } from '@/lib/ice-contact-read'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -110,6 +111,16 @@ export default async function OfficialsPage({ params }: Props) {
     )
   )
 
+  // N37: ICE contacts for the roster, in one read. Keyed by user id because
+  // the contact belongs to the person, not to the roster row; invited
+  // officials have no user yet and so no contact. The admin read policy is
+  // what lets this page see them — an official on the same query gets none.
+  const iceContacts = await fetchIceContactsByUserId(
+    supabase,
+    visible.flatMap((o) => (o.user_id ? [o.user_id] : [])),
+    { op: 'admin/officials', tenantId: tenant.id }
+  )
+
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">
       <OfficialsList
@@ -124,6 +135,7 @@ export default async function OfficialsPage({ params }: Props) {
         adminCap={adminCap}
         tier={tenant.tier}
         candidates={candidates}
+        iceContacts={iceContacts}
       />
     </div>
   )
