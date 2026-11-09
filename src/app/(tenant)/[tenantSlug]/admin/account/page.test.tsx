@@ -12,6 +12,12 @@ vi.mock('@/lib/supabase/server', () => ({
 // so a null return means either "no such tenant" or "not authorized". Both are
 // notFound() to the caller, which is deliberate: an unauthorized caller must not
 // be able to probe for tenant existence.
+// N37: the ICE read has its own module and tests; here it only has to resolve.
+vi.mock('@/lib/ice-contact-read', () => ({
+  fetchOwnIceContact: vi.fn().mockResolvedValue(null),
+  fetchIceContactsByUserId: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getAdminTenant: vi.fn(),
@@ -154,6 +160,7 @@ describe('AdminAccountPage', () => {
       i18nNamespace: 'admin',
       language: 'en',
       layout: 'desktop',
+      iceContact: null,
     })
   })
 

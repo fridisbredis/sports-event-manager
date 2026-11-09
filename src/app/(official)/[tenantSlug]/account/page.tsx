@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
 import { countOfficialShifts } from '@/lib/scheduling/shift-count'
+import { fetchOwnIceContact } from '@/lib/ice-contact-read'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -52,6 +53,9 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   const hasSeveralEvents = (await listMemberEvents(tenantSlug)).length > 1
 
+  // N37: the user's own row, read through RLS like everything else here.
+  const iceContact = await fetchOwnIceContact(supabase, user.id, 'official/account')
+
   return (
     <div>
       {/* page-title like every other heading in the app. This was the one
@@ -81,6 +85,7 @@ export default async function OfficialAccountPage({ params }: Props) {
         // Dockerfile ARG plus a build-arg in every deploy workflow; a runtime
         // env var on the Container App needs neither.
         vapidPublicKey={process.env.VAPID_PUBLIC_KEY ?? null}
+        iceContact={iceContact}
       />
     </div>
   )

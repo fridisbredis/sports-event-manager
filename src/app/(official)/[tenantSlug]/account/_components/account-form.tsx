@@ -19,6 +19,8 @@ import { useTranslation } from '@/lib/i18n/client'
 import { useAutosave } from '@/lib/hooks/use-autosave'
 import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
+import { IceContactFields } from '@/components/ice-contact-fields'
+import { normalizeIceContact, type IceContact, type IceContactInput } from '@/lib/ice-contact'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n/config'
 import { AvatarPicker } from './avatar-picker'
@@ -42,6 +44,16 @@ interface AccountFormProps {
    * announcements go to officials; absent, the push row is not rendered.
    */
   vapidPublicKey?: string | null
+  /** N37: the user's own ICE contact, or null when none is stored. */
+  iceContact?: IceContact | null
+}
+
+function iceContactToInput(contact: IceContact | null): IceContactInput {
+  return {
+    phone: contact?.phone ? formatPhoneForDisplay(contact.phone) : '',
+    name: contact?.name ?? '',
+    relation: contact?.relation ?? '',
+  }
 }
 
 export default function AccountForm({
@@ -57,6 +69,7 @@ export default function AccountForm({
   layout = 'mobile',
   changeEventHref = null,
   vapidPublicKey = null,
+  iceContact = null,
 }: AccountFormProps) {
   const { t } = useTranslation(i18nNamespace)
   // The section heading is shared with every other language control in the
@@ -95,6 +108,57 @@ export default function AccountForm({
     if (!res.ok) throw new Error('Save failed')
 
     savedName.current = nameRef.current
+  }
+
+  // N37: the ICE contact is a separate, user-scoped write (/api/account/ice),
+  // not part of the tenant-scoped PATCH above — the same person has one ICE
+  // contact across every tenant. It saves when focus leaves one of its three
+  // fields rather than per keystroke: a half-typed phone number is not valid,
+  // and validating it while the user is still typing would flash an error at
+  // them for a number they have not finished.
+  const [ice, setIce] = useState<IceContactInput>(() => iceContactToInput(iceContact))
+  const [icePhoneError, setIcePhoneError] = useState<string | null>(null)
+  const iceRef = useRef(ice)
+  // What the server last accepted, normalized — so leaving a field without
+  // having changed anything (or having changed it back) writes nothing.
+  // Derived through the same normalization as a save, so key order and phone
+  // shape match what handleIceBlur compares against.
+  const savedIce = useRef(iceKey(iceContactToInput(iceContact)))
+
+  const iceSave = useAutosave<string>({
+    onSave: async (key) => {
+      const res = await fetch('/api/account/ice', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        // The raw text, not the normalized phone: the route normalizes again
+        // and a bare "4670…" without its '+' would read as a national number.
+        body: JSON.stringify(iceRef.current),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        if (body?.code === 'invalid_phone') setIcePhoneError(tCommon('iceContact.invalidPhone'))
+        throw new Error('Save failed')
+      }
+      savedIce.current = key
+    },
+    delay: 0,
+    onError: () => toastError(t('account.saveError')),
+  })
+
+  function handleIceChange(next: IceContactInput) {
+    if (next.phone !== iceRef.current.phone) setIcePhoneError(null)
+    setIce(next)
+    iceRef.current = next
+  }
+
+  function handleIceBlur() {
+    const key = iceKey(iceRef.current)
+    if (key === null) {
+      setIcePhoneError(tCommon('iceContact.invalidPhone'))
+      return
+    }
+    if (key === savedIce.current) return
+    iceSave.queue(key)
   }
 
   // Typing is debounced; the switch writes on the spot. A half-typed name is a
@@ -152,14 +216,14 @@ export default function AccountForm({
   // "Saved" markers on a screen this short read as two different things having
   // happened. 'saving' wins over 'saved' so a new edit replaces the previous
   // confirmation instead of flickering between them.
-  const status =
-    nameSave.status === 'saving' || toggleSave.status === 'saving'
-      ? 'saving'
-      : nameSave.status === 'error' || toggleSave.status === 'error'
-        ? 'error'
-        : nameSave.status === 'saved' || toggleSave.status === 'saved'
-          ? 'saved'
-          : 'idle'
+  const statuses = [nameSave.status, toggleSave.status, iceSave.status]
+  const status = statuses.includes('saving')
+    ? 'saving'
+    : statuses.includes('error')
+      ? 'error'
+      : statuses.includes('saved')
+        ? 'saved'
+        : 'idle'
 
   const isDesktop = layout === 'desktop'
 
@@ -256,6 +320,23 @@ export default function AccountForm({
               inputWrapper: '!bg-surface !border-edge',
               input: 'cursor-default !text-ink-muted',
             }}
+          />
+        </div>
+
+        {/* N37: ICE contact, right under the person's own phone number as in
+            the ACCT-01 wireframes — it is part of who you are, not a setting.
+            All three fields optional (R5a/R5b). Shown to admins too: they are
+            on the roster and in the field like everyone else. */}
+        <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+          {tCommon('iceContact.heading')}
+        </p>
+        <div className={isDesktop ? 'mb-10' : 'mb-8'}>
+          <IceContactFields
+            value={ice}
+            onChange={handleIceChange}
+            onBlur={handleIceBlur}
+            phoneError={icePhoneError}
+            idPrefix="account-ice"
           />
         </div>
 
@@ -479,4 +560,9 @@ function SaveStatus({
             : ''}
     </p>
   )
+}
+
+function iceKey(input: IceContactInput): string | null {
+  const normalized = normalizeIceContact(input)
+  return normalized.ok ? JSON.stringify(normalized.contact) : null
 }

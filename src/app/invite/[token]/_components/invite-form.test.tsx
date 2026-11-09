@@ -293,3 +293,69 @@ describe('InviteForm orientation', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('InviteForm ICE contact (N37)', () => {
+  beforeEach(() => {
+    signInWithOtp.mockReset()
+    verifyOtp.mockReset()
+    fetchMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function renderForm() {
+    render(<InviteForm token="tok-abc" phone={PHONE} name="Anna" tenantName={TENANT} />)
+  }
+
+  function fillIce(values: { phone?: string; name?: string; relation?: string }) {
+    for (const [field, value] of Object.entries(values)) {
+      fireEvent.change(screen.getByLabelText(`iceContact.${field}Label`), { target: { value } })
+    }
+  }
+
+  async function submitThroughOtp() {
+    signInWithOtp.mockResolvedValue({ error: null })
+    verifyOtp.mockResolvedValue({ data: { session: { access_token: 'tok' } }, error: null })
+    fetchMock.mockResolvedValue({ ok: true })
+
+    fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByText('confirmation.confirmButton'))
+
+    await screen.findByLabelText('signIn.codeLabel')
+    fireEvent.change(screen.getByLabelText('signIn.codeLabel'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('signIn.verifyButton'))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    return JSON.parse(fetchMock.mock.calls[0][1].body)
+  }
+
+  it('is optional: the confirm call carries no ice when left empty', async () => {
+    renderForm()
+    const body = await submitThroughOtp()
+    expect(body).not.toHaveProperty('ice')
+  })
+
+  it('sends the entered contact on the confirm call', async () => {
+    renderForm()
+    fillIce({ phone: '070 123 45 67', name: 'Göran', relation: 'Partner' })
+
+    const body = await submitThroughOtp()
+
+    expect(body.ice).toEqual({ phone: '070 123 45 67', name: 'Göran', relation: 'Partner' })
+  })
+
+  it('blocks the OTP request on an invalid ICE phone and says why', async () => {
+    renderForm()
+    fillIce({ phone: '12' })
+
+    fireEvent.click(screen.getByText('confirmation.availabilityCheck'))
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByText('confirmation.confirmButton'))
+
+    expect(await screen.findByText(/iceContact\.invalidPhone/)).toBeInTheDocument()
+    expect(signInWithOtp).not.toHaveBeenCalled()
+  })
+})

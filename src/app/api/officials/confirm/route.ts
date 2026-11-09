@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { logQueryError } from '@/lib/db/query-error'
 import { locales } from '@/lib/i18n/config'
 import { sendAvailabilityConfirmSms } from '@/lib/sms/availability-confirm'
+import { iceContactInputSchema, isIceContactEmpty, normalizeIceContact } from '@/lib/ice-contact'
 
 const confirmSchema = z.object({
   token: z.string().uuid(),
@@ -16,6 +17,9 @@ const confirmSchema = z.object({
   // client that does not send it still confirms, and that user simply has no
   // stored preference yet.
   language: z.enum(locales).optional(),
+  // N37: the optional ICE contact entered on the invite form. Absent from an
+  // older client, and from anyone who left all three fields empty.
+  ice: iceContactInputSchema.optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -26,6 +30,18 @@ export async function POST(request: NextRequest) {
   }
 
   const { token, name, privacyAccepted, language } = parsed.data
+
+  // Validated before anything is confirmed, so a bad ICE phone is something
+  // the invitee can still correct on the form rather than a contact that is
+  // silently dropped after their invite has gone through. The form checks the
+  // same thing first; this is the server's own copy of that rule.
+  const ice = parsed.data.ice ? normalizeIceContact(parsed.data.ice) : null
+  if (ice && !ice.ok) {
+    return NextResponse.json(
+      { error: 'Invalid ICE phone number', code: 'invalid_ice_phone' },
+      { status: 400 }
+    )
+  }
 
   // User must be authenticated (OTP verified) before we confirm the invite.
   // Accept Bearer token from the Authorization header (set by the invite form
@@ -184,6 +200,34 @@ export async function POST(request: NextRequest) {
         kind: 'update',
         tenantId,
         extra: { usage: 'invite_language_carryover' },
+      })
+    }
+  }
+
+  // N37: store the ICE contact, under the same rules as the language above —
+  // after the confirm, when the auth user is certain to exist, and never
+  // failing a confirmation that has already committed. A failure leaves the
+  // official without an ICE contact, which they can add on ACCT-01.
+  //
+  // service_role, not the RLS client: this request is often authenticated by
+  // the Bearer token alone, before the session cookie exists, so the cookie
+  // client would have no auth.uid() for the own-row policy to match. user.id
+  // comes from that verified token, so the row is still the caller's own.
+  if (ice?.ok && !isIceContactEmpty(ice.contact)) {
+    const { error: iceError } = await service
+      .from('user_ice_contacts')
+      .upsert(
+        { user_id: user.id, ...ice.contact, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+
+    if (iceError) {
+      logQueryError(iceError, {
+        op: 'POST /api/officials/confirm',
+        table: 'user_ice_contacts',
+        kind: 'update',
+        tenantId,
+        extra: { usage: 'invite_ice_contact' },
       })
     }
   }

@@ -13,6 +13,12 @@ vi.mock('@/lib/supabase/server', () => ({
 // "not authorized" — both are notFound() to the caller, by design.
 // N23: whether "Change event" shows is listMemberEvents' answer, tested
 // with the picker; one event here, so the card stays hidden.
+// N37: the ICE read has its own module and tests; here it only has to resolve.
+vi.mock('@/lib/ice-contact-read', () => ({
+  fetchOwnIceContact: vi.fn().mockResolvedValue(null),
+  fetchIceContactsByUserId: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('@/lib/events/official-event', () => ({
   listMemberEvents: vi.fn(async () => [{ id: 'event-1' }]),
 }))
@@ -181,6 +187,7 @@ describe('OfficialAccountPage', () => {
       language: 'en',
       avatarUrl: undefined,
       vapidPublicKey: null,
+      iceContact: null,
     })
   })
 

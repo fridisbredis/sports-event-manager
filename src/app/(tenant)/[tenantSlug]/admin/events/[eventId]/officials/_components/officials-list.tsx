@@ -1,6 +1,6 @@
 'use client'
 
-import { Users, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { Users, ChevronRight, MoreHorizontal, Phone, UserPlus, CalendarPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -38,7 +38,9 @@ import {
   PHONE_COUNTRIES,
   DEFAULT_PHONE_COUNTRY,
   formatPhoneForDisplay,
+  toTwilioE164,
 } from '@/lib/phone'
+import { isIceContactEmpty, type IceContact } from '@/lib/ice-contact'
 import type { OfficialListItem } from '@/types/app'
 import type { OfficialDetail } from '@/lib/scheduling/official-detail'
 import { formatStageDate, formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
@@ -64,9 +66,20 @@ interface Props {
   tier: string
   /** N23 (7c): the tenant's officials from other events, not yet in this one. */
   candidates: OfficialCandidate[]
+  /** N37: ICE contacts keyed by user id; absent means none given. */
+  iceContacts?: Record<string, IceContact>
 }
 
 type AdminRoleChange = { official: OfficialListItem; action: 'make' | 'remove' }
+
+/** Columns that drop out below sm, so the name has the row to itself. */
+const HIDE_ON_MOBILE = 'hidden sm:table-cell'
+
+/**
+ * A text button that is a square icon button below sm. Overrides HeroUI's
+ * min-w-20/px-4 there; its tailwind-merge keeps the sm: variants intact.
+ */
+const ICON_ON_MOBILE = 'min-w-10 w-10 px-0 sm:w-auto sm:min-w-20 sm:px-4'
 
 /**
  * Up to two initials for the avatar. Falls back to the first two characters
@@ -92,6 +105,7 @@ export default function OfficialsList({
   adminCap,
   tier,
   candidates,
+  iceContacts = {},
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
@@ -321,17 +335,28 @@ export default function OfficialsList({
       <div className="flex items-center justify-between mb-6">
         <h1 className="page-title">{t('officials.title')}</h1>
         <div className="flex flex-wrap items-center justify-end gap-3">
+          {/* Icon-only below sm: on a phone the title and two text buttons
+              did not fit on one line, and the primary button pushed off the
+              edge of the screen. The label stays as the accessible name. */}
           {candidates.length > 0 && (
             <Button
               variant="bordered"
-              className="rounded-control border-edge-field bg-white"
+              className={`rounded-control border-edge-field bg-white ${ICON_ON_MOBILE}`}
+              aria-label={t('officials.fromEvents.open')}
               onPress={() => setFromEventsOpen(true)}
             >
-              {t('officials.fromEvents.open')}
+              <CalendarPlus className="size-4 sm:hidden" strokeWidth={2} aria-hidden="true" />
+              <span className="hidden sm:inline">{t('officials.fromEvents.open')}</span>
             </Button>
           )}
-          <Button color="primary" onPress={() => setAddModalOpen(true)}>
-            {t('officials.add')}
+          <Button
+            color="primary"
+            className={ICON_ON_MOBILE}
+            aria-label={t('officials.add')}
+            onPress={() => setAddModalOpen(true)}
+          >
+            <UserPlus className="size-4 sm:hidden" strokeWidth={2} aria-hidden="true" />
+            <span className="hidden sm:inline">{t('officials.add')}</span>
           </Button>
         </div>
       </div>
@@ -387,8 +412,10 @@ export default function OfficialsList({
         >
           <TableHeader>
             <TableColumn>{t('officials.name')}</TableColumn>
-            <TableColumn>{t('officials.phone')}</TableColumn>
-            <TableColumn>{t('officials.status')}</TableColumn>
+            {/* Phone and status give way below sm: the name is what an admin
+                scans for on a phone, and the row expands for the rest. */}
+            <TableColumn className={HIDE_ON_MOBILE}>{t('officials.phone')}</TableColumn>
+            <TableColumn className={HIDE_ON_MOBILE}>{t('officials.status')}</TableColumn>
             {/* One ⋯ button per row (N27): four text links in a row read as
                 the same action. Narrow, right-aligned, and labelled for
                 screen readers since the header is the only visible text. */}
@@ -402,6 +429,8 @@ export default function OfficialsList({
               const isAdmin = official.user_id !== null && adminIds.has(official.user_id)
               const isResending = resendingId === official.id
               const isExpanded = expanded.has(official.id)
+              const ice = official.user_id ? (iceContacts[official.user_id] ?? null) : null
+              const hasIce = !isIceContactEmpty(ice)
 
               // Two rows per official: the roster row, and the detail panel
               // beneath it when open. Returned as an array rather than a
@@ -443,12 +472,26 @@ export default function OfficialsList({
                       {isCurrentUser
                         ? `${official.name} — ${t('officials.youLabel')}`
                         : official.name}
+                      {/* N37: tells the admin which rows to open in an
+                          emergency without opening every one. Visual text
+                          "ICE" is jargon to a screen reader, so it carries a
+                          spelled-out label instead. */}
+                      {hasIce && (
+                        <span
+                          role="img"
+                          aria-label={t('officials.iceBadgeLabel')}
+                          title={t('officials.iceBadgeLabel')}
+                          className="ml-1 inline-flex shrink-0 items-center rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold leading-none tracking-wider text-white"
+                        >
+                          {t('officials.iceBadge')}
+                        </span>
+                      )}
                     </button>
                   </TableCell>
-                  <TableCell className="text-[15px] text-ink-soft">
+                  <TableCell className={`text-[15px] text-ink-soft ${HIDE_ON_MOBILE}`}>
                     {formatPhoneForDisplay(official.phone)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={HIDE_ON_MOBILE}>
                     <Chip
                       size="sm"
                       variant="flat"
@@ -515,6 +558,7 @@ export default function OfficialsList({
                         >
                           <OfficialDetailPanel
                             detail={details[official.id]}
+                            ice={ice}
                             language={language}
                             t={t}
                           />
@@ -744,10 +788,12 @@ function OfficialActionsMenu({
  */
 function OfficialDetailPanel({
   detail,
+  ice,
   language,
   t,
 }: {
   detail: OfficialDetail | undefined
+  ice: IceContact | null
   language: string
   t: ReturnType<typeof useTranslation>['t']
 }) {
@@ -755,7 +801,10 @@ function OfficialDetailPanel({
   const timeOff = detail?.timeOff ?? []
 
   return (
-    <div className="grid gap-6 px-4 pb-5 pt-1 sm:grid-cols-2">
+    <div className="grid gap-6 px-4 pb-5 pt-1 sm:grid-cols-2 lg:grid-cols-3">
+      {/* N37: first, because this is the section someone opens the row for in
+          a hurry. Read only — the contact is the official's to edit. */}
+      <IceContactSection ice={ice} t={t} />
       <section>
         <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
           {t('officials.detailShifts', { count: shifts.length })}
@@ -820,5 +869,66 @@ function OfficialDetailPanel({
         )}
       </section>
     </div>
+  )
+}
+
+/**
+ * N37: the ICE block of OFF-01's expanded row — phone, name and relation as
+ * key/value rows (OFF-01 row-expanded-ice), or "No ICE contact given".
+ *
+ * The phone is a tel: link so an admin on a phone taps it to call (L22, L27).
+ * Built from the stored E.164 with its '+' restored, which is what a dialler
+ * needs whatever country the number is in.
+ */
+function IceContactSection({
+  ice,
+  t,
+}: {
+  ice: IceContact | null
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  const { t: tCommon } = useTranslation('common')
+
+  return (
+    <section>
+      <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+        {t('officials.detailIce')}
+      </h3>
+      {isIceContactEmpty(ice) || !ice ? (
+        <p className="text-[14px] text-ink-soft">{t('officials.detailNoIce')}</p>
+      ) : (
+        <dl className="space-y-1.5 text-[14px]">
+          {ice.phone && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.phoneLabel')}</dt>
+              <dd>
+                <a
+                  href={`tel:${toTwilioE164(ice.phone)}`}
+                  aria-label={t('officials.detailIceCall', {
+                    name: ice.name ?? formatPhoneForDisplay(ice.phone),
+                  })}
+                  className="inline-flex items-center gap-1.5 font-medium text-tenant-primary underline-offset-2 hover:underline"
+                >
+                  <Phone className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+                  <span className="tabular-nums">{formatPhoneForDisplay(ice.phone)}</span>
+                </a>
+              </dd>
+            </div>
+          )}
+          {ice.name && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.nameLabel')}</dt>
+              <dd className="text-ink">{ice.name}</dd>
+            </div>
+          )}
+          {ice.relation && (
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.relationLabel')}</dt>
+              <dd className="text-ink">{ice.relation}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+    </section>
   )
 }

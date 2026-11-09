@@ -392,4 +392,75 @@ describe('POST /api/officials/confirm', () => {
 
     expect(res.status).toBe(200)
   })
+
+  describe('N37 ICE contact', () => {
+    function mockServiceWithIce(upsertResult: { error: unknown } = { error: null }) {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { tenant_id: TENANT_ID, role_granted: true },
+        error: null,
+      })
+      const upsert = vi.fn().mockResolvedValue(upsertResult)
+      const from = vi.fn((table: string) =>
+        table === 'user_ice_contacts' ? { upsert } : chain({ data: null, error: null })
+      )
+      vi.mocked(createSupabaseServiceClient).mockResolvedValue({ rpc, from } as never)
+      return { rpc, from, upsert }
+    }
+
+    it('stores the normalized ICE contact for the confirming user', async () => {
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      const { upsert } = mockServiceWithIce()
+
+      const res = await POST(
+        makeRequest({
+          ...validBody,
+          ice: { phone: '070-123 45 67', name: 'Göran', relation: 'Partner' },
+        })
+      )
+
+      expect(res.status).toBe(200)
+      expect(upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: USER_ID,
+          phone: '46701234567',
+          name: 'Göran',
+          relation: 'Partner',
+        }),
+        { onConflict: 'user_id' }
+      )
+    })
+
+    it('writes nothing when every ICE field is empty', async () => {
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      const { from } = mockServiceWithIce()
+
+      await POST(makeRequest({ ...validBody, ice: { phone: '', name: ' ', relation: '' } }))
+
+      expect(from).not.toHaveBeenCalledWith('user_ice_contacts')
+    })
+
+    it('rejects an invalid ICE phone before confirming anything', async () => {
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      const { rpc } = mockServiceWithIce()
+
+      const res = await POST(
+        makeRequest({ ...validBody, ice: { phone: '12', name: '', relation: '' } })
+      )
+
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ code: 'invalid_ice_phone' })
+      expect(rpc).not.toHaveBeenCalled()
+    })
+
+    it('still confirms when storing the ICE contact fails', async () => {
+      mockAuthedUser({ id: USER_ID, phone: PHONE })
+      mockServiceWithIce({ error: { message: 'boom' } })
+
+      const res = await POST(
+        makeRequest({ ...validBody, ice: { phone: '', name: 'Göran', relation: '' } })
+      )
+
+      expect(res.status).toBe(200)
+    })
+  })
 })

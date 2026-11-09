@@ -281,7 +281,12 @@
       "selectMatches": "Markera träffarna",
       "deselectAll": "Avmarkera alla",
       "selectedOf": "{{n}} av {{total}} markerade"
-    }
+    },
+    "detailIce": "ICE-kontakt",
+    "detailNoIce": "Ingen ICE-kontakt angiven",
+    "detailIceCall": "Ring {{name}}",
+    "iceBadge": "ICE",
+    "iceBadgeLabel": "Har ICE-kontakt"
   },
   "participants": {
     "title": "Deltagare",
