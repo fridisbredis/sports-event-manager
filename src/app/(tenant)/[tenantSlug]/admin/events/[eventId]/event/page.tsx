@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import type { InfoSection } from '@/lib/events/info-sections'
 import { unstable_cache } from 'next/cache'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
@@ -33,7 +34,10 @@ interface AdminEventCached {
     position: number
   }>
   distances: Array<{ label: string; position: number; stage_id: string | null }>
+  // Still returned until the contract migration drops event_facilities;
+  // this page no longer reads it (N38, L24).
   facilities: Array<{ label: string; position: number }>
+  info_sections: InfoSection[]
 }
 
 export default async function EventConfigPage({ params }: Props) {
@@ -75,7 +79,7 @@ export default async function EventConfigPage({ params }: Props) {
     }
   )
 
-  const { event, stages, distances, facilities } = await getAdminEventCached(tenant.id, eventId)
+  const { event, stages, distances, info_sections } = await getAdminEventCached(tenant.id, eventId)
 
   if (!event) notFound()
 
@@ -116,10 +120,7 @@ export default async function EventConfigPage({ params }: Props) {
           position: s.position,
           distances: distancesByStageId[s.id] ?? [],
         }))}
-        initialFacilities={facilities.map((f) => ({
-          label: f.label,
-          position: f.position,
-        }))}
+        initialInfoSections={info_sections}
         isPublished={isPublished}
         tierAllowsPublish={tierAllowsPublish}
         isArchived={event.status === 'archived'}
