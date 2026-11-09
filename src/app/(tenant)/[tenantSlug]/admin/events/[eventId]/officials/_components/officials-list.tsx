@@ -1,6 +1,6 @@
 'use client'
 
-import { Users, ChevronRight, MoreHorizontal, Phone } from 'lucide-react'
+import { Users, ChevronRight, MoreHorizontal, Phone, UserPlus, CalendarPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -71,6 +71,15 @@ interface Props {
 }
 
 type AdminRoleChange = { official: OfficialListItem; action: 'make' | 'remove' }
+
+/** Columns that drop out below sm, so the name has the row to itself. */
+const HIDE_ON_MOBILE = 'hidden sm:table-cell'
+
+/**
+ * A text button that is a square icon button below sm. Overrides HeroUI's
+ * min-w-20/px-4 there; its tailwind-merge keeps the sm: variants intact.
+ */
+const ICON_ON_MOBILE = 'min-w-10 w-10 px-0 sm:w-auto sm:min-w-20 sm:px-4'
 
 /**
  * Up to two initials for the avatar. Falls back to the first two characters
@@ -326,17 +335,28 @@ export default function OfficialsList({
       <div className="flex items-center justify-between mb-6">
         <h1 className="page-title">{t('officials.title')}</h1>
         <div className="flex flex-wrap items-center justify-end gap-3">
+          {/* Icon-only below sm: on a phone the title and two text buttons
+              did not fit on one line, and the primary button pushed off the
+              edge of the screen. The label stays as the accessible name. */}
           {candidates.length > 0 && (
             <Button
               variant="bordered"
-              className="rounded-control border-edge-field bg-white"
+              className={`rounded-control border-edge-field bg-white ${ICON_ON_MOBILE}`}
+              aria-label={t('officials.fromEvents.open')}
               onPress={() => setFromEventsOpen(true)}
             >
-              {t('officials.fromEvents.open')}
+              <CalendarPlus className="size-4 sm:hidden" strokeWidth={2} aria-hidden="true" />
+              <span className="hidden sm:inline">{t('officials.fromEvents.open')}</span>
             </Button>
           )}
-          <Button color="primary" onPress={() => setAddModalOpen(true)}>
-            {t('officials.add')}
+          <Button
+            color="primary"
+            className={ICON_ON_MOBILE}
+            aria-label={t('officials.add')}
+            onPress={() => setAddModalOpen(true)}
+          >
+            <UserPlus className="size-4 sm:hidden" strokeWidth={2} aria-hidden="true" />
+            <span className="hidden sm:inline">{t('officials.add')}</span>
           </Button>
         </div>
       </div>
@@ -392,8 +412,10 @@ export default function OfficialsList({
         >
           <TableHeader>
             <TableColumn>{t('officials.name')}</TableColumn>
-            <TableColumn>{t('officials.phone')}</TableColumn>
-            <TableColumn>{t('officials.status')}</TableColumn>
+            {/* Phone and status give way below sm: the name is what an admin
+                scans for on a phone, and the row expands for the rest. */}
+            <TableColumn className={HIDE_ON_MOBILE}>{t('officials.phone')}</TableColumn>
+            <TableColumn className={HIDE_ON_MOBILE}>{t('officials.status')}</TableColumn>
             {/* One ⋯ button per row (N27): four text links in a row read as
                 the same action. Narrow, right-aligned, and labelled for
                 screen readers since the header is the only visible text. */}
@@ -466,10 +488,10 @@ export default function OfficialsList({
                       )}
                     </button>
                   </TableCell>
-                  <TableCell className="text-[15px] text-ink-soft">
+                  <TableCell className={`text-[15px] text-ink-soft ${HIDE_ON_MOBILE}`}>
                     {formatPhoneForDisplay(official.phone)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={HIDE_ON_MOBILE}>
                     <Chip
                       size="sm"
                       variant="flat"

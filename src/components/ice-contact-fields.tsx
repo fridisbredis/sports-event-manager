@@ -86,7 +86,7 @@ export function IceContactFields({
           />
         </div>
       </div>
-      <p id={`${idPrefix}-note`} className="mt-2 text-sm text-ink-muted">
+      <p id={`${idPrefix}-note`} className="mt-2 text-xs text-gray-400">
         {t('iceContact.visibilityNote')}
       </p>
     </fieldset>
