@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { Chip } from '@heroui/react'
 import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,6 @@ import {
   uploadEventLogo,
   removeEventLogo,
   type StageInput,
-  type LabelInput,
   type SaveEventInput,
 } from '../actions'
 import { publishEvent, unpublishEvent } from '@/lib/actions/publish-event'
@@ -23,7 +22,8 @@ import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
 import { LogoUploadField } from './logo-upload-field'
 import { DatesAndGranularitySection } from './dates-and-granularity-section'
-import { FacilitiesEditor } from './facilities-editor'
+import { InfoSectionsEditor } from './info-sections-editor'
+import type { InfoSection } from '@/lib/events/info-sections'
 import { derivedDateRange } from '../_utils'
 
 interface Props {
@@ -37,7 +37,7 @@ interface Props {
   initialLogoUrl: string
   initialGranularity: number
   initialStages: StageInput[]
-  initialFacilities: LabelInput[]
+  initialInfoSections: InfoSection[]
   // As the admin should see it (displayedEventStatus): never true on Standard.
   isPublished: boolean
   // N36 / PB5: the tenant's tier includes publishing (Premium and up).
@@ -62,7 +62,7 @@ export default function EventConfigForm({
   initialLogoUrl,
   initialGranularity,
   initialStages,
-  initialFacilities,
+  initialInfoSections,
   isPublished,
   tierAllowsPublish,
   isArchived = false,
@@ -120,8 +120,6 @@ export default function EventConfigForm({
   // event row rather than hardcoded, so an older row keeps rendering its own value.
   const [granularity] = useState(initialGranularity)
   const [stages, setStages] = useState<StageInput[]>(initialStages)
-  const [facilities, setFacilities] = useState<LabelInput[]>(initialFacilities)
-  const [facilityInput, setFacilityInput] = useState('')
 
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | undefined>()
@@ -227,23 +225,6 @@ export default function EventConfigForm({
     return { ok: true }
   }
 
-  function handleFacilityKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== 'Enter') return
-    e.preventDefault()
-    const label = facilityInput.trim()
-    if (!label) return
-    setFacilities((prev) => [...prev, { label, position: prev.length }])
-    setFacilityInput('')
-    setSaveSuccess(false)
-    markDirty()
-  }
-
-  function removeFacility(index: number) {
-    setFacilities((prev) => prev.filter((_, i) => i !== index))
-    setSaveSuccess(false)
-    markDirty()
-  }
-
   // `logoUrl` is whatever is on screen, which during a pending change is a
   // blob: preview URL — never something to persist. The logo the save should
   // write is decided by commitPendingLogo and passed in here instead.
@@ -261,7 +242,6 @@ export default function EventConfigForm({
       logo_url: resolvedLogoUrl ?? '',
       scheduling_granularity_min: granularity,
       stages,
-      facilities: facilities.map((f, i) => ({ label: f.label, position: i })),
     }
   }
 
@@ -488,13 +468,17 @@ export default function EventConfigForm({
             {isPublished && (
               <p className="text-xs text-gray-400 -mt-2">{t('eventConfig.editableAfterPublish')}</p>
             )}
+          </AppCard>
 
-            <FacilitiesEditor
-              facilities={facilities}
-              facilityInput={facilityInput}
-              onFacilityInputChange={setFacilityInput}
-              onKeyDown={handleFacilityKeyDown}
-              onRemoveFacility={removeFacility}
+          {/* N38: info sections replace facilities (L24). They sit under
+              Identity, as in the EVT-02 wireframe (Identity, Info sections,
+              Stages), and are saved one at a time by their own actions — not
+              by this form's Save button. */}
+          <AppCard className="card-accent-primary mt-6" bodyClassName="p-0">
+            <InfoSectionsEditor
+              tenantId={tenantId}
+              eventId={eventId}
+              sections={initialInfoSections}
             />
           </AppCard>
         </section>

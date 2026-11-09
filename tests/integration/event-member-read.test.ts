@@ -26,6 +26,7 @@ describe('N23: event-member read isolation', () => {
     | 'event_stages'
     | 'event_distances'
     | 'event_facilities'
+    | 'event_info_sections'
     | 'workstations'
     | 'announcements'
 
@@ -55,6 +56,10 @@ describe('N23: event-member read isolation', () => {
       await admin
         .from('event_facilities')
         .insert({ tenant_id: tenantId, event_id: eventId, label: 'Toilets', position: 0 })
+      const { error: sectionError } = await admin
+        .from('event_info_sections')
+        .insert({ tenant_id: tenantId, event_id: eventId, title: 'Parking', body: 'North lot' })
+      if (sectionError) throw sectionError
       const { data: ws } = await admin
         .from('workstations')
         .insert({ tenant_id: tenantId, event_id: eventId, name: 'Desk', capacity_ceiling: 1 })
@@ -133,6 +138,7 @@ describe('N23: event-member read isolation', () => {
     'event_stages',
     'event_distances',
     'event_facilities',
+    'event_info_sections',
     'workstations',
     'announcements',
   ] as Table[])('scopes %s to the official’s event', async (table) => {

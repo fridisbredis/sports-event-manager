@@ -46,6 +46,16 @@ describe('resizeImage', () => {
     expect(canvas.height).toBe(256)
   })
 
+  it('caps the longest edge at maxDimension when one is given', async () => {
+    stubBitmap(1200, 3200)
+    const canvas = stubCanvas(new Blob(['x'], { type: 'image/webp' }))
+
+    await resizeImage(bigFile(), 'image', 1600)
+
+    expect(canvas.width).toBe(600)
+    expect(canvas.height).toBe(1600)
+  })
+
   it('re-encodes to WebP and renames the file accordingly', async () => {
     stubBitmap(1000, 1000)
     stubCanvas(new Blob(['x'], { type: 'image/webp' }))

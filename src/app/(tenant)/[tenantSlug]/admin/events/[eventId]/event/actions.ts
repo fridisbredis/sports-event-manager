@@ -51,7 +51,6 @@ export interface SaveEventInput {
   logo_url: string
   scheduling_granularity_min: number
   stages: StageInput[]
-  facilities: LabelInput[]
   // start_date and end_date are derived from Race stage times in this action
 }
 
@@ -179,28 +178,11 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
   if (rpcError)
     return { error: await translateDbError('saveEvent: sync_event_stages failed', rpcError) }
 
-  // REL-01: facilities are replaced atomically by this RPC — see migration
-  // 20260908131614 and docs/patterns/atomic-multi-table-writes.md.
-  // Previously this was a separate delete + insert with no transaction, so
-  // a failure on the insert left the delete already committed, silently
-  // wiping the event's facility list.
-  const facilityRows = input.facilities
-    .filter((f) => f.label.trim())
-    .map((f, i) => ({ label: f.label, position: i }))
-
-  const { error: facError } = await supabase.rpc('sync_event_facilities', {
-    p_event_id: input.eventId,
-    p_tenant_id: input.tenantId,
-    p_facilities: facilityRows,
-  })
-  if (facError)
-    return { error: await translateDbError('saveEvent: sync_event_facilities failed', facError) }
-
   revalidatePath(adminEventRoutePattern('event'), 'page')
   revalidatePath(adminEventRoutePattern('dashboard'), 'page')
 
   // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): saveEvent touches events,
-  // event_stages, event_distances, and event_facilities — every Group 1
+  // event_stages and event_distances — every Group 1
   // cached page reads at least one of those tables, so all three tags are
   // invalidated. updateTag (not revalidateTag) so the admin who just saved
   // sees their own write immediately on next render.

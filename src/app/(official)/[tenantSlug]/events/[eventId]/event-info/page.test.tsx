@@ -85,7 +85,7 @@ describe('EventInfoPage', () => {
     expect(getOfficialTenant).toHaveBeenCalledWith('viadal')
   })
 
-  it('reads event, stages, and facilities via the cached RPC scoped by tenant and event', async () => {
+  it('reads event, stages, and info sections via the cached RPC scoped by tenant and event', async () => {
     mockResolvedTenant()
     mockUser('user-1')
     const rpc = mockEventInfoRpc({
@@ -93,6 +93,7 @@ describe('EventInfoPage', () => {
         event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
         stages: [],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -105,10 +106,13 @@ describe('EventInfoPage', () => {
     })
   })
 
-  it('renders successfully with empty stages and facilities lists', async () => {
+  it('renders successfully with empty stages and info sections', async () => {
     mockResolvedTenant()
     mockUser('user-1')
-    mockEventInfoRpc({ data: { event: null, stages: [], facilities: [] }, error: null })
+    mockEventInfoRpc({
+      data: { event: null, stages: [], facilities: [], info_sections: [] },
+      error: null,
+    })
 
     const result = await EventInfoPage({ params: PARAMS })
 
@@ -138,6 +142,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -166,6 +171,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -198,6 +204,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -236,6 +243,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -279,6 +287,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -325,6 +334,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -358,6 +368,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -391,6 +402,7 @@ describe('EventInfoPage', () => {
           },
         ],
         facilities: [],
+        info_sections: [],
       },
       error: null,
     })
@@ -409,5 +421,84 @@ describe('EventInfoPage', () => {
     mockEventInfoRpc({ data: null, error: new Error('rpc failed') })
 
     await expect(EventInfoPage({ params: PARAMS })).rejects.toThrow('rpc failed')
+  })
+
+  // N38 (L17): the organiser's sections, in admin order, right after the
+  // identity block; text as typed, link with its label or else the host.
+  it('renders info sections in admin order with text, image and link', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [],
+        facilities: [],
+        info_sections: [
+          {
+            id: 's1',
+            title: 'Getting there',
+            body: 'Train to Båstad.\nBus 525.',
+            image_path: null,
+            link_url: 'https://www.resrobot.se/planner',
+            link_label: null,
+            position: 0,
+          },
+          {
+            id: 's2',
+            title: 'Depot area',
+            body: null,
+            image_path: 't/e/s2/1.webp',
+            link_url: null,
+            link_label: null,
+            position: 1,
+          },
+          {
+            id: 's3',
+            title: 'Live video',
+            body: null,
+            image_path: null,
+            link_url: 'https://video.example.com/live',
+            link_label: 'Watch live',
+            position: 2,
+          },
+        ],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Getting there',
+      'Depot area',
+      'Live video',
+    ])
+    expect(screen.getByText(/Train to Båstad/)).toHaveTextContent('Train to Båstad. Bus 525.')
+    expect(screen.getByRole('img', { name: 'Depot area' })).toBeInTheDocument()
+
+    const host = screen.getByRole('link', { name: 'resrobot.se' })
+    expect(host).toHaveAttribute('href', 'https://www.resrobot.se/planner')
+    const live = screen.getByRole('link', { name: 'Watch live' })
+    expect(live).toHaveAttribute('target', '_blank')
+    expect(live).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('shows no info-section block at all when there are none', async () => {
+    mockResolvedTenant()
+    mockUser('user-1')
+    mockEventInfoRpc({
+      data: {
+        event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
+        stages: [],
+        facilities: [],
+        info_sections: [],
+      },
+      error: null,
+    })
+
+    render(await EventInfoPage({ params: PARAMS }))
+
+    expect(screen.queryAllByRole('heading', { level: 2 })).toEqual([])
+    expect(screen.queryByText('eventInfo.facilities')).not.toBeInTheDocument()
   })
 })

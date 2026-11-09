@@ -27,6 +27,7 @@ describe('N23: create_event', () => {
     stages: true,
     distances: true,
     facilities: true,
+    info_sections: true,
     work_areas: true,
     checklists: true,
     officials: true,
@@ -115,6 +116,17 @@ describe('N23: create_event', () => {
       .from('event_facilities')
       .insert({ tenant_id: tenantId, event_id: sourceId, label: 'Showers', position: 0 })
     if (facilityError) throw facilityError
+    const { error: sectionError } = await admin.from('event_info_sections').insert({
+      tenant_id: tenantId,
+      event_id: sourceId,
+      title: 'Depot area',
+      body: 'Behind the arena',
+      image_path: `${tenantId}/${sourceId}/depot/1.webp`,
+      link_url: 'https://example.com/depot',
+      link_label: 'Map',
+      position: 0,
+    })
+    if (sectionError) throw sectionError
 
     const { data: dated, error: wsError } = await admin
       .from('workstations')
@@ -288,6 +300,23 @@ describe('N23: create_event', () => {
       .eq('event_id', eventId)
     expect(facilities).toEqual([{ label: 'Showers' }])
 
+    // N38: sections come over whole, image path included (shared object;
+    // the app's cleanup is reference-counted).
+    const { data: sections } = await admin
+      .from('event_info_sections')
+      .select('title, body, image_path, link_url, link_label, position')
+      .eq('event_id', eventId)
+    expect(sections).toEqual([
+      {
+        title: 'Depot area',
+        body: 'Behind the arena',
+        image_path: `${tenantId}/${sourceId}/depot/1.webp`,
+        link_url: 'https://example.com/depot',
+        link_label: 'Map',
+        position: 0,
+      },
+    ])
+
     const { data: workAreas } = await admin
       .from('workstations')
       .select(
@@ -343,7 +372,12 @@ describe('N23: create_event', () => {
       .eq('id', eventId)
       .single()
     expect(event?.description).toBeNull()
-    for (const table of ['event_distances', 'event_facilities', 'workstations'] as const) {
+    for (const table of [
+      'event_distances',
+      'event_facilities',
+      'event_info_sections',
+      'workstations',
+    ] as const) {
       const { count } = await admin
         .from(table)
         .select('id', { count: 'exact', head: true })

@@ -432,6 +432,63 @@ export type Database = {
           },
         ]
       }
+      event_info_sections: {
+        Row: {
+          body: string | null
+          created_at: string
+          event_id: string
+          id: string
+          image_path: string | null
+          link_label: string | null
+          link_url: string | null
+          position: number
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          image_path?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          position?: number
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          image_path?: string | null
+          link_label?: string | null
+          link_url?: string | null
+          position?: number
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'event_info_sections_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id', 'tenant_id']
+          },
+          {
+            foreignKeyName: 'event_info_sections_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       event_stages: {
         Row: {
           created_at: string
@@ -1430,6 +1487,10 @@ export type Database = {
       remove_official_from_event: {
         Args: { p_event_id: string; p_official_id: string; p_tenant_id: string }
         Returns: Json
+      }
+      reorder_event_info_sections: {
+        Args: { p_event_id: string; p_ids: string[]; p_tenant_id: string }
+        Returns: undefined
       }
       revoke_system_admin: { Args: { p_user_id: string }; Returns: Json }
       revoke_tenant_admin: {

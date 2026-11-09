@@ -43,9 +43,7 @@ function chain(result: unknown) {
   return builder
 }
 
-// sync_event_stages and sync_event_facilities are both plain RPC calls now
-// (REL-01), so a single blanket rpc mock can no longer distinguish which one
-// failed — results are looked up by function name, defaulting to success.
+// RPC results are looked up by function name, defaulting to success.
 function mockClient(
   fromMock: ReturnType<typeof vi.fn>,
   rpcResults: Partial<Record<'sync_event_stages' | 'sync_event_facilities', unknown>> = {}
@@ -95,7 +93,6 @@ const BASE_INPUT = {
   logo_url: '',
   scheduling_granularity_min: 60,
   stages: [RACE_STAGE],
-  facilities: [],
 }
 
 function statusBuilderFor(status: 'draft' | 'published' | null, errorMessage?: string) {
@@ -255,7 +252,7 @@ describe('saveEvent', () => {
     expect(updateTag).not.toHaveBeenCalled()
   })
 
-  it('translates the rpc error and skips facility sync when sync_event_stages fails', async () => {
+  it('translates the rpc error and skips revalidation when sync_event_stages fails', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
@@ -268,7 +265,7 @@ describe('saveEvent', () => {
 
     expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
     expect(fromMock).toHaveBeenCalledTimes(2)
-    expect(rpcMock).not.toHaveBeenCalledWith('sync_event_facilities', expect.anything())
+    expect(rpcMock).toHaveBeenCalledTimes(1)
     expect(revalidatePath).not.toHaveBeenCalled()
     expect(updateTag).not.toHaveBeenCalled()
   })
@@ -287,27 +284,6 @@ describe('saveEvent', () => {
     expect(result).toEqual({
       error: 'Cannot remove the last Race stage from a published event.',
     })
-  })
-
-  // REL-01: facilities are now replaced atomically via the
-  // sync_event_facilities RPC (migration 20260908131614) instead of a
-  // separate delete + insert — see
-  // tests/integration/sync-event-facilities-atomicity.test.ts for the
-  // real-Postgres proof that a partial failure rolls back both statements.
-  it('translates the rpc error and skips revalidation when sync_event_facilities fails', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const statusBuilder = statusBuilderFor('draft')
-    const eventsBuilder = chain({ error: null })
-    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
-    mockClient(fromMock, {
-      sync_event_facilities: { error: { message: 'facility sync failed' } },
-    })
-
-    const result = await saveEvent(BASE_INPUT)
-
-    expect(result).toEqual({ error: GENERIC_SAVE_ERROR })
-    expect(revalidatePath).not.toHaveBeenCalled()
-    expect(updateTag).not.toHaveBeenCalled()
   })
 
   it('allows removing the Race stage from a draft event, revalidates, and invalidates all three Group 1 cache tags', async () => {
@@ -352,35 +328,17 @@ describe('saveEvent', () => {
     )
   })
 
-  it('calls sync_event_facilities with the filtered, re-positioned facilities payload', async () => {
+  // N38 (L24): info sections are saved by their own actions; the page's Save
+  // no longer writes facilities at all.
+  it('does not touch facilities on save', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
     const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
     const rpcMock = mockClient(fromMock)
 
-    const result = await saveEvent({
-      ...BASE_INPUT,
-      facilities: [
-        { label: 'Water station', position: 0 },
-        { label: '   ', position: 1 },
-        { label: 'Medical tent', position: 5 },
-      ],
-    })
-
-    expect(result).toEqual({})
-    expect(rpcMock).toHaveBeenCalledWith('sync_event_facilities', {
-      p_event_id: EVENT_ID,
-      p_tenant_id: TENANT_ID,
-      p_facilities: [
-        { label: 'Water station', position: 0 },
-        { label: 'Medical tent', position: 1 },
-      ],
-    })
-    expect(revalidatePath).toHaveBeenCalledWith(
-      '/[tenantSlug]/admin/events/[eventId]/event',
-      'page'
-    )
+    expect(await saveEvent(BASE_INPUT)).toEqual({})
+    expect(rpcMock).not.toHaveBeenCalledWith('sync_event_facilities', expect.anything())
   })
 })
 

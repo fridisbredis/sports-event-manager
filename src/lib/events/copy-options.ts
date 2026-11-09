@@ -6,7 +6,7 @@ export const COPY_OPTIONS = [
   'details',
   'stages',
   'distances',
-  'facilities',
+  'info_sections',
   'work_areas',
   'checklists',
   'officials',
