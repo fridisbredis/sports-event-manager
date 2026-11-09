@@ -23,7 +23,9 @@
 --             20261028140031_admin_cached_rpcs_take_event.sql and
 --             get_event_info_cached from migration
 --             20261029094424_event_info_cached_scope_children_to_event.sql.
---   Data:     no data loss. Reads only.
+--   Data:     prod snapshot: NOT YET TAKEN — run scripts/ops/snapshot-prod-db.sh 20261109181103
+--             right before the prod push and put the filename here.
+--             no data loss. Reads only.
 --   Blast:    if the new select failed, EVT-02 and INFO-01 would throw for
 --             every event (the page rethrows RPC errors) until rolled back.
 --   Window:   compatible. Same signatures, every existing key unchanged; the
