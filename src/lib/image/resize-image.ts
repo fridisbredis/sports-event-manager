@@ -15,8 +15,12 @@
  * accept it alongside JPEG and PNG.
  */
 
-/** Longest edge of the re-encoded image, in pixels. */
-const MAX_DIMENSION = 512
+/**
+ * Default longest edge of the re-encoded image, in pixels — what the avatar
+ * and the event logo use. Info-section images (N38) pass a larger value: a
+ * map or a depot sketch is read at full phone width, where 512px blurs.
+ */
+const DEFAULT_MAX_DIMENSION = 512
 
 const OUTPUT_TYPE = 'image/webp'
 const OUTPUT_QUALITY = 0.85
@@ -34,9 +38,14 @@ export interface ResizeResult {
  * makes the common case fit, it is not a security boundary.
  *
  * `fallbackName` names the re-encoded file when the source name has no stem
- * to reuse; it only affects the storage object's name.
+ * to reuse; it only affects the storage object's name. `maxDimension` caps
+ * the longest edge.
  */
-export async function resizeImage(file: File, fallbackName = 'image'): Promise<ResizeResult> {
+export async function resizeImage(
+  file: File,
+  fallbackName = 'image',
+  maxDimension = DEFAULT_MAX_DIMENSION
+): Promise<ResizeResult> {
   // createImageBitmap is the cheap path and is supported everywhere this app
   // runs; if it throws, the file isn't a decodable image and the server-side
   // validation will reject it with a proper message.
@@ -49,7 +58,7 @@ export async function resizeImage(file: File, fallbackName = 'image'): Promise<R
 
   try {
     const { width, height } = bitmap
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height))
+    const scale = Math.min(1, maxDimension / Math.max(width, height))
 
     // Already small enough and already WebP — nothing to gain by re-encoding.
     if (scale === 1 && file.type === OUTPUT_TYPE) {
