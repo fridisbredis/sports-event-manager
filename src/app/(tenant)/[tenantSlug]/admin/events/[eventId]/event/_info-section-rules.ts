@@ -1,7 +1,7 @@
 // N38: limits shared by the info-section modal (client) and saveInfoSection
 // (server), so the two can't drift. Decided 2026-11-09 (card N38).
 
-export const INFO_SECTION_BUCKET = 'event-info-images'
+export { INFO_SECTION_BUCKET } from '@/lib/events/info-sections'
 
 /** Longest edge the client downscales to before upload. */
 export const INFO_SECTION_IMAGE_MAX_DIMENSION = 1600

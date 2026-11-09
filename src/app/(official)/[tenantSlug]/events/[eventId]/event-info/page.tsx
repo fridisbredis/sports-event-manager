@@ -8,10 +8,11 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
-import { FacilityChips } from './_components/facility-chips'
+import { InfoSectionCard } from './_components/info-section-card'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
 import { formatStageDate, stageTimeRangeParts } from '@/lib/i18n/stage-range'
+import type { InfoSection } from '@/lib/events/info-sections'
 
 interface EventInfoCached {
   event: {
@@ -32,7 +33,10 @@ interface EventInfoCached {
     results_url: string | null
     position: number
   }>
+  // Still returned until the contract migration drops event_facilities;
+  // this page no longer reads it (N38, L24).
   facilities: Array<{ id: string; label: string; position: number }>
+  info_sections: InfoSection[]
 }
 
 interface Props {
@@ -101,10 +105,9 @@ export default async function EventInfoPage({ params }: Props) {
     }
   )
 
-  const { event, stages, facilities } = await getEventInfoCached(tenant.id, eventId)
+  const { event, stages, info_sections } = await getEventInfoCached(tenant.id, eventId)
 
   const stageList = stages
-  const facilityList = facilities
 
   return (
     <div className="px-5 pt-10 pb-6">
@@ -116,6 +119,22 @@ export default async function EventInfoPage({ params }: Props) {
         logoUrl={event?.logo_url ?? null}
         description={event?.description ?? null}
       />
+
+      {/* N38 (L17): the organiser's info sections come right after the
+          identity block, in the admin's order. Officials always see them.
+          Participant screens (N43) gate the same data on
+          isParticipantSideOpen — this route is official-only.
+
+          No label and no empty state: when there are none the block is
+          simply absent (no-info-sections wireframe), unlike the programme
+          below, whose empty state tells an official it is not out yet. */}
+      {info_sections.length > 0 ? (
+        <div className="mb-8 flex flex-col gap-3">
+          {info_sections.map((section) => (
+            <InfoSectionCard key={section.id} section={section} />
+          ))}
+        </div>
+      ) : null}
 
       {/* One stage list, carrying every fact a stage has — day, hours and
           venue. It replaces three sections that walked the same stages three
@@ -160,21 +179,6 @@ export default async function EventInfoPage({ params }: Props) {
             title={t('eventInfo.noProgramme')}
             description={t('eventInfo.noProgrammeDescription')}
           />
-        )}
-      </div>
-
-      {/* The empty state is a muted line, not the boxed card used elsewhere on
-          this screen: a framed card with a map pin led officials to expect a
-          location view once facilities existed. A single line in the same slot
-          the chips occupy says the same thing without promising more. */}
-      <div className="mb-8">
-        <SectionLabel>{t('eventInfo.facilities')}</SectionLabel>
-        {facilityList.length > 0 ? (
-          <FacilityChips facilities={facilityList} />
-        ) : (
-          <p className="text-[15px] leading-relaxed text-ink-label">
-            {t('eventInfo.noFacilities')}
-          </p>
         )}
       </div>
     </div>

@@ -46,6 +46,26 @@ function str(formData: FormData, key: string): string {
   return typeof v === 'string' ? v : ''
 }
 
+type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>
+
+/**
+ * Removes a section image from storage unless another section still points
+ * at it. create_event copies sections with their image_path (20261109203226),
+ * so last year's depot map is one object shared by both editions; deleting it
+ * for one would break the other. Admin RLS sees every section in the tenant,
+ * and paths are tenant-prefixed, so the count covers every possible sharer.
+ * Best effort: a failed lookup keeps the file — an orphan is harmless, a
+ * missing image is not.
+ */
+async function removeImageIfUnreferenced(supabase: ServerClient, path: string) {
+  const { count, error } = await supabase
+    .from('event_info_sections')
+    .select('id', { count: 'exact', head: true })
+    .eq('image_path', path)
+  if (error || typeof count !== 'number' || count > 0) return
+  await supabase.storage.from(INFO_SECTION_BUCKET).remove([path])
+}
+
 function invalidate(tenantId: string) {
   revalidatePath(adminEventRoutePattern('event'), 'page')
   updateTag(eventInfoCacheTag(tenantId))
@@ -191,9 +211,9 @@ export async function saveInfoSection(formData: FormData): Promise<InfoSectionRe
     return { error: await translateDbError('saveInfoSection: section write failed', writeError) }
   }
 
-  // ---- 3. old file, best effort: an orphaned object is harmless.
+  // ---- 3. old file, unless a copied section still uses it.
   if (currentImagePath && currentImagePath !== fields.image_path) {
-    await supabase.storage.from(INFO_SECTION_BUCKET).remove([currentImagePath])
+    await removeImageIfUnreferenced(supabase, currentImagePath)
   }
 
   invalidate(tenantId)
@@ -234,7 +254,7 @@ export async function deleteInfoSection(
 
   // Row first, file second, as removeEventLogo.
   if (deleted?.image_path) {
-    await supabase.storage.from(INFO_SECTION_BUCKET).remove([deleted.image_path])
+    await removeImageIfUnreferenced(supabase, deleted.image_path)
   }
 
   invalidate(ids.data.tenantId)

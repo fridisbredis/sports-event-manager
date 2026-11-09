@@ -146,7 +146,11 @@ describe('saveInfoSection', () => {
   it('replaces an image: old file removed only after the row points at the new one', async () => {
     const oldPath = `${TENANT_ID}/${EVENT_ID}/${SECTION_ID}/1.webp`
     const { builders, upload, remove } = setup({
-      queries: [{ data: { image_path: oldPath }, error: null }, { error: null }],
+      queries: [
+        { data: { image_path: oldPath }, error: null },
+        { error: null },
+        { count: 0, error: null },
+      ],
     })
     const result = await saveInfoSection(
       form({ sectionId: SECTION_ID, title: 'Map', image: webp() })
@@ -156,7 +160,24 @@ describe('saveInfoSection', () => {
     expect(builders[1].update).toHaveBeenCalledWith(
       expect.objectContaining({ image_path: newPath })
     )
+    expect(builders[2].eq).toHaveBeenCalledWith('image_path', oldPath)
     expect(remove).toHaveBeenCalledWith([oldPath])
+  })
+
+  // create_event copies sections with their image (20261109203226): last
+  // year's edition still shows the same file, so replacing it here must not
+  // delete it.
+  it('keeps the old file when a copied section still uses it', async () => {
+    const oldPath = `${TENANT_ID}/${EVENT_ID}/${SECTION_ID}/1.webp`
+    const { remove } = setup({
+      queries: [
+        { data: { image_path: oldPath }, error: null },
+        { error: null },
+        { count: 1, error: null },
+      ],
+    })
+    await saveInfoSection(form({ sectionId: SECTION_ID, title: 'Map', image: webp() }))
+    expect(remove).not.toHaveBeenCalled()
   })
 
   it('keeps the current image when the edit does not touch it', async () => {
@@ -184,9 +205,26 @@ describe('saveInfoSection', () => {
 describe('deleteInfoSection', () => {
   it('deletes the row, then its image', async () => {
     const path = `${TENANT_ID}/${EVENT_ID}/${SECTION_ID}/1.webp`
-    const { remove } = setup({ queries: [{ data: { image_path: path }, error: null }] })
+    const { remove } = setup({
+      queries: [
+        { data: { image_path: path }, error: null },
+        { count: 0, error: null },
+      ],
+    })
     expect(await deleteInfoSection(TENANT_ID, EVENT_ID, SECTION_ID)).toEqual({})
     expect(remove).toHaveBeenCalledWith([path])
+  })
+
+  it('keeps the image when the reference count cannot be read', async () => {
+    const path = `${TENANT_ID}/${EVENT_ID}/${SECTION_ID}/1.webp`
+    const { remove } = setup({
+      queries: [
+        { data: { image_path: path }, error: null },
+        { count: null, error: { message: 'boom' } },
+      ],
+    })
+    expect(await deleteInfoSection(TENANT_ID, EVENT_ID, SECTION_ID)).toEqual({})
+    expect(remove).not.toHaveBeenCalled()
   })
 
   it('rejects a malformed id', async () => {
