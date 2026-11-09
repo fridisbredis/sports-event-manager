@@ -20,8 +20,8 @@
 --
 -- Forward-fix: replace (create_event body)
 --   Rollback: restore create_event from migration 20261029081215_create_event.sql.
---   Data:     prod snapshot: NOT YET TAKEN — run scripts/ops/snapshot-prod-db.sh 20261109203226
---             right before the prod push and put the filename here.
+--   Data:     prod snapshot 20261109181103_pre-migration_2026-11-09T22-01-27Z.tar.gz (N38 release,
+--             taken 2026-11-09 right before the prod push).
 --             no data loss. Writes only into the event being created.
 --   Blast:    if the new insert failed, creating an event with "info
 --             sections" ticked would fail and write nothing (one
