@@ -59,7 +59,12 @@
     "createEventArchiveFirst": "Your plan has room for one active event. Archive the active event first, then create the new one.",
     "createEventUpgrade": "All active event slots in your plan are in use. Archive an event, or upgrade for more events.",
     "addOfficialsFailed": "The officials could not be added. Please try again.",
-    "updateNameFailed": "Could not save your name. Try again."
+    "updateNameFailed": "Could not save your name. Try again.",
+    "infoSectionTitleRequired": "Give the section a title.",
+    "infoSectionTitleTooLong": "Keep the title to 80 characters or fewer.",
+    "infoSectionBodyTooLong": "Keep the text to 4,000 characters or fewer.",
+    "infoSectionLinkInvalid": "Enter a web address starting with http:// or https://.",
+    "infoSectionNeedsContent": "Add text, an image or a link."
   },
   "notFoundPage": {
     "eyebrow": "No result",

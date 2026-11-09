@@ -59,7 +59,12 @@
     "createEventArchiveFirst": "Er plan har plats för ett aktivt event. Arkivera det aktiva eventet först och skapa sedan det nya.",
     "createEventUpgrade": "Alla platser för aktiva event i er plan används. Arkivera ett event eller uppgradera för fler event.",
     "addOfficialsFailed": "Funktionärerna kunde inte läggas till. Försök igen.",
-    "updateNameFailed": "Kunde inte spara ditt namn. Försök igen."
+    "updateNameFailed": "Kunde inte spara ditt namn. Försök igen.",
+    "infoSectionTitleRequired": "Ge sektionen en rubrik.",
+    "infoSectionTitleTooLong": "Rubriken får vara högst 80 tecken.",
+    "infoSectionBodyTooLong": "Texten får vara högst 4 000 tecken.",
+    "infoSectionLinkInvalid": "Ange en webbadress som börjar med http:// eller https://.",
+    "infoSectionNeedsContent": "Lägg till text, en bild eller en länk."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",
