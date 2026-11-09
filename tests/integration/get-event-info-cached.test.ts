@@ -57,6 +57,15 @@ interface EventInfoCached {
     position: number
   }>
   facilities: Array<{ id: string; label: string; position: number }>
+  info_sections: Array<{
+    id: string
+    title: string
+    body: string | null
+    image_path: string | null
+    link_url: string | null
+    link_label: string | null
+    position: number
+  }>
 }
 
 async function seedTenantEvent(
@@ -92,6 +101,28 @@ async function seedTenantEvent(
     position: 0,
   })
   if (facilityError) throw facilityError
+
+  // N38: inserted out of order so the shape test also proves the RPC sorts
+  // by position (L17: admin order).
+  const { error: sectionError } = await admin.from('event_info_sections').insert([
+    {
+      tenant_id: tenantId,
+      event_id: event.id,
+      title: `${eventName} Live video`,
+      link_url: 'https://video.example.com/live',
+      link_label: 'Watch live',
+      position: 1,
+    },
+    {
+      tenant_id: tenantId,
+      event_id: event.id,
+      title: `${eventName} Getting there`,
+      body: 'Take the train.',
+      image_path: `${tenantId}/${event.id}/map.webp`,
+      position: 0,
+    },
+  ])
+  if (sectionError) throw sectionError
 
   return event
 }
@@ -136,6 +167,27 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
     expect(payload.facilities).toEqual([
       { id: expect.any(String), label: 'Shape Test Event Water Station', position: 0 },
     ])
+    expect(payload.info_sections).toEqual([
+      {
+        id: expect.any(String),
+        title: 'Shape Test Event Getting there',
+        body: 'Take the train.',
+        image_path: expect.stringMatching(/\/map\.webp$/),
+        link_url: null,
+        link_label: null,
+        position: 0,
+      },
+      {
+        id: expect.any(String),
+        title: 'Shape Test Event Live video',
+        body: null,
+        image_path: null,
+        link_url: 'https://video.example.com/live',
+        link_label: 'Watch live',
+        position: 1,
+      },
+    ])
+    expect(Object.keys(payload).sort()).toEqual(['event', 'facilities', 'info_sections', 'stages'])
   })
 
   it('returns a null event and empty arrays when the tenant has no event row', async () => {
@@ -149,6 +201,7 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
     expect(payload.event).toBeNull()
     expect(payload.stages).toEqual([])
     expect(payload.facilities).toEqual([])
+    expect(payload.info_sections).toEqual([])
   })
 
   it("does not leak another tenant's event, stages, or facilities", async () => {
@@ -171,6 +224,7 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
     // anywhere in tenant A's result.
     expect(payloadA.stages.some((s) => s.name.startsWith('Tenant B'))).toBe(false)
     expect(payloadA.facilities.some((f) => f.label.startsWith('Tenant B'))).toBe(false)
+    expect(payloadA.info_sections.some((i) => i.title.startsWith('Tenant B'))).toBe(false)
   })
 
   // N23 (migration 20261029094424): with several events, the stages and
@@ -193,6 +247,10 @@ describe('get_event_info_cached RPC (PERF-06 Phase 2 fail-closed boundary)', () 
     expect(payload.event?.name).toBe('Edition 2027')
     expect(payload.stages.map((s) => s.name)).toEqual(['Edition 2027 Stage 1'])
     expect(payload.facilities.map((f) => f.label)).toEqual(['Edition 2027 Water Station'])
+    expect(payload.info_sections.map((i) => i.title)).toEqual([
+      'Edition 2027 Getting there',
+      'Edition 2027 Live video',
+    ])
   })
 
   describe('access control: anon/authenticated must be denied', () => {

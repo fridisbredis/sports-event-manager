@@ -56,6 +56,15 @@ interface AdminEventCached {
   }>
   distances: Array<{ label: string; position: number; stage_id: string | null }>
   facilities: Array<{ label: string; position: number }>
+  info_sections: Array<{
+    id: string
+    title: string
+    body: string | null
+    image_path: string | null
+    link_url: string | null
+    link_label: string | null
+    position: number
+  }>
 }
 
 async function seedTenantEvent(
@@ -107,6 +116,15 @@ async function seedTenantEvent(
   })
   if (facilityError) throw facilityError
 
+  const { error: sectionError } = await admin.from('event_info_sections').insert({
+    tenant_id: tenantId,
+    event_id: event.id,
+    title: `${eventName} Parking`,
+    body: 'North lot.',
+    position: 0,
+  })
+  if (sectionError) throw sectionError
+
   return { event, stage }
 }
 
@@ -154,6 +172,24 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
       { label: 'Shape Test Event 10k', position: 0, stage_id: stage.id },
     ])
     expect(payload.facilities).toEqual([{ label: 'Shape Test Event Water Station', position: 0 }])
+    expect(payload.info_sections).toEqual([
+      {
+        id: expect.any(String),
+        title: 'Shape Test Event Parking',
+        body: 'North lot.',
+        image_path: null,
+        link_url: null,
+        link_label: null,
+        position: 0,
+      },
+    ])
+    expect(Object.keys(payload).sort()).toEqual([
+      'distances',
+      'event',
+      'facilities',
+      'info_sections',
+      'stages',
+    ])
   })
 
   it('returns a null event and empty arrays when the tenant has no event row', async () => {
@@ -168,6 +204,7 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     expect(payload.stages).toEqual([])
     expect(payload.distances).toEqual([])
     expect(payload.facilities).toEqual([])
+    expect(payload.info_sections).toEqual([])
   })
 
   it("does not leak another tenant's event, stages, distances, or facilities", async () => {
@@ -190,6 +227,7 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     expect(payloadA.stages.some((s) => s.name.startsWith('Tenant B'))).toBe(false)
     expect(payloadA.distances.some((d) => d.label.startsWith('Tenant B'))).toBe(false)
     expect(payloadA.facilities.some((f) => f.label.startsWith('Tenant B'))).toBe(false)
+    expect(payloadA.info_sections.some((i) => i.title.startsWith('Tenant B'))).toBe(false)
   })
 
   it('scopes child reads by event_id, not just tenant_id, when a tenant has one event', async () => {

@@ -23,6 +23,7 @@ export type Event = DbTables['events']['Row']
 export type EventStage = DbTables['event_stages']['Row']
 export type EventDistance = DbTables['event_distances']['Row']
 export type EventFacility = DbTables['event_facilities']['Row']
+export type EventInfoSection = DbTables['event_info_sections']['Row']
 export type Workstation = DbTables['workstations']['Row']
 export type WorkstationOperatingWindow = DbTables['workstation_operating_windows']['Row']
 // item_type is a CHECK constraint, not a Postgres enum, so the generated Row
@@ -80,6 +81,7 @@ export type AnnouncementInsert = DbTables['announcements']['Insert']
 export type EventUpdate = DbTables['events']['Update']
 export type EventDistanceInsert = DbTables['event_distances']['Insert']
 export type EventFacilityInsert = DbTables['event_facilities']['Insert']
+export type EventInfoSectionInsert = DbTables['event_info_sections']['Insert']
 export type WorkstationUpdate = DbTables['workstations']['Update']
 // ...add more as you need them
 

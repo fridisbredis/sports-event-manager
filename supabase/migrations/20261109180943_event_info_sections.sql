@@ -28,6 +28,9 @@
 --    read the event reads. cache_rpc_reader gets the same tenant-pinned read
 --    policy as every other table behind the cached Group 1 RPCs (0051), so
 --    get_event_info_cached / get_admin_event_cached can return the sections.
+--    The two app policies are TO authenticated, like event_stages': a
+--    policy for all roles is also evaluated for cache_rpc_reader, which may
+--    not execute can_read_event, and the cached RPCs fail with 42501.
 --
 --    No participant read policy. "Participants see sections once the event
 --    is published" depends on the tenant's tier as well as events.status —
@@ -118,13 +121,13 @@ alter table public.event_info_sections force row level security;
 
 drop policy if exists tenant_admin_manage_event_info_sections on public.event_info_sections;
 create policy tenant_admin_manage_event_info_sections
-  on public.event_info_sections for all
+  on public.event_info_sections for all to authenticated
   using (public.get_user_role(tenant_id) = 'tenant_admin' or public.is_system_admin())
   with check (public.get_user_role(tenant_id) = 'tenant_admin' or public.is_system_admin());
 
 drop policy if exists event_member_read_event_info_sections on public.event_info_sections;
 create policy event_member_read_event_info_sections
-  on public.event_info_sections for select
+  on public.event_info_sections for select to authenticated
   using (public.can_read_event(tenant_id, event_id));
 
 drop policy if exists cache_rpc_reader_read_event_info_sections on public.event_info_sections;
