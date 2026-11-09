@@ -1044,6 +1044,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_ice_contacts: {
+        Row: {
+          name: string | null
+          phone: string | null
+          relation: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          name?: string | null
+          phone?: string | null
+          relation?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          name?: string | null
+          phone?: string | null
+          relation?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string
@@ -1236,6 +1260,7 @@ export type Database = {
         Args: { p_event_id: string; p_tenant_id: string }
         Returns: boolean
       }
+      can_read_ice_contact: { Args: { p_user_id: string }; Returns: boolean }
       can_write_avatar_object: {
         Args: { object_name: string }
         Returns: boolean
