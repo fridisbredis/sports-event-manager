@@ -164,6 +164,25 @@ grant select, insert, update, delete on table public.rate_limit_hits
 to service_role;
 
 -- ----------------------------------------------------------------------------
+-- auth_events — service_role writes, authenticated reads via RLS.
+-- ----------------------------------------------------------------------------
+-- Migration 0038 (SEC-07) grants authenticated SELECT (gated to system admins
+-- by RLS) and revokes writes from anon and authenticated. Every write goes
+-- through the service-role client in logAuthEvent() — a failed OTP verify has
+-- no session to derive an INSERT policy from (ADR-0001 category 5). The
+-- migration never grants service_role, because hosted Supabase does.
+--
+-- The symptom (B17): every OTP send/verify and invite-confirmation role grant
+-- fails its audit write locally with 42501. logAuthEvent() is fail-safe, so
+-- login still works and the only trace is a "Failed to write auth event" log
+-- line. Dev and prod are unaffected — verified 2026-11-10: service_role holds
+-- full DML on auth_events on both, and rows are being written.
+-- tests/integration/auth-events-service-role.test.ts pins this grant.
+
+grant select, insert, update, delete on table public.auth_events
+to service_role;
+
+-- ----------------------------------------------------------------------------
 -- sms_queue — service_role full, authenticated INSERT only, anon nothing.
 -- ----------------------------------------------------------------------------
 -- Migration 0030 revokes all from anon and authenticated; 0032 restores INSERT
