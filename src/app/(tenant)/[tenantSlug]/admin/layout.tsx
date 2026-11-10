@@ -29,8 +29,8 @@ export async function SidebarChrome({
   // tenant by role alone does not have — see hasAccountScreen.
   const showAccount = await hasAccountScreen(tenantSlug)
 
-  // N21: PART-01 is Premium and up, so a Standard tenant gets no link.
-  // getAdminTenant is memoised per render pass, so this costs no extra
+  // N21: PART-01 is Premium and up. A Standard tenant still sees the menu
+  // item, greyed out and marked Premium, but not as a link. getAdminTenant is memoised per render pass, so this costs no extra
   // query. The page and every participants server action carry the same
   // gate independently — hiding a link is not access control.
   const tenant = await getAdminTenant(tenantSlug)

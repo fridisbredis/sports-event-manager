@@ -163,4 +163,23 @@ describe('sendAvailabilityConfirmSms — N13 sender', () => {
 
     expect(messagesCreate).toHaveBeenCalledWith(expect.objectContaining({ from: '+15550001111' }))
   })
+
+  // B15: the body named the tenant by its slug, while the invite sent minutes
+  // earlier in the same flow names it by tenants.name. The slug stays in the link.
+  it('names the tenant by its display name, not its slug', async () => {
+    await send(
+      serviceWith({ data: { tier: 'professional', sms_sender_id: 'Viadal', name: 'Viadal 2026' } })
+    )
+
+    const { body } = messagesCreate.mock.calls[0][0]
+    expect(body).toContain('availability for Viadal 2026 is confirmed')
+    expect(body).toContain('https://app.example.com/viadal/home')
+  })
+
+  it('falls back to the slug in the body when the tenant cannot be read', async () => {
+    await send(serviceWith({ error: { message: 'tenants unreadable' } }))
+
+    const { body } = messagesCreate.mock.calls[0][0]
+    expect(body).toContain('availability for viadal is confirmed')
+  })
 })
