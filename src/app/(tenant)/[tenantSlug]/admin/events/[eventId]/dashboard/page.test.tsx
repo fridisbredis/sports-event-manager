@@ -16,7 +16,7 @@ vi.mock('@/lib/supabase/server', () => ({
 // N41: tested on its own (claim-status.test.ts, and against Postgres in
 // participant-unlink.test.ts); here only whether the page shows its result.
 vi.mock('@/lib/participants/claim-status', () => ({
-  fetchClaimCounts: vi.fn(async () => ({ claimed: 28, total: 42 })),
+  fetchClaimCounts: vi.fn(async () => ({ claimed: 28, total: 42, conflicts: 0 })),
 }))
 
 // PERF-06 / F-PERF-04 Phase 3: unstable_cache would otherwise need a real
@@ -284,11 +284,26 @@ describe('DashboardPage', () => {
     const card = findByType(result, ParticipantsCard)
     expect(card!.props.claimed).toBe(28)
     expect(card!.props.total).toBe(42)
+    // N42: no conflicts, no flag.
+    expect(card!.props.conflictsLabel).toBeNull()
     expect(fetchClaimCounts).toHaveBeenCalledWith(expect.anything(), {
       tenantId: TENANT_ID,
       eventId: EVENT_ID,
       op: 'GET /[tenantSlug]/admin/dashboard',
     })
+  })
+
+  // N42 (EVT-01 participants-with-conflicts).
+  it('flags conflicts on the participants card when there are any', async () => {
+    vi.mocked(getAdminTenant).mockResolvedValue({ ...TENANT, tier: 'premium' } as never)
+    vi.mocked(fetchClaimCounts).mockResolvedValueOnce({ claimed: 28, total: 42, conflicts: 2 })
+    mockDashboardRpc({ data: dashboardPayload(), error: null })
+
+    const result = await DashboardPage({ params: PARAMS })
+
+    const card = findByType(result, ParticipantsCard)
+    expect(card!.props.conflictsLabel).toEqual(expect.any(String))
+    expect(card!.props.conflictsLabel).not.toBe('')
   })
 
   it('leaves the participants card out on Standard, without reading', async () => {

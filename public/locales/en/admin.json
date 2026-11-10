@@ -53,7 +53,9 @@
     "smsUsageEstimated": "Estimated from Twilio's list price.",
     "adminAreas": "Admin Areas",
     "participants": "Participants",
-    "participantsClaimed": "{{claimed}} of {{total}} claimed"
+    "participantsClaimed": "{{claimed}} of {{total}} claimed",
+    "participantsConflicts_one": "{{count}} conflict",
+    "participantsConflicts_other": "{{count}} conflicts"
   },
   "eventConfig": {
     "title": "Event configuration",
@@ -403,11 +405,30 @@
       "filterAll": "All",
       "claimed": "Claimed",
       "unclaimed": "Unclaimed",
+      "conflict": "Conflict",
       "unlink": "Unlink",
       "unlinkConfirmTitle": "Unlink phone number?",
       "unlinkConfirmBody": "{{name}} loses access as a participant in this event. The record can be claimed again.",
       "unlinkSuccess": "{{name}} is unlinked",
       "iceNotClaimed": "Shown once the participant has claimed their record."
+    },
+    "conflict": {
+      "heading": "Claim conflict",
+      "count_one": "{{count}} conflict",
+      "count_other": "{{count}} conflicts",
+      "current": "Current claimant",
+      "new": "New claimant",
+      "newSeveral": "New claimants",
+      "claimedAt": "Claimed at",
+      "triedAt": "Tried at",
+      "keep": "Keep current",
+      "switch": "Switch to new",
+      "switchToThis": "Switch to this one",
+      "noSms": "No SMS is sent to either person. Let them know yourself.",
+      "keepSuccess": "{{name}} stays with the current claimant",
+      "switchSuccess": "{{name}} is switched to the new claimant",
+      "switchConfirmTitle": "Switch to the new claimant?",
+      "switchConfirmBody": "The current claimant loses access to {{name}} at once, and {{phone}} can sign in instead. Any other pending claims on this participant are dismissed. No SMS is sent."
     },
     "detail": {
       "otherFields": "Other fields from Race Results",
