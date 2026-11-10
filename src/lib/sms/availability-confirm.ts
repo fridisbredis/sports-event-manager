@@ -110,9 +110,11 @@ export async function sendAvailabilityConfirmSms({
 
   // N13: the tenant's sender name. A failed read sends from the platform
   // number rather than dropping the message.
+  // B15: the same row supplies the display name for the body, so it matches
+  // the invite ("Viadal has invited you") instead of showing the URL slug.
   const { data: tenant, error: tenantError } = await service
     .from('tenants')
-    .select('tier, sms_sender_id')
+    .select('tier, sms_sender_id, name')
     .eq('id', tenantId)
     .maybeSingle()
 
@@ -126,7 +128,9 @@ export async function sendAvailabilityConfirmSms({
     })
   }
 
-  const body = buildAvailabilityConfirmSms({ name, tenant: tenantSlug, url })
+  // A failed read falls back to the slug: less readable, but it still tells
+  // the recipient which organisation the confirmation is for.
+  const body = buildAvailabilityConfirmSms({ name, tenant: tenant?.name ?? tenantSlug, url })
 
   // Constructed inside the try: twilio() throws synchronously on a non-AC
   // account SID, and that would otherwise escape into a confirmation that
