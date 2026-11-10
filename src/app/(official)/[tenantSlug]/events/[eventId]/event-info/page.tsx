@@ -1,40 +1,15 @@
 import { redirect, notFound } from 'next/navigation'
-import { unstable_cache } from 'next/cache'
 import { Info } from 'lucide-react'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { EventHeaderCard } from './_components/event-header-card'
 import { StageCard } from './_components/stage-card'
 import { InfoSectionCard } from './_components/info-section-card'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { SectionLabel } from './_components/section-label'
 import { formatStageDate, stageTimeRangeParts } from '@/lib/i18n/stage-range'
-import type { InfoSection } from '@/lib/events/info-sections'
-
-interface EventInfoCached {
-  event: {
-    name: string | null
-    event_type: string | null
-    description: string | null
-    logo_url: string | null
-    status: string
-  } | null
-  stages: Array<{
-    id: string
-    name: string
-    stage_type: string
-    stage_date: string | null
-    start_time: string | null
-    end_time: string | null
-    venue: string | null
-    results_url: string | null
-    position: number
-  }>
-  info_sections: InfoSection[]
-}
+import { getEventInfoCached } from '@/lib/events/event-info-cached'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -78,30 +53,8 @@ export default async function EventInfoPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): reads moved behind
-  // get_event_info_cached (migration 0051). Must be the service-role
-  // client — unstable_cache can't reach cookies(), and this is only safe
-  // because the RPC is SECURITY DEFINER owned by cache_rpc_reader
-  // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
-  const getEventInfoCached = unstable_cache(
-    async (tenantId: string, eventId: string) => {
-      const service = createSupabaseServiceClient()
-      const { data, error } = await service.rpc('get_event_info_cached', {
-        p_tenant_id: tenantId,
-        p_event_id: eventId,
-      })
-      if (error) throw error
-      return data as unknown as EventInfoCached
-    },
-    ['event-info'], // cache namespace, data-shape only — tenant scoping
-    // comes entirely from the tenantId closure argument reaching both the
-    // RPC call above and the tags array below
-    {
-      tags: [eventInfoCacheTag(tenant.id)],
-      revalidate: 60,
-    }
-  )
-
+  // Cached read shared with the participant variant (N43); the access
+  // check above is what makes it safe to call.
   const { event, stages, info_sections } = await getEventInfoCached(tenant.id, eventId)
 
   const stageList = stages

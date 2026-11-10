@@ -1,6 +1,16 @@
 import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
-import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
+import { Flag } from 'lucide-react'
+import {
+  getCurrentUser,
+  getOfficialTenant,
+  hasAdminScreens,
+  hasParticipantScreens,
+} from '@/lib/auth/tenant'
+import { getServerTranslation } from '@/lib/i18n/server'
+import { getUserLanguage } from '@/lib/i18n/user-language'
+import { participantPath } from '@/lib/events/paths'
+import { SurfaceSwitchLink } from '@/components/navigation/surface-switch-link'
 import { AdminViewLink } from './_components/admin-view-link'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 import { getSoleOfficialEventId } from '@/lib/events/official-event'
@@ -20,6 +30,21 @@ export async function AdminLinkChrome({ tenantSlug }: { tenantSlug: string }) {
   const showAdminLink = await hasAdminScreens(tenantSlug)
 
   return showAdminLink ? <AdminViewLink tenantSlug={tenantSlug} /> : null
+}
+
+// N43: an official who has also claimed a participant record lands here after
+// sign-in (official outranks participant in ROLE_PRIORITY). This strip is
+// their way to PAR-01; the participant layout has the way back.
+export async function ParticipantLinkChrome({ tenantSlug }: { tenantSlug: string }) {
+  if (!(await hasParticipantScreens(tenantSlug))) return null
+  const t = await getServerTranslation(await getUserLanguage(), 'official')
+  return (
+    <SurfaceSwitchLink
+      href={participantPath(tenantSlug)}
+      label={t('nav.participantView')}
+      Icon={Flag}
+    />
+  )
 }
 
 export default async function OfficialLayout({ children, params }: Props) {
@@ -62,6 +87,9 @@ export default async function OfficialLayout({ children, params }: Props) {
             will be. */}
         <Suspense>
           <AdminLinkChrome tenantSlug={tenantSlug} />
+        </Suspense>
+        <Suspense>
+          <ParticipantLinkChrome tenantSlug={tenantSlug} />
         </Suspense>
         <div className="flex-1 pb-16">{children}</div>
         <BottomTabBar

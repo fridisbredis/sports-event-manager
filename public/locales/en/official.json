@@ -5,7 +5,8 @@
     "eventInfo": "Event info",
     "announcements": "Announcements",
     "account": "Account",
-    "adminView": "Admin view"
+    "adminView": "Admin view",
+    "participantView": "My race"
   },
   "home": {
     "title": "Official Home",
@@ -155,6 +156,24 @@
     "role": {
       "official": "Official",
       "participant": "Participant"
+    }
+  },
+  "participant": {
+    "nav": {
+      "home": "Home",
+      "eventInfo": "Event info",
+      "account": "Account",
+      "myShifts": "My shifts"
+    },
+    "home": {
+      "title": "My race",
+      "bib": "Bib",
+      "category": "Class",
+      "myResults": "My results",
+      "noStages": "You are not entered in a race stage yet.",
+      "notAvailable": "This event is not available right now. Please check back later.",
+      "eventInfo": "Event info",
+      "latestAnnouncement": "Announcements"
     }
   }
 }

@@ -605,6 +605,60 @@ export async function resolveTenantForOfficial(
   return { ...tenant, officialId: access.officialId }
 }
 
+// N43: one linked participant record — the caller's entry in one event.
+export type ParticipantEntry = { participantId: string; eventId: string }
+
+// Participant-surface counterpart of ResolvedOfficialTenant. `entries` is
+// never empty: a caller with no linked participant record has nothing to see
+// on these screens and is denied instead.
+export type ResolvedParticipantTenant = ResolvedTenant & { entries: ParticipantEntry[] }
+
+// Participant surfaces — the mobile screens under (participant)/[tenantSlug]/
+// participant — are open to whoever is linked to at least one participant
+// record in an active tenant, and to no one else.
+//
+// Keyed on the participants rows, NOT on user_roles. user_roles holds one row
+// per (user, tenant), so an official who claims a record keeps their
+// 'official' row (claim_participant returns role_granted: false) and has no
+// 'participant' role to find. The link itself is what makes someone a
+// participant. Admins get no exception: without a record there is no bib, no
+// stage and no event to show them.
+//
+// Not gated on isParticipantSideOpen. ACCT-01 must stay reachable while every
+// one of the caller's events is closed (PB3, PB10); the pages that close
+// (PAR-01's cards, INFO-01) ask that question themselves, per event.
+//
+// The service client and the explicit user_id filter mirror the official
+// guard (ADR-0001 category 1, bootstrap lookup): the answer decides access,
+// so it must not depend on the request's own session reading itself.
+export async function resolveTenantForParticipant(
+  tenantSlug: string,
+  userId: string
+): Promise<ResolvedParticipantTenant | null> {
+  const tenant = await resolveTenantBySlug(tenantSlug)
+  if (!tenant || !tenant.is_active) return null
+
+  const service = createSupabaseServiceClient()
+  const { data, error } = await service
+    .from('participants')
+    .select('id, event_id')
+    .eq('user_id', userId)
+    .eq('tenant_id', tenant.id)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    logger.error('Failed to fetch participant records', error)
+    return null
+  }
+
+  if (!data || data.length === 0) return null
+
+  return {
+    ...tenant,
+    entries: data.map((row) => ({ participantId: row.id, eventId: row.event_id })),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Request-scoped memoisation (F-PERF-07)
 // ---------------------------------------------------------------------------
@@ -767,4 +821,26 @@ export const hasAccountScreen = cache(async (tenantSlug: string): Promise<boolea
 // check that answering the question requires at all.
 export const hasAdminScreens = cache(async (tenantSlug: string): Promise<boolean> => {
   return (await getAdminTenant(tenantSlug)) != null
+})
+
+// N43: participant-surface counterpart of getOfficialTenant, memoised the
+// same way so the layout and the page share one lookup.
+export const getParticipantTenant = cache(
+  async (tenantSlug: string): Promise<ResolvedParticipantTenant | null> => {
+    const user = await getCurrentUser()
+    if (!user) return null
+    return resolveTenantForParticipant(tenantSlug, user.id)
+  }
+)
+
+// N43: whether to offer an official the link to their participant pages, and
+// a participant the link back to their shifts. A user who is both lands on the
+// official surface after sign-in (ROLE_PRIORITY), so without these links the
+// other surface is reachable only by editing the URL.
+export const hasParticipantScreens = cache(async (tenantSlug: string): Promise<boolean> => {
+  return (await getParticipantTenant(tenantSlug)) != null
+})
+
+export const hasOfficialScreens = cache(async (tenantSlug: string): Promise<boolean> => {
+  return (await getOfficialTenant(tenantSlug)) != null
 })
