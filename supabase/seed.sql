@@ -201,4 +201,26 @@ grant insert on table public.sms_queue to authenticated;
 grant select, insert, update, delete on table public.sms_usage
 to service_role;
 
+-- ----------------------------------------------------------------------------
+-- sms_cap_warnings — service_role only.
+-- ----------------------------------------------------------------------------
+-- Migration 20261030084025 (N32) revokes all from anon and authenticated and,
+-- like sms_usage above, leaves service_role to the hosted platform's automatic
+-- grant — which a local `supabase db reset` does not supply.
+--
+-- The symptom (B16): sendSmsCapWarnings logs "permission denied for table
+-- sms_cap_warnings" (42501) with consequence cap_warnings_skipped_this_tick,
+-- returns 0, and the 90% warning never goes out locally. The integration test
+-- 'texts the tenant admin and the system admin, not the official, once' in
+-- sms-cap-warning.test.ts fails with an empty recipient list. Dev and prod
+-- are unaffected — verified 2026-11-10: service_role holds select, insert,
+-- update and delete on this table on both.
+--
+-- All four are needed: the worker reads the month's claims, inserts its own
+-- claim, updates it with the send counts, and deletes it when every send
+-- failed so the next tick retries.
+
+grant select, insert, update, delete on table public.sms_cap_warnings
+to service_role;
+
 commit;
