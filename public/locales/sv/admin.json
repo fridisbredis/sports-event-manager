@@ -380,6 +380,19 @@
       "removeConfirmBody": "{{name}} tas bort från det här eventet. Det går inte att ångra.",
       "cancel": "Avbryt",
       "genericError": "Kunde inte uppdatera deltagaren. Försök igen."
+    },
+    "claimLink": {
+      "copy": "Kopiera registreringslänk",
+      "copyShort": "Kopiera länk",
+      "copied": "Registreringslänken kopierad",
+      "copyError": "Kunde inte kopiera länken. Kopiera den från rutan i stället.",
+      "showQr": "Visa QR-kod",
+      "qrTitle": "Skanna för att registrera ditt deltagarkonto",
+      "qrAlt": "QR-kod för registreringslänken",
+      "qrError": "Kunde inte skapa QR-koden.",
+      "linkLabel": "Registreringslänk",
+      "download": "Ladda ner",
+      "closedNotice": "Evenemanget är inte publicerat. Du kan kopiera registreringslänken och skriva ut QR-koden redan nu. Tills du publicerar visar länken att registreringen inte är öppen."
     }
   },
   "scheduling": {
