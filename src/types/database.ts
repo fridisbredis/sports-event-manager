@@ -1301,16 +1301,6 @@ export type Database = {
         }
         Returns: Json
       }
-      complete_participant_claim: {
-        Args: {
-          p_event_id: string
-          p_participant_id: string
-          p_privacy_accepted: boolean
-          p_tenant_id: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
       claim_sms_queue_batch: {
         Args: { p_batch_size: number }
         Returns: {
@@ -1330,6 +1320,16 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      complete_participant_claim: {
+        Args: {
+          p_event_id: string
+          p_participant_id: string
+          p_privacy_accepted: boolean
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       confirm_official_invite: {
         Args: {
