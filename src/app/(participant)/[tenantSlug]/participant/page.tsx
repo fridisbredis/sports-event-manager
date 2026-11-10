@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
-import { AlertCircle, ArrowUpRight, ChevronRight, Flag } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, Flag } from 'lucide-react'
 import { getCurrentUser, getParticipantTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -9,6 +9,7 @@ import { participantEventInfoPath } from '@/lib/events/paths'
 import { loadParticipantHome, type ParticipantHomeEvent } from '@/lib/participants/participant-home'
 import { AppCard } from '@/components/ui/app-card'
 import { AnnouncementCard } from '@/components/announcements/announcement-card'
+import { NotAvailable } from './_components/not-available'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -66,17 +67,6 @@ function StageCards({ event, t }: { event: ParticipantHomeEvent; t: T }) {
         </AppCard>
       ))}
     </div>
-  )
-}
-
-// PB3: a closed event keeps the runner's record and account, but shows
-// nothing of the event — no bib, no stages — until it opens again.
-function NotAvailable({ t }: { t: T }) {
-  return (
-    <AppCard bodyClassName="flex-row items-start gap-3 p-4">
-      <AlertCircle className="mt-0.5 size-5 shrink-0 text-ink-soft" aria-hidden="true" />
-      <p className="text-[15px] leading-relaxed text-ink">{t('participant.home.notAvailable')}</p>
-    </AppCard>
   )
 }
 
@@ -139,7 +129,7 @@ export default async function ParticipantHomePage({ params }: Props) {
                 )}
               </>
             ) : (
-              <NotAvailable t={t} />
+              <NotAvailable message={t('participant.home.notAvailable')} />
             )}
           </section>
         ))}
