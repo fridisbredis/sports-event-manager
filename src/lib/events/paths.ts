@@ -35,3 +35,18 @@ export function officialEventPath(tenantSlug: string, eventId: string, subpath =
 export function officialEventRoutePattern(subpath: string): string {
   return `/[tenantSlug]/events/[eventId]/${subpath.replace(/^\/+/, '')}`
 }
+
+// N43: the participant surfaces live under /[tenantSlug]/participant — the
+// path resolvePostLoginRedirect already sends a participant to. Home and
+// account are tenant-wide (a runner sees every event they are entered in on
+// one page); event info is per event.
+export type ParticipantSegment = '' | 'account'
+
+export function participantPath(tenantSlug: string, segment: ParticipantSegment = ''): string {
+  const base = `/${tenantSlug}/participant`
+  return segment ? `${base}/${segment}` : base
+}
+
+export function participantEventInfoPath(tenantSlug: string, eventId: string): string {
+  return `/${tenantSlug}/participant/events/${eventId}/info`
+}

@@ -1,66 +1,18 @@
 import { redirect, notFound } from 'next/navigation'
-import { unstable_cache } from 'next/cache'
 import { Info } from 'lucide-react'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import { eventInfoCacheTag } from '@/lib/cache/tags'
-import { EventHeaderCard } from './_components/event-header-card'
-import { StageCard } from './_components/stage-card'
-import { InfoSectionCard } from './_components/info-section-card'
+import { EventHeaderCard } from '@/components/event-info/event-header-card'
+import { StageCard } from '@/components/event-info/stage-card'
+import { InfoSectionCard } from '@/components/event-info/info-section-card'
 import { EmptyStateCard } from '@/components/ui/empty-state'
-import { SectionLabel } from './_components/section-label'
-import { formatStageDate, stageTimeRangeParts } from '@/lib/i18n/stage-range'
-import type { InfoSection } from '@/lib/events/info-sections'
-
-interface EventInfoCached {
-  event: {
-    name: string | null
-    event_type: string | null
-    description: string | null
-    logo_url: string | null
-    status: string
-  } | null
-  stages: Array<{
-    id: string
-    name: string
-    stage_type: string
-    stage_date: string | null
-    start_time: string | null
-    end_time: string | null
-    venue: string | null
-    results_url: string | null
-    position: number
-  }>
-  info_sections: InfoSection[]
-}
+import { SectionLabel } from '@/components/event-info/section-label'
+import { stageDetails } from '@/components/event-info/stage-details'
+import { getEventInfoCached } from '@/lib/events/event-info-cached'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
-}
-
-// A stage carries either a full start timestamp or just a date (stage_date,
-// set when the admin has pinned the day but not yet the hour). The card
-// should show the day in both cases, so fall back rather than leaving the
-// row blank.
-//
-// Formatting itself lives in @/lib/i18n/stage-range, shared with the admin
-// stage list (EVT-02): both screens describe the same stage, and when they
-// formatted it separately this screen lost the end date and rendered a
-// six-day stage as "Sun, 2 Aug · 12:00 – 12:00".
-function stageDetails(
-  stage: { start_time: string | null; stage_date: string | null; end_time: string | null },
-  language: string
-): string[] {
-  const range = stageTimeRangeParts(stage.start_time, stage.end_time, language)
-  // The start's date is already inside `from`, so the range carries the day
-  // itself and no separate date detail is added beside it.
-  if (range) return [range.to ? `${range.from} – ${range.to}` : range.from]
-  // stage_date is a bare 'YYYY-MM-DD'; append UTC midnight so it is not
-  // parsed as local time and pulled back a day west of Greenwich.
-  if (stage.stage_date) return [formatStageDate(stage.stage_date + 'T00:00:00Z', language)]
-  return []
 }
 
 export default async function EventInfoPage({ params }: Props) {
@@ -78,30 +30,8 @@ export default async function EventInfoPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): reads moved behind
-  // get_event_info_cached (migration 0051). Must be the service-role
-  // client — unstable_cache can't reach cookies(), and this is only safe
-  // because the RPC is SECURITY DEFINER owned by cache_rpc_reader
-  // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
-  const getEventInfoCached = unstable_cache(
-    async (tenantId: string, eventId: string) => {
-      const service = createSupabaseServiceClient()
-      const { data, error } = await service.rpc('get_event_info_cached', {
-        p_tenant_id: tenantId,
-        p_event_id: eventId,
-      })
-      if (error) throw error
-      return data as unknown as EventInfoCached
-    },
-    ['event-info'], // cache namespace, data-shape only — tenant scoping
-    // comes entirely from the tenantId closure argument reaching both the
-    // RPC call above and the tags array below
-    {
-      tags: [eventInfoCacheTag(tenant.id)],
-      revalidate: 60,
-    }
-  )
-
+  // Cached read shared with the participant variant (N43); the access
+  // check above is what makes it safe to call.
   const { event, stages, info_sections } = await getEventInfoCached(tenant.id, eventId)
 
   const stageList = stages

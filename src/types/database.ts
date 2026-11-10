@@ -1509,6 +1509,10 @@ export type Database = {
           time_off_clash: number
         }[]
       }
+      set_own_participant_sms_opt_out: {
+        Args: { p_opt_out: boolean; p_tenant_id: string }
+        Returns: number
+      }
       shares_event_with_caller: {
         Args: { p_official_id: string }
         Returns: boolean

@@ -5,7 +5,8 @@
     "eventInfo": "Evenemangsinfo",
     "announcements": "Meddelanden",
     "account": "Konto",
-    "adminView": "Adminvy"
+    "adminView": "Adminvy",
+    "participantView": "Mitt lopp"
   },
   "home": {
     "title": "Funktionärsstart",
@@ -155,6 +156,32 @@
     "role": {
       "official": "Funktionär",
       "participant": "Deltagare"
+    }
+  },
+  "participant": {
+    "nav": {
+      "home": "Start",
+      "eventInfo": "Evenemangsinfo",
+      "account": "Konto",
+      "myShifts": "Mina pass"
+    },
+    "home": {
+      "title": "Mitt lopp",
+      "bib": "Startnr",
+      "category": "Klass",
+      "myResults": "Mina resultat",
+      "noStages": "Du är inte anmäld till någon etapp än.",
+      "notAvailable": "Det här evenemanget är inte tillgängligt just nu. Titta in igen senare.",
+      "eventInfo": "Evenemangsinfo",
+      "latestAnnouncement": "Meddelanden"
+    },
+    "account": {
+      "nameLabel": "Namn (endast läsbart)",
+      "nameHint": "Som på startlistan i Race Results.",
+      "myRace": "Mitt lopp",
+      "myShiftsHeading": "Dina pass",
+      "myShifts": "Mina pass",
+      "myShiftsSub": "Du är funktionär här också"
     }
   }
 }
