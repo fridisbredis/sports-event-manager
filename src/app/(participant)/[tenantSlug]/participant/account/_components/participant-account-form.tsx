@@ -158,7 +158,7 @@ export function ParticipantAccountForm({
           const facts = [
             ...entry.stageNames,
             entry.bib ? `${t('participant.home.bib')} ${entry.bib}` : null,
-            entry.category,
+            entry.category ? `${t('participant.home.category')} ${entry.category}` : null,
           ].filter(Boolean)
           return (
             <AppCard key={entry.eventId} bodyClassName="px-4 py-4">

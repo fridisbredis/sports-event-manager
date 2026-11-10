@@ -82,7 +82,7 @@ describe('ParticipantAccountForm', () => {
   it('shows the race facts and the own results link', () => {
     render(<ParticipantAccountForm {...baseProps} />)
 
-    expect(screen.getByText('6dagars · participant.home.bib 101 · W40')).toBeTruthy()
+    expect(screen.getByText('6dagars · participant.home.bib 101 · participant.home.category W40')).toBeTruthy()
     expect(screen.getByText('participant.home.myResults').closest('a')?.getAttribute('href')).toBe(
       'https://example.test/101'
     )
