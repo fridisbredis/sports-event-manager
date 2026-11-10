@@ -1,6 +1,6 @@
 'use client'
 
-import { Users, ChevronRight, MoreHorizontal, Phone, UserPlus, CalendarPlus } from 'lucide-react'
+import { Users, ChevronRight, MoreHorizontal, UserPlus, CalendarPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -38,7 +38,6 @@ import {
   PHONE_COUNTRIES,
   DEFAULT_PHONE_COUNTRY,
   formatPhoneForDisplay,
-  toTwilioE164,
 } from '@/lib/phone'
 import { isIceContactEmpty, type IceContact } from '@/lib/ice-contact'
 import type { OfficialListItem } from '@/types/app'
@@ -46,6 +45,7 @@ import type { OfficialDetail } from '@/lib/scheduling/official-detail'
 import { formatStageDate, formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
 import { makeTenantAdmin, removeTenantAdmin } from '../actions'
 import { AddFromEventsModal, type OfficialCandidate } from './add-from-events-modal'
+import { IceContactSection } from '../../../../_components/ice-contact-section'
 
 interface Props {
   tenantSlug: string
@@ -804,7 +804,7 @@ function OfficialDetailPanel({
     <div className="grid gap-6 px-4 pb-5 pt-1 sm:grid-cols-2 lg:grid-cols-3">
       {/* N37: first, because this is the section someone opens the row for in
           a hurry. Read only — the contact is the official's to edit. */}
-      <IceContactSection ice={ice} t={t} />
+      <IceContactSection ice={ice} />
       <section>
         <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
           {t('officials.detailShifts', { count: shifts.length })}
@@ -869,66 +869,5 @@ function OfficialDetailPanel({
         )}
       </section>
     </div>
-  )
-}
-
-/**
- * N37: the ICE block of OFF-01's expanded row — phone, name and relation as
- * key/value rows (OFF-01 row-expanded-ice), or "No ICE contact given".
- *
- * The phone is a tel: link so an admin on a phone taps it to call (L22, L27).
- * Built from the stored E.164 with its '+' restored, which is what a dialler
- * needs whatever country the number is in.
- */
-function IceContactSection({
-  ice,
-  t,
-}: {
-  ice: IceContact | null
-  t: ReturnType<typeof useTranslation>['t']
-}) {
-  const { t: tCommon } = useTranslation('common')
-
-  return (
-    <section>
-      <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
-        {t('officials.detailIce')}
-      </h3>
-      {isIceContactEmpty(ice) || !ice ? (
-        <p className="text-[14px] text-ink-soft">{t('officials.detailNoIce')}</p>
-      ) : (
-        <dl className="space-y-1.5 text-[14px]">
-          {ice.phone && (
-            <div className="flex gap-3">
-              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.phoneLabel')}</dt>
-              <dd>
-                <a
-                  href={`tel:${toTwilioE164(ice.phone)}`}
-                  aria-label={t('officials.detailIceCall', {
-                    name: ice.name ?? formatPhoneForDisplay(ice.phone),
-                  })}
-                  className="inline-flex items-center gap-1.5 font-medium text-tenant-primary underline-offset-2 hover:underline"
-                >
-                  <Phone className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
-                  <span className="tabular-nums">{formatPhoneForDisplay(ice.phone)}</span>
-                </a>
-              </dd>
-            </div>
-          )}
-          {ice.name && (
-            <div className="flex gap-3">
-              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.nameLabel')}</dt>
-              <dd className="text-ink">{ice.name}</dd>
-            </div>
-          )}
-          {ice.relation && (
-            <div className="flex gap-3">
-              <dt className="w-20 shrink-0 text-ink-soft">{tCommon('iceContact.relationLabel')}</dt>
-              <dd className="text-ink">{ice.relation}</dd>
-            </div>
-          )}
-        </dl>
-      )}
-    </section>
   )
 }

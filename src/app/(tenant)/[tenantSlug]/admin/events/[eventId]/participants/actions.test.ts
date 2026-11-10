@@ -5,13 +5,15 @@ import {
   addParticipant,
   setParticipantHidden,
   removeParticipant,
+  unlinkParticipant,
 } from './actions'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { fetchParticipants } from '@/lib/race-results/client'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(),
+  createSupabaseServiceClient: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -536,5 +538,115 @@ describe('removeParticipant', () => {
 
     expect(result.error).toBe('actionErrors.notAuthorized')
     expect(stub.participantsBuilder.delete).not.toHaveBeenCalled()
+  })
+})
+
+describe('unlinkParticipant (N41)', () => {
+  const AVATAR_BASE = 'https://x.supabase.co/storage/v1/object/public/avatars/'
+
+  function storageStub() {
+    const remove = vi.fn(async () => ({ data: [], error: null }))
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      storage: { from: vi.fn(() => ({ remove })) },
+    } as never)
+    return remove
+  }
+
+  it('clears the link, the phone, the consent and the photo in one update', async () => {
+    const remove = storageStub()
+    const stub = supabaseStub({ insertResult: { data: [{ id: PARTICIPANT_ID }], error: null } })
+    stub.participantsBuilder.maybeSingle = vi.fn(async () => ({
+      data: { avatar_url: `${AVATAR_BASE}${TENANT_ID}/participants/${PARTICIPANT_ID}/1.webp` },
+      error: null,
+    }))
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await unlinkParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(stub.participantsBuilder.update).toHaveBeenCalledTimes(1)
+    expect(stub.participantsBuilder.update).toHaveBeenCalledWith({
+      user_id: null,
+      phone: null,
+      privacy_accepted_at: null,
+      avatar_url: null,
+    })
+    // Only a claimed row: an unclaimed one must not lose an admin-typed phone.
+    expect(stub.participantsBuilder.not).toHaveBeenCalledWith('user_id', 'is', null)
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('event_id', 'event-1')
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(remove).toHaveBeenCalledWith([`${TENANT_ID}/participants/${PARTICIPANT_ID}/1.webp`])
+  })
+
+  it("never removes a file outside this participant's own folder", async () => {
+    const remove = storageStub()
+    const stub = supabaseStub({ insertResult: { data: [{ id: PARTICIPANT_ID }], error: null } })
+    stub.participantsBuilder.maybeSingle = vi.fn(async () => ({
+      data: { avatar_url: `${AVATAR_BASE}${TENANT_ID}/officials/someone/1.webp` },
+      error: null,
+    }))
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await unlinkParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('reports an unclaimed or unknown participant as not found', async () => {
+    const remove = storageStub()
+    const stub = supabaseStub({ insertResult: { data: [], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await unlinkParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBe('actionErrors.participantNotFound')
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('refuses a tenant whose tier has no participants', async () => {
+    const stub = supabaseStub({ tier: 'standard' })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await unlinkParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBe('actionErrors.participantsNotInTier')
+    expect(stub.participantsBuilder.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a caller without admin access to the tenant', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const stub = supabaseStub()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await unlinkParticipant({
+      tenantSlug: 't',
+      tenantId: TENANT_ID,
+      eventId: 'event-1',
+      participantId: PARTICIPANT_ID,
+    })
+
+    expect(result.error).toBe('actionErrors.notAuthorized')
+    expect(stub.participantsBuilder.update).not.toHaveBeenCalled()
   })
 })

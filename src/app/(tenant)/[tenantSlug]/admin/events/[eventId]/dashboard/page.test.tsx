@@ -5,9 +5,18 @@ import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { OfficialsCard } from './_components/officials-card'
 import { PublishSection } from './_components/publish-section'
+import { ParticipantsCard } from './_components/participants-card'
+import { fetchClaimCounts } from '@/lib/participants/claim-status'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
+  createSupabaseServerClient: vi.fn(async () => ({})),
+}))
+
+// N41: tested on its own (claim-status.test.ts, and against Postgres in
+// participant-unlink.test.ts); here only whether the page shows its result.
+vi.mock('@/lib/participants/claim-status', () => ({
+  fetchClaimCounts: vi.fn(async () => ({ claimed: 28, total: 42 })),
 }))
 
 // PERF-06 / F-PERF-04 Phase 3: unstable_cache would otherwise need a real
@@ -49,6 +58,9 @@ vi.mock('./_components/publish-section', () => ({
 }))
 vi.mock('./_components/officials-card', () => ({
   OfficialsCard: vi.fn(() => null),
+}))
+vi.mock('./_components/participants-card', () => ({
+  ParticipantsCard: vi.fn(() => null),
 }))
 vi.mock('./_components/scheduling-warnings-card', () => ({
   SchedulingWarningsCard: vi.fn(() => null),
@@ -261,4 +273,41 @@ describe('DashboardPage', () => {
       expect(section!.props.isPublished).toBe(isPublished)
     }
   )
+
+  // N41 (L21): claimed participants beside the officials counts.
+  it('shows the claimed count on a tier with participants', async () => {
+    vi.mocked(getAdminTenant).mockResolvedValue({ ...TENANT, tier: 'premium' } as never)
+    mockDashboardRpc({ data: dashboardPayload(), error: null })
+
+    const result = await DashboardPage({ params: PARAMS })
+
+    const card = findByType(result, ParticipantsCard)
+    expect(card!.props.claimed).toBe(28)
+    expect(card!.props.total).toBe(42)
+    expect(fetchClaimCounts).toHaveBeenCalledWith(expect.anything(), {
+      tenantId: TENANT_ID,
+      eventId: EVENT_ID,
+      op: 'GET /[tenantSlug]/admin/dashboard',
+    })
+  })
+
+  it('leaves the participants card out on Standard, without reading', async () => {
+    vi.mocked(getAdminTenant).mockResolvedValue({ ...TENANT, tier: 'standard' } as never)
+    mockDashboardRpc({ data: dashboardPayload(), error: null })
+
+    const result = await DashboardPage({ params: PARAMS })
+
+    expect(findByType(result, ParticipantsCard)).toBeNull()
+    expect(fetchClaimCounts).not.toHaveBeenCalled()
+  })
+
+  it('leaves the participants card out when the count cannot be read', async () => {
+    vi.mocked(getAdminTenant).mockResolvedValue({ ...TENANT, tier: 'premium' } as never)
+    vi.mocked(fetchClaimCounts).mockResolvedValueOnce(null)
+    mockDashboardRpc({ data: dashboardPayload(), error: null })
+
+    const result = await DashboardPage({ params: PARAMS })
+
+    expect(findByType(result, ParticipantsCard)).toBeNull()
+  })
 })

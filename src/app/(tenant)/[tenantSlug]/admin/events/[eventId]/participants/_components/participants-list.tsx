@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ClipboardList, MoreHorizontal, TriangleAlert } from 'lucide-react'
+import { Check, ChevronRight, ClipboardList, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import {
   Chip,
   Table,
@@ -39,13 +39,21 @@ import {
   addParticipant,
   setParticipantHidden,
   removeParticipant,
+  unlinkParticipant,
   type StageImportOutcome,
 } from '../actions'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 
 import { PremiumBadge } from '@/components/ui/premium-badge'
 
+import type { IceContact } from '@/lib/ice-contact'
+import type { ClaimCounts, ClaimFilter } from '@/lib/participants/claim-status'
+
+import { IceContactSection } from '../../../../_components/ice-contact-section'
 import { ClaimLinkActions } from './claim-link-actions'
+
+/** Bib, Name, Class, Club, Nation, Gender, Phone, Claim status, Stages, ⋯ */
+const COLUMN_COUNT = 10
 
 // Columns drop out as the screen narrows, so Bib and Name always have room
 // (same approach as the officials roster's HIDE_ON_MOBILE). On a phone the
@@ -70,6 +78,8 @@ export interface ParticipantRow {
   extra: Record<string, string>
   withdrawnAt: string | null
   hiddenAt: string | null
+  /** N41: participants.user_id is set. The id itself never reaches the browser. */
+  claimed: boolean
   stageIds: string[]
 }
 
@@ -90,6 +100,11 @@ interface Props {
   selectedStageId: string | null
   showWithdrawn: boolean
   showHidden: boolean
+  claimFilter: ClaimFilter
+  /** Null when the count could not be read; the header then leaves it out. */
+  claimCounts: ClaimCounts | null
+  /** N41: ICE contacts of claimed rows on this page, keyed by participant id. */
+  iceContacts: Record<string, IceContact>
   claimList: { path: string; eventName: string; isOpen: boolean }
 }
 
@@ -104,6 +119,9 @@ export default function ParticipantsList({
   selectedStageId,
   showWithdrawn,
   showHidden,
+  claimFilter,
+  claimCounts,
+  iceContacts,
   claimList,
 }: Props) {
   const { t } = useTranslation('admin')
@@ -118,6 +136,17 @@ export default function ParticipantsList({
   const [removeTarget, setRemoveTarget] = useState<ParticipantRow | null>(null)
   // The row whose hide/remove is in flight, so only its ⋯ button spins.
   const [rowPendingId, setRowPendingId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [unlinkTarget, setUnlinkTarget] = useState<ParticipantRow | null>(null)
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const importableStages = stages.filter((s) => s.hasResultsLink)
 
@@ -244,6 +273,32 @@ export default function ParticipantsList({
     }
   }
 
+  async function confirmUnlink() {
+    if (!unlinkTarget) return
+    const target = unlinkTarget
+    setUnlinkTarget(null)
+    setRowPendingId(target.id)
+    try {
+      const result = await unlinkParticipant({
+        tenantSlug,
+        tenantId,
+        eventId,
+        participantId: target.id,
+      })
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
+      toastSuccess(t('participants.claim.unlinkSuccess', { name: target.name ?? '—' }))
+      router.refresh()
+    } catch (err) {
+      logger.error('Unlinking a participant failed', err)
+      toastError(extractErrorMessage(err, t('participants.actions.genericError')))
+    } finally {
+      setRowPendingId(null)
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -292,6 +347,24 @@ export default function ParticipantsList({
           {t('participants.claimLink.closedNotice')}
         </p>
       )}
+
+      {/* N41 (L25): how many have claimed, then the claim-status filter.
+          The count is the whole start list, not this page or this filter —
+          the same figure EVT-01 shows (fetchClaimCounts). */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+        {claimCounts && (
+          <p className="text-[15px] font-medium text-ink">
+            {t('participants.claim.count', {
+              claimed: claimCounts.claimed,
+              total: claimCounts.total,
+            })}
+          </p>
+        )}
+        <ClaimFilterTabs
+          value={claimFilter}
+          onChange={(next) => setParam('claim', next === 'all' ? null : next)}
+        />
+      </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Select
@@ -362,6 +435,7 @@ export default function ParticipantsList({
             <TableColumn className={SHOW_FROM_LG}>{t('participants.columns.nation')}</TableColumn>
             <TableColumn className={SHOW_FROM_LG}>{t('participants.columns.gender')}</TableColumn>
             <TableColumn className={SHOW_FROM_MD}>{t('participants.columns.phone')}</TableColumn>
+            <TableColumn>{t('participants.columns.claimStatus')}</TableColumn>
             <TableColumn className={SHOW_FROM_MD}>{t('participants.columns.stages')}</TableColumn>
             {/* Same ⋯ column as the officials roster (N27): narrow,
                 right-aligned, labelled only for screen readers. */}
@@ -370,85 +444,144 @@ export default function ParticipantsList({
             </TableColumn>
           </TableHeader>
           <TableBody>
-            {participants.map((p) => (
-              <TableRow
-                key={p.id}
-                className={p.withdrawnAt || p.hiddenAt ? 'opacity-60' : undefined}
-              >
-                <TableCell className="text-[15px] tabular-nums text-ink-soft">
-                  {p.bib ?? '—'}
-                </TableCell>
-                <TableCell className="text-[15px] font-medium text-ink">
-                  <span className="flex flex-wrap items-center gap-2">
-                    {p.name ?? '—'}
-                    {p.withdrawnAt && (
-                      <Chip
-                        size="sm"
-                        variant="flat"
-                        className="bg-status-pending-bg text-status-pending-text"
-                      >
-                        {t('participants.withdrawn')}
-                      </Chip>
-                    )}
-                    {p.hiddenAt && (
-                      <Chip
-                        size="sm"
-                        variant="flat"
-                        className="bg-status-neutral-bg text-status-neutral-text"
-                      >
-                        {t('participants.hidden')}
-                      </Chip>
-                    )}
-                    {p.source === 'manual' && (
-                      <Chip
-                        size="sm"
-                        variant="flat"
-                        className="bg-status-neutral-bg text-status-neutral-text"
-                      >
-                        {t('participants.manual')}
-                      </Chip>
-                    )}
-                  </span>
-                </TableCell>
-                <TableCell className={`${SHOW_FROM_SM} text-[15px] text-ink-soft`}>
-                  {p.category ?? '—'}
-                </TableCell>
-                <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
-                  {p.club ?? '—'}
-                </TableCell>
-                <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
-                  {p.nation ?? '—'}
-                </TableCell>
-                <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
-                  {p.gender ?? '—'}
-                </TableCell>
-                {/* Always shown, empty until filled: Race Results does not
+            {participants.flatMap((p) => {
+              const isExpanded = expanded.has(p.id)
+              // Same two-row pattern as OFF-01: the roster row, and the
+              // detail panel beneath it only while open. An array, not a
+              // fragment, because HeroUI's TableBody reads its children as a
+              // collection.
+              return [
+                <TableRow
+                  key={p.id}
+                  className={p.withdrawnAt || p.hiddenAt ? 'opacity-60' : undefined}
+                >
+                  <TableCell className="text-[15px] tabular-nums text-ink-soft">
+                    {p.bib ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-[15px] font-medium text-ink">
+                    {/* The name is the disclosure control, as on OFF-01: a
+                      wide target, and the row stays inert so the ⋯ menu's
+                      clicks are not swallowed by it. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(p.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`participant-detail-${p.id}`}
+                      className="flex w-full flex-wrap items-center gap-2 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tenant-primary"
+                    >
+                      <ChevronRight
+                        className={`size-4 shrink-0 text-ink-faint transition-transform ${
+                          isExpanded ? 'rotate-90' : ''
+                        }`}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                      {p.name ?? '—'}
+                      {p.withdrawnAt && (
+                        <Chip
+                          size="sm"
+                          variant="flat"
+                          className="bg-status-pending-bg text-status-pending-text"
+                        >
+                          {t('participants.withdrawn')}
+                        </Chip>
+                      )}
+                      {p.hiddenAt && (
+                        <Chip
+                          size="sm"
+                          variant="flat"
+                          className="bg-status-neutral-bg text-status-neutral-text"
+                        >
+                          {t('participants.hidden')}
+                        </Chip>
+                      )}
+                      {p.source === 'manual' && (
+                        <Chip
+                          size="sm"
+                          variant="flat"
+                          className="bg-status-neutral-bg text-status-neutral-text"
+                        >
+                          {t('participants.manual')}
+                        </Chip>
+                      )}
+                    </button>
+                  </TableCell>
+                  <TableCell className={`${SHOW_FROM_SM} text-[15px] text-ink-soft`}>
+                    {p.category ?? '—'}
+                  </TableCell>
+                  <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
+                    {p.club ?? '—'}
+                  </TableCell>
+                  <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
+                    {p.nation ?? '—'}
+                  </TableCell>
+                  <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
+                    {p.gender ?? '—'}
+                  </TableCell>
+                  {/* Always shown, empty until filled: Race Results does not
                     expose phone numbers, so an imported row has none until
                     someone links it. */}
-                <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
-                  {/* Free text, not normalised on save — hence not
+                  <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
+                    {/* Free text, not normalised on save — hence not
                       formatPhoneForDisplay, which assumes the stored E.164. */}
-                  {p.phone ? formatEnteredPhoneForDisplay(p.phone) : '—'}
-                </TableCell>
-                <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
-                  {p.stageIds.length === 0
-                    ? '—'
-                    : stages
-                        .filter((s) => p.stageIds.includes(s.id))
-                        .map((s) => s.name)
-                        .join(', ')}
-                </TableCell>
-                <TableCell>
-                  <ParticipantActionsMenu
-                    participant={p}
-                    busy={rowPendingId === p.id}
-                    t={t}
-                    onToggleHidden={() => toggleHidden(p)}
-                    onRemove={() => setRemoveTarget(p)}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+                    {p.phone ? formatEnteredPhoneForDisplay(p.phone) : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="sm"
+                      variant="flat"
+                      className={
+                        p.claimed
+                          ? 'bg-status-ok-bg text-status-ok-text'
+                          : 'bg-status-neutral-bg text-status-neutral-text'
+                      }
+                    >
+                      {p.claimed
+                        ? t('participants.claim.claimed')
+                        : t('participants.claim.unclaimed')}
+                    </Chip>
+                  </TableCell>
+                  <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
+                    {p.stageIds.length === 0
+                      ? '—'
+                      : stages
+                          .filter((s) => p.stageIds.includes(s.id))
+                          .map((s) => s.name)
+                          .join(', ')}
+                  </TableCell>
+                  <TableCell>
+                    <ParticipantActionsMenu
+                      participant={p}
+                      busy={rowPendingId === p.id}
+                      t={t}
+                      onToggleHidden={() => toggleHidden(p)}
+                      onRemove={() => setRemoveTarget(p)}
+                    />
+                  </TableCell>
+                </TableRow>,
+                ...(isExpanded
+                  ? [
+                      <TableRow key={`${p.id}-detail`}>
+                        {/* One cell spanning every column, and the row's only
+                          cell: React Stately throws unless a row's colSpans
+                          add up to the column count (see OFF-01). */}
+                        <TableCell
+                          colSpan={COLUMN_COUNT}
+                          id={`participant-detail-${p.id}`}
+                          className="bg-status-neutral-bg/40 p-0"
+                        >
+                          <ParticipantDetailPanel
+                            participant={p}
+                            ice={iceContacts[p.id] ?? null}
+                            busy={rowPendingId === p.id}
+                            onUnlink={() => setUnlinkTarget(p)}
+                          />
+                        </TableCell>
+                      </TableRow>,
+                    ]
+                  : []),
+              ]
+            })}
           </TableBody>
         </Table>
       )}
@@ -662,6 +795,126 @@ export default function ParticipantsList({
         onCancel={() => setRemoveTarget(null)}
         onConfirm={confirmRemove}
       />
+
+      <ConfirmDialog
+        open={unlinkTarget !== null}
+        title={t('participants.claim.unlinkConfirmTitle')}
+        body={t('participants.claim.unlinkConfirmBody', { name: unlinkTarget?.name ?? '—' })}
+        cancelLabel={t('participants.actions.cancel')}
+        confirmLabel={t('participants.claim.unlink')}
+        destructive
+        onCancel={() => setUnlinkTarget(null)}
+        onConfirm={confirmUnlink}
+      />
+    </div>
+  )
+}
+
+/**
+ * N41 (L25): All / Unclaimed / Claimed. A segmented control like SCHED-01's
+ * view toggle — one either/or choice. Conflict joins it in N42, when there
+ * is a stored conflict to filter on.
+ */
+function ClaimFilterTabs({
+  value,
+  onChange,
+}: {
+  value: ClaimFilter
+  onChange: (value: ClaimFilter) => void
+}) {
+  const { t } = useTranslation('admin')
+  const options: Array<[ClaimFilter, string]> = [
+    ['all', t('participants.claim.filterAll')],
+    ['unclaimed', t('participants.claim.unclaimed')],
+    ['claimed', t('participants.claim.claimed')],
+  ]
+
+  return (
+    <div
+      role="tablist"
+      aria-label={t('participants.claim.filterLabel')}
+      className="inline-flex gap-1 rounded-control bg-status-neutral-bg p-1"
+    >
+      {options.map(([key, label]) => {
+        const isActive = value === key
+        return (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(key)}
+            className={`rounded-[7px] px-4 py-1.5 text-sm font-semibold transition-colors ${
+              isActive ? 'bg-tenant-primary text-white shadow-card' : 'text-ink-soft hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * N41: a participant's expanded row (PART-01 row-expanded-claimed).
+ *
+ * ICE first for a claimed row — it is what someone opens the row for in a
+ * hurry (R5c, L27). Then the Race Results fields the columns have no room
+ * for. Unlink last, on its own, and only for a claimed row: it asks first.
+ */
+function ParticipantDetailPanel({
+  participant,
+  ice,
+  busy,
+  onUnlink,
+}: {
+  participant: ParticipantRow
+  ice: IceContact | null
+  busy: boolean
+  onUnlink: () => void
+}) {
+  const { t } = useTranslation('admin')
+  const extra = Object.entries(participant.extra).filter(([, v]) => v !== '' && v != null)
+
+  return (
+    <div className="flex flex-col gap-5 px-4 pb-5 pt-1">
+      <div className="grid gap-6 sm:grid-cols-2">
+        {participant.claimed ? (
+          <IceContactSection ice={ice} />
+        ) : (
+          <section>
+            <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+              {t('officials.detailIce')}
+            </h3>
+            <p className="text-[14px] text-ink-soft">{t('participants.claim.iceNotClaimed')}</p>
+          </section>
+        )}
+        <section>
+          <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+            {t('participants.detail.otherFields')}
+          </h3>
+          {extra.length === 0 ? (
+            <p className="text-[14px] text-ink-soft">{t('participants.detail.noOtherFields')}</p>
+          ) : (
+            <dl className="space-y-1.5 text-[14px]">
+              {extra.map(([key, value]) => (
+                <div key={key} className="flex gap-3">
+                  <dt className="w-32 shrink-0 break-words text-ink-soft">{key}</dt>
+                  <dd className="text-ink">{String(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+      </div>
+      {participant.claimed && (
+        <div>
+          <Button variant="bordered" color="danger" size="sm" isLoading={busy} onPress={onUnlink}>
+            {t('participants.claim.unlink')}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
