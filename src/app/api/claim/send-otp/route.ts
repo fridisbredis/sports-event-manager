@@ -18,10 +18,11 @@ import { loadClaimTarget } from '@/lib/participants/claim-target'
 // Reached without a session (src/proxy.ts exempts this exact path), so the
 // checks here are the whole guard:
 //
-//   1. The token and participant id must name an OPEN event and an
-//      unclaimed, offered row in it (loadClaimTarget). No SMS is ever sent
-//      for a closed event, an unknown row or a row someone already claimed —
-//      the last of those is the conflict path (N42), not a second claim.
+//   1. The token and participant id must name an OPEN event and an offered
+//      row in it (loadClaimTarget). No SMS is ever sent for a closed event or
+//      an unknown row. A row someone already claimed DOES get a code (N42):
+//      "This is me" needs a verified number to store as the conflict, and
+//      the rate limits below bound it exactly as they bound a first claim.
 //   2. Rate limits (L15), per number and per claim list. The per-number half
 //      is the sign-in bucket itself (checkLoginSendRateLimit): one number,
 //      one budget of codes, whichever page asks.
@@ -73,10 +74,6 @@ export async function POST(request: NextRequest) {
   if (target.kind === 'closed') {
     return NextResponse.json({ error: 'Claiming is not open', code: 'not_open' }, { status: 403 })
   }
-  if (target.participant.claimed) {
-    return NextResponse.json({ error: 'Already claimed', code: 'already_claimed' }, { status: 409 })
-  }
-
   // Number first (the narrower limit), and short-circuit on reject so a
   // blocked number does not also spend the list's budget — the same order
   // checkInviteRateLimit uses.

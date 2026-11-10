@@ -15,9 +15,10 @@ import { locales, type Locale } from '@/lib/i18n/config'
 //
 // Nothing here throws: this fills in a form, and a failed read degrades to an
 // empty field the runner can fill in themselves. The two flags that matter
-// for correctness — already claimed, already in the event — are enforced
-// again by complete_participant_claim, so a failed read cannot let a second
-// claim through; it only loses the early warning.
+// for correctness — already claimed, already in the event — are decided
+// again by submit_participant_claim under the row lock, so a failed read
+// cannot let a second claim through (it becomes a conflict, N42); it only
+// loses the early warning.
 
 export interface ClaimPrefill {
   /** The number already has a role in this tenant (official, admin or participant). */

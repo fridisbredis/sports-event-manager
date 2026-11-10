@@ -51,11 +51,11 @@ export async function POST(request: NextRequest) {
     op: OP,
   })
 
-  // Someone else's claim. Their details are not ours to show, so nothing of
-  // the prefill is returned — the form shows the claimed message only.
-  if (target.participant.claimed && !prefill.claimedByYou) {
-    return NextResponse.json({ error: 'Already claimed', code: 'already_claimed' }, { status: 409 })
-  }
+  // N42: also answered for a record someone else holds ("This is me"). The
+  // prefill is built only from the caller's OWN rows read through RLS — their
+  // roles, their linked participants, their ICE and language — so nothing of
+  // the current claimant can be in it. alreadyInEvent matters most here: the
+  // conflict is refused for someone already linked in this event.
 
   return NextResponse.json({ ok: true, prefill })
 }

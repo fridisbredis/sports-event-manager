@@ -9,7 +9,7 @@ import { parsePageParam, pageRange } from '@/lib/pagination'
 import { parseRaceResultsEventId } from '@/lib/race-results/parse-url'
 import { isParticipantSideOpen } from '@/lib/events/participant-side'
 import { fetchIceContactsByUserId } from '@/lib/ice-contact-read'
-import { fetchClaimCounts, parseClaimFilter } from '@/lib/participants/claim-status'
+import { claimStatusOf, fetchClaimCounts, parseClaimFilter } from '@/lib/participants/claim-status'
 
 import ParticipantsList from './_components/participants-list'
 
@@ -134,12 +134,21 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
   //
   // The stage filter goes through the link table with an inner join, which
   // is also why participant_stages carries its own tenant_id.
+  //
+  // N42: pending claimants ride along the same way, embedded per row (admin-
+  // only through RLS). The Conflict filter makes that embed an inner join, so
+  // only rows with someone waiting come back.
+  const stagesEmbed = selectedStageId
+    ? 'participant_stages!inner(stage_id)'
+    : 'participant_stages(stage_id)'
+  const conflictsEmbed =
+    claimFilter === 'conflict'
+      ? 'participant_claim_conflicts!inner(id, phone, created_at)'
+      : 'participant_claim_conflicts(id, phone, created_at)'
   let query = supabase
     .from('participants')
     .select(
-      selectedStageId
-        ? 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, user_id, participant_stages!inner(stage_id)'
-        : 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, user_id, participant_stages(stage_id)'
+      `id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, user_id, privacy_accepted_at, ${stagesEmbed}, ${conflictsEmbed}`
     )
     .eq('tenant_id', tenant.id)
     // N23: this event's participants.
@@ -164,9 +173,12 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     query = query.is('hidden_at', null)
   }
 
-  // N41 (L25): claim status, from participants.user_id.
-  if (claimFilter === 'claimed') query = query.not('user_id', 'is', null)
-  else if (claimFilter === 'unclaimed') query = query.is('user_id', null)
+  // N41 (L25): claim status, from participants.user_id. A conflict row is a
+  // claimed row (claim-status.ts), so Claimed includes it and Conflict adds
+  // the inner embed above on top of the same filter.
+  if (claimFilter === 'claimed' || claimFilter === 'conflict') {
+    query = query.not('user_id', 'is', null)
+  } else if (claimFilter === 'unclaimed') query = query.is('user_id', null)
 
   const { data: participantRows, error } = await query
     .order('bib', { ascending: true, nullsFirst: false })
@@ -197,24 +209,43 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     context: { tenantId: tenant.id },
   })
 
-  const participants = pageRows.map((p) => ({
-    id: p.id,
-    name: p.name,
-    bib: p.bib,
-    category: p.category,
-    club: p.club,
-    nation: p.nation,
-    gender: p.gender,
-    phone: p.phone,
-    source: p.source,
-    extra: (p.extra ?? {}) as Record<string, string>,
-    withdrawnAt: p.withdrawn_at,
-    hiddenAt: p.hidden_at,
-    claimed: p.user_id !== null,
-    stageIds: ((p.participant_stages ?? []) as unknown as Array<{ stage_id: string }>).map(
-      (link) => link.stage_id
-    ),
-  }))
+  const participants = pageRows.map((p) => {
+    // Oldest first: the first person to ask is the first one listed.
+    const pending = (
+      (p.participant_claim_conflicts ?? []) as Array<{
+        id: string
+        phone: string | null
+        created_at: string
+      }>
+    )
+      .map((c) => ({ id: c.id, phone: c.phone, triedAt: c.created_at }))
+      .sort((a, b) => a.triedAt.localeCompare(b.triedAt))
+    const claimed = p.user_id !== null
+    return {
+      id: p.id,
+      name: p.name,
+      bib: p.bib,
+      category: p.category,
+      club: p.club,
+      nation: p.nation,
+      gender: p.gender,
+      phone: p.phone,
+      source: p.source,
+      extra: (p.extra ?? {}) as Record<string, string>,
+      withdrawnAt: p.withdrawn_at,
+      hiddenAt: p.hidden_at,
+      claimed,
+      claimStatus: claimStatusOf({ claimed, pendingClaims: pending.length }),
+      // When the current claimant claimed: complete_participant_claim sets
+      // privacy_accepted_at in the same transaction as the link.
+      claimedAt: claimed ? p.privacy_accepted_at : null,
+      // N42: only ever the conflict id, never the claimant's user id.
+      pendingClaims: claimed ? pending : [],
+      stageIds: ((p.participant_stages ?? []) as unknown as Array<{ stage_id: string }>).map(
+        (link) => link.stage_id
+      ),
+    }
+  })
 
   // N41 (R5c, L27): ICE contacts for the claimed rows on THIS page only —
   // one query for at most PARTICIPANTS_PAGE_SIZE ids, never the whole list.

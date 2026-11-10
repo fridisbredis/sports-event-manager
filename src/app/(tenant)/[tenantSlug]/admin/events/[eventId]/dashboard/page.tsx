@@ -124,7 +124,8 @@ export default async function DashboardPage({ params }: Props) {
   // N41 (L21): claimed participants, beside the officials counts. Like the
   // SMS figure above, read OUTSIDE the 60-second cache — through the same
   // fetchClaimCounts PART-01's header uses, so the two always match, also
-  // right after an unlink. Premium and up, as PART-01 itself; a failed read
+  // right after an unlink or a Keep current / Switch to new (N42, which adds
+  // the conflict count to the same read). Premium and up, as PART-01 itself; a failed read
   // leaves the card out rather than showing "0 of 0".
   const claimCounts = hasFeature(tenant.tier, 'participants')
     ? await fetchClaimCounts(await createSupabaseServerClient(), {
@@ -209,6 +210,11 @@ export default async function DashboardPage({ params }: Props) {
                 claimed: claimCounts.claimed,
                 total: claimCounts.total,
               })}
+              conflictsLabel={
+                claimCounts.conflicts > 0
+                  ? t('dashboard.participantsConflicts', { count: claimCounts.conflicts })
+                  : null
+              }
               href={adminEventPath(tenantSlug, eventId, 'participants')}
             />
           )}

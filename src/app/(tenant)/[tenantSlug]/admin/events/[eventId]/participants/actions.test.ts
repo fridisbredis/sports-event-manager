@@ -6,6 +6,8 @@ import {
   setParticipantHidden,
   removeParticipant,
   unlinkParticipant,
+  keepCurrentClaimant,
+  switchToNewClaimant,
 } from './actions'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
@@ -648,5 +650,127 @@ describe('unlinkParticipant (N41)', () => {
 
     expect(result.error).toBe('actionErrors.notAuthorized')
     expect(stub.participantsBuilder.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('keepCurrentClaimant (N42)', () => {
+  const input = {
+    tenantSlug: 't',
+    tenantId: TENANT_ID,
+    eventId: 'event-1',
+    participantId: PARTICIPANT_ID,
+  }
+
+  it("dismisses the record's pending claimants in this event, nothing else", async () => {
+    const stub = supabaseStub({ insertResult: { data: [{ id: 'c1' }, { id: 'c2' }], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await keepCurrentClaimant(input)
+
+    expect(result.error).toBeUndefined()
+    expect(stub.from).toHaveBeenCalledWith('participant_claim_conflicts')
+    expect(stub.participantsBuilder.delete).toHaveBeenCalledTimes(1)
+    expect(stub.participantsBuilder.update).not.toHaveBeenCalled()
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('participant_id', PARTICIPANT_ID)
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+    expect(stub.participantsBuilder.eq).toHaveBeenCalledWith('event_id', 'event-1')
+  })
+
+  it('reports a record with nothing pending (decided elsewhere) as not found', async () => {
+    const stub = supabaseStub({ insertResult: { data: [], error: null } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    expect((await keepCurrentClaimant(input)).error).toBe('actionErrors.claimConflictNotFound')
+  })
+
+  it('refuses a tenant whose tier has no participants', async () => {
+    const stub = supabaseStub({ tier: 'standard' })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    expect((await keepCurrentClaimant(input)).error).toBe('actionErrors.participantsNotInTier')
+    expect(stub.participantsBuilder.delete).not.toHaveBeenCalled()
+  })
+
+  it('refuses a caller without admin access to the tenant', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const stub = supabaseStub()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    expect((await keepCurrentClaimant(input)).error).toBe('actionErrors.notAuthorized')
+    expect(stub.participantsBuilder.delete).not.toHaveBeenCalled()
+  })
+})
+
+describe('switchToNewClaimant (N42)', () => {
+  const CONFLICT_ID = '33333333-3333-4333-8333-333333333333'
+  const AVATAR_BASE = 'https://x.supabase.co/storage/v1/object/public/avatars/'
+  const input = {
+    tenantSlug: 't',
+    tenantId: TENANT_ID,
+    eventId: 'event-1',
+    conflictId: CONFLICT_ID,
+  }
+
+  function storageStub() {
+    const remove = vi.fn(async () => ({ data: [], error: null }))
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({
+      storage: { from: vi.fn(() => ({ remove })) },
+    } as never)
+    return remove
+  }
+
+  it('switches through the RPC with the conflict id, then removes the old photo', async () => {
+    const remove = storageStub()
+    const stub = supabaseStub({
+      rpcResult: {
+        data: {
+          participant_id: PARTICIPANT_ID,
+          previous_avatar_url: `${AVATAR_BASE}${TENANT_ID}/participants/${PARTICIPANT_ID}/1.webp`,
+        },
+        error: null,
+      },
+    })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await switchToNewClaimant(input)
+
+    expect(result.error).toBeUndefined()
+    expect(stub.rpc).toHaveBeenCalledWith('switch_participant_claimant', {
+      p_tenant_id: TENANT_ID,
+      p_event_id: 'event-1',
+      p_conflict_id: CONFLICT_ID,
+    })
+    expect(remove).toHaveBeenCalledWith([`${TENANT_ID}/participants/${PARTICIPANT_ID}/1.webp`])
+  })
+
+  it.each([
+    ['not_found', 'actionErrors.claimConflictNotFound'],
+    ['already_in_event', 'actionErrors.claimantAlreadyInEvent'],
+  ])('maps the RPC refusal %s to %s', async (message, key) => {
+    const remove = storageStub()
+    const stub = supabaseStub({ rpcResult: { data: null, error: { message, code: 'P0001' } } })
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    expect((await switchToNewClaimant(input)).error).toBe(key)
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('rejects a conflict id that is not a uuid, before any call', async () => {
+    const stub = supabaseStub()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    const result = await switchToNewClaimant({ ...input, conflictId: 'user-123' })
+
+    expect(result.error).toBe('actionErrors.invalidRequest')
+    expect(stub.rpc).not.toHaveBeenCalled()
+  })
+
+  it('refuses a caller without admin access to the tenant', async () => {
+    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(false)
+    const stub = supabaseStub()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(stub.client as never)
+
+    expect((await switchToNewClaimant(input)).error).toBe('actionErrors.notAuthorized')
+    expect(stub.rpc).not.toHaveBeenCalled()
   })
 })

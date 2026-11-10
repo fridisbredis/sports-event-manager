@@ -37,24 +37,7 @@ export default async function ClaimParticipantPage({ params }: Props) {
     return (
       <>
         <TenantThemeStyle colorPalette={result.event.palette} />
-        <ClaimStatusView event={result.event} status="closed" listHref={listHref} />
-      </>
-    )
-  }
-
-  // Someone already claimed this row. A second claim is the conflict path
-  // (N42), not this form: no code is sent and nothing about the claimer is
-  // shown. If it was the runner themself, they simply sign in.
-  if (result.participant.claimed) {
-    return (
-      <>
-        <TenantThemeStyle colorPalette={result.event.palette} />
-        <ClaimStatusView
-          event={result.event}
-          participant={result.participant}
-          status="claimed"
-          listHref={listHref}
-        />
+        <ClaimStatusView event={result.event} listHref={listHref} />
       </>
     )
   }
@@ -71,6 +54,11 @@ export default async function ClaimParticipantPage({ params }: Props) {
           name: result.participant.name,
         }}
         listHref={listHref}
+        // N42: someone already holds this row. The same form, ending as a
+        // conflict for an admin to decide ("This is me"). Nothing about the
+        // current claimant is read or shown. If it was the runner themself,
+        // verifying their own number simply completes as before.
+        conflict={result.participant.claimed}
       />
     </>
   )

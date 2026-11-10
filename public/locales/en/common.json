@@ -41,6 +41,8 @@
     "participantsNotInTier": "Participants are not included in this tenant's plan.",
     "publishNeedsPremium": "Publishing needs the Premium tier or higher.",
     "participantNotFound": "That participant could not be found. Refresh the page and try again.",
+    "claimConflictNotFound": "There is no pending claim to decide on any more. Refresh the page to see the current state.",
+    "claimantAlreadyInEvent": "That person is now linked to another participant in this event, so the record cannot be switched to them.",
     "noStagesSelected": "Choose at least one Race stage.",
     "participantsNoResultsLink": "This stage has no Race Results link yet.",
     "participantsFetch_network": "Race Results could not be reached.",

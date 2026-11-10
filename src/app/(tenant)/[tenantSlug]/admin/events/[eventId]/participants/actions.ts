@@ -475,6 +475,9 @@ export async function removeParticipant(input: {
  *   - privacy_accepted_at goes: that consent was the previous claimant's,
  *     and the next one gives their own on CLAIM-02.
  *   - avatar_url goes: it is a photo of the previous claimant.
+ *   - pending claim conflicts on the record go (N42): the
+ *     participants_clear_claim_conflicts trigger fires on the same user_id
+ *     change. The record is plain Unclaimed again, open to anyone.
  * The ACCOUNT is kept (L26) — it may be an official or a participant
  * elsewhere, and deleting auth users is not an admin's call.
  *
@@ -546,19 +549,171 @@ export async function unlinkParticipant(input: {
     return { error: await tError('actionErrors.participantNotFound') }
   }
 
-  const avatarPath = before?.avatar_url ? avatarStoragePath(before.avatar_url) : null
-  // Only ever a path under this participant's own prefix.
-  if (avatarPath?.startsWith(`${tenantId}/participants/${participantId.data}/`)) {
-    const { error: removeError } = await createSupabaseServiceClient()
-      .storage.from('avatars')
-      .remove([avatarPath])
-    if (removeError) {
-      logger.warn('unlinkParticipant: could not remove the previous photo', {
-        tenantId,
-        participantId: participantId.data,
-        message: removeError.message,
-      })
+  await removePreviousClaimantPhoto(
+    before?.avatar_url ?? null,
+    { tenantId, participantId: participantId.data },
+    'unlinkParticipant'
+  )
+
+  revalidatePath(adminEventRoutePattern('participants'), 'page')
+  revalidatePath(adminEventRoutePattern('dashboard'), 'page')
+
+  return {}
+}
+
+/**
+ * The previous claimant's photo file, once the record is no longer theirs
+ * (unlink, switch). Best-effort: the change has committed, and a stray object
+ * in storage is not worth failing it. Only ever a path under this
+ * participant's own prefix, whatever the URL says.
+ */
+async function removePreviousClaimantPhoto(
+  avatarUrl: string | null,
+  ctx: { tenantId: string; participantId: string },
+  op: string
+) {
+  const avatarPath = avatarUrl ? avatarStoragePath(avatarUrl) : null
+  if (!avatarPath?.startsWith(`${ctx.tenantId}/participants/${ctx.participantId}/`)) return
+
+  const { error } = await createSupabaseServiceClient().storage.from('avatars').remove([avatarPath])
+  if (error) {
+    logger.warn(`${op}: could not remove the previous photo`, {
+      tenantId: ctx.tenantId,
+      participantId: ctx.participantId,
+      message: error.message,
+    })
+  }
+}
+
+/**
+ * N42 (L11, L18): Keep current. The admin has talked to the people involved
+ * and the record stays with whoever holds it. Every pending claimant on the
+ * record is dismissed; they keep their accounts (L26) and get no SMS (L18).
+ *
+ * ONE DELETE through the admin's RLS client. Scoped by tenant, event and
+ * participant, and `.select('id')` so a row with nothing pending — already
+ * decided in another tab — is "not found" rather than a silent success.
+ */
+export async function keepCurrentClaimant(input: {
+  tenantSlug: string
+  tenantId: string
+  eventId: string
+  participantId: string
+}): Promise<ParticipantRowActionResult> {
+  const auth = await authorize(input.tenantId)
+  if (!auth.ok) return { error: auth.error }
+  const { supabase, tenantId } = auth
+
+  const participantId = participantIdSchema.safeParse(input.participantId)
+  if (!participantId.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, input.eventId)
+  if (!eventId) return { error: await tError('actionErrors.invalidRequest') }
+
+  const { data, error } = await supabase
+    .from('participant_claim_conflicts')
+    .delete()
+    .eq('participant_id', participantId.data)
+    .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
+    .select('id')
+
+  if (error) {
+    return {
+      error: await translateDbError(
+        'keepCurrentClaimant: delete failed',
+        error,
+        'participants.actions.genericError'
+      ),
     }
+  }
+
+  if (!data || data.length === 0) {
+    logger.warn('keepCurrentClaimant: no pending claimants', {
+      tenantId,
+      eventId,
+      participantId: participantId.data,
+    })
+    return { error: await tError('actionErrors.claimConflictNotFound') }
+  }
+
+  revalidatePath(adminEventRoutePattern('participants'), 'page')
+  revalidatePath(adminEventRoutePattern('dashboard'), 'page')
+
+  return {}
+}
+
+const conflictIdSchema = z.string().uuid()
+
+/**
+ * N42 (L11, L18): Switch to new. The record moves to the chosen pending
+ * claimant; the current one loses access at once, the new one can sign in.
+ *
+ * switch_participant_claimant does it in ONE transaction (REL-01): the link,
+ * the new claimant's verified phone and consent time, the old photo cleared,
+ * the record's other pending claimants dismissed (trigger), and the
+ * participant tier moved (sync_participant_role). SECURITY INVOKER, so the
+ * admin's RLS is the access check inside it as well as authorize() here.
+ *
+ * Takes the CONFLICT id, not a user id: which person to switch to is the
+ * stored row the admin was shown, and no user id ever reaches the browser.
+ * No SMS to either person (L18).
+ */
+export async function switchToNewClaimant(input: {
+  tenantSlug: string
+  tenantId: string
+  eventId: string
+  conflictId: string
+}): Promise<ParticipantRowActionResult> {
+  const auth = await authorize(input.tenantId)
+  if (!auth.ok) return { error: auth.error }
+  const { supabase, tenantId } = auth
+
+  const conflictId = conflictIdSchema.safeParse(input.conflictId)
+  if (!conflictId.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, input.eventId)
+  if (!eventId) return { error: await tError('actionErrors.invalidRequest') }
+
+  const { data, error } = await supabase.rpc('switch_participant_claimant', {
+    p_tenant_id: tenantId,
+    p_event_id: eventId,
+    p_conflict_id: conflictId.data,
+  })
+
+  if (error) {
+    if (error.message === 'not_found') {
+      logger.warn('switchToNewClaimant: conflict not found', {
+        tenantId,
+        eventId,
+        conflictId: conflictId.data,
+      })
+      return { error: await tError('actionErrors.claimConflictNotFound') }
+    }
+    if (error.message === 'already_in_event') {
+      return { error: await tError('actionErrors.claimantAlreadyInEvent') }
+    }
+    return {
+      error: await translateDbError(
+        'switchToNewClaimant: switch_participant_claimant failed',
+        error,
+        'participants.actions.genericError'
+      ),
+    }
+  }
+
+  // jsonb (F-REL-16); shape asserted in
+  // tests/integration/participant-claim-conflicts.test.ts.
+  const result = (data ?? {}) as unknown as {
+    participant_id?: string
+    previous_avatar_url?: string | null
+  }
+  if (result.participant_id) {
+    await removePreviousClaimantPhoto(
+      result.previous_avatar_url ?? null,
+      { tenantId, participantId: result.participant_id },
+      'switchToNewClaimant'
+    )
   }
 
   revalidatePath(adminEventRoutePattern('participants'), 'page')

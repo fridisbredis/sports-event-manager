@@ -41,6 +41,8 @@
     "participantsNotInTier": "Deltagare ingår inte i den här kundens abonnemang.",
     "publishNeedsPremium": "Publicering kräver nivån Premium eller högre.",
     "participantNotFound": "Deltagaren kunde inte hittas. Ladda om sidan och försök igen.",
+    "claimConflictNotFound": "Det finns ingen väntande registrering att ta ställning till längre. Ladda om sidan för att se aktuellt läge.",
+    "claimantAlreadyInEvent": "Personen är nu kopplad till en annan deltagare i det här evenemanget, så posten kan inte flyttas till hen.",
     "noStagesSelected": "Välj minst en tävlingsetapp.",
     "participantsNoResultsLink": "Den här etappen har ingen Race Results-länk än.",
     "participantsFetch_network": "Race Results gick inte att nå.",

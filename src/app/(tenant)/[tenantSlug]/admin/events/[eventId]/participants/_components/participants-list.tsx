@@ -32,7 +32,8 @@ import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError, toastSuccess, extractErrorMessage } from '@/lib/toast'
 import { logger } from '@/lib/logger'
-import { formatEnteredPhoneForDisplay } from '@/lib/phone'
+import { formatEnteredPhoneForDisplay, formatPhoneForDisplay } from '@/lib/phone'
+import { dateLocaleFor, EVENT_TIME_ZONE } from '@/lib/i18n/date-locale'
 
 import {
   importParticipants,
@@ -40,6 +41,8 @@ import {
   setParticipantHidden,
   removeParticipant,
   unlinkParticipant,
+  keepCurrentClaimant,
+  switchToNewClaimant,
   type StageImportOutcome,
 } from '../actions'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
@@ -47,7 +50,7 @@ import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 import { PremiumBadge } from '@/components/ui/premium-badge'
 
 import type { IceContact } from '@/lib/ice-contact'
-import type { ClaimCounts, ClaimFilter } from '@/lib/participants/claim-status'
+import type { ClaimCounts, ClaimFilter, ClaimStatus } from '@/lib/participants/claim-status'
 
 import { IceContactSection } from '../../../../_components/ice-contact-section'
 import { ClaimLinkActions } from './claim-link-actions'
@@ -80,7 +83,27 @@ export interface ParticipantRow {
   hiddenAt: string | null
   /** N41: participants.user_id is set. The id itself never reaches the browser. */
   claimed: boolean
+  /** N42: unclaimed / claimed / conflict (claimed with someone waiting). */
+  claimStatus: ClaimStatus
+  /** When the current claimant claimed; null for an unclaimed row. */
+  claimedAt: string | null
+  /** N42: verified claimants waiting for Keep current / Switch to new, oldest first. */
+  pendingClaims: PendingClaim[]
   stageIds: string[]
+}
+
+export interface PendingClaim {
+  /** The conflict row's id, which Switch to new takes. */
+  id: string
+  /** E.164 without '+', SMS-verified. */
+  phone: string | null
+  triedAt: string
+}
+
+const CLAIM_STATUS_CHIP: Record<ClaimStatus, string> = {
+  unclaimed: 'bg-status-neutral-bg text-status-neutral-text',
+  claimed: 'bg-status-ok-bg text-status-ok-text',
+  conflict: 'bg-status-pending-bg text-status-pending-text',
 }
 
 export interface StageOption {
@@ -138,6 +161,12 @@ export default function ParticipantsList({
   const [rowPendingId, setRowPendingId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [unlinkTarget, setUnlinkTarget] = useState<ParticipantRow | null>(null)
+  // N42: Switch to new asks first — someone loses access. Keep current does
+  // not: nobody's access changes.
+  const [switchTarget, setSwitchTarget] = useState<{
+    participant: ParticipantRow
+    claim: PendingClaim
+  } | null>(null)
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -299,6 +328,55 @@ export default function ParticipantsList({
     }
   }
 
+  async function keepCurrent(participant: ParticipantRow) {
+    setRowPendingId(participant.id)
+    try {
+      const result = await keepCurrentClaimant({
+        tenantSlug,
+        tenantId,
+        eventId,
+        participantId: participant.id,
+      })
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
+      toastSuccess(t('participants.conflict.keepSuccess', { name: participant.name ?? '—' }))
+      router.refresh()
+    } catch (err) {
+      logger.error('Keeping the current claimant failed', err)
+      toastError(extractErrorMessage(err, t('participants.actions.genericError')))
+    } finally {
+      setRowPendingId(null)
+    }
+  }
+
+  async function confirmSwitch() {
+    if (!switchTarget) return
+    const { participant, claim } = switchTarget
+    setSwitchTarget(null)
+    setRowPendingId(participant.id)
+    try {
+      const result = await switchToNewClaimant({
+        tenantSlug,
+        tenantId,
+        eventId,
+        conflictId: claim.id,
+      })
+      if (result.error) {
+        toastError(result.error)
+        return
+      }
+      toastSuccess(t('participants.conflict.switchSuccess', { name: participant.name ?? '—' }))
+      router.refresh()
+    } catch (err) {
+      logger.error('Switching the claimant failed', err)
+      toastError(extractErrorMessage(err, t('participants.actions.genericError')))
+    } finally {
+      setRowPendingId(null)
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -353,11 +431,17 @@ export default function ParticipantsList({
           the same figure EVT-01 shows (fetchClaimCounts). */}
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         {claimCounts && (
-          <p className="text-[15px] font-medium text-ink">
+          <p className="flex flex-wrap items-center gap-x-3 text-[15px] font-medium text-ink">
             {t('participants.claim.count', {
               claimed: claimCounts.claimed,
               total: claimCounts.total,
             })}
+            {claimCounts.conflicts > 0 && (
+              <span className="inline-flex items-center gap-1 text-status-pending-text">
+                <TriangleAlert className="size-4" strokeWidth={2.2} aria-hidden="true" />
+                {t('participants.conflict.count', { count: claimCounts.conflicts })}
+              </span>
+            )}
           </p>
         )}
         <ClaimFilterTabs
@@ -527,18 +611,8 @@ export default function ParticipantsList({
                     {p.phone ? formatEnteredPhoneForDisplay(p.phone) : '—'}
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      size="sm"
-                      variant="flat"
-                      className={
-                        p.claimed
-                          ? 'bg-status-ok-bg text-status-ok-text'
-                          : 'bg-status-neutral-bg text-status-neutral-text'
-                      }
-                    >
-                      {p.claimed
-                        ? t('participants.claim.claimed')
-                        : t('participants.claim.unclaimed')}
+                    <Chip size="sm" variant="flat" className={CLAIM_STATUS_CHIP[p.claimStatus]}>
+                      {t(`participants.claim.${p.claimStatus}`)}
                     </Chip>
                   </TableCell>
                   <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
@@ -575,6 +649,8 @@ export default function ParticipantsList({
                             ice={iceContacts[p.id] ?? null}
                             busy={rowPendingId === p.id}
                             onUnlink={() => setUnlinkTarget(p)}
+                            onKeepCurrent={() => keepCurrent(p)}
+                            onSwitch={(claim) => setSwitchTarget({ participant: p, claim })}
                           />
                         </TableCell>
                       </TableRow>,
@@ -806,14 +882,28 @@ export default function ParticipantsList({
         onCancel={() => setUnlinkTarget(null)}
         onConfirm={confirmUnlink}
       />
+
+      <ConfirmDialog
+        open={switchTarget !== null}
+        title={t('participants.conflict.switchConfirmTitle')}
+        body={t('participants.conflict.switchConfirmBody', {
+          name: switchTarget?.participant.name ?? '—',
+          phone: switchTarget?.claim.phone ? formatPhoneForDisplay(switchTarget.claim.phone) : '—',
+        })}
+        cancelLabel={t('participants.actions.cancel')}
+        confirmLabel={t('participants.conflict.switch')}
+        onCancel={() => setSwitchTarget(null)}
+        onConfirm={confirmSwitch}
+      />
     </div>
   )
 }
 
 /**
- * N41 (L25): All / Unclaimed / Claimed. A segmented control like SCHED-01's
- * view toggle — one either/or choice. Conflict joins it in N42, when there
- * is a stored conflict to filter on.
+ * N41/N42 (L25): All / Unclaimed / Claimed / Conflict. A segmented control
+ * like SCHED-01's view toggle — one either/or choice. Claimed includes the
+ * conflict rows (they are claimed, see claim-status.ts); Conflict narrows to
+ * the ones waiting for a decision.
  */
 function ClaimFilterTabs({
   value,
@@ -827,6 +917,7 @@ function ClaimFilterTabs({
     ['all', t('participants.claim.filterAll')],
     ['unclaimed', t('participants.claim.unclaimed')],
     ['claimed', t('participants.claim.claimed')],
+    ['conflict', t('participants.claim.conflict')],
   ]
 
   return (
@@ -862,23 +953,40 @@ function ClaimFilterTabs({
  * ICE first for a claimed row — it is what someone opens the row for in a
  * hurry (R5c, L27). Then the Race Results fields the columns have no room
  * for. Unlink last, on its own, and only for a claimed row: it asks first.
+ *
+ * N42 (conflict-row-expanded): a row in conflict opens on the decision —
+ * current claimant, the waiting claimant(s), Keep current / Switch to new —
+ * and offers no Unlink: the decision is the way out of a conflict.
  */
 function ParticipantDetailPanel({
   participant,
   ice,
   busy,
   onUnlink,
+  onKeepCurrent,
+  onSwitch,
 }: {
   participant: ParticipantRow
   ice: IceContact | null
   busy: boolean
   onUnlink: () => void
+  onKeepCurrent: () => void
+  onSwitch: (claim: PendingClaim) => void
 }) {
   const { t } = useTranslation('admin')
   const extra = Object.entries(participant.extra).filter(([, v]) => v !== '' && v != null)
+  const inConflict = participant.claimStatus === 'conflict'
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-5 pt-1">
+      {inConflict && (
+        <ClaimConflictSection
+          participant={participant}
+          busy={busy}
+          onKeepCurrent={onKeepCurrent}
+          onSwitch={onSwitch}
+        />
+      )}
       <div className="grid gap-6 sm:grid-cols-2">
         {participant.claimed ? (
           <IceContactSection ice={ice} />
@@ -908,7 +1016,7 @@ function ParticipantDetailPanel({
           )}
         </section>
       </div>
-      {participant.claimed && (
+      {participant.claimed && !inConflict && (
         <div>
           <Button variant="bordered" color="danger" size="sm" isLoading={busy} onPress={onUnlink}>
             {t('participants.claim.unlink')}
@@ -916,6 +1024,134 @@ function ParticipantDetailPanel({
         </div>
       )}
     </div>
+  )
+}
+
+// Claim times are real instants: shown in the event's zone, so the server
+// pass and hydration agree (same rule as COMM-01).
+function formatClaimTime(iso: string, language?: string): string {
+  return new Date(iso).toLocaleString(dateLocaleFor(language), {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: EVENT_TIME_ZONE,
+  })
+}
+
+/**
+ * N42 (L11, L18): who holds the record and who else says it is theirs. The
+ * admin has called them outside the app; this is where the answer goes in.
+ *
+ * Several waiting claimants are each listed with their own Switch button
+ * (Frida 2026-11-10: every verified claimant is kept). Keep current dismisses
+ * all of them. Neither choice sends an SMS — said under the buttons, since an
+ * admin would otherwise reasonably expect one.
+ */
+function ClaimConflictSection({
+  participant,
+  busy,
+  onKeepCurrent,
+  onSwitch,
+}: {
+  participant: ParticipantRow
+  busy: boolean
+  onKeepCurrent: () => void
+  onSwitch: (claim: PendingClaim) => void
+}) {
+  const { t, i18n } = useTranslation('admin')
+  const single = participant.pendingClaims.length === 1
+
+  return (
+    <section
+      aria-label={t('participants.conflict.heading')}
+      className="rounded-lg border border-status-pending-text/25 bg-white p-4"
+    >
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+            {t('participants.conflict.current')}
+          </h3>
+          <dl className="space-y-1.5 text-[14px]">
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-ink-soft">{t('participants.columns.phone')}</dt>
+              <dd className="text-ink">
+                {participant.phone ? formatEnteredPhoneForDisplay(participant.phone) : '—'}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-ink-soft">
+                {t('participants.conflict.claimedAt')}
+              </dt>
+              <dd className="tabular-nums text-ink">
+                {participant.claimedAt
+                  ? formatClaimTime(participant.claimedAt, i18n.language)
+                  : '—'}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div>
+          <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-ink-faint">
+            {single ? t('participants.conflict.new') : t('participants.conflict.newSeveral')}
+          </h3>
+          <ul className="flex flex-col gap-3">
+            {participant.pendingClaims.map((claim) => (
+              <li key={claim.id} className="flex flex-wrap items-end justify-between gap-3">
+                <dl className="space-y-1.5 text-[14px]">
+                  <div className="flex gap-3">
+                    <dt className="w-24 shrink-0 text-ink-soft">
+                      {t('participants.columns.phone')}
+                    </dt>
+                    <dd className="text-ink">
+                      {claim.phone ? formatPhoneForDisplay(claim.phone) : '—'}
+                    </dd>
+                  </div>
+                  <div className="flex gap-3">
+                    <dt className="w-24 shrink-0 text-ink-soft">
+                      {t('participants.conflict.triedAt')}
+                    </dt>
+                    <dd className="tabular-nums text-ink">
+                      {formatClaimTime(claim.triedAt, i18n.language)}
+                    </dd>
+                  </div>
+                </dl>
+                {!single && (
+                  <Button
+                    variant="bordered"
+                    size="sm"
+                    isDisabled={busy}
+                    onPress={() => onSwitch(claim)}
+                  >
+                    {t('participants.conflict.switchToThis')}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button variant="bordered" size="sm" isLoading={busy} onPress={onKeepCurrent}>
+          {t('participants.conflict.keep')}
+        </Button>
+        {single && (
+          <Button
+            color="primary"
+            size="sm"
+            isDisabled={busy}
+            onPress={() => onSwitch(participant.pendingClaims[0])}
+          >
+            {t('participants.conflict.switch')}
+          </Button>
+        )}
+      </div>
+      <p className="mt-3 text-[13px] text-ink-label">{t('participants.conflict.noSms')}</p>
+    </section>
   )
 }
 

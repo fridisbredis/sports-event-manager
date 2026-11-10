@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { loadClaimTarget } from '@/lib/participants/claim-target'
-import { completeParticipantClaim } from '@/lib/participants/claim-participant'
+import { submitParticipantClaim } from '@/lib/participants/claim-participant'
 import { loadClaimPrefill } from '@/lib/participants/claim-prefill'
 import { copyAvatarToParticipant } from '@/lib/participants/participant-avatar'
 
@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(() => ({ service: true })),
 }))
 vi.mock('@/lib/participants/claim-target', () => ({ loadClaimTarget: vi.fn() }))
-vi.mock('@/lib/participants/claim-participant', () => ({ completeParticipantClaim: vi.fn() }))
+vi.mock('@/lib/participants/claim-participant', () => ({ submitParticipantClaim: vi.fn() }))
 vi.mock('@/lib/participants/claim-prefill', () => ({ loadClaimPrefill: vi.fn() }))
 vi.mock('@/lib/participants/participant-avatar', () => ({ copyAvatarToParticipant: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn() } }))
@@ -52,8 +52,9 @@ beforeEach(() => {
     tenantId: 'tenant-1',
     participant: { id: PARTICIPANT, bib: '101', name: 'Lisa Nord', claimed: false },
   })
-  vi.mocked(completeParticipantClaim).mockResolvedValue({
+  vi.mocked(submitParticipantClaim).mockResolvedValue({
     ok: true,
+    outcome: 'claimed',
     participantId: PARTICIPANT,
     eventId: 'event-1',
     roleGranted: true,
@@ -65,7 +66,8 @@ describe('POST /api/claim/complete (N40)', () => {
     const res = await POST(request(valid))
 
     expect(res.status).toBe(200)
-    expect(completeParticipantClaim).toHaveBeenCalledWith({
+    expect((await res.json()).outcome).toBe('claimed')
+    expect(submitParticipantClaim).toHaveBeenCalledWith({
       userId: USER,
       participantId: PARTICIPANT,
       tenantId: 'tenant-1',
@@ -81,7 +83,7 @@ describe('POST /api/claim/complete (N40)', () => {
     const res = await POST(request({ ...valid, ...override }))
 
     expect(res.status).toBe(400)
-    expect(completeParticipantClaim).not.toHaveBeenCalled()
+    expect(submitParticipantClaim).not.toHaveBeenCalled()
   })
 
   it('refuses without a session', async () => {
@@ -90,7 +92,7 @@ describe('POST /api/claim/complete (N40)', () => {
     const res = await POST(request(valid))
 
     expect(res.status).toBe(401)
-    expect(completeParticipantClaim).not.toHaveBeenCalled()
+    expect(submitParticipantClaim).not.toHaveBeenCalled()
   })
 
   it('refuses a closed event', async () => {
@@ -102,7 +104,7 @@ describe('POST /api/claim/complete (N40)', () => {
     const res = await POST(request(valid))
 
     expect(res.status).toBe(403)
-    expect(completeParticipantClaim).not.toHaveBeenCalled()
+    expect(submitParticipantClaim).not.toHaveBeenCalled()
   })
 
   it('rejects an invalid ICE phone before claiming, so the form can still fix it', async () => {
@@ -112,7 +114,7 @@ describe('POST /api/claim/complete (N40)', () => {
 
     expect(res.status).toBe(400)
     expect((await res.json()).code).toBe('invalid_ice_phone')
-    expect(completeParticipantClaim).not.toHaveBeenCalled()
+    expect(submitParticipantClaim).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -121,7 +123,7 @@ describe('POST /api/claim/complete (N40)', () => {
     ['not_found', 404],
     ['failed', 500],
   ] as const)('maps the RPC refusal %s to %i and writes nothing else', async (code, status) => {
-    vi.mocked(completeParticipantClaim).mockResolvedValue({ ok: false, error: code })
+    vi.mocked(submitParticipantClaim).mockResolvedValue({ ok: false, error: code })
 
     const res = await POST(request({ ...valid, language: 'sv' }))
 
@@ -174,5 +176,53 @@ describe('POST /api/claim/complete (N40)', () => {
       'https://x/storage/v1/object/public/avatars/tenant-1/o/1.webp',
       expect.any(String)
     )
+  })
+
+  // N42: "This is me" on a record someone else holds.
+  describe('when the record is held by someone else (conflict)', () => {
+    beforeEach(() => {
+      vi.mocked(submitParticipantClaim).mockResolvedValue({
+        ok: true,
+        outcome: 'conflict',
+        participantId: PARTICIPANT,
+        eventId: 'event-1',
+        roleGranted: false,
+      })
+    })
+
+    it('answers 200 with outcome conflict and no role', async () => {
+      const res = await POST(request(valid))
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ ok: true, outcome: 'conflict', roleGranted: false })
+    })
+
+    it('still stores the account language and ICE contact', async () => {
+      await POST(
+        request({
+          ...valid,
+          language: 'sv',
+          ice: { phone: '070 123 45 67', name: 'Anna', relation: 'Partner' },
+        })
+      )
+
+      expect(from).toHaveBeenCalledWith('user_preferences')
+      expect(from).toHaveBeenCalledWith('user_ice_contacts')
+    })
+
+    it('never copies a photo onto a record that is not theirs', async () => {
+      vi.mocked(loadClaimPrefill).mockResolvedValue({
+        existingAccount: true,
+        alreadyInEvent: false,
+        claimedByYou: false,
+        avatarUrl: 'https://x/storage/v1/object/public/avatars/tenant-1/o/1.webp',
+        ice: null,
+        language: null,
+      })
+
+      await POST(request({ ...valid, keepExistingPhoto: true }))
+
+      expect(copyAvatarToParticipant).not.toHaveBeenCalled()
+    })
   })
 })

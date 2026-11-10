@@ -175,4 +175,64 @@ describe('ClaimForm (CLAIM-02)', () => {
       keepExistingPhoto: false,
     })
   })
+
+  // N42: "This is me" on a record someone else already holds.
+  describe('conflict (N42)', () => {
+    it('says the record is claimed, offers sign-in, and asks for no photo', () => {
+      render(<ClaimForm {...PROPS} conflict />)
+
+      expect(screen.getByText('claim.alreadyClaimedTitle')).toBeInTheDocument()
+      expect(screen.getByText('claim.conflictIntro')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'claim.signIn' })).toHaveAttribute('href', '/login')
+      expect(screen.queryByRole('button', { name: 'claim.photoAdd' })).not.toBeInTheDocument()
+      // The same steps: number first, Complete waits for it.
+      expect(completeButton()).toBeDisabled()
+    })
+
+    it('ends on the conflict-submitted message, not the completed one', async () => {
+      render(<ClaimForm {...PROPS} conflict />)
+      await sendAndVerify()
+      fetchMock.mockImplementationOnce(() =>
+        reply(200, { ok: true, outcome: 'conflict', roleGranted: false })
+      )
+
+      fireEvent.click(screen.getByText('claim.confirmIdentity'))
+      fireEvent.click(screen.getByText('confirmation.privacyCheckPrefix'))
+      fireEvent.click(completeButton())
+
+      expect(await screen.findByText('claim.conflictSubmitted')).toBeInTheDocument()
+      expect(screen.queryByText('claim.completedTitle')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'claim.goToMyPage' })).not.toBeInTheDocument()
+      // Complete was the last call: no photo upload after a conflict.
+      expect(fetchMock).toHaveBeenCalledTimes(4)
+    })
+
+    it('completes normally when the server says the record is theirs after all', async () => {
+      render(<ClaimForm {...PROPS} conflict />)
+      await sendAndVerify({ ...EMPTY_PREFILL, existingAccount: true, claimedByYou: true })
+      fetchMock.mockImplementationOnce(() =>
+        reply(200, { ok: true, outcome: 'claimed', roleGranted: false })
+      )
+
+      fireEvent.click(screen.getByText('claim.confirmIdentity'))
+      fireEvent.click(screen.getByText('confirmation.privacyCheckPrefix'))
+      fireEvent.click(completeButton())
+
+      expect(await screen.findByText('claim.completedTitle')).toBeInTheDocument()
+    })
+
+    it('a record claimed while the ordinary form was open also ends as a conflict', async () => {
+      render(<ClaimForm {...PROPS} />)
+      await sendAndVerify()
+      fetchMock.mockImplementationOnce(() =>
+        reply(200, { ok: true, outcome: 'conflict', roleGranted: false })
+      )
+
+      fireEvent.click(screen.getByText('claim.confirmIdentity'))
+      fireEvent.click(screen.getByText('confirmation.privacyCheckPrefix'))
+      fireEvent.click(completeButton())
+
+      expect(await screen.findByText('claim.conflictSubmitted')).toBeInTheDocument()
+    })
+  })
 })

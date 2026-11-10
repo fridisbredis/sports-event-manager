@@ -715,6 +715,58 @@ export type Database = {
           },
         ]
       }
+      participant_claim_conflicts: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          participant_id: string
+          phone: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          participant_id: string
+          phone?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          participant_id?: string
+          phone?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'participant_claim_conflicts_event_id_fkey'
+            columns: ['event_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'participant_claim_conflicts_participant_id_fkey'
+            columns: ['participant_id']
+            isOneToOne: false
+            referencedRelation: 'participants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'participant_claim_conflicts_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       participant_stages: {
         Row: {
           created_at: string
@@ -1524,6 +1576,20 @@ export type Database = {
           p_workstation_id: string
         }
         Returns: boolean
+      }
+      submit_participant_claim: {
+        Args: {
+          p_event_id: string
+          p_participant_id: string
+          p_privacy_accepted: boolean
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      switch_participant_claimant: {
+        Args: { p_conflict_id: string; p_event_id: string; p_tenant_id: string }
+        Returns: Json
       }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }

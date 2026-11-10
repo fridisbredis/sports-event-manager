@@ -53,7 +53,9 @@
     "smsUsageEstimated": "Uppskattat utifrån Twilios listpris.",
     "adminAreas": "Adminområden",
     "participants": "Deltagare",
-    "participantsClaimed": "{{claimed}} av {{total}} registrerade"
+    "participantsClaimed": "{{claimed}} av {{total}} registrerade",
+    "participantsConflicts_one": "{{count}} konflikt",
+    "participantsConflicts_other": "{{count}} konflikter"
   },
   "eventConfig": {
     "title": "Evenemangsinställningar",
@@ -403,11 +405,30 @@
       "filterAll": "Alla",
       "claimed": "Registrerad",
       "unclaimed": "Ej registrerad",
+      "conflict": "Konflikt",
       "unlink": "Koppla bort",
       "unlinkConfirmTitle": "Koppla bort telefonnumret?",
       "unlinkConfirmBody": "{{name}} förlorar åtkomsten som deltagare i det här evenemanget. Posten kan registreras igen.",
       "unlinkSuccess": "{{name}} är bortkopplad",
       "iceNotClaimed": "Visas när deltagaren har registrerat sig."
+    },
+    "conflict": {
+      "heading": "Registreringskonflikt",
+      "count_one": "{{count}} konflikt",
+      "count_other": "{{count}} konflikter",
+      "current": "Nuvarande registrering",
+      "new": "Ny registrering",
+      "newSeveral": "Nya registreringar",
+      "claimedAt": "Registrerad",
+      "triedAt": "Försökte",
+      "keep": "Behåll nuvarande",
+      "switch": "Byt till ny",
+      "switchToThis": "Byt till den här",
+      "noSms": "Inget sms skickas till någon av dem. Meddela dem själv.",
+      "keepSuccess": "{{name}} behåller nuvarande registrering",
+      "switchSuccess": "{{name}} har flyttats till den nya registreringen",
+      "switchConfirmTitle": "Byta till den nya registreringen?",
+      "switchConfirmBody": "Den nuvarande förlorar åtkomsten till {{name}} direkt, och {{phone}} kan logga in i stället. Andra väntande registreringar på deltagaren avvisas. Inget sms skickas."
     },
     "detail": {
       "otherFields": "Övriga fält från Race Results",
