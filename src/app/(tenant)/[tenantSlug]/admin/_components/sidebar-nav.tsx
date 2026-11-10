@@ -22,6 +22,7 @@ import {
   Menu,
   type LucideIcon,
 } from 'lucide-react'
+import { PremiumBadge } from '@/components/ui/premium-badge'
 import { useTranslation } from '@/lib/i18n/client'
 import { LogoutButton } from '@/components/logout-button'
 
@@ -31,8 +32,9 @@ interface Props {
   // False when the caller has no `officials` row in this tenant, so ACCT-01
   // has nothing to show them — see hasAccountScreen in lib/auth/tenant.
   showAccount: boolean
-  // False on Standard, where PART-01 does not exist (N21). The page and its
-  // server actions enforce the same tier independently.
+  // False on Standard (N21). Participants is then still listed, marked
+  // Premium, but greyed out and not a link. The page and its server actions
+  // enforce the same tier independently.
   showParticipants: boolean
 }
 
@@ -68,7 +70,13 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
   }
 
   const eventBase = `admin/events/${eventId}`
-  const navItems: { segment: string; label: string; icon: LucideIcon }[] = eventId
+  const navItems: {
+    segment: string
+    label: string
+    icon: LucideIcon
+    badge?: string
+    locked?: boolean
+  }[] = eventId
     ? [
         {
           segment: `${eventBase}/dashboard`,
@@ -78,15 +86,15 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
         { segment: `${eventBase}/event`, label: t('navigation.eventConfig'), icon: Trophy },
         { segment: `${eventBase}/workstations`, label: t('navigation.workstations'), icon: Flag },
         { segment: `${eventBase}/officials`, label: t('navigation.officials'), icon: Users },
-        ...(showParticipants
-          ? [
-              {
-                segment: `${eventBase}/participants`,
-                label: t('navigation.participants'),
-                icon: ClipboardList,
-              },
-            ]
-          : []),
+        // Listed on every tier and marked Premium, so a Standard admin can see
+        // what Premium adds. On Standard it is locked: greyed out, not a link.
+        {
+          segment: `${eventBase}/participants`,
+          label: t('navigation.participants'),
+          icon: ClipboardList,
+          badge: t('dashboard.premiumBadge'),
+          locked: !showParticipants,
+        },
         {
           segment: `${eventBase}/scheduling`,
           label: t('navigation.scheduling'),
@@ -110,9 +118,39 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
       isCollapsed = false,
       onNavigate,
       exact = false,
-    }: { isCollapsed?: boolean; onNavigate?: () => void; exact?: boolean } = {}
+      badge,
+      locked = false,
+    }: {
+      isCollapsed?: boolean
+      onNavigate?: () => void
+      exact?: boolean
+      badge?: string
+      locked?: boolean
+    } = {}
   ) => {
     const href = `/${tenantSlug}/${segment}`
+
+    // A tier-locked item: shown, not a link. aria-disabled so screen readers
+    // announce it as unavailable, and the tooltip says which tier unlocks it.
+    if (locked) {
+      const lockedHint = t('settings.colorThemeLocked', { tier: t('systemAdmin.premium') })
+      return (
+        <div
+          key={segment}
+          role="link"
+          aria-disabled="true"
+          title={isCollapsed ? `${label} · ${lockedHint}` : lockedHint}
+          className={`flex cursor-not-allowed select-none items-center gap-3 px-6 py-2.5 text-[15px] text-ink-faint ${
+            isCollapsed ? 'justify-center px-0' : ''
+          }`}
+        >
+          <Icon className="size-[18px] shrink-0" strokeWidth={1.5} />
+          {!isCollapsed && <span className="truncate">{label}</span>}
+          {!isCollapsed && badge && <PremiumBadge label={badge} className="ml-auto" />}
+        </div>
+      )
+    }
+
     // `exact` for "All events": /admin is a prefix of every admin screen, so
     // a prefix match would light it up everywhere.
     const isActive = pathname === href || (!exact && pathname.startsWith(href + '/'))
@@ -151,6 +189,9 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
             {label}
           </span>
         )}
+        {/* ml-auto pushes it to the row's right edge. Not shown on the
+            collapsed rail, which has room for the icon only. */}
+        {!isCollapsed && badge && <PremiumBadge label={badge} className="ml-auto" />}
       </Link>
     )
   }
@@ -164,7 +205,13 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
         {navLink('admin', t('navigation.allEvents'), CalendarRange, { ...opts, exact: true })}
         {navLink('admin/settings', t('navigation.settings'), Settings, opts)}
         {navItems.length > 0 && <div className="mx-6 my-2 border-t border-gray-100" />}
-        {navItems.map((item) => navLink(item.segment, item.label, item.icon, opts))}
+        {navItems.map((item) =>
+          navLink(item.segment, item.label, item.icon, {
+            ...opts,
+            badge: item.badge,
+            locked: item.locked,
+          })
+        )}
       </nav>
       <div className="border-t border-gray-100 py-2">
         {/* The official surface for this same tenant. Shown to every admin,

@@ -7,6 +7,7 @@ import { logQueryError } from '@/lib/db/query-error'
 import { hasFeature } from '@/lib/tiers/features'
 import { parsePageParam, pageRange } from '@/lib/pagination'
 import { parseRaceResultsEventId } from '@/lib/race-results/parse-url'
+import { isParticipantSideOpen } from '@/lib/events/participant-side'
 
 import ParticipantsList from './_components/participants-list'
 
@@ -88,6 +89,33 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
   }))
 
   const selectedStageId = stages.some((s) => s.id === stageParam) ? stageParam : undefined
+
+  // N39 (PB6): the claim link and QR code are offered in every state, so they
+  // can be printed before publishing. Whether the list behind the link is
+  // open is the shared N36 check, shown as a notice while it is closed.
+  const { data: eventRow, error: eventError } = await supabase
+    .from('events')
+    .select('name, status, claim_token')
+    .eq('tenant_id', tenant.id)
+    .eq('id', eventId)
+    .maybeSingle()
+
+  if (eventError) {
+    logQueryError(eventError, {
+      op: 'admin/participants',
+      table: 'events',
+      kind: 'select',
+      tenantId: tenant.id,
+    })
+    throw eventError
+  }
+  if (!eventRow) notFound()
+
+  const claimList = {
+    path: `/claim/${eventRow.claim_token}`,
+    eventName: eventRow.name,
+    isOpen: isParticipantSideOpen({ status: eventRow.status }, tenant.tier),
+  }
 
   // Everything rendered per row comes from THIS query. OFF-01 fetches its
   // expanded detail with a Promise.all over the whole roster and says in a
@@ -186,6 +214,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
         selectedStageId={selectedStageId ?? null}
         showWithdrawn={showWithdrawn}
         showHidden={showHidden}
+        claimList={claimList}
       />
     </div>
   )

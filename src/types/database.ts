@@ -512,6 +512,7 @@ export type Database = {
       }
       events: {
         Row: {
+          claim_token: string
           created_at: string
           description: string | null
           end_date: string | null
@@ -526,6 +527,7 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          claim_token?: string
           created_at?: string
           description?: string | null
           end_date?: string | null
@@ -540,6 +542,7 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          claim_token?: string
           created_at?: string
           description?: string | null
           end_date?: string | null
