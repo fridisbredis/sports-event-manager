@@ -95,8 +95,15 @@ export async function proxy(request: NextRequest) {
   // links it before a number is handed over — gating it behind auth would
   // bounce all three to /login, i.e. ask for consent to a document the
   // reader cannot open. Exact match, not a prefix: there is no /privacy/*.
+  //
+  // /claim/ is the open claim list (CLAIM-01, N39) and, from N40, the claim
+  // form below it: a runner arrives from a link or QR code with no account
+  // yet. The page itself decides open/closed and exposes only bib and name.
   const isPublicPath =
-    pathname === '/login' || pathname === '/privacy' || pathname.startsWith('/invite/')
+    pathname === '/login' ||
+    pathname === '/privacy' ||
+    pathname.startsWith('/invite/') ||
+    pathname.startsWith('/claim/')
 
   if (!user && !isPublicPath) {
     // For API routes, return 401 JSON instead of redirecting to login HTML

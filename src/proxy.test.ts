@@ -139,6 +139,28 @@ describe('proxy — privacy policy auth exemption', () => {
   })
 })
 
+describe('proxy — claim list auth exemption (N39)', () => {
+  // CLAIM-01 is opened from a link or a printed QR code by a runner who has
+  // no account yet. The page decides open/closed itself.
+  it('serves /claim/<token> without auth', async () => {
+    const res = await proxy(requestFor('/claim/0b8a3c3e-6f1d-4c55-9a43-0f5e2b7d9a11'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  // Control: the trailing slash is part of the prefix, so a /claims admin
+  // page or the bare /claim path stays behind sign-in.
+  it('control: does not exempt /claims or the bare /claim', async () => {
+    expect((await proxy(requestFor('/claims'))).headers.get('location')).toBe(
+      'http://localhost/login'
+    )
+    expect((await proxy(requestFor('/claim'))).headers.get('location')).toBe(
+      'http://localhost/login'
+    )
+  })
+})
+
 describe('proxy — malformed session cookie', () => {
   // getClaims() can throw a plain Error instead of returning { error } — a
   // token whose segments are valid base64url but decode to non-JSON makes

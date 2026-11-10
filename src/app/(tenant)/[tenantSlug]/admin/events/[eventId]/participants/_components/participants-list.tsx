@@ -43,6 +43,8 @@ import {
 } from '../actions'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 
+import { ClaimLinkActions } from './claim-link-actions'
+
 export interface ParticipantRow {
   id: string
   name: string | null
@@ -76,6 +78,7 @@ interface Props {
   selectedStageId: string | null
   showWithdrawn: boolean
   showHidden: boolean
+  claimList: { path: string; eventName: string; isOpen: boolean }
 }
 
 export default function ParticipantsList({
@@ -89,6 +92,7 @@ export default function ParticipantsList({
   selectedStageId,
   showWithdrawn,
   showHidden,
+  claimList,
 }: Props) {
   const { t } = useTranslation('admin')
   const router = useRouter()
@@ -233,6 +237,7 @@ export default function ParticipantsList({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">{t('participants.title')}</h1>
         <div className="flex flex-wrap gap-2">
+          <ClaimLinkActions claimPath={claimList.path} eventName={claimList.eventName} />
           <Button variant="bordered" onPress={() => setAddOpen(true)}>
             {t('participants.add.button')}
           </Button>
@@ -248,6 +253,18 @@ export default function ParticipantsList({
           </Button>
         </div>
       </div>
+
+      {/* PB6: the link and QR code work in every state, the list behind
+          them only once the participant side is open (N36). Said here so a
+          printed QR code showing "not available" is not a surprise. */}
+      {!claimList.isOpen && (
+        <p
+          className="mb-6 rounded-lg border border-edge bg-status-neutral-bg px-4 py-3 text-sm text-ink-soft"
+          role="note"
+        >
+          {t('participants.claimLink.closedNotice')}
+        </p>
+      )}
 
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Select

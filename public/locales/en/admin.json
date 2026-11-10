@@ -380,6 +380,19 @@
       "removeConfirmBody": "{{name}} will be removed from this event. This cannot be undone.",
       "cancel": "Cancel",
       "genericError": "Could not update the participant. Try again."
+    },
+    "claimLink": {
+      "copy": "Copy claim link",
+      "copyShort": "Copy link",
+      "copied": "Claim link copied",
+      "copyError": "Could not copy the link. Copy it from the box instead.",
+      "showQr": "Show QR code",
+      "qrTitle": "Scan to claim your participant account",
+      "qrAlt": "QR code for the claim link",
+      "qrError": "Could not create the QR code.",
+      "linkLabel": "Claim link",
+      "download": "Download",
+      "closedNotice": "The event is not published. You can copy the claim link and print the QR code now. Until you publish, the link says claiming is not open."
     }
   },
   "scheduling": {
