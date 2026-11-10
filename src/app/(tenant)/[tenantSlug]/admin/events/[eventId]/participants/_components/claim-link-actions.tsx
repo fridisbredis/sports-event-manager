@@ -15,6 +15,8 @@ interface Props {
   claimPath: string
   /** File name stem for the downloaded QR image. */
   eventName: string
+  /** Layout classes for the two header buttons (PART-01 sizes them per breakpoint). */
+  buttonClassName?: string
 }
 
 // PB6: the admin can copy the claim link and show a QR code in every state,
@@ -28,7 +30,7 @@ interface Props {
 //
 // The QR code is drawn in the browser by the qrcode package. No third-party
 // QR service ever sees the link.
-export function ClaimLinkActions({ claimPath, eventName }: Props) {
+export function ClaimLinkActions({ claimPath, eventName, buttonClassName }: Props) {
   const { t } = useTranslation('admin')
   const [qrOpen, setQrOpen] = useState(false)
   const [claimUrl, setClaimUrl] = useState<string | null>(null)
@@ -77,10 +79,10 @@ export function ClaimLinkActions({ claimPath, eventName }: Props) {
 
   return (
     <>
-      <Button variant="bordered" onPress={copyLink}>
+      <Button variant="bordered" className={buttonClassName} onPress={copyLink}>
         {t('participants.claimLink.copy')}
       </Button>
-      <Button variant="bordered" onPress={openQr}>
+      <Button variant="bordered" className={buttonClassName} onPress={openQr}>
         {t('participants.claimLink.showQr')}
       </Button>
 

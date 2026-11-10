@@ -45,6 +45,16 @@ import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 
 import { ClaimLinkActions } from './claim-link-actions'
 
+// Columns drop out as the screen narrows, so Bib and Name always have room
+// (same approach as the officials roster's HIDE_ON_MOBILE). On a phone the
+// row is Bib, Name and the ⋯ menu; the rest comes back from sm/md/lg up.
+const SHOW_FROM_SM = 'hidden sm:table-cell'
+const SHOW_FROM_MD = 'hidden md:table-cell'
+const SHOW_FROM_LG = 'hidden lg:table-cell'
+
+/** Header buttons: full width in a two-column grid on a phone, natural width from sm. */
+const HEADER_BUTTON = 'w-full sm:w-auto'
+
 export interface ParticipantRow {
   id: string
   name: string | null
@@ -236,13 +246,25 @@ export default function ParticipantsList({
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">{t('participants.title')}</h1>
-        <div className="flex flex-wrap gap-2">
-          <ClaimLinkActions claimPath={claimList.path} eventName={claimList.eventName} />
-          <Button variant="bordered" onPress={() => setAddOpen(true)}>
+        {/* On a phone: Import, then Add, each the full width (the labels are
+            too long for half a 320px screen), then the claim link pair side
+            by side. From sm: one row, in reading order, primary last. */}
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+          <ClaimLinkActions
+            claimPath={claimList.path}
+            eventName={claimList.eventName}
+            buttonClassName={`${HEADER_BUTTON} order-3 sm:order-none`}
+          />
+          <Button
+            variant="bordered"
+            className={`${HEADER_BUTTON} col-span-2 order-2 sm:order-none`}
+            onPress={() => setAddOpen(true)}
+          >
             {t('participants.add.button')}
           </Button>
           <Button
             color="primary"
+            className={`${HEADER_BUTTON} col-span-2 order-1 sm:order-none`}
             onPress={() => {
               setOutcomes(null)
               setSelectedStages(importableStages.map((s) => s.id))
@@ -330,12 +352,12 @@ export default function ParticipantsList({
           <TableHeader>
             <TableColumn>{t('participants.columns.bib')}</TableColumn>
             <TableColumn>{t('participants.columns.name')}</TableColumn>
-            <TableColumn>{t('participants.columns.category')}</TableColumn>
-            <TableColumn>{t('participants.columns.club')}</TableColumn>
-            <TableColumn>{t('participants.columns.nation')}</TableColumn>
-            <TableColumn>{t('participants.columns.gender')}</TableColumn>
-            <TableColumn>{t('participants.columns.phone')}</TableColumn>
-            <TableColumn>{t('participants.columns.stages')}</TableColumn>
+            <TableColumn className={SHOW_FROM_SM}>{t('participants.columns.category')}</TableColumn>
+            <TableColumn className={SHOW_FROM_LG}>{t('participants.columns.club')}</TableColumn>
+            <TableColumn className={SHOW_FROM_LG}>{t('participants.columns.nation')}</TableColumn>
+            <TableColumn className={SHOW_FROM_LG}>{t('participants.columns.gender')}</TableColumn>
+            <TableColumn className={SHOW_FROM_MD}>{t('participants.columns.phone')}</TableColumn>
+            <TableColumn className={SHOW_FROM_MD}>{t('participants.columns.stages')}</TableColumn>
             {/* Same ⋯ column as the officials roster (N27): narrow,
                 right-aligned, labelled only for screen readers. */}
             <TableColumn width={64} align="end">
@@ -383,19 +405,27 @@ export default function ParticipantsList({
                     )}
                   </span>
                 </TableCell>
-                <TableCell className="text-[15px] text-ink-soft">{p.category ?? '—'}</TableCell>
-                <TableCell className="text-[15px] text-ink-soft">{p.club ?? '—'}</TableCell>
-                <TableCell className="text-[15px] text-ink-soft">{p.nation ?? '—'}</TableCell>
-                <TableCell className="text-[15px] text-ink-soft">{p.gender ?? '—'}</TableCell>
+                <TableCell className={`${SHOW_FROM_SM} text-[15px] text-ink-soft`}>
+                  {p.category ?? '—'}
+                </TableCell>
+                <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
+                  {p.club ?? '—'}
+                </TableCell>
+                <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
+                  {p.nation ?? '—'}
+                </TableCell>
+                <TableCell className={`${SHOW_FROM_LG} text-[15px] text-ink-soft`}>
+                  {p.gender ?? '—'}
+                </TableCell>
                 {/* Always shown, empty until filled: Race Results does not
                     expose phone numbers, so an imported row has none until
                     someone links it. */}
-                <TableCell className="text-[15px] text-ink-soft">
+                <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
                   {/* Free text, not normalised on save — hence not
                       formatPhoneForDisplay, which assumes the stored E.164. */}
                   {p.phone ? formatEnteredPhoneForDisplay(p.phone) : '—'}
                 </TableCell>
-                <TableCell className="text-[15px] text-ink-soft">
+                <TableCell className={`${SHOW_FROM_MD} text-[15px] text-ink-soft`}>
                   {p.stageIds.length === 0
                     ? '—'
                     : stages
