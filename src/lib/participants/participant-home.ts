@@ -37,7 +37,9 @@ export interface ParticipantHome {
 // Errors are thrown, never read as "nothing there" (F-REL-10): an empty card
 // list on a failed read would tell a runner they are entered in no stage.
 export async function loadParticipantHome(
-  tenant: ResolvedParticipantTenant
+  tenant: ResolvedParticipantTenant,
+  // ACCT-01 reuses the per-event facts and has no use for the announcement.
+  { withAnnouncement = true }: { withAnnouncement?: boolean } = {}
 ): Promise<ParticipantHome> {
   const supabase = await createSupabaseServerClient()
   const participantIds = tenant.entries.map((e) => e.participantId)
@@ -95,7 +97,7 @@ export async function loadParticipantHome(
   const openEventIds = events.filter((e) => e.open).map((e) => e.eventId)
   let latestAnnouncement: LatestAnnouncement | null = null
 
-  if (openEventIds.length > 0) {
+  if (withAnnouncement && openEventIds.length > 0) {
     // event_participant_read_announcements (N43) limits this to the
     // participant channel of the caller's events; the filters say the same
     // thing in the app and keep a closed event's announcements off the page.

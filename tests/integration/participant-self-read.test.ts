@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   serviceClient,
@@ -134,6 +134,50 @@ describe('N43: participant self-read policies', () => {
       .eq('tenant_id', tenantId)
     expect(error).toBeNull()
     expect(data?.map((p) => p.id)).toEqual([myParticipantId])
+  })
+
+  // set_own_participant_sms_opt_out: the caller's own records, that one
+  // column, nobody else's.
+  it('sets the caller’s own SMS opt-out and no one else’s', async () => {
+    const admin = serviceClient()
+    const { data: changed, error } = await participantClient.rpc(
+      'set_own_participant_sms_opt_out',
+      { p_tenant_id: tenantId, p_opt_out: true }
+    )
+    expect(error).toBeNull()
+    expect(changed).toBe(1)
+
+    const { data: rows } = await admin
+      .from('participants')
+      .select('id, sms_opt_out')
+      .in('id', [myParticipantId, otherParticipantId])
+    expect(Object.fromEntries(rows!.map((r) => [r.id, r.sms_opt_out]))).toEqual({
+      [myParticipantId]: true,
+      [otherParticipantId]: false,
+    })
+  })
+
+  it('changes nothing in a tenant where the caller has no record', async () => {
+    const other = await createTenant('Participant Self Read Other', 'premium')
+    try {
+      const { data, error } = await participantClient.rpc('set_own_participant_sms_opt_out', {
+        p_tenant_id: other.id,
+        p_opt_out: true,
+      })
+      expect(error).toBeNull()
+      expect(data).toBe(0)
+    } finally {
+      await cleanupTenant(other.id)
+    }
+  })
+
+  it('is not callable without a session', async () => {
+    const anon = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!)
+    const { error } = await anon.rpc('set_own_participant_sms_opt_out', {
+      p_tenant_id: tenantId,
+      p_opt_out: true,
+    })
+    expect(error?.code).toBe('42501')
   })
 
   it('loses every read once unlinked', async () => {

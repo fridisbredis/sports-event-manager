@@ -174,6 +174,14 @@
       "notAvailable": "This event is not available right now. Please check back later.",
       "eventInfo": "Event info",
       "latestAnnouncement": "Announcements"
+    },
+    "account": {
+      "nameLabel": "Name (read-only)",
+      "nameHint": "As on the Race Results start list.",
+      "myRace": "My race",
+      "myShiftsHeading": "Your shifts",
+      "myShifts": "My shifts",
+      "myShiftsSub": "You are an official here too"
     }
   }
 }

@@ -15,6 +15,13 @@
 --    timeline on the same policy). can_read_event stays official-only, so the
 --    officials channel stays unreadable to a participant.
 --
+-- 3. set_own_participant_sms_opt_out — ACCT-01's SMS switch. The one column a
+--    participant may change on their own record, so a function rather than
+--    an UPDATE policy: a policy cannot limit which columns change, and the
+--    rest of the row (name, bib, claim state) belongs to the import and the
+--    admin. Applies to every record the caller has in the tenant, the way
+--    the official switch is one setting per tenant.
+--
 -- Deliberately NOT event_stages or event_info_sections. INFO-01 reads those
 -- through get_event_info_cached, with the app deciding access — that was
 -- N38's decision for participants too (tests/integration/
@@ -37,11 +44,15 @@
 -- Forward-fix: additive
 --   Rollback: drop policy if exists participant_read_own_participant_stages on public.participant_stages;
 --             drop policy if exists event_participant_read_announcements on public.announcements;
+--             drop function if exists public.set_own_participant_sms_opt_out(uuid, boolean);
 --   Data:     no data loss
 --   Blast:    SELECT policies are OR'ed with the existing ones, so admins and
 --             officials read exactly what they read before. Too narrow, and a
---             PAR-01 card or the announcement preview comes back empty.
---   Window:   compatible. New policies only; no deployed code depends on them.
+--             PAR-01 card or the announcement preview comes back empty. If
+--             the function raised, ACCT-01's SMS switch would show its save
+--             error and leave sms_opt_out as it was.
+--   Window:   compatible. New policies and a new function; no deployed code
+--             depends on them.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -71,3 +82,41 @@ create policy event_participant_read_announcements
   for select
   to authenticated
   using (channel = 'participants' and public.is_event_participant(event_id));
+
+-- ----------------------------------------------------------------------------
+-- 3. set_own_participant_sms_opt_out
+-- ----------------------------------------------------------------------------
+-- Scoped by auth.uid(), so it is called with the caller's own session, never
+-- the service client (auth.uid() is NULL under service_role and the update
+-- would match nothing). Returns how many records changed; 0 means the caller
+-- has no record in the tenant.
+
+create or replace function public.set_own_participant_sms_opt_out(
+  p_tenant_id uuid,
+  p_opt_out   boolean
+)
+returns integer
+language sql
+security definer
+set search_path = public
+as $$
+  with changed as (
+    update public.participants
+       set sms_opt_out = p_opt_out
+     where tenant_id = p_tenant_id
+       and user_id = auth.uid()
+    returning 1
+  )
+  select count(*)::integer from changed;
+$$;
+
+comment on function public.set_own_participant_sms_opt_out(uuid, boolean) is
+  'N43: the caller''s SMS opt-out on every participant record they hold in the '
+  'tenant. The only participant column a participant writes.';
+
+-- New functions in public get EXECUTE for anon and authenticated from the
+-- schema's default ACL; revoking from PUBLIC alone does not remove those.
+revoke all on function public.set_own_participant_sms_opt_out(uuid, boolean)
+  from public, anon, authenticated;
+grant execute on function public.set_own_participant_sms_opt_out(uuid, boolean)
+  to authenticated;
