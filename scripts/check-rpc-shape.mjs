@@ -39,11 +39,15 @@ function extractFunctionBodies(sql) {
   let match
   while ((match = re.exec(sql)) !== null) {
     const name = match[1]
-    // Find the `as $$ ... $$;` body following this signature.
+    // Find the dollar-quoted body following this signature: `as $$ ... $$;`
+    // or a tagged `AS $function$ ... $function$;` (the pg_get_functiondef
+    // form some migrations copy verbatim). Matching only `$$` skipped a
+    // tagged body and read the NEXT function's `$$` body in the file
+    // instead, so a tagged RPC was compared against the wrong keys.
     const tail = sql.slice(match.index)
-    const bodyMatch = tail.match(/as\s+\$\$([\s\S]*?)\$\$\s*;/i)
+    const bodyMatch = tail.match(/as\s+(\$\w*\$)([\s\S]*?)\1\s*;/i)
     if (bodyMatch) {
-      bodies.set(name, bodyMatch[1])
+      bodies.set(name, bodyMatch[2])
     }
   }
   return bodies
