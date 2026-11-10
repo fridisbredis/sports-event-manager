@@ -164,6 +164,25 @@ grant select, insert, update, delete on table public.rate_limit_hits
 to service_role;
 
 -- ----------------------------------------------------------------------------
+-- auth_events — service_role writes, authenticated reads via RLS.
+-- ----------------------------------------------------------------------------
+-- Migration 0038 (SEC-07) grants authenticated SELECT (gated to system admins
+-- by RLS) and revokes writes from anon and authenticated. Every write goes
+-- through the service-role client in logAuthEvent() — a failed OTP verify has
+-- no session to derive an INSERT policy from (ADR-0001 category 5). The
+-- migration never grants service_role, because hosted Supabase does.
+--
+-- The symptom (B17): every OTP send/verify and invite-confirmation role grant
+-- fails its audit write locally with 42501. logAuthEvent() is fail-safe, so
+-- login still works and the only trace is a "Failed to write auth event" log
+-- line. Dev and prod are unaffected — verified 2026-11-10: service_role holds
+-- full DML on auth_events on both, and rows are being written.
+-- tests/integration/auth-events-service-role.test.ts pins this grant.
+
+grant select, insert, update, delete on table public.auth_events
+to service_role;
+
+-- ----------------------------------------------------------------------------
 -- sms_queue — service_role full, authenticated INSERT only, anon nothing.
 -- ----------------------------------------------------------------------------
 -- Migration 0030 revokes all from anon and authenticated; 0032 restores INSERT
@@ -199,6 +218,28 @@ grant insert on table public.sms_queue to authenticated;
 -- need nothing added.
 
 grant select, insert, update, delete on table public.sms_usage
+to service_role;
+
+-- ----------------------------------------------------------------------------
+-- sms_cap_warnings — service_role only.
+-- ----------------------------------------------------------------------------
+-- Migration 20261030084025 (N32) revokes all from anon and authenticated and,
+-- like sms_usage above, leaves service_role to the hosted platform's automatic
+-- grant — which a local `supabase db reset` does not supply.
+--
+-- The symptom (B16): sendSmsCapWarnings logs "permission denied for table
+-- sms_cap_warnings" (42501) with consequence cap_warnings_skipped_this_tick,
+-- returns 0, and the 90% warning never goes out locally. The integration test
+-- 'texts the tenant admin and the system admin, not the official, once' in
+-- sms-cap-warning.test.ts fails with an empty recipient list. Dev and prod
+-- are unaffected — verified 2026-11-10: service_role holds select, insert,
+-- update and delete on this table on both.
+--
+-- All four are needed: the worker reads the month's claims, inserts its own
+-- claim, updates it with the send counts, and deletes it when every send
+-- failed so the next tick retries.
+
+grant select, insert, update, delete on table public.sms_cap_warnings
 to service_role;
 
 commit;
