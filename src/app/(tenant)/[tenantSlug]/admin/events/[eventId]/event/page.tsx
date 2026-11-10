@@ -34,9 +34,6 @@ interface AdminEventCached {
     position: number
   }>
   distances: Array<{ label: string; position: number; stage_id: string | null }>
-  // Still returned until the contract migration drops event_facilities;
-  // this page no longer reads it (N38, L24).
-  facilities: Array<{ label: string; position: number }>
   info_sections: InfoSection[]
 }
 

@@ -55,7 +55,6 @@ interface AdminEventCached {
     position: number
   }>
   distances: Array<{ label: string; position: number; stage_id: string | null }>
-  facilities: Array<{ label: string; position: number }>
   info_sections: Array<{
     id: string
     title: string
@@ -108,14 +107,6 @@ async function seedTenantEvent(
   })
   if (distanceError) throw distanceError
 
-  const { error: facilityError } = await admin.from('event_facilities').insert({
-    tenant_id: tenantId,
-    event_id: event.id,
-    label: `${eventName} Water Station`,
-    position: 0,
-  })
-  if (facilityError) throw facilityError
-
   const { error: sectionError } = await admin.from('event_info_sections').insert({
     tenant_id: tenantId,
     event_id: event.id,
@@ -135,7 +126,7 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     await Promise.all(createdTenantIds.map((id) => cleanupTenant(id)))
   })
 
-  it('returns the exact event/stages/distances/facilities shape the page destructures', async () => {
+  it('returns the exact event/stages/distances/info_sections shape the page destructures', async () => {
     const admin = serviceClient()
     const tenant = await createTenant('PERF-06 Admin Event Shape')
     createdTenantIds.push(tenant.id)
@@ -171,7 +162,6 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     expect(payload.distances).toEqual([
       { label: 'Shape Test Event 10k', position: 0, stage_id: stage.id },
     ])
-    expect(payload.facilities).toEqual([{ label: 'Shape Test Event Water Station', position: 0 }])
     expect(payload.info_sections).toEqual([
       {
         id: expect.any(String),
@@ -183,13 +173,7 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
         position: 0,
       },
     ])
-    expect(Object.keys(payload).sort()).toEqual([
-      'distances',
-      'event',
-      'facilities',
-      'info_sections',
-      'stages',
-    ])
+    expect(Object.keys(payload).sort()).toEqual(['distances', 'event', 'info_sections', 'stages'])
   })
 
   it('returns a null event and empty arrays when the tenant has no event row', async () => {
@@ -203,11 +187,10 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     expect(payload.event).toBeNull()
     expect(payload.stages).toEqual([])
     expect(payload.distances).toEqual([])
-    expect(payload.facilities).toEqual([])
     expect(payload.info_sections).toEqual([])
   })
 
-  it("does not leak another tenant's event, stages, distances, or facilities", async () => {
+  it("does not leak another tenant's event, stages, distances, or info sections", async () => {
     const admin = serviceClient()
     const tenantA = await createTenant('PERF-06 Admin Event Tenant A')
     const tenantB = await createTenant('PERF-06 Admin Event Tenant B')
@@ -223,10 +206,9 @@ describe('get_admin_event_cached RPC (PERF-06 Phase 2 fail-closed boundary)', ()
     expect(payloadA.event?.name).toBe('Tenant A Event')
     expect(payloadA.stages.every((s) => s.name.startsWith('Tenant A'))).toBe(true)
     expect(payloadA.distances.every((d) => d.label.startsWith('Tenant A'))).toBe(true)
-    expect(payloadA.facilities.every((f) => f.label.startsWith('Tenant A'))).toBe(true)
+    expect(payloadA.info_sections.every((i) => i.title.startsWith('Tenant A'))).toBe(true)
     expect(payloadA.stages.some((s) => s.name.startsWith('Tenant B'))).toBe(false)
     expect(payloadA.distances.some((d) => d.label.startsWith('Tenant B'))).toBe(false)
-    expect(payloadA.facilities.some((f) => f.label.startsWith('Tenant B'))).toBe(false)
     expect(payloadA.info_sections.some((i) => i.title.startsWith('Tenant B'))).toBe(false)
   })
 

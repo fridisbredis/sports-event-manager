@@ -56,7 +56,7 @@ function mockResolvedTenant() {
   })
 }
 
-// PERF-06 / F-PERF-04 Phase 2: the event/stages/facilities reads moved off
+// PERF-06 / F-PERF-04 Phase 2: the event/stages reads moved off
 // the session client onto get_event_info_cached (migration 0051) via the
 // service-role client — see the page's own comment for why.
 function mockEventInfoRpc(result: { data: unknown; error: unknown }) {
@@ -92,7 +92,6 @@ describe('EventInfoPage', () => {
       data: {
         event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
         stages: [],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -110,7 +109,7 @@ describe('EventInfoPage', () => {
     mockResolvedTenant()
     mockUser('user-1')
     mockEventInfoRpc({
-      data: { event: null, stages: [], facilities: [], info_sections: [] },
+      data: { event: null, stages: [], info_sections: [] },
       error: null,
     })
 
@@ -141,7 +140,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -170,7 +168,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -203,7 +200,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -242,7 +238,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -286,7 +281,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -333,7 +327,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -367,7 +360,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -401,7 +393,6 @@ describe('EventInfoPage', () => {
             position: 0,
           },
         ],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -432,7 +423,6 @@ describe('EventInfoPage', () => {
       data: {
         event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
         stages: [],
-        facilities: [],
         info_sections: [
           {
             id: 's1',
@@ -490,7 +480,6 @@ describe('EventInfoPage', () => {
       data: {
         event: { name: 'Viadal 2026', event_type: 'race', description: null, logo_url: null },
         stages: [],
-        facilities: [],
         info_sections: [],
       },
       error: null,
@@ -499,6 +488,5 @@ describe('EventInfoPage', () => {
     render(await EventInfoPage({ params: PARAMS }))
 
     expect(screen.queryAllByRole('heading', { level: 2 })).toEqual([])
-    expect(screen.queryByText('eventInfo.facilities')).not.toBeInTheDocument()
   })
 })

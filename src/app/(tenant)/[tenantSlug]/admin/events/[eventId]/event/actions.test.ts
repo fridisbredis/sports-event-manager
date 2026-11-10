@@ -46,12 +46,10 @@ function chain(result: unknown) {
 // RPC results are looked up by function name, defaulting to success.
 function mockClient(
   fromMock: ReturnType<typeof vi.fn>,
-  rpcResults: Partial<Record<'sync_event_stages' | 'sync_event_facilities', unknown>> = {}
+  rpcResults: Partial<Record<'sync_event_stages', unknown>> = {}
 ) {
   const rpcMock = vi.fn((fn: string) =>
-    Promise.resolve(
-      rpcResults[fn as 'sync_event_stages' | 'sync_event_facilities'] ?? { error: null }
-    )
+    Promise.resolve(rpcResults[fn as 'sync_event_stages'] ?? { error: null })
   )
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
@@ -326,19 +324,6 @@ describe('saveEvent', () => {
       '/[tenantSlug]/admin/events/[eventId]/event',
       'page'
     )
-  })
-
-  // N38 (L24): info sections are saved by their own actions; the page's Save
-  // no longer writes facilities at all.
-  it('does not touch facilities on save', async () => {
-    vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
-    const statusBuilder = statusBuilderFor('draft')
-    const eventsBuilder = chain({ error: null })
-    const fromMock = vi.fn().mockReturnValueOnce(statusBuilder).mockReturnValueOnce(eventsBuilder)
-    const rpcMock = mockClient(fromMock)
-
-    expect(await saveEvent(BASE_INPUT)).toEqual({})
-    expect(rpcMock).not.toHaveBeenCalledWith('sync_event_facilities', expect.anything())
   })
 })
 
