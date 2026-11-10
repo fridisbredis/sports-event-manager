@@ -11,3 +11,7 @@ package-lock.json
 # read, never edit. Reformatting it rewrites ~4000 lines of machine-authored
 # markup for no gain and buries any real change to it in noise.
 docs/design_handoff_admin_dashboard/*.dc.html
+
+# Delivered wireframes, same reasoning: a layout reference we read, never edit.
+# Reformatting would rewrite them away from the files as delivered.
+docs/wireframes/**/*.html
