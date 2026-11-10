@@ -68,3 +68,64 @@ export async function claimParticipant(
     roleGranted: result.role_granted,
   }
 }
+
+// complete_participant_claim (migration 20261110130000) adds one refusal of
+// its own on top of claim_participant's.
+export const COMPLETE_CLAIM_ERRORS = [...CLAIM_PARTICIPANT_ERRORS, 'privacy_not_accepted'] as const
+
+export type CompleteClaimError = (typeof COMPLETE_CLAIM_ERRORS)[number] | 'failed'
+
+export type CompleteClaimResult =
+  | { ok: true; participantId: string; eventId: string; roleGranted: boolean }
+  | { ok: false; error: CompleteClaimError }
+
+/**
+ * N40 (CLAIM-02): the claim as the Complete button makes it — link, event
+ * check and privacy consent in one transaction (REL-01).
+ *
+ * `eventId` and `tenantId` must come from the claim token (loadClaimTarget),
+ * never from the request body, and `userId` from the verified session. The
+ * RPC refuses a participant outside that event, or one that is withdrawn or
+ * hidden, with the same not_found as an unknown id.
+ */
+export async function completeParticipantClaim(input: {
+  userId: string
+  participantId: string
+  tenantId: string
+  eventId: string
+  privacyAccepted: boolean
+}): Promise<CompleteClaimResult> {
+  const { userId, participantId, tenantId, eventId, privacyAccepted } = input
+  if (![userId, participantId, tenantId, eventId].every((id) => uuid.safeParse(id).success)) {
+    return { ok: false, error: 'not_found' }
+  }
+
+  const service = createSupabaseServiceClient()
+  const { data, error } = await service.rpc('complete_participant_claim', {
+    p_user_id: userId,
+    p_participant_id: participantId,
+    p_tenant_id: tenantId,
+    p_event_id: eventId,
+    p_privacy_accepted: privacyAccepted,
+  })
+
+  if (error) {
+    const known = COMPLETE_CLAIM_ERRORS.find((code) => code === error.message)
+    if (known) return { ok: false, error: known }
+    logger.error('complete_participant_claim failed', error)
+    return { ok: false, error: 'failed' }
+  }
+
+  const result = data as unknown as {
+    participant_id: string
+    event_id: string
+    role_granted: boolean
+  }
+
+  return {
+    ok: true,
+    participantId: result.participant_id,
+    eventId: result.event_id,
+    roleGranted: result.role_granted,
+  }
+}

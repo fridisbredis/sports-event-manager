@@ -159,6 +159,22 @@ describe('proxy — claim list auth exemption (N39)', () => {
       'http://localhost/login'
     )
   })
+
+  // N40: the claim form asks for a code before there is a session, so this
+  // one API path is open — guarded by its own per-number and per-list rate
+  // limits, like /api/auth/send-otp.
+  it('passes /api/claim/send-otp through without auth', async () => {
+    const res = await proxy(requestFor('/api/claim/send-otp'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  // Control: completing a claim happens after the code is verified, so the
+  // rest of /api/claim/* still needs a session.
+  it('control: does not exempt /api/claim/complete', async () => {
+    expect((await proxy(requestFor('/api/claim/complete'))).status).toBe(401)
+  })
 })
 
 describe('proxy — malformed session cookie', () => {

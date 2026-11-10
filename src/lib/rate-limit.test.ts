@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createHash } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  checkClaimListSendRateLimit,
   checkInviteRateLimit,
   checkLoginSendRateLimit,
   checkLoginVerifyRateLimit,
@@ -240,5 +241,20 @@ describe('login rate limits', () => {
     await expect(checkLoginVerifyRateLimit('46700000001')).rejects.toThrow(
       'rate limit check failed'
     )
+  })
+})
+
+describe('claim list rate limit (N40, L15)', () => {
+  it('checks one key per event against a 100-per-hour limit', async () => {
+    rpc.mockResolvedValueOnce({ data: [{ allowed: true, retry_after_ms: 0 }], error: null })
+
+    const result = await checkClaimListSendRateLimit('event-1')
+
+    expect(result).toEqual({ allowed: true, retryAfterSeconds: 0 })
+    expect(rpc).toHaveBeenCalledWith('check_rate_limit', {
+      p_key: 'claim:list:event-1',
+      p_limit: 100,
+      p_duration_seconds: 3600,
+    })
   })
 })
