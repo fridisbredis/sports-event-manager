@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SCHED-01 · Scheduling — Viadal EventAdmin wireframes</title>
+<!-- Source: Viadal Event Planner wireframes, page "EventAdmin_view", row SCHED-01.
+     Each <div class="screen"> is one state of this screen (1440×1024 frame, label above it). -->
+<style>
+  body { margin:0; background:#f2f2f2; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .lbl { font:600 15px/1.4 ui-sans-serif,system-ui,sans-serif; color:#333; margin-bottom:12px; }
+  .lbl span { color:#999; font-weight:400; }
+  .dframe { width:1440px; height:1024px; background:#fff; border:1px solid #999; border-radius:8px; overflow:hidden; display:flex; }
+  .side { width:240px; flex:0 0 auto; border-right:1px solid #999; padding:24px 14px; display:flex; flex-direction:column; }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:24px; padding:0 6px; }
+  .blogo { width:32px; height:32px; border:1.5px solid #999; border-radius:7px; flex:0 0 auto; }
+  .bname { font:700 15px/1.1 system-ui; color:#333; }
+  .bsub { font:400 11px/1.2 system-ui; color:#999; margin-top:2px; }
+  .navg { display:flex; flex-direction:column; gap:4px; flex:1; }
+  .navi { padding:10px 12px; border-radius:6px; font:500 13px/1.2 system-ui; color:#666; }
+  .navi.on { background:#E5E5E5; color:#333; font-weight:700; }
+  .main { flex:1; padding:28px 36px; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  .dh1 { font:700 22px/1.2 system-ui; color:#333; margin:0; }
+  .dhrow { display:flex; align-items:center; justify-content:space-between; }
+  .btn { height:40px; padding:0 18px; border-radius:7px; background:#333; color:#fff; display:inline-flex; align-items:center; justify-content:center; font:600 13px/1 system-ui; }
+  .btn.dis { background:#E5E5E5; color:#999; border:1px solid #999; }
+  .btno { height:40px; padding:0 18px; border-radius:7px; border:1px solid #999; color:#333; background:#fff; display:inline-flex; align-items:center; justify-content:center; font:600 13px/1 system-ui; }
+  .btnsm { height:30px; padding:0 12px; border-radius:6px; font:600 12px/1 system-ui; display:inline-flex; align-items:center; justify-content:center; }
+  .badge { display:inline-flex; align-items:center; padding:5px 11px; border:1px solid #999; border-radius:20px; font:600 11px/1 system-ui; color:#333; }
+  .badge.fill { background:#E5E5E5; }
+  .chip { display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 12px; border:1px solid #999; border-radius:20px; font:500 13px/1 system-ui; color:#333; }
+  .chip .x { width:18px; height:18px; border-radius:50%; background:#E5E5E5; display:inline-flex; align-items:center; justify-content:center; font:600 12px/1 system-ui; color:#333; }
+  .card { border:1px solid #999; border-radius:10px; padding:18px; }
+  .sect { font:700 11px/1.2 system-ui; color:#333; letter-spacing:.06em; text-transform:uppercase; margin:0 0 12px; }
+  .lab { font:500 12px/1.2 system-ui; color:#666; margin-bottom:6px; }
+  .small { font:400 13px/1.5 system-ui; color:#666; margin:0; }
+  .inp { height:42px; border:1px solid #999; border-radius:7px; display:flex; align-items:center; padding:0 14px; font:400 14px/1 system-ui; color:#333; }
+  .inp.ph { color:#999; }
+  .inp.dash { border-style:dashed; color:#666; }
+  .inp.err { border-color:#333; border-width:2px; }
+  .ta { border:1px solid #999; border-radius:7px; padding:12px 14px; }
+  .dl { height:0; border-top:1.5px dashed #999; }
+  .img { background:#E5E5E5; background-image:linear-gradient(45deg,transparent calc(50% - .8px),#999 calc(50% - .8px),#999 calc(50% + .8px),transparent calc(50% + .8px)),linear-gradient(-45deg,transparent calc(50% - .8px),#999 calc(50% - .8px),#999 calc(50% + .8px),transparent calc(50% + .8px)); border:1px solid #999; }
+  .av { border-radius:50%; background:#E5E5E5; border:1px solid #999; flex:0 0 auto; }
+  .seg { display:inline-flex; border:1px solid #999; border-radius:8px; overflow:hidden; }
+  .seg > div { padding:9px 18px; font:600 13px/1 system-ui; }
+  .seg .on { background:#333; color:#fff; }
+  .seg .off { background:#fff; color:#666; }
+  .th { display:flex; align-items:center; padding:0 16px; height:38px; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; border-bottom:1px solid #999; }
+  .tr { display:flex; align-items:center; padding:0 16px; height:56px; border-bottom:1px solid #E5E5E5; font:400 14px/1.3 system-ui; color:#333; }
+  .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .chk { width:18px; height:18px; border:1.5px solid #999; border-radius:4px; flex:0 0 auto; }
+  .stk { display:flex; flex-direction:column; }
+  .warn { width:18px; height:18px; border:1.5px solid #333; border-radius:50%; display:flex; align-items:center; justify-content:center; font:700 12px/1 system-ui; color:#333; flex:0 0 auto; }
+  .warnbar { border:2px solid #333; border-radius:10px; padding:14px 18px; display:flex; gap:10px; align-items:center; }
+  /* stages */
+  .srow { display:flex; align-items:center; gap:12px; padding:14px 16px; }
+  .exp { font:400 13px/1 system-ui; color:#666; width:14px; flex:0 0 auto; }
+  .sdet { border-top:1px solid #E5E5E5; padding:14px 16px 16px; background:#FAFAFA; }
+  /* scheduling grid */
+  .ghead { display:flex; border-bottom:1px solid #999; }
+  .grow { display:flex; border-bottom:1px solid #E5E5E5; height:78px; }
+  .grow.last { border-bottom:none; }
+  .rhead { width:210px; flex:0 0 auto; padding:0 16px; display:flex; flex-direction:column; justify-content:center; }
+  .rheadp { width:210px; flex:0 0 auto; padding:0 16px; display:flex; align-items:center; gap:10px; }
+  .grid6 { flex:1; display:grid; grid-template-columns:repeat(6,1fr); }
+  .gcol { padding:12px 6px; font:700 11px/1 system-ui; color:#666; text-align:center; border-left:1px solid #E5E5E5; }
+  .gcell { border-left:1px solid #E5E5E5; padding:8px; display:flex; align-items:center; justify-content:center; }
+  .gempty { border-left:1px solid #E5E5E5; }
+  .cellbox { width:100%; height:100%; border:1px solid #999; border-radius:6px; background:#E5E5E5; display:flex; align-items:center; justify-content:center; font:700 13px/1 system-ui; color:#333; }
+  .cellname { width:100%; height:100%; border:1px solid #999; border-radius:6px; background:#E5E5E5; display:flex; align-items:center; justify-content:center; font:600 11px/1.15 system-ui; color:#333; text-align:center; padding:2px; }
+  .cellover { border:2px solid #333; flex-direction:column; gap:1px; }
+  .hatch { background:repeating-linear-gradient(45deg,#fff,#fff 5px,#E5E5E5 5px,#E5E5E5 10px); }
+  .dbk { width:22px; height:22px; border:1.5px solid #333; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; gap:1px; flex:0 0 auto; }
+  .dbk .ring { width:6px; height:6px; border-radius:50%; border:1.5px solid #333; }
+  .dbk .ex { font:700 9px/1 system-ui; color:#333; }
+  .stagesel { position:relative; }
+  .seldd { position:absolute; top:42px; left:0; width:240px; background:#fff; border:1px solid #999; border-radius:8px; padding:6px; z-index:5; box-shadow:0 6px 20px rgba(51,51,51,.12); }
+  .seldd .opt { padding:9px 10px; border-radius:6px; font:500 13px/1.2 system-ui; color:#333; display:flex; align-items:center; justify-content:space-between; }
+  .seldd .opt.on { background:#E5E5E5; font-weight:700; }
+  .scrim { position:absolute; inset:0; background:rgba(51,51,51,.18); display:flex; align-items:center; justify-content:center; }
+  .modal { width:520px; background:#fff; border:1px solid #999; border-radius:12px; padding:24px; }
+  /* --- participants / info sections additions --- */
+  .pbadge { display:inline-flex; align-items:center; padding:2px 7px; border:1px solid #999; border-radius:10px; font:600 10px/1.2 system-ui; color:#333; background:#E5E5E5; }
+  .navi.lock { color:#BBB; }
+  .navi.lock .pbadge { background:#fff; color:#999; }
+  .isrow { display:flex; align-items:center; gap:10px; padding:0 12px; height:40px; border-bottom:1px solid #E5E5E5; }
+  .drag { color:#999; font:700 12px/1 system-ui; letter-spacing:-2px; width:14px; flex:0 0 auto; }
+  .fchip { display:inline-flex; align-items:center; padding:7px 14px; border:1px solid #999; border-radius:20px; font:600 12px/1 system-ui; color:#666; background:#fff; }
+  .fchip.on { background:#333; color:#fff; border-color:#333; }
+  .badge.cf { border:2px solid #333; padding:4px 10px; }
+  .ptr { display:flex; align-items:center; padding:0 16px; height:52px; border-bottom:1px solid #E5E5E5; font:400 13px/1.3 system-ui; color:#333; }
+  .pth { display:flex; align-items:center; padding:0 16px; height:38px; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; border-bottom:1px solid #999; }
+  .msgbar { border:1px solid #999; border-radius:10px; padding:12px 18px; background:#E5E5E5; font:600 13px/1.3 system-ui; color:#333; }
+  .kv { display:flex; gap:10px; font:400 13px/1.5 system-ui; }
+  .kv .k { color:#666; width:110px; flex:0 0 auto; }
+  .kv .v { color:#333; }
+  .iceb { display:inline-flex; align-items:center; padding:3px 8px; border-radius:20px; background:#333; color:#fff; font:700 10px/1 system-ui; letter-spacing:.06em; margin-left:10px; }
+  .upl { border:1.5px dashed #999; border-radius:8px; height:96px; display:flex; align-items:center; justify-content:center; gap:12px; }
+
+  body { padding:60px; }
+  .screen { width:1440px; margin-bottom:80px; }
+</style>
+</head>
+<body>
+<!-- SCHED-01 : by-person -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— by-person</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 by-person">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden;">
+      <div class="dhrow">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="on">By person</div><div class="off">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="small" style="margin-top:8px;">Day selector only offers days within Stage 2's allocable range (1–3 Jul).</div>
+      <div class="card" style="margin-top:14px; padding:0; flex:1; overflow:hidden;">
+        <div class="ghead"><div class="rheadp" style="font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666;">Official</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Anna Berg</span></div><div class="grid6"><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Depå<span style="font-weight:700; font-size:12px;">2/3</span></div></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Depå<span style="font-weight:700; font-size:12px;">2/3</span></div></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="background:#fff; color:#666;">On break</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Johan Lind</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Start line<span style="font-weight:700; font-size:12px;">1/4</span></div></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Start line<span style="font-weight:700; font-size:12px;">1/4</span></div></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="background:#fff; color:#666;">On call</div></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Maria Holm</span></div><div class="grid6"><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Feed zone<span style="font-weight:700; font-size:12px;">3/6</span></div></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Feed zone<span style="font-weight:700; font-size:12px;">3/6</span></div></div><div class="gcell"><div class="cellname" style="background:#fff; color:#666;">Blocked</div></div><div class="gempty"></div></div></div>
+        <div class="grow last"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Erik Falk</span></div><div class="grid6"><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Officials HQ<span style="font-weight:700; font-size:12px;">1/3</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Finish line<span style="font-weight:700; font-size:12px;">2/5</span></div></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Finish line<span style="font-weight:700; font-size:12px;">2/5</span></div></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : by-person-hour-popup -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— by-person-hour-popup</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 by-person-popup">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden; position:relative;">
+      <div class="dhrow" style="opacity:.4;">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="on">By person</div><div class="off">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="small" style="margin-top:8px; opacity:.4;">Day selector only offers days within Stage 2's allocable range (1–3 Jul).</div>
+      <div class="card" style="margin-top:14px; padding:0; flex:1; overflow:hidden; opacity:.4;">
+        <div class="ghead"><div class="rheadp" style="font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666;">Official</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Anna Berg</span></div><div class="grid6"><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Depå<span style="font-weight:700; font-size:12px;">2/3</span></div></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Depå<span style="font-weight:700; font-size:12px;">2/3</span></div></div><div class="gcell"><div class="cellname" style="border:2px solid #333; background:#fff;"> </div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Johan Lind</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Start line<span style="font-weight:700; font-size:12px;">1/4</span></div></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Start line<span style="font-weight:700; font-size:12px;">1/4</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow last"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Maria Holm</span></div><div class="grid6"><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Feed zone<span style="font-weight:700; font-size:12px;">3/6</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+      </div>
+      <div class="scrim" style="align-items:flex-start; justify-content:flex-start;">
+        <div style="position:absolute; top:210px; left:430px; width:320px; background:#fff; border:1px solid #999; border-radius:10px; padding:18px; box-shadow:0 6px 20px rgba(51,51,51,.14);">
+          <div style="font:700 14px/1.3 system-ui; color:#333;">Assign — Anna Berg, 10:00</div>
+          <div class="sect" style="margin:16px 0 8px;">Work areas open at 10:00</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; background:#E5E5E5; font:600 13px/1 system-ui; color:#333;">Feed zone KM 45 <span class="small">3/6</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; font:500 13px/1 system-ui; color:#333;">Finish line <span class="small">3/5</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; font:500 13px/1 system-ui; color:#333;">Officials HQ <span class="small">1/3</span></div>
+          </div>
+          <div class="sect" style="margin:16px 0 8px;">Status</div>
+          <div style="display:flex; gap:7px; flex-wrap:wrap;"><span class="badge fill">Assign</span><span class="badge">On call</span><span class="badge">On break</span><span class="badge">Blocked</span></div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px;"><span class="btno btnsm">Cancel</span><span class="btn btnsm">Done</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : by-work-area-collapsed -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— by-work-area-collapsed</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 wa-collapsed">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden;">
+      <div class="dhrow">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="off">By person</div><div class="on">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="small" style="margin-top:8px;">Day selector only offers days within Stage 2's allocable range (1–3 Jul).</div>
+      <div class="card" style="margin-top:14px; padding:0; flex:1; overflow:hidden;">
+        <div class="ghead"><div class="rhead" style="justify-content:center; align-items:flex-start; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; padding-top:12px;">Work area</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▸</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Start line</div><span class="small" style="font-size:11px;">Up to 4</span></div></div><div class="grid6"><div class="gcell"><div class="cellbox">2/4</div></div><div class="gcell"><div class="cellbox">3/4</div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▸</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Feed zone KM 45</div><span class="small" style="font-size:11px;">Up to 6</span></div></div><div class="grid6"><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellbox">4/6</div></div><div class="gcell"><div class="cellbox">4/6</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▸</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Finish line</div><span class="small" style="font-size:11px;">Up to 5</span></div></div><div class="grid6"><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellbox">3/5</div></div><div class="gcell"><div class="cellbox">5/5</div></div><div class="gempty"></div></div></div>
+        <div class="grow last"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▸</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Officials HQ</div><span class="small" style="font-size:11px;">Up to 3</span></div></div><div class="grid6"><div class="gcell"><div class="cellbox">1/3</div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : by-work-area-expanded -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— by-work-area-expanded</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 wa-expanded">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden;">
+      <div class="dhrow">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="off">By person</div><div class="on">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="small" style="margin-top:8px;">Day selector only offers days within Stage 2's allocable range (1–3 Jul).</div>
+      <div class="card" style="margin-top:14px; padding:0; flex:1; overflow:hidden;">
+        <div class="ghead"><div class="rhead" style="justify-content:center; align-items:flex-start; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; padding-top:12px;">Work area</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▸</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Start line</div><span class="small" style="font-size:11px;">Up to 4</span></div></div><div class="grid6"><div class="gcell"><div class="cellbox">2/4</div></div><div class="gcell"><div class="cellbox">3/4</div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="background:#FAFAFA;"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▾</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Feed zone KM 45</div><span class="small" style="font-size:11px;">Window 10:00–11:30 · Up to 6</span></div></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell"><div class="cellbox">1/6</div></div><div class="gcell"><div class="cellbox">2/6</div></div><div class="gcell"><div class="cellbox">2/6</div></div><div class="gcell"><div class="cellbox">1/6</div></div></div></div>
+        <div class="grow" style="height:44px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #1</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell" style="grid-column:span 2;"><div class="cellname">Anna Berg</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:44px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #2</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell" style="grid-column:span 2;"><div class="cellname">Johan Lind</div></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:44px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #3</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gempty"></div><div class="gcell" style="grid-column:span 2;"><div class="cellname">Maria Holm</div></div></div></div>
+        <div class="grow" style="height:44px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#999;">Slot #4</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:44px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#999;">Slot #5</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:44px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#999;">Slot #6</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow last"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▸</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Finish line</div><span class="small" style="font-size:11px;">Up to 5</span></div></div><div class="grid6"><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellbox">3/5</div></div><div class="gcell"><div class="cellbox">5/5</div></div><div class="gempty"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : by-work-area-overflow -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— by-work-area-overflow</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 wa-overflow">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden;">
+      <div class="dhrow">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="off">By person</div><div class="on">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="warnbar" style="margin-top:10px;"><div class="warn">!</div><span class="small" style="color:#333;">Feed zone KM 45 is over capacity at 10:30 — 7 assigned, ceiling 6. Resolve before saving.</span></div>
+      <div class="card" style="margin-top:12px; padding:0; flex:1; overflow:hidden;">
+        <div class="ghead"><div class="rhead" style="justify-content:center; align-items:flex-start; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; padding-top:12px;">Work area</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow" style="background:#FAFAFA;"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▾</span><div style="display:flex; align-items:center; gap:8px;"><div><div style="font:600 13px/1.2 system-ui; color:#333;">Feed zone KM 45</div><span class="small" style="font-size:11px;">Window 10:00–11:30 · Up to 6</span></div><div class="warn">!</div></div></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell"><div class="cellbox">2/6</div></div><div class="gcell"><div class="cellbox cellover">7/6 <span style="font:700 9px/1 system-ui;">OVER</span></div></div><div class="gcell"><div class="cellbox">2/6</div></div><div class="gcell"><div class="cellbox">1/6</div></div></div></div>
+        <div class="grow" style="height:42px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #1</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell" style="grid-column:span 2;"><div class="cellname">Anna Berg</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:42px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #2</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell"><div class="cellname">Johan L.</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:42px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #3</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell"><div class="cellname">Maria H.</div></div><div class="gcell" style="grid-column:span 2;"><div class="cellname">Maria Holm</div></div></div></div>
+        <div class="grow" style="height:42px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #4</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell"><div class="cellname">Sofia E.</div></div><div class="gcell"><div class="cellname">Sofia E.</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:42px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #5</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell"><div class="cellname">Lars N.</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:42px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #6</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell"><div class="cellname">Nina P.</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow last" style="height:46px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span class="badge" style="border:2px solid #333; font-weight:700;">⚠ Overflow</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="border:2px solid #333;">Erik Falk</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : by-work-area-slot-popup -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— by-work-area-slot-popup</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 slot-popup">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden; position:relative;">
+      <div class="dhrow" style="opacity:.4;">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="off">By person</div><div class="on">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="card" style="margin-top:14px; padding:0; flex:1; overflow:hidden; opacity:.4;">
+        <div class="ghead"><div class="rhead" style="justify-content:center; align-items:flex-start; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; padding-top:12px;">Work area</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow" style="background:#FAFAFA;"><div class="rhead" style="flex-direction:row; align-items:center; gap:10px;"><span class="exp">▾</span><div><div style="font:600 13px/1.2 system-ui; color:#333;">Feed zone KM 45</div><span class="small" style="font-size:11px;">Up to 6</span></div></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell"><div class="cellbox">1/6</div></div><div class="gcell"><div class="cellbox">2/6</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow" style="height:48px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #1</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gcell" style="grid-column:span 2;"><div class="cellname">Anna Berg</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow last" style="height:48px; background:#FAFAFA;"><div class="rhead" style="justify-content:center;"><span style="font:600 12px/1 system-ui; color:#666;">Slot #2</span></div><div class="grid6"><div class="gempty hatch"></div><div class="gempty hatch"></div><div class="gempty"></div><div class="gcell"><div class="cellname" style="border:2px solid #333;">Johan Lind</div></div><div class="gempty"></div><div class="gempty"></div></div></div>
+      </div>
+      <div class="scrim" style="align-items:flex-start; justify-content:flex-start;">
+        <div style="position:absolute; top:230px; left:520px; width:340px; background:#fff; border:1px solid #999; border-radius:10px; padding:18px; box-shadow:0 6px 20px rgba(51,51,51,.14);">
+          <div style="font:700 14px/1.3 system-ui; color:#333;">Slot #2 — Feed zone KM 45, 12:00</div>
+          <div class="sect" style="margin:16px 0 8px;">Assigned</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; background:#E5E5E5; font:600 13px/1 system-ui; color:#333;">Johan Lind <span class="btno btnsm" style="height:26px; padding:0 10px;">Remove</span></div>
+          <div class="sect" style="margin:16px 0 8px;">Available at 12:00</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; font:500 13px/1 system-ui; color:#333;">Sofia Ek <span class="btno btnsm" style="height:26px; padding:0 10px;">Add</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; font:500 13px/1 system-ui; color:#333;">Lars Nyström <span class="btno btnsm" style="height:26px; padding:0 10px;">Add</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border:1px solid #999; border-radius:7px; font:500 13px/1 system-ui; color:#333;">Nina Palm <span class="btno btnsm" style="height:26px; padding:0 10px;">Add</span></div>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px;"><span class="btno btnsm">Cancel</span><span class="btn btnsm">Done</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : empty -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— empty (no assignments)</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 empty">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden;">
+      <div class="dhrow">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="on">By person</div><div class="off">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="small" style="margin-top:8px;">Day selector only offers days within Stage 2's allocable range (1–3 Jul).</div>
+      <div class="card" style="margin-top:14px; flex:1; display:flex;"><div class="empty"><div class="img" style="width:72px;height:72px;border-radius:12px;"></div><div style="font:700 16px/1.2 system-ui; color:#333; margin-top:18px;">No assignments yet</div><p class="small" style="margin-top:8px; max-width:360px;">Pick a person or work area and an hour to start scheduling.</p></div></div>
+    </div>
+  </div>
+</div>
+<!-- SCHED-01 : flags-and-legend -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">SCHED-01 · Scheduling <span>— flags-and-legend</span></div>
+  <div class="dframe" data-screen-label="SCHED-01 flags-legend">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi on">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="overflow:hidden;">
+      <div class="dhrow">
+        <div style="display:flex; align-items:center; gap:12px;"><h1 class="dh1">Scheduling</h1><div class="inp" style="height:38px; width:200px; justify-content:space-between;">Stage 2 · Road race <span class="small">▾</span></div><div class="seg"><div class="on">By person</div><div class="off">By work area</div></div></div>
+        <div style="display:flex; gap:10px; align-items:center;"><div style="display:flex; align-items:center; gap:6px;"><div class="btno" style="width:38px; height:38px; padding:0;">‹</div><div class="inp" style="height:38px; min-width:140px; justify-content:center;">Day 3 · 3 Jul</div><div class="btno" style="width:38px; height:38px; padding:0;">›</div></div><span class="btn">Save</span></div>
+      </div>
+      <div class="card" style="margin-top:14px; padding:0; flex:1; overflow:hidden;">
+        <div class="ghead"><div class="rheadp" style="font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666;">Official</div><div class="grid6"><div class="gcol">09:00</div><div class="gcol">09:30</div><div class="gcol">10:00</div><div class="gcol">10:30</div><div class="gcol">11:00</div><div class="gcol">11:30</div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Anna Berg</span></div><div class="grid6"><div class="gempty"></div><div class="gcell" style="position:relative;"><div class="cellname" style="border:2px solid #333;">Start line</div><div class="dbk" style="position:absolute; top:1px; right:1px;"><div class="ring"></div><span class="ex">!</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Anna Berg</span></div><div class="grid6"><div class="gempty"></div><div class="gcell" style="position:relative;"><div class="cellname" style="border:2px solid #333;">Feed zone</div><div class="dbk" style="position:absolute; top:1px; right:1px;"><div class="ring"></div><span class="ex">!</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Johan Lind</span></div><div class="grid6"><div class="gcell"><div class="cellname" style="flex-direction:column; gap:2px;">Finish line<span style="font-weight:700; font-size:12px;">3/5</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+        <div class="grow last"><div class="rheadp"><div class="av" style="width:28px;height:28px;"></div><span style="font:600 13px/1.2 system-ui; color:#333;">Maria Holm</span></div><div class="grid6"><div class="gempty"></div><div class="gempty"></div><div class="gcell"><div class="cellname cellover" style="flex-direction:column; gap:1px;">Feed zone<span style="font-weight:700; font-size:11px;">7/6 OVER</span></div></div><div class="gempty"></div><div class="gempty"></div><div class="gempty"></div></div></div>
+      </div>
+      <div style="display:flex; gap:26px; align-items:center; margin-top:14px; flex-wrap:wrap;">
+        <span class="small" style="font-weight:700; color:#333;">Legend</span>
+        <div style="display:flex; align-items:center; gap:8px;"><div class="cellname cellover" style="width:26px; height:22px; font-size:8px; padding:0;">7/6</div><span class="small">Over capacity — work area assigned &gt; ceiling</span></div>
+        <div style="display:flex; align-items:center; gap:8px;"><div class="dbk"><div class="ring"></div><span class="ex">!</span></div><span class="small">Double-booked — same person, two work areas, same hour</span></div>
+        <div style="display:flex; align-items:center; gap:8px;"><div class="hatch" style="width:26px; height:22px; border:1px dashed #999; border-radius:6px;"></div><span class="small">Outside operating window — disabled</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===================================================== OFF-01 ===================================================== -->
+</body>
+</html>

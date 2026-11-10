@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WS-02 · Work area configuration — Viadal EventAdmin wireframes</title>
+<!-- Source: Viadal Event Planner wireframes, page "EventAdmin_view", row WS-02.
+     Each <div class="screen"> is one state of this screen (1440×1024 frame, label above it). -->
+<style>
+  body { margin:0; background:#f2f2f2; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .lbl { font:600 15px/1.4 ui-sans-serif,system-ui,sans-serif; color:#333; margin-bottom:12px; }
+  .lbl span { color:#999; font-weight:400; }
+  .dframe { width:1440px; height:1024px; background:#fff; border:1px solid #999; border-radius:8px; overflow:hidden; display:flex; }
+  .side { width:240px; flex:0 0 auto; border-right:1px solid #999; padding:24px 14px; display:flex; flex-direction:column; }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:24px; padding:0 6px; }
+  .blogo { width:32px; height:32px; border:1.5px solid #999; border-radius:7px; flex:0 0 auto; }
+  .bname { font:700 15px/1.1 system-ui; color:#333; }
+  .bsub { font:400 11px/1.2 system-ui; color:#999; margin-top:2px; }
+  .navg { display:flex; flex-direction:column; gap:4px; flex:1; }
+  .navi { padding:10px 12px; border-radius:6px; font:500 13px/1.2 system-ui; color:#666; }
+  .navi.on { background:#E5E5E5; color:#333; font-weight:700; }
+  .main { flex:1; padding:28px 36px; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  .dh1 { font:700 22px/1.2 system-ui; color:#333; margin:0; }
+  .dhrow { display:flex; align-items:center; justify-content:space-between; }
+  .btn { height:40px; padding:0 18px; border-radius:7px; background:#333; color:#fff; display:inline-flex; align-items:center; justify-content:center; font:600 13px/1 system-ui; }
+  .btn.dis { background:#E5E5E5; color:#999; border:1px solid #999; }
+  .btno { height:40px; padding:0 18px; border-radius:7px; border:1px solid #999; color:#333; background:#fff; display:inline-flex; align-items:center; justify-content:center; font:600 13px/1 system-ui; }
+  .btnsm { height:30px; padding:0 12px; border-radius:6px; font:600 12px/1 system-ui; display:inline-flex; align-items:center; justify-content:center; }
+  .badge { display:inline-flex; align-items:center; padding:5px 11px; border:1px solid #999; border-radius:20px; font:600 11px/1 system-ui; color:#333; }
+  .badge.fill { background:#E5E5E5; }
+  .chip { display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 12px; border:1px solid #999; border-radius:20px; font:500 13px/1 system-ui; color:#333; }
+  .chip .x { width:18px; height:18px; border-radius:50%; background:#E5E5E5; display:inline-flex; align-items:center; justify-content:center; font:600 12px/1 system-ui; color:#333; }
+  .card { border:1px solid #999; border-radius:10px; padding:18px; }
+  .sect { font:700 11px/1.2 system-ui; color:#333; letter-spacing:.06em; text-transform:uppercase; margin:0 0 12px; }
+  .lab { font:500 12px/1.2 system-ui; color:#666; margin-bottom:6px; }
+  .small { font:400 13px/1.5 system-ui; color:#666; margin:0; }
+  .inp { height:42px; border:1px solid #999; border-radius:7px; display:flex; align-items:center; padding:0 14px; font:400 14px/1 system-ui; color:#333; }
+  .inp.ph { color:#999; }
+  .inp.dash { border-style:dashed; color:#666; }
+  .inp.err { border-color:#333; border-width:2px; }
+  .ta { border:1px solid #999; border-radius:7px; padding:12px 14px; }
+  .dl { height:0; border-top:1.5px dashed #999; }
+  .img { background:#E5E5E5; background-image:linear-gradient(45deg,transparent calc(50% - .8px),#999 calc(50% - .8px),#999 calc(50% + .8px),transparent calc(50% + .8px)),linear-gradient(-45deg,transparent calc(50% - .8px),#999 calc(50% - .8px),#999 calc(50% + .8px),transparent calc(50% + .8px)); border:1px solid #999; }
+  .av { border-radius:50%; background:#E5E5E5; border:1px solid #999; flex:0 0 auto; }
+  .seg { display:inline-flex; border:1px solid #999; border-radius:8px; overflow:hidden; }
+  .seg > div { padding:9px 18px; font:600 13px/1 system-ui; }
+  .seg .on { background:#333; color:#fff; }
+  .seg .off { background:#fff; color:#666; }
+  .th { display:flex; align-items:center; padding:0 16px; height:38px; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; border-bottom:1px solid #999; }
+  .tr { display:flex; align-items:center; padding:0 16px; height:56px; border-bottom:1px solid #E5E5E5; font:400 14px/1.3 system-ui; color:#333; }
+  .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .chk { width:18px; height:18px; border:1.5px solid #999; border-radius:4px; flex:0 0 auto; }
+  .stk { display:flex; flex-direction:column; }
+  .warn { width:18px; height:18px; border:1.5px solid #333; border-radius:50%; display:flex; align-items:center; justify-content:center; font:700 12px/1 system-ui; color:#333; flex:0 0 auto; }
+  .warnbar { border:2px solid #333; border-radius:10px; padding:14px 18px; display:flex; gap:10px; align-items:center; }
+  /* stages */
+  .srow { display:flex; align-items:center; gap:12px; padding:14px 16px; }
+  .exp { font:400 13px/1 system-ui; color:#666; width:14px; flex:0 0 auto; }
+  .sdet { border-top:1px solid #E5E5E5; padding:14px 16px 16px; background:#FAFAFA; }
+  /* scheduling grid */
+  .ghead { display:flex; border-bottom:1px solid #999; }
+  .grow { display:flex; border-bottom:1px solid #E5E5E5; height:78px; }
+  .grow.last { border-bottom:none; }
+  .rhead { width:210px; flex:0 0 auto; padding:0 16px; display:flex; flex-direction:column; justify-content:center; }
+  .rheadp { width:210px; flex:0 0 auto; padding:0 16px; display:flex; align-items:center; gap:10px; }
+  .grid6 { flex:1; display:grid; grid-template-columns:repeat(6,1fr); }
+  .gcol { padding:12px 6px; font:700 11px/1 system-ui; color:#666; text-align:center; border-left:1px solid #E5E5E5; }
+  .gcell { border-left:1px solid #E5E5E5; padding:8px; display:flex; align-items:center; justify-content:center; }
+  .gempty { border-left:1px solid #E5E5E5; }
+  .cellbox { width:100%; height:100%; border:1px solid #999; border-radius:6px; background:#E5E5E5; display:flex; align-items:center; justify-content:center; font:700 13px/1 system-ui; color:#333; }
+  .cellname { width:100%; height:100%; border:1px solid #999; border-radius:6px; background:#E5E5E5; display:flex; align-items:center; justify-content:center; font:600 11px/1.15 system-ui; color:#333; text-align:center; padding:2px; }
+  .cellover { border:2px solid #333; flex-direction:column; gap:1px; }
+  .hatch { background:repeating-linear-gradient(45deg,#fff,#fff 5px,#E5E5E5 5px,#E5E5E5 10px); }
+  .dbk { width:22px; height:22px; border:1.5px solid #333; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; gap:1px; flex:0 0 auto; }
+  .dbk .ring { width:6px; height:6px; border-radius:50%; border:1.5px solid #333; }
+  .dbk .ex { font:700 9px/1 system-ui; color:#333; }
+  .stagesel { position:relative; }
+  .seldd { position:absolute; top:42px; left:0; width:240px; background:#fff; border:1px solid #999; border-radius:8px; padding:6px; z-index:5; box-shadow:0 6px 20px rgba(51,51,51,.12); }
+  .seldd .opt { padding:9px 10px; border-radius:6px; font:500 13px/1.2 system-ui; color:#333; display:flex; align-items:center; justify-content:space-between; }
+  .seldd .opt.on { background:#E5E5E5; font-weight:700; }
+  .scrim { position:absolute; inset:0; background:rgba(51,51,51,.18); display:flex; align-items:center; justify-content:center; }
+  .modal { width:520px; background:#fff; border:1px solid #999; border-radius:12px; padding:24px; }
+  /* --- participants / info sections additions --- */
+  .pbadge { display:inline-flex; align-items:center; padding:2px 7px; border:1px solid #999; border-radius:10px; font:600 10px/1.2 system-ui; color:#333; background:#E5E5E5; }
+  .navi.lock { color:#BBB; }
+  .navi.lock .pbadge { background:#fff; color:#999; }
+  .isrow { display:flex; align-items:center; gap:10px; padding:0 12px; height:40px; border-bottom:1px solid #E5E5E5; }
+  .drag { color:#999; font:700 12px/1 system-ui; letter-spacing:-2px; width:14px; flex:0 0 auto; }
+  .fchip { display:inline-flex; align-items:center; padding:7px 14px; border:1px solid #999; border-radius:20px; font:600 12px/1 system-ui; color:#666; background:#fff; }
+  .fchip.on { background:#333; color:#fff; border-color:#333; }
+  .badge.cf { border:2px solid #333; padding:4px 10px; }
+  .ptr { display:flex; align-items:center; padding:0 16px; height:52px; border-bottom:1px solid #E5E5E5; font:400 13px/1.3 system-ui; color:#333; }
+  .pth { display:flex; align-items:center; padding:0 16px; height:38px; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; border-bottom:1px solid #999; }
+  .msgbar { border:1px solid #999; border-radius:10px; padding:12px 18px; background:#E5E5E5; font:600 13px/1.3 system-ui; color:#333; }
+  .kv { display:flex; gap:10px; font:400 13px/1.5 system-ui; }
+  .kv .k { color:#666; width:110px; flex:0 0 auto; }
+  .kv .v { color:#333; }
+  .iceb { display:inline-flex; align-items:center; padding:3px 8px; border-radius:20px; background:#333; color:#fff; font:700 10px/1 system-ui; letter-spacing:.06em; margin-left:10px; }
+  .upl { border:1.5px dashed #999; border-radius:8px; height:96px; display:flex; align-items:center; justify-content:center; gap:12px; }
+
+  body { padding:60px; }
+  .screen { width:1440px; margin-bottom:80px; }
+</style>
+</head>
+<body>
+<!-- WS-02 : filled -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">WS-02 · Work area configuration <span>— filled</span></div>
+  <div class="dframe" data-screen-label="WS-02 filled">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi on">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><div><div class="small" style="margin-bottom:4px;">‹ Work areas</div><h1 class="dh1">Start line</h1></div><div class="btn">Save</div></div>
+      <div style="display:flex; gap:28px; margin-top:22px; flex:1; overflow:hidden;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div>
+            <div class="lab">Stage</div>
+            <div style="border:1px solid #999; border-radius:7px; background:#FAFAFA; padding:12px 14px; font:600 14px/1.2 system-ui; color:#333;">Stage: Race — Viadal 6-day</div>
+            <div class="small" style="margin-top:6px;">Set when the work area was created. To move it to another stage, delete and recreate.</div>
+          </div>
+          <div class="sect" style="margin:2px 0 0;">Identity</div>
+          <div><div class="lab">Name</div><div class="inp">Start line</div></div>
+          <div><div class="lab">Description / location</div><div class="inp">Below the finish gantry, road side</div></div>
+          <div class="sect" style="margin:2px 0 0;">Operating windows</div>
+          <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+            <div style="display:flex; gap:8px; align-items:center;"><div style="flex:1;"><div class="lab">Start</div><div class="inp">07:00</div></div><span class="small" style="margin-top:16px;">–</span><div style="flex:1;"><div class="lab">End</div><div class="inp">10:00</div></div><span class="btno btnsm" style="margin-top:16px;">Remove</span></div>
+            <label style="display:flex; gap:8px; align-items:center; margin-top:10px;"><div class="chk"></div><span class="small" style="color:#333;">Recurrent daily</span></label>
+          </div>
+          <div class="btno btnsm" style="align-self:flex-start;">+ Add window</div>
+          <div class="small">Windows must fall within the stage's allocable range.</div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div class="sect" style="margin:0;">Capacity</div>
+          <div><div class="lab">Maximum officials at once</div><div class="inp" style="max-width:180px;">Up to 3</div></div>
+          <div class="sect" style="margin:2px 0 0;">Checklists / to-dos</div>
+          <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+            <div style="display:flex; gap:10px; align-items:center;"><div class="inp" style="flex:1;">Verify rider numbers against start list</div><span class="btno btnsm">Remove</span></div>
+            <div class="ta" style="margin-top:8px; padding:10px 12px;"><span class="small">Cross-check bib numbers against the official start list before flag-off.</span></div>
+          </div>
+          <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+            <div style="display:flex; gap:10px; align-items:center;"><div class="inp" style="flex:1;">Confirm road closure with marshals</div><span class="btno btnsm">Remove</span></div>
+            <div class="ta" style="margin-top:8px; padding:10px 12px;"><span class="small">Radio each marshal post and note closures on the board.</span></div>
+          </div>
+          <div class="btno btnsm" style="align-self:flex-start;">+ Add to-do</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- WS-02 : window-recurrent-daily -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">WS-02 · Work area configuration <span>— window-recurrent-daily</span></div>
+  <div class="dframe" data-screen-label="WS-02 window-recurrent-daily">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi on">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><div><div class="small" style="margin-bottom:4px;">‹ Work areas</div><h1 class="dh1">Feeding station</h1></div><div class="btn">Save</div></div>
+      <div style="display:flex; gap:28px; margin-top:22px; flex:1; overflow:hidden;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div>
+            <div class="lab">Stage</div>
+            <div style="border:1px solid #999; border-radius:7px; background:#FAFAFA; padding:12px 14px; font:600 14px/1.2 system-ui; color:#333;">Stage: Race — Viadal 6-day</div>
+            <div class="small" style="margin-top:6px;">Set when the work area was created. To move it to another stage, delete and recreate.</div>
+          </div>
+          <div class="sect" style="margin:2px 0 0;">Identity</div>
+          <div><div class="lab">Name</div><div class="inp">Feeding station (Toa)</div></div>
+          <div class="sect" style="margin:2px 0 0;">Operating windows</div>
+          <div class="stk" style="gap:10px;">
+            <div style="border:1px solid #E5E5E5; border-radius:8px; padding:10px 12px;">
+              <div style="display:flex; gap:8px; align-items:center;"><div class="inp" style="flex:1;">07:00</div><span class="small">–</span><div class="inp" style="flex:1;">08:00</div><span class="btno btnsm">Remove</span></div>
+              <label style="display:flex; gap:8px; align-items:center; margin-top:9px;"><div class="chk" style="background:#333; border-color:#333; display:flex; align-items:center; justify-content:center; font:700 11px/1 system-ui; color:#fff;">✓</div><span class="small" style="color:#333;">Recurrent daily</span></label>
+            </div>
+            <div style="border:1px solid #E5E5E5; border-radius:8px; padding:10px 12px;">
+              <div style="display:flex; gap:8px; align-items:center;"><div class="inp" style="flex:1;">12:00</div><span class="small">–</span><div class="inp" style="flex:1;">13:00</div><span class="btno btnsm">Remove</span></div>
+              <label style="display:flex; gap:8px; align-items:center; margin-top:9px;"><div class="chk" style="background:#333; border-color:#333; display:flex; align-items:center; justify-content:center; font:700 11px/1 system-ui; color:#fff;">✓</div><span class="small" style="color:#333;">Recurrent daily</span></label>
+            </div>
+            <div style="border:1px solid #E5E5E5; border-radius:8px; padding:10px 12px;">
+              <div style="display:flex; gap:8px; align-items:center;"><div class="inp" style="flex:1;">18:00</div><span class="small">–</span><div class="inp" style="flex:1;">19:00</div><span class="btno btnsm">Remove</span></div>
+              <label style="display:flex; gap:8px; align-items:center; margin-top:9px;"><div class="chk" style="background:#333; border-color:#333; display:flex; align-items:center; justify-content:center; font:700 11px/1 system-ui; color:#fff;">✓</div><span class="small" style="color:#333;">Recurrent daily</span></label>
+            </div>
+          </div>
+          <div class="btno btnsm" style="align-self:flex-start;">+ Add window</div>
+          <div class="small">Windows must fall within the stage's allocable range. Recurrent daily repeats each window on every day the stage spans.</div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div class="sect" style="margin:0;">Capacity</div>
+          <div><div class="lab">Maximum officials at once</div><div class="inp" style="max-width:180px;">Up to 3</div></div>
+          <div class="sect" style="margin:2px 0 0;">Checklists / to-dos</div>
+          <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+            <div style="display:flex; gap:10px; align-items:center;"><div class="inp" style="flex:1;">Refill bottles and hand-up bags</div><span class="btno btnsm">Remove</span></div>
+            <div class="ta" style="margin-top:8px; padding:10px 12px;"><span class="small">Stock the table 20 minutes before the leading group is expected.</span></div>
+          </div>
+          <div class="btno btnsm" style="align-self:flex-start;">+ Add to-do</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- WS-02 : recurrent-daily-disabled -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">WS-02 · Work area configuration <span>— recurrent-daily-disabled</span></div>
+  <div class="dframe" data-screen-label="WS-02 recurrent-daily-disabled">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi on">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><div><div class="small" style="margin-bottom:4px;">‹ Work areas</div><h1 class="dh1">Start line</h1></div><div class="btn">Save</div></div>
+      <div style="display:flex; gap:28px; margin-top:22px; flex:1; overflow:hidden;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div>
+            <div class="lab">Stage</div>
+            <div style="border:1px solid #999; border-radius:7px; background:#FAFAFA; padding:12px 14px; font:600 14px/1.2 system-ui; color:#333;">Stage: Race — Prologue (single day)</div>
+            <div class="small" style="margin-top:6px;">Set when the work area was created. To move it to another stage, delete and recreate.</div>
+          </div>
+          <div class="sect" style="margin:2px 0 0;">Identity</div>
+          <div><div class="lab">Name</div><div class="inp">Start line</div></div>
+          <div class="sect" style="margin:2px 0 0;">Operating windows</div>
+          <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+            <div style="display:flex; gap:8px; align-items:center;"><div style="flex:1;"><div class="lab">Start</div><div class="inp">07:00</div></div><span class="small" style="margin-top:16px;">–</span><div style="flex:1;"><div class="lab">End</div><div class="inp">10:00</div></div><span class="btno btnsm" style="margin-top:16px;">Remove</span></div>
+            <label style="display:flex; gap:8px; align-items:center; margin-top:10px; opacity:.45;"><div class="chk" style="background:#E5E5E5;"></div><span class="small">Recurrent daily</span></label>
+            <div class="small" style="margin-top:6px; padding-left:26px;">Available when the stage spans more than one day.</div>
+          </div>
+          <div class="btno btnsm" style="align-self:flex-start;">+ Add window</div>
+          <div class="small">Windows must fall within the stage's allocable range.</div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div class="sect" style="margin:0;">Capacity</div>
+          <div><div class="lab">Maximum officials at once</div><div class="inp" style="max-width:180px;">Up to 3</div></div>
+          <div class="sect" style="margin:2px 0 0;">Checklists / to-dos</div>
+          <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+            <div style="display:flex; gap:10px; align-items:center;"><div class="inp" style="flex:1;">Verify rider numbers against start list</div><span class="btno btnsm">Remove</span></div>
+            <div class="ta" style="margin-top:8px; padding:10px 12px;"><span class="small">Cross-check bib numbers against the official start list before flag-off.</span></div>
+          </div>
+          <div class="btno btnsm" style="align-self:flex-start;">+ Add to-do</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- WS-02 : unsaved-changes-guard -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">WS-02 · Work area configuration <span>— unsaved-changes-guard</span></div>
+  <div class="dframe" data-screen-label="WS-02 unsaved-changes-guard">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi on">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="position:relative;">
+      <div style="opacity:.4; display:flex; flex-direction:column; flex:1; overflow:hidden;">
+        <div class="dhrow"><div><div class="small" style="margin-bottom:4px;">‹ Work areas</div><h1 class="dh1">Start line</h1></div><div class="btn">Save</div></div>
+        <div style="display:flex; gap:28px; margin-top:22px; flex:1; overflow:hidden;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+            <div>
+              <div class="lab">Stage</div>
+              <div style="border:1px solid #999; border-radius:7px; background:#FAFAFA; padding:12px 14px; font:600 14px/1.2 system-ui; color:#333;">Stage: Race — Viadal 6-day</div>
+            </div>
+            <div class="sect" style="margin:2px 0 0;">Identity</div>
+            <div><div class="lab">Name</div><div class="inp">Start line</div></div>
+            <div class="sect" style="margin:2px 0 0;">Operating windows</div>
+            <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;">
+              <div style="display:flex; gap:8px; align-items:center;"><div class="inp" style="flex:1;">07:00</div><span class="small">–</span><div class="inp" style="flex:1;">10:00</div><span class="btno btnsm">Remove</span></div>
+            </div>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+            <div class="sect" style="margin:0;">Capacity</div>
+            <div><div class="lab">Maximum officials at once</div><div class="inp" style="max-width:180px;">Up to 3</div></div>
+            <div class="sect" style="margin:2px 0 0;">Checklists / to-dos</div>
+            <div style="border:1px solid #E5E5E5; border-radius:8px; padding:12px;"><div class="inp" style="flex:1;">Verify rider numbers against start list</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="scrim">
+        <div class="modal">
+          <div style="font:700 17px/1.3 system-ui; color:#333;">Unsaved changes</div>
+          <div class="small" style="margin-top:12px;">You have unsaved changes to this work area.</div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; margin-top:22px;">
+            <span class="small" style="color:#333; text-decoration:underline; cursor:default;">Cancel</span>
+            <span class="btno">Discard and continue</span>
+            <span class="btn">Save</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================================================== SCHED-01 ===================================================== -->
+</body>
+</html>
