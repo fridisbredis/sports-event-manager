@@ -10,15 +10,17 @@ import {
 // SEC-01 (migration 20260909123808): event_facilities.event_id and
 // event_distances.event_id/stage_id were plain foreign keys with no check
 // that the referenced row belonged to the same tenant_id as the child row.
-// tenant_admin_manage_event_facilities / tenant_admin_manage_event_distances
-// (migration 0005) are FOR ALL policies with a USING predicate on tenant_id
-// alone and no WITH CHECK, so a direct INSERT with an honest tenant_id
-// paired with a foreign event_id/stage_id inserted cleanly. Neither
-// sync_event_facilities nor sync_event_stages verifies p_event_id belongs to
-// p_tenant_id either. This suite proves the composite FKs reject that
-// payload shape, independent of RLS or any RPC-level check — same pattern
-// as create-workstation-tenant-consistency.test.ts (migration 0060).
-describe('SEC-01: event_facilities/event_distances reject cross-tenant event_id/stage_id', () => {
+// Their tenant_admin_manage_* policies (migration 0005) are FOR ALL with a
+// USING predicate on tenant_id alone, so a direct INSERT with an honest
+// tenant_id paired with a foreign event_id/stage_id inserted cleanly. This
+// suite proves the composite FKs reject that payload shape, independent of
+// RLS or any RPC-level check — same pattern as
+// create-workstation-tenant-consistency.test.ts (migration 0060).
+//
+// event_facilities is gone (N38 contract, migration 20261110062834). Its
+// successor event_info_sections was created with the same composite FK
+// (20261109180943) and takes its place in this suite.
+describe('SEC-01: event_info_sections/event_distances reject cross-tenant event_id/stage_id', () => {
   let tenantA: { id: string }
   let tenantB: { id: string }
   let eventA: { id: string }
@@ -27,8 +29,8 @@ describe('SEC-01: event_facilities/event_distances reject cross-tenant event_id/
   let clientAdminA: Awaited<ReturnType<typeof signInAsClient>>
 
   beforeAll(async () => {
-    tenantA = await createTenant('Tenant A Facilities Consistency')
-    tenantB = await createTenant('Tenant B Facilities Consistency')
+    tenantA = await createTenant('Tenant A Info Sections Consistency')
+    tenantB = await createTenant('Tenant B Info Sections Consistency')
 
     const adminA = await createUserWithRole(tenantA.id, 'tenant_admin')
     clientAdminA = await signInAsClient(adminA.phone, '000000')
@@ -85,16 +87,17 @@ describe('SEC-01: event_facilities/event_distances reject cross-tenant event_id/
     await cleanupTenant(tenantB.id)
   })
 
-  it('rejects a direct INSERT into event_facilities with a foreign event_id', async () => {
+  it('rejects a direct INSERT into event_info_sections with a foreign event_id', async () => {
     const admin = serviceClient()
-    const { error } = await admin.from('event_facilities').insert({
+    const { error } = await admin.from('event_info_sections').insert({
       tenant_id: tenantA.id,
       event_id: eventB.id,
-      label: 'Cross-tenant facility',
+      title: 'Cross-tenant section',
+      body: 'x',
     })
 
     expect(error).not.toBeNull()
-    expect(error?.message).toMatch(/event_facilities_event_tenant_fkey/)
+    expect(error?.message).toMatch(/event_info_sections_event_tenant_fkey/)
   })
 
   it('rejects a direct INSERT into event_distances with a foreign event_id', async () => {
@@ -144,26 +147,27 @@ describe('SEC-01: event_facilities/event_distances reject cross-tenant event_id/
     expect(error?.message).toMatch(/event_distances_stage_tenant_fkey/)
   })
 
-  it('rejects a direct UPDATE that moves event_facilities.event_id to a foreign tenant', async () => {
+  it('rejects a direct UPDATE that moves event_info_sections.event_id to a foreign tenant', async () => {
     const admin = serviceClient()
-    const { data: ownFacility, error: insertError } = await admin
-      .from('event_facilities')
+    const { data: ownSection, error: insertError } = await admin
+      .from('event_info_sections')
       .insert({
         tenant_id: tenantA.id,
         event_id: eventA.id,
-        label: 'Own-tenant facility for update test',
+        title: 'Own-tenant section for update test',
+        body: 'x',
       })
       .select()
       .single()
     if (insertError) throw insertError
 
     const { error } = await admin
-      .from('event_facilities')
+      .from('event_info_sections')
       .update({ event_id: eventB.id })
-      .eq('id', ownFacility.id)
+      .eq('id', ownSection.id)
 
     expect(error).not.toBeNull()
-    expect(error?.message).toMatch(/event_facilities_event_tenant_fkey/)
+    expect(error?.message).toMatch(/event_info_sections_event_tenant_fkey/)
   })
 
   it('still allows an honest tenant_id/event_id/stage_id combination', async () => {
@@ -200,16 +204,17 @@ describe('SEC-01: event_facilities/event_distances reject cross-tenant event_id/
 
   // Exercises the actual threat model: a tenant_admin hitting PostgREST
   // directly (same request shape a browser client would send), going
-  // through RLS (which allows it, since tenant_admin_manage_event_facilities
-  // has no WITH CHECK) before the composite FK is what stops the write.
-  it("rejects tenant_admin A's own direct INSERT into event_facilities with a foreign event_id via RLS-scoped client", async () => {
-    const { error } = await clientAdminA.from('event_facilities').insert({
+  // through RLS (which allows it, since tenant_admin_manage_event_info_sections
+  // checks tenant_id only) before the composite FK is what stops the write.
+  it("rejects tenant_admin A's own direct INSERT into event_info_sections with a foreign event_id via RLS-scoped client", async () => {
+    const { error } = await clientAdminA.from('event_info_sections').insert({
       tenant_id: tenantA.id,
       event_id: eventB.id,
-      label: 'RLS-client direct-insert cross-tenant facility',
+      title: 'RLS-client direct-insert cross-tenant section',
+      body: 'x',
     })
 
     expect(error).not.toBeNull()
-    expect(error?.message).toMatch(/event_facilities_event_tenant_fkey/)
+    expect(error?.message).toMatch(/event_info_sections_event_tenant_fkey/)
   })
 })

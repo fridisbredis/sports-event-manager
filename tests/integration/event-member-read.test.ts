@@ -25,7 +25,6 @@ describe('N23: event-member read isolation', () => {
   type Table =
     | 'event_stages'
     | 'event_distances'
-    | 'event_facilities'
     | 'event_info_sections'
     | 'workstations'
     | 'announcements'
@@ -53,9 +52,6 @@ describe('N23: event-member read isolation', () => {
       await admin
         .from('event_distances')
         .insert({ tenant_id: tenantId, event_id: eventId, label: '10 km', position: 0 })
-      await admin
-        .from('event_facilities')
-        .insert({ tenant_id: tenantId, event_id: eventId, label: 'Toilets', position: 0 })
       const { error: sectionError } = await admin
         .from('event_info_sections')
         .insert({ tenant_id: tenantId, event_id: eventId, title: 'Parking', body: 'North lot' })
@@ -137,7 +133,6 @@ describe('N23: event-member read isolation', () => {
   it.each([
     'event_stages',
     'event_distances',
-    'event_facilities',
     'event_info_sections',
     'workstations',
     'announcements',

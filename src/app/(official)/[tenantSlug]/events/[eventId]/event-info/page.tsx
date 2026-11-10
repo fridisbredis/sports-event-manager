@@ -33,9 +33,6 @@ interface EventInfoCached {
     results_url: string | null
     position: number
   }>
-  // Still returned until the contract migration drops event_facilities;
-  // this page no longer reads it (N38, L24).
-  facilities: Array<{ id: string; label: string; position: number }>
   info_sections: InfoSection[]
 }
 

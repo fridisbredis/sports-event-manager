@@ -26,7 +26,6 @@ describe('N23: create_event', () => {
     details: true,
     stages: true,
     distances: true,
-    facilities: true,
     info_sections: true,
     work_areas: true,
     checklists: true,
@@ -112,10 +111,6 @@ describe('N23: create_event', () => {
       position: 0,
     })
     if (distanceError) throw distanceError
-    const { error: facilityError } = await admin
-      .from('event_facilities')
-      .insert({ tenant_id: tenantId, event_id: sourceId, label: 'Showers', position: 0 })
-    if (facilityError) throw facilityError
     const { error: sectionError } = await admin.from('event_info_sections').insert({
       tenant_id: tenantId,
       event_id: sourceId,
@@ -294,12 +289,6 @@ describe('N23: create_event', () => {
       .eq('event_id', eventId)
     expect(distances).toEqual([{ label: '42 km', stage_id: night.id }])
 
-    const { data: facilities } = await admin
-      .from('event_facilities')
-      .select('label')
-      .eq('event_id', eventId)
-    expect(facilities).toEqual([{ label: 'Showers' }])
-
     // N38: sections come over whole, image path included (shared object;
     // the app's cleanup is reference-counted).
     const { data: sections } = await admin
@@ -372,12 +361,7 @@ describe('N23: create_event', () => {
       .eq('id', eventId)
       .single()
     expect(event?.description).toBeNull()
-    for (const table of [
-      'event_distances',
-      'event_facilities',
-      'event_info_sections',
-      'workstations',
-    ] as const) {
+    for (const table of ['event_distances', 'event_info_sections', 'workstations'] as const) {
       const { count } = await admin
         .from(table)
         .select('id', { count: 'exact', head: true })

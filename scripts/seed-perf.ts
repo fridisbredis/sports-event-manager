@@ -190,7 +190,7 @@ async function seedTenant(index: number) {
   // cost: that query filters on event_id, not stage_id, and fetches all 15 —
   // the stage filter is applied client-side in getCurrentStage. The
   // distribution matters for client rendering and the allocable-range logic.
-  // event-info reads facilities, the scheduling view reads workstations with
+  // event-info reads info sections, the scheduling view reads workstations with
   // their operating windows nested — so both need depth.
   const workstationRows = Array.from({ length: WORK_AREAS_PER_EVENT }, (_, i) => ({
     tenant_id: tenant.id,
@@ -230,13 +230,14 @@ async function seedTenant(index: number) {
     ])
   )
 
-  // Event facilities — read by event-info.
+  // Info sections — read by event-info (N38).
   await insertMany(
-    'event_facilities',
+    'event_info_sections',
     Array.from({ length: 6 }, (_, i) => ({
       tenant_id: tenant.id,
       event_id: event.id,
-      label: `Facility ${i + 1}`,
+      title: `Info section ${i + 1}`,
+      body: `Seeded info section ${i + 1} for PERF-01 volume`,
       position: i,
     }))
   )

@@ -390,48 +390,6 @@ export type Database = {
           },
         ]
       }
-      event_facilities: {
-        Row: {
-          created_at: string
-          event_id: string
-          id: string
-          label: string
-          position: number
-          tenant_id: string
-        }
-        Insert: {
-          created_at?: string
-          event_id: string
-          id?: string
-          label: string
-          position?: number
-          tenant_id: string
-        }
-        Update: {
-          created_at?: string
-          event_id?: string
-          id?: string
-          label?: string
-          position?: number
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'event_facilities_event_tenant_fkey'
-            columns: ['event_id', 'tenant_id']
-            isOneToOne: false
-            referencedRelation: 'events'
-            referencedColumns: ['id', 'tenant_id']
-          },
-          {
-            foreignKeyName: 'event_facilities_tenant_id_fkey'
-            columns: ['tenant_id']
-            isOneToOne: false
-            referencedRelation: 'tenants'
-            referencedColumns: ['id']
-          },
-        ]
-      }
       event_info_sections: {
         Row: {
           body: string | null
@@ -1546,10 +1504,6 @@ export type Database = {
           p_workstation_id: string
         }
         Returns: boolean
-      }
-      sync_event_facilities: {
-        Args: { p_event_id: string; p_facilities: Json; p_tenant_id: string }
-        Returns: undefined
       }
       sync_event_stages: {
         Args: { p_event_id: string; p_stages: Json; p_tenant_id: string }
