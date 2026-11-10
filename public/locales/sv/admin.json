@@ -51,7 +51,9 @@
     "smsUsageReached": "Gränsen nådd",
     "smsUsageBlocked": "Inbjudningar och meddelanden skickas inte förrän nästa månad börjar. Inloggningskoder påverkas inte.",
     "smsUsageEstimated": "Uppskattat utifrån Twilios listpris.",
-    "adminAreas": "Adminområden"
+    "adminAreas": "Adminområden",
+    "participants": "Deltagare",
+    "participantsClaimed": "{{claimed}} av {{total}} registrerade"
   },
   "eventConfig": {
     "title": "Evenemangsinställningar",
@@ -317,7 +319,7 @@
   "participants": {
     "title": "Deltagare",
     "subtitle": "Startlistan för eventets tävlingsetapper.",
-    "withdrawn": "Struken",
+    "withdrawn": "Inte på Race Results-listan",
     "hidden": "Dold",
     "manual": "Tillagd för hand",
     "pagination": "Sidor i deltagarlistan",
@@ -332,7 +334,8 @@
       "nation": "Nation",
       "gender": "Kön",
       "phone": "Telefon",
-      "stages": "Tävlingsetapper"
+      "stages": "Tävlingsetapper",
+      "claimStatus": "Registrering"
     },
     "filters": {
       "stage": "Tävlingsetapp",
@@ -393,6 +396,22 @@
       "linkLabel": "Registreringslänk",
       "download": "Ladda ner",
       "closedNotice": "Evenemanget är inte publicerat. Du kan kopiera registreringslänken och skriva ut QR-koden redan nu. Tills du publicerar visar länken att registreringen inte är öppen."
+    },
+    "claim": {
+      "count": "{{claimed}} av {{total}} registrerade",
+      "filterLabel": "Registrering",
+      "filterAll": "Alla",
+      "claimed": "Registrerad",
+      "unclaimed": "Ej registrerad",
+      "unlink": "Koppla bort",
+      "unlinkConfirmTitle": "Koppla bort telefonnumret?",
+      "unlinkConfirmBody": "{{name}} förlorar åtkomsten som deltagare i det här evenemanget. Posten kan registreras igen.",
+      "unlinkSuccess": "{{name}} är bortkopplad",
+      "iceNotClaimed": "Visas när deltagaren har registrerat sig."
+    },
+    "detail": {
+      "otherFields": "Övriga fält från Race Results",
+      "noOtherFields": "Inga övriga fält"
     }
   },
   "scheduling": {

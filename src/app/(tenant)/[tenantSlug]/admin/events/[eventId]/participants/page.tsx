@@ -8,12 +8,20 @@ import { hasFeature } from '@/lib/tiers/features'
 import { parsePageParam, pageRange } from '@/lib/pagination'
 import { parseRaceResultsEventId } from '@/lib/race-results/parse-url'
 import { isParticipantSideOpen } from '@/lib/events/participant-side'
+import { fetchIceContactsByUserId } from '@/lib/ice-contact-read'
+import { fetchClaimCounts, parseClaimFilter } from '@/lib/participants/claim-status'
 
 import ParticipantsList from './_components/participants-list'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
-  searchParams: Promise<{ page?: string; stage?: string; withdrawn?: string; hidden?: string }>
+  searchParams: Promise<{
+    page?: string
+    stage?: string
+    withdrawn?: string
+    hidden?: string
+    claim?: string
+  }>
 }
 
 /**
@@ -36,6 +44,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     stage: stageParam,
     withdrawn: withdrawnParam,
     hidden: hiddenParam,
+    claim: claimParam,
   } = await searchParams
 
   const user = await getCurrentUser()
@@ -58,6 +67,7 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
   const { from, to } = pageRange(page, PARTICIPANTS_PAGE_SIZE)
   const showWithdrawn = withdrawnParam === '1'
   const showHidden = hiddenParam === '1'
+  const claimFilter = parseClaimFilter(claimParam)
 
   // Race stages, for the stage filter and for the import dialog. Which of
   // them actually has a Race Results link decides what can be imported, so
@@ -128,8 +138,8 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     .from('participants')
     .select(
       selectedStageId
-        ? 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, participant_stages!inner(stage_id)'
-        : 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, participant_stages(stage_id)'
+        ? 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, user_id, participant_stages!inner(stage_id)'
+        : 'id, name, bib, category, club, nation, gender, phone, source, extra, withdrawn_at, hidden_at, user_id, participant_stages(stage_id)'
     )
     .eq('tenant_id', tenant.id)
     // N23: this event's participants.
@@ -153,6 +163,10 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
   if (!showHidden) {
     query = query.is('hidden_at', null)
   }
+
+  // N41 (L25): claim status, from participants.user_id.
+  if (claimFilter === 'claimed') query = query.not('user_id', 'is', null)
+  else if (claimFilter === 'unclaimed') query = query.is('user_id', null)
 
   const { data: participantRows, error } = await query
     .order('bib', { ascending: true, nullsFirst: false })
@@ -196,10 +210,32 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
     extra: (p.extra ?? {}) as Record<string, string>,
     withdrawnAt: p.withdrawn_at,
     hiddenAt: p.hidden_at,
+    claimed: p.user_id !== null,
     stageIds: ((p.participant_stages ?? []) as unknown as Array<{ stage_id: string }>).map(
       (link) => link.stage_id
     ),
   }))
+
+  // N41 (R5c, L27): ICE contacts for the claimed rows on THIS page only —
+  // one query for at most PARTICIPANTS_PAGE_SIZE ids, never the whole list.
+  // RLS (can_read_ice_contact) decides what comes back; the claim gave the
+  // runner a participant role in this tenant, which is what lets an admin
+  // read it. Keyed by participant id so the client never sees user ids.
+  const claimedRows = pageRows.filter((p) => p.user_id !== null)
+  const [iceByUserId, claimCounts] = await Promise.all([
+    fetchIceContactsByUserId(
+      supabase,
+      claimedRows.map((p) => p.user_id as string),
+      { op: 'admin/participants', tenantId: tenant.id }
+    ),
+    fetchClaimCounts(supabase, { tenantId: tenant.id, eventId, op: 'admin/participants' }),
+  ])
+  const iceContacts = Object.fromEntries(
+    claimedRows.flatMap((p) => {
+      const ice = iceByUserId[p.user_id as string]
+      return ice ? [[p.id, ice]] : []
+    })
+  )
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">
@@ -214,6 +250,9 @@ export default async function ParticipantsPage({ params, searchParams }: Props) 
         selectedStageId={selectedStageId ?? null}
         showWithdrawn={showWithdrawn}
         showHidden={showHidden}
+        claimFilter={claimFilter}
+        claimCounts={claimCounts}
+        iceContacts={iceContacts}
         claimList={claimList}
       />
     </div>

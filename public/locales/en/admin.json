@@ -51,7 +51,9 @@
     "smsUsageReached": "Limit reached",
     "smsUsageBlocked": "Invites and announcements have stopped sending until the start of next month. Sign-in codes are not affected.",
     "smsUsageEstimated": "Estimated from Twilio's list price.",
-    "adminAreas": "Admin Areas"
+    "adminAreas": "Admin Areas",
+    "participants": "Participants",
+    "participantsClaimed": "{{claimed}} of {{total}} claimed"
   },
   "eventConfig": {
     "title": "Event configuration",
@@ -317,7 +319,7 @@
   "participants": {
     "title": "Participants",
     "subtitle": "The start list for this event's Race stages.",
-    "withdrawn": "Withdrawn",
+    "withdrawn": "Not on Race Results list",
     "hidden": "Hidden",
     "manual": "Added by hand",
     "pagination": "Participant list pages",
@@ -332,7 +334,8 @@
       "nation": "Nation",
       "gender": "Gender",
       "phone": "Phone",
-      "stages": "Race stages"
+      "stages": "Race stages",
+      "claimStatus": "Claim status"
     },
     "filters": {
       "stage": "Race stage",
@@ -393,6 +396,22 @@
       "linkLabel": "Claim link",
       "download": "Download",
       "closedNotice": "The event is not published. You can copy the claim link and print the QR code now. Until you publish, the link says claiming is not open."
+    },
+    "claim": {
+      "count": "{{claimed}} of {{total}} claimed",
+      "filterLabel": "Claim status",
+      "filterAll": "All",
+      "claimed": "Claimed",
+      "unclaimed": "Unclaimed",
+      "unlink": "Unlink",
+      "unlinkConfirmTitle": "Unlink phone number?",
+      "unlinkConfirmBody": "{{name}} loses access as a participant in this event. The record can be claimed again.",
+      "unlinkSuccess": "{{name}} is unlinked",
+      "iceNotClaimed": "Shown once the participant has claimed their record."
+    },
+    "detail": {
+      "otherFields": "Other fields from Race Results",
+      "noOtherFields": "No other fields"
     }
   },
   "scheduling": {

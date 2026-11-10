@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { logQueryError } from '@/lib/db/query-error'
@@ -16,6 +16,7 @@ import { hasFeature } from '@/lib/tiers/features'
 import type { Json } from '@/types/database'
 import { adminEventRoutePattern } from '@/lib/events/paths'
 import { resolveRequestEventId } from '@/lib/events/request-event'
+import { avatarStoragePath } from '@/lib/participants/participant-avatar'
 
 const tenantIdSchema = z.string().uuid()
 const stageIdSchema = z.string().uuid()
@@ -454,6 +455,114 @@ export async function removeParticipant(input: {
   }
 
   revalidatePath(adminEventRoutePattern('participants'), 'page')
+
+  return {}
+}
+
+/**
+ * Unlink a claimed participant record (N41, L7, L26): the wrong person — or a
+ * wrong number — claimed it, and the admin puts it back to Unclaimed.
+ *
+ * ONE UPDATE, so nothing can half-happen (REL-01). In that one statement:
+ *   - user_id goes, and with it the access. participants_sync_participant_role
+ *     (migration 20261106120000) fires on the user_id change and drops the
+ *     'participant' row from user_roles when this was their only record in
+ *     the tenant, and is_event_participant stops matching this event. Both
+ *     are read per request, so the session they still hold opens nothing.
+ *   - phone goes: claim_participant wrote the claimant's verified number
+ *     there, and that number is what is being unlinked ("Unlink phone
+ *     number?"). Race Results supplies none, so there is nothing to restore.
+ *   - privacy_accepted_at goes: that consent was the previous claimant's,
+ *     and the next one gives their own on CLAIM-02.
+ *   - avatar_url goes: it is a photo of the previous claimant.
+ * The ACCOUNT is kept (L26) — it may be an official or a participant
+ * elsewhere, and deleting auth users is not an admin's call.
+ *
+ * The photo file itself is removed after the update, best-effort: a stray
+ * object in storage is not worth failing an unlink that has committed.
+ */
+export async function unlinkParticipant(input: {
+  tenantSlug: string
+  tenantId: string
+  eventId: string
+  participantId: string
+}): Promise<ParticipantRowActionResult> {
+  const auth = await authorize(input.tenantId)
+  if (!auth.ok) return { error: auth.error }
+  const { supabase, tenantId } = auth
+
+  const participantId = participantIdSchema.safeParse(input.participantId)
+  if (!participantId.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  const eventId = await resolveRequestEventId(supabase, tenantId, input.eventId)
+  if (!eventId) return { error: await tError('actionErrors.invalidRequest') }
+
+  // Only to clean up the photo afterwards; a failed read leaves the file.
+  const { data: before, error: beforeError } = await supabase
+    .from('participants')
+    .select('avatar_url')
+    .eq('id', participantId.data)
+    .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (beforeError) {
+    logQueryError(beforeError, {
+      op: 'unlinkParticipant',
+      table: 'participants',
+      kind: 'select',
+      tenantId,
+      extra: { usage: 'unlink_avatar_lookup' },
+    })
+  }
+
+  // `user_id is not null` in the filter: unlinking a row nobody has claimed
+  // (or that someone else unlinked a moment ago) is "not found", not a
+  // silent success that also wipes a phone number an admin typed in.
+  const { data, error } = await supabase
+    .from('participants')
+    .update({ user_id: null, phone: null, privacy_accepted_at: null, avatar_url: null })
+    .eq('id', participantId.data)
+    .eq('tenant_id', tenantId)
+    .eq('event_id', eventId)
+    .not('user_id', 'is', null)
+    .select('id')
+
+  if (error) {
+    return {
+      error: await translateDbError(
+        'unlinkParticipant: update failed',
+        error,
+        'participants.actions.genericError'
+      ),
+    }
+  }
+
+  if (!data || data.length === 0) {
+    logger.warn('unlinkParticipant: no matching claimed participant', {
+      tenantId,
+      eventId,
+      participantId: participantId.data,
+    })
+    return { error: await tError('actionErrors.participantNotFound') }
+  }
+
+  const avatarPath = before?.avatar_url ? avatarStoragePath(before.avatar_url) : null
+  // Only ever a path under this participant's own prefix.
+  if (avatarPath?.startsWith(`${tenantId}/participants/${participantId.data}/`)) {
+    const { error: removeError } = await createSupabaseServiceClient()
+      .storage.from('avatars')
+      .remove([avatarPath])
+    if (removeError) {
+      logger.warn('unlinkParticipant: could not remove the previous photo', {
+        tenantId,
+        participantId: participantId.data,
+        message: removeError.message,
+      })
+    }
+  }
+
+  revalidatePath(adminEventRoutePattern('participants'), 'page')
+  revalidatePath(adminEventRoutePattern('dashboard'), 'page')
 
   return {}
 }

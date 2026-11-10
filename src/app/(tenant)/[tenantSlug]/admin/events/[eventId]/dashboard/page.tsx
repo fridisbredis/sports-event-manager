@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -8,6 +8,9 @@ import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
 import { OfficialsCard } from './_components/officials-card'
+import { ParticipantsCard } from './_components/participants-card'
+import { hasFeature } from '@/lib/tiers/features'
+import { fetchClaimCounts } from '@/lib/participants/claim-status'
 import { SchedulingWarningsCard } from './_components/scheduling-warnings-card'
 import { SmsUsageCard } from './_components/sms-usage-card'
 import { AdminAreasGrid } from './_components/admin-areas-grid'
@@ -118,6 +121,19 @@ export default async function DashboardPage({ params }: Props) {
     op: 'GET /[tenantSlug]/admin/dashboard',
   })
 
+  // N41 (L21): claimed participants, beside the officials counts. Like the
+  // SMS figure above, read OUTSIDE the 60-second cache — through the same
+  // fetchClaimCounts PART-01's header uses, so the two always match, also
+  // right after an unlink. Premium and up, as PART-01 itself; a failed read
+  // leaves the card out rather than showing "0 of 0".
+  const claimCounts = hasFeature(tenant.tier, 'participants')
+    ? await fetchClaimCounts(await createSupabaseServerClient(), {
+        tenantId: tenant.id,
+        eventId,
+        op: 'GET /[tenantSlug]/admin/dashboard',
+      })
+    : null
+
   const hasName = Boolean(event?.name?.trim())
   const hasRaceStage = raceStageCount > 0
   const canPublish = hasName && hasRaceStage
@@ -176,13 +192,27 @@ export default async function DashboardPage({ params }: Props) {
           tenantId={tenantId}
           eventId={event?.id ?? null}
         />
-        <OfficialsCard
-          title={t('dashboard.officials')}
-          invited={officialsInvited}
-          invitedLabel={t('dashboard.invited')}
-          confirmed={officialsConfirmed}
-          confirmedLabel={t('dashboard.confirmed')}
-        />
+        <div className="flex flex-col gap-5">
+          <OfficialsCard
+            title={t('dashboard.officials')}
+            invited={officialsInvited}
+            invitedLabel={t('dashboard.invited')}
+            confirmed={officialsConfirmed}
+            confirmedLabel={t('dashboard.confirmed')}
+          />
+          {claimCounts && (
+            <ParticipantsCard
+              title={t('dashboard.participants')}
+              claimed={claimCounts.claimed}
+              total={claimCounts.total}
+              claimedLabel={t('dashboard.participantsClaimed', {
+                claimed: claimCounts.claimed,
+                total: claimCounts.total,
+              })}
+              href={adminEventPath(tenantSlug, eventId, 'participants')}
+            />
+          )}
+        </div>
       </div>
 
       <div className="mb-5">
