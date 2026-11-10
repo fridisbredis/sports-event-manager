@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>COMM-01 · Communication — Viadal EventAdmin wireframes</title>
+<!-- Source: Viadal Event Planner wireframes, page "EventAdmin_view", row COMM-01.
+     Each <div class="screen"> is one state of this screen (1440×1024 frame, label above it). -->
+<style>
+  body { margin:0; background:#f2f2f2; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .lbl { font:600 15px/1.4 ui-sans-serif,system-ui,sans-serif; color:#333; margin-bottom:12px; }
+  .lbl span { color:#999; font-weight:400; }
+  .dframe { width:1440px; height:1024px; background:#fff; border:1px solid #999; border-radius:8px; overflow:hidden; display:flex; }
+  .side { width:240px; flex:0 0 auto; border-right:1px solid #999; padding:24px 14px; display:flex; flex-direction:column; }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:24px; padding:0 6px; }
+  .blogo { width:32px; height:32px; border:1.5px solid #999; border-radius:7px; flex:0 0 auto; }
+  .bname { font:700 15px/1.1 system-ui; color:#333; }
+  .bsub { font:400 11px/1.2 system-ui; color:#999; margin-top:2px; }
+  .navg { display:flex; flex-direction:column; gap:4px; flex:1; }
+  .navi { padding:10px 12px; border-radius:6px; font:500 13px/1.2 system-ui; color:#666; }
+  .navi.on { background:#E5E5E5; color:#333; font-weight:700; }
+  .main { flex:1; padding:28px 36px; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  .dh1 { font:700 22px/1.2 system-ui; color:#333; margin:0; }
+  .dhrow { display:flex; align-items:center; justify-content:space-between; }
+  .btn { height:40px; padding:0 18px; border-radius:7px; background:#333; color:#fff; display:inline-flex; align-items:center; justify-content:center; font:600 13px/1 system-ui; }
+  .btn.dis { background:#E5E5E5; color:#999; border:1px solid #999; }
+  .btno { height:40px; padding:0 18px; border-radius:7px; border:1px solid #999; color:#333; background:#fff; display:inline-flex; align-items:center; justify-content:center; font:600 13px/1 system-ui; }
+  .btnsm { height:30px; padding:0 12px; border-radius:6px; font:600 12px/1 system-ui; display:inline-flex; align-items:center; justify-content:center; }
+  .badge { display:inline-flex; align-items:center; padding:5px 11px; border:1px solid #999; border-radius:20px; font:600 11px/1 system-ui; color:#333; }
+  .badge.fill { background:#E5E5E5; }
+  .chip { display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 12px; border:1px solid #999; border-radius:20px; font:500 13px/1 system-ui; color:#333; }
+  .chip .x { width:18px; height:18px; border-radius:50%; background:#E5E5E5; display:inline-flex; align-items:center; justify-content:center; font:600 12px/1 system-ui; color:#333; }
+  .card { border:1px solid #999; border-radius:10px; padding:18px; }
+  .sect { font:700 11px/1.2 system-ui; color:#333; letter-spacing:.06em; text-transform:uppercase; margin:0 0 12px; }
+  .lab { font:500 12px/1.2 system-ui; color:#666; margin-bottom:6px; }
+  .small { font:400 13px/1.5 system-ui; color:#666; margin:0; }
+  .inp { height:42px; border:1px solid #999; border-radius:7px; display:flex; align-items:center; padding:0 14px; font:400 14px/1 system-ui; color:#333; }
+  .inp.ph { color:#999; }
+  .inp.dash { border-style:dashed; color:#666; }
+  .inp.err { border-color:#333; border-width:2px; }
+  .ta { border:1px solid #999; border-radius:7px; padding:12px 14px; }
+  .dl { height:0; border-top:1.5px dashed #999; }
+  .img { background:#E5E5E5; background-image:linear-gradient(45deg,transparent calc(50% - .8px),#999 calc(50% - .8px),#999 calc(50% + .8px),transparent calc(50% + .8px)),linear-gradient(-45deg,transparent calc(50% - .8px),#999 calc(50% - .8px),#999 calc(50% + .8px),transparent calc(50% + .8px)); border:1px solid #999; }
+  .av { border-radius:50%; background:#E5E5E5; border:1px solid #999; flex:0 0 auto; }
+  .seg { display:inline-flex; border:1px solid #999; border-radius:8px; overflow:hidden; }
+  .seg > div { padding:9px 18px; font:600 13px/1 system-ui; }
+  .seg .on { background:#333; color:#fff; }
+  .seg .off { background:#fff; color:#666; }
+  .th { display:flex; align-items:center; padding:0 16px; height:38px; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; border-bottom:1px solid #999; }
+  .tr { display:flex; align-items:center; padding:0 16px; height:56px; border-bottom:1px solid #E5E5E5; font:400 14px/1.3 system-ui; color:#333; }
+  .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .chk { width:18px; height:18px; border:1.5px solid #999; border-radius:4px; flex:0 0 auto; }
+  .stk { display:flex; flex-direction:column; }
+  .warn { width:18px; height:18px; border:1.5px solid #333; border-radius:50%; display:flex; align-items:center; justify-content:center; font:700 12px/1 system-ui; color:#333; flex:0 0 auto; }
+  .warnbar { border:2px solid #333; border-radius:10px; padding:14px 18px; display:flex; gap:10px; align-items:center; }
+  /* stages */
+  .srow { display:flex; align-items:center; gap:12px; padding:14px 16px; }
+  .exp { font:400 13px/1 system-ui; color:#666; width:14px; flex:0 0 auto; }
+  .sdet { border-top:1px solid #E5E5E5; padding:14px 16px 16px; background:#FAFAFA; }
+  /* scheduling grid */
+  .ghead { display:flex; border-bottom:1px solid #999; }
+  .grow { display:flex; border-bottom:1px solid #E5E5E5; height:78px; }
+  .grow.last { border-bottom:none; }
+  .rhead { width:210px; flex:0 0 auto; padding:0 16px; display:flex; flex-direction:column; justify-content:center; }
+  .rheadp { width:210px; flex:0 0 auto; padding:0 16px; display:flex; align-items:center; gap:10px; }
+  .grid6 { flex:1; display:grid; grid-template-columns:repeat(6,1fr); }
+  .gcol { padding:12px 6px; font:700 11px/1 system-ui; color:#666; text-align:center; border-left:1px solid #E5E5E5; }
+  .gcell { border-left:1px solid #E5E5E5; padding:8px; display:flex; align-items:center; justify-content:center; }
+  .gempty { border-left:1px solid #E5E5E5; }
+  .cellbox { width:100%; height:100%; border:1px solid #999; border-radius:6px; background:#E5E5E5; display:flex; align-items:center; justify-content:center; font:700 13px/1 system-ui; color:#333; }
+  .cellname { width:100%; height:100%; border:1px solid #999; border-radius:6px; background:#E5E5E5; display:flex; align-items:center; justify-content:center; font:600 11px/1.15 system-ui; color:#333; text-align:center; padding:2px; }
+  .cellover { border:2px solid #333; flex-direction:column; gap:1px; }
+  .hatch { background:repeating-linear-gradient(45deg,#fff,#fff 5px,#E5E5E5 5px,#E5E5E5 10px); }
+  .dbk { width:22px; height:22px; border:1.5px solid #333; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; gap:1px; flex:0 0 auto; }
+  .dbk .ring { width:6px; height:6px; border-radius:50%; border:1.5px solid #333; }
+  .dbk .ex { font:700 9px/1 system-ui; color:#333; }
+  .stagesel { position:relative; }
+  .seldd { position:absolute; top:42px; left:0; width:240px; background:#fff; border:1px solid #999; border-radius:8px; padding:6px; z-index:5; box-shadow:0 6px 20px rgba(51,51,51,.12); }
+  .seldd .opt { padding:9px 10px; border-radius:6px; font:500 13px/1.2 system-ui; color:#333; display:flex; align-items:center; justify-content:space-between; }
+  .seldd .opt.on { background:#E5E5E5; font-weight:700; }
+  .scrim { position:absolute; inset:0; background:rgba(51,51,51,.18); display:flex; align-items:center; justify-content:center; }
+  .modal { width:520px; background:#fff; border:1px solid #999; border-radius:12px; padding:24px; }
+  /* --- participants / info sections additions --- */
+  .pbadge { display:inline-flex; align-items:center; padding:2px 7px; border:1px solid #999; border-radius:10px; font:600 10px/1.2 system-ui; color:#333; background:#E5E5E5; }
+  .navi.lock { color:#BBB; }
+  .navi.lock .pbadge { background:#fff; color:#999; }
+  .isrow { display:flex; align-items:center; gap:10px; padding:0 12px; height:40px; border-bottom:1px solid #E5E5E5; }
+  .drag { color:#999; font:700 12px/1 system-ui; letter-spacing:-2px; width:14px; flex:0 0 auto; }
+  .fchip { display:inline-flex; align-items:center; padding:7px 14px; border:1px solid #999; border-radius:20px; font:600 12px/1 system-ui; color:#666; background:#fff; }
+  .fchip.on { background:#333; color:#fff; border-color:#333; }
+  .badge.cf { border:2px solid #333; padding:4px 10px; }
+  .ptr { display:flex; align-items:center; padding:0 16px; height:52px; border-bottom:1px solid #E5E5E5; font:400 13px/1.3 system-ui; color:#333; }
+  .pth { display:flex; align-items:center; padding:0 16px; height:38px; font:700 11px/1 system-ui; letter-spacing:.05em; text-transform:uppercase; color:#666; border-bottom:1px solid #999; }
+  .msgbar { border:1px solid #999; border-radius:10px; padding:12px 18px; background:#E5E5E5; font:600 13px/1.3 system-ui; color:#333; }
+  .kv { display:flex; gap:10px; font:400 13px/1.5 system-ui; }
+  .kv .k { color:#666; width:110px; flex:0 0 auto; }
+  .kv .v { color:#333; }
+  .iceb { display:inline-flex; align-items:center; padding:3px 8px; border-radius:20px; background:#333; color:#fff; font:700 10px/1 system-ui; letter-spacing:.06em; margin-left:10px; }
+  .upl { border:1.5px dashed #999; border-radius:8px; height:96px; display:flex; align-items:center; justify-content:center; gap:12px; }
+
+  body { padding:60px; }
+  .screen { width:1440px; margin-bottom:80px; }
+</style>
+</head>
+<body>
+<!-- COMM-01 : participant-channel -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">COMM-01 · Communication <span>— participant-channel</span></div>
+  <div class="dframe" data-screen-label="COMM-01 participant-channel">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi on">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><h1 class="dh1">Communication</h1></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:20px;"><span class="lab" style="margin:0;">Channel</span><div class="seg"><div class="on">Participants</div><div class="off">Officials</div></div></div>
+      <div class="card" style="margin-top:20px;">
+        <div class="sect">New announcement</div>
+        <div class="ta" style="min-height:96px; color:#999; font:400 14px/1.5 system-ui;">Write an announcement…</div>
+        <div class="dhrow" style="margin-top:14px;"><p class="small" style="margin:0;">Recipients get an SMS unless they've opted out.</p><span class="btn">Publish</span></div>
+      </div>
+      <div class="sect" style="margin:24px 0 8px;">Timeline — Participants</div>
+      <div class="card" style="padding:4px 18px;">
+        <div style="padding:16px 0; border-bottom:1px solid #E5E5E5;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Start list for the 6-day is now published. Check your bib number in the participant portal.</p><div class="small" style="margin-top:6px;">2 Aug, 09:14</div></div>
+        <div style="padding:16px 0; border-bottom:1px solid #E5E5E5;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Parking opens at 06:00. Follow the marshals' directions on arrival.</p><div class="small" style="margin-top:6px;">1 Aug, 17:40</div></div>
+        <div style="padding:16px 0;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Welcome to Viadal 2026. Race briefing details follow shortly.</p><div class="small" style="margin-top:6px;">31 Jul, 12:00</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- COMM-01 : officials-channel -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">COMM-01 · Communication <span>— officials-channel</span></div>
+  <div class="dframe" data-screen-label="COMM-01 officials-channel">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi on">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><h1 class="dh1">Communication</h1></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:20px;"><span class="lab" style="margin:0;">Channel</span><div class="seg"><div class="off">Participants</div><div class="on">Officials</div></div></div>
+      <div class="card" style="margin-top:20px;">
+        <div class="sect">New announcement</div>
+        <div class="ta" style="min-height:96px; color:#999; font:400 14px/1.5 system-ui;">Write an announcement…</div>
+        <div class="dhrow" style="margin-top:14px;"><p class="small" style="margin:0;">Recipients get an SMS unless they've opted out.</p><span class="btn">Publish</span></div>
+      </div>
+      <div class="sect" style="margin:24px 0 8px;">Timeline — Officials</div>
+      <div class="card" style="padding:4px 18px;">
+        <div style="padding:16px 0; border-bottom:1px solid #E5E5E5;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Shift schedule is finalised. Please confirm your assignments in your account.</p><div class="small" style="margin-top:6px;">2 Aug, 08:30</div></div>
+        <div style="padding:16px 0; border-bottom:1px solid #E5E5E5;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Officials lounge opens at 05:30. Coffee and briefing material available.</p><div class="small" style="margin-top:6px;">1 Aug, 19:05</div></div>
+        <div style="padding:16px 0;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Thank you for volunteering. Accreditation collection details follow soon.</p><div class="small" style="margin-top:6px;">30 Jul, 15:20</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- COMM-01 : empty -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">COMM-01 · Communication <span>— empty</span></div>
+  <div class="dframe" data-screen-label="COMM-01 empty">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi on">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><h1 class="dh1">Communication</h1></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:20px;"><span class="lab" style="margin:0;">Channel</span><div class="seg"><div class="on">Participants</div><div class="off">Officials</div></div></div>
+      <div class="card" style="margin-top:20px;">
+        <div class="sect">New announcement</div>
+        <div class="ta" style="min-height:96px; color:#999; font:400 14px/1.5 system-ui;">Write an announcement…</div>
+        <div class="dhrow" style="margin-top:14px;"><p class="small" style="margin:0;">Recipients get an SMS unless they've opted out.</p><span class="btn">Publish</span></div>
+      </div>
+      <div class="sect" style="margin:24px 0 8px;">Timeline — Participants</div>
+      <div class="card" style="flex:1; display:flex;"><div class="empty"><div class="img" style="width:64px;height:64px;border-radius:12px;"></div><div style="font:700 16px/1.2 system-ui; color:#333; margin-top:16px;">No announcements yet</div><p class="small" style="margin-top:8px;">Published announcements will appear here.</p></div></div>
+    </div>
+  </div>
+</div>
+<!-- COMM-01 : unsaved-changes-guard -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">COMM-01 · Communication <span>— unsaved-changes-guard</span></div>
+  <div class="dframe" data-screen-label="COMM-01 unsaved-changes-guard">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi on">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main" style="position:relative;">
+      <div style="opacity:.4; display:flex; flex-direction:column; flex:1; overflow:hidden;">
+        <div class="dhrow"><h1 class="dh1">Communication</h1></div>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:20px;"><span class="lab" style="margin:0;">Channel</span><div class="seg"><div class="on">Participants</div><div class="off">Officials</div></div></div>
+        <div class="card" style="margin-top:20px;">
+          <div class="sect">New announcement</div>
+          <div class="ta" style="min-height:96px; color:#333; font:400 14px/1.5 system-ui;">Road closure on the north loop updated — see revised map before your shift.</div>
+          <div class="dhrow" style="margin-top:14px;"><p class="small" style="margin:0;">Recipients get an SMS unless they've opted out.</p><span class="btn">Publish</span></div>
+        </div>
+      </div>
+      <div class="scrim">
+        <div class="modal">
+          <div style="font:700 17px/1.3 system-ui; color:#333;">Unsaved changes</div>
+          <div class="small" style="margin-top:12px;">You have an unpublished announcement.</div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center; margin-top:22px;">
+            <span class="small" style="color:#333; text-decoration:underline;">Cancel</span>
+            <span class="btno">Discard and continue</span>
+            <span class="btn">Publish</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================================================== ACCT-01 ===================================================== -->
+<!-- COMM-01 : participant-channel-unavailable-in-draft -->
+<div class="screen">
+  <div class="lbl" data-drags-parent="1">COMM-01 · Communication <span>— participant-channel-unavailable-in-draft</span></div>
+  <div class="dframe" data-screen-label="COMM-01 participant-channel-draft">
+    <div class="side"><div class="brand"><div class="blogo"></div><div><div class="bname">Viadal</div><div class="bsub">Event admin</div></div></div><div class="navg"><div class="navi">Dashboard</div><div class="navi">Event configuration</div><div class="navi">Work areas</div><div class="navi">Officials</div><div class="navi" style="display:flex; align-items:center; justify-content:space-between;">Participants <span class="pbadge">Premium</span></div><div class="navi">Scheduling</div><div class="navi on">Communication</div><div class="navi" style="margin-top:auto;">Account</div></div></div>
+    <div class="main">
+      <div class="dhrow"><h1 class="dh1">Communication</h1></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:20px;"><span class="lab" style="margin:0;">Channel</span><div class="seg"><div class="off" style="color:#BBB;">Participants</div><div class="on">Officials</div></div><span class="small">The participant channel opens when the event is published.</span></div>
+      <div class="card" style="margin-top:20px;">
+        <div class="sect">New announcement</div>
+        <div class="ta" style="min-height:96px; color:#999; font:400 14px/1.5 system-ui;">Write an announcement…</div>
+        <div class="dhrow" style="margin-top:14px;"><p class="small" style="margin:0;">Recipients get an SMS unless they've opted out.</p><span class="btn">Publish</span></div>
+      </div>
+      <div class="sect" style="margin:24px 0 8px;">Timeline — Officials</div>
+      <div class="card" style="padding:4px 18px;">
+        <div style="padding:16px 0;"><p style="margin:0; font:400 14px/1.5 system-ui; color:#333;">Thank you for volunteering. Accreditation collection details follow soon.</p><div class="small" style="margin-top:6px;">30 Jul, 15:20</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
