@@ -43,6 +43,8 @@ import {
 } from '../actions'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 
+import { PremiumBadge } from '@/components/ui/premium-badge'
+
 import { ClaimLinkActions } from './claim-link-actions'
 
 // Columns drop out as the screen narrows, so Bib and Name always have room
@@ -245,7 +247,10 @@ export default function ParticipantsList({
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="page-title">{t('participants.title')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="page-title">{t('participants.title')}</h1>
+          <PremiumBadge label={t('dashboard.premiumBadge')} />
+        </div>
         {/* On a phone: Import, then Add, each the full width (the labels are
             too long for half a 320px screen), then the claim link pair side
             by side. From sm: one row, in reading order, primary last. */}

@@ -22,6 +22,7 @@ import {
   Menu,
   type LucideIcon,
 } from 'lucide-react'
+import { PremiumBadge } from '@/components/ui/premium-badge'
 import { useTranslation } from '@/lib/i18n/client'
 import { LogoutButton } from '@/components/logout-button'
 
@@ -68,7 +69,7 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
   }
 
   const eventBase = `admin/events/${eventId}`
-  const navItems: { segment: string; label: string; icon: LucideIcon }[] = eventId
+  const navItems: { segment: string; label: string; icon: LucideIcon; badge?: string }[] = eventId
     ? [
         {
           segment: `${eventBase}/dashboard`,
@@ -84,6 +85,8 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
                 segment: `${eventBase}/participants`,
                 label: t('navigation.participants'),
                 icon: ClipboardList,
+                // A Premium feature: marked as one, per the wireframe.
+                badge: t('dashboard.premiumBadge'),
               },
             ]
           : []),
@@ -110,7 +113,8 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
       isCollapsed = false,
       onNavigate,
       exact = false,
-    }: { isCollapsed?: boolean; onNavigate?: () => void; exact?: boolean } = {}
+      badge,
+    }: { isCollapsed?: boolean; onNavigate?: () => void; exact?: boolean; badge?: string } = {}
   ) => {
     const href = `/${tenantSlug}/${segment}`
     // `exact` for "All events": /admin is a prefix of every admin screen, so
@@ -151,6 +155,9 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
             {label}
           </span>
         )}
+        {/* ml-auto pushes it to the row's right edge. Not shown on the
+            collapsed rail, which has room for the icon only. */}
+        {!isCollapsed && badge && <PremiumBadge label={badge} className="ml-auto" />}
       </Link>
     )
   }
@@ -164,7 +171,9 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
         {navLink('admin', t('navigation.allEvents'), CalendarRange, { ...opts, exact: true })}
         {navLink('admin/settings', t('navigation.settings'), Settings, opts)}
         {navItems.length > 0 && <div className="mx-6 my-2 border-t border-gray-100" />}
-        {navItems.map((item) => navLink(item.segment, item.label, item.icon, opts))}
+        {navItems.map((item) =>
+          navLink(item.segment, item.label, item.icon, { ...opts, badge: item.badge })
+        )}
       </nav>
       <div className="border-t border-gray-100 py-2">
         {/* The official surface for this same tenant. Shown to every admin,
