@@ -216,6 +216,6 @@ describe('N41: unlink a claimed participant', () => {
     // State built up by the tests above: Karl (claimed), Official Runner and
     // Lisa (unlinked), Nobody Yet, Emma (claimed), Ida (claimed, struck).
     const counts = await fetchClaimCounts(adminClient, { tenantId, eventId, op: 'test' })
-    expect(counts).toEqual({ claimed: 2, total: 5 })
+    expect(counts).toEqual({ claimed: 2, total: 5, conflicts: 0 })
   })
 })
