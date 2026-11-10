@@ -29,10 +29,10 @@ export default function ClaimListView({ token, event, participants }: Props) {
     [participants, query]
   )
 
-  // Where both buttons lead: CLAIM-02, built in N40 (claim) and N42 ("This is
-  // me" on an already claimed row ends as a conflict). The participant id is
-  // safe to put in the URL — CLAIM-02 must re-check it belongs to this
-  // token's event, exactly as this list does.
+  // Where both buttons lead: CLAIM-02. For a claimed row ("This is me") the
+  // page itself sees the claim and ends the form as a conflict (N42), so the
+  // URL is the same. The participant id is safe to put in the URL — CLAIM-02
+  // re-checks it belongs to this token's event, exactly as this list does.
   const claimHref = (row: ClaimListRow) =>
     `/claim/${encodeURIComponent(token)}/${encodeURIComponent(row.id)}`
 
@@ -100,7 +100,7 @@ export default function ClaimListView({ token, event, participants }: Props) {
                         {t('claimList.claimed')}
                       </span>
                       <Link
-                        href={`${claimHref(row)}?conflict=1`}
+                        href={claimHref(row)}
                         className="text-[13px] text-ink-soft underline underline-offset-2"
                       >
                         {t('claimList.thisIsMe')}

@@ -25,7 +25,7 @@ export type ClaimParticipantResult =
  * the verified session, never from the client: the SMS-verified phone the
  * person signed in with is the proof of who they are, and the RPC writes it
  * into participants.phone. The record's own phone is not checked — imported
- * participants have none — and the first claim wins (conflicts are N42).
+ * participants have none — and the first claim wins (a later one is a conflict, N42).
  * The RPC is granted to service_role only, hence the service client.
  *
  * An official who claims keeps their single tenant role row and gains the
@@ -69,39 +69,56 @@ export async function claimParticipant(
   }
 }
 
-// complete_participant_claim (migration 20261110130000) adds one refusal of
-// its own on top of claim_participant's.
-export const COMPLETE_CLAIM_ERRORS = [...CLAIM_PARTICIPANT_ERRORS, 'privacy_not_accepted'] as const
+// submit_participant_claim (migration 20261110142443) adds one refusal of its
+// own on top of claim_participant's. It never raises already_claimed — a
+// claimed record becomes a conflict instead — but the list is shared.
+export const SUBMIT_CLAIM_ERRORS = [...CLAIM_PARTICIPANT_ERRORS, 'privacy_not_accepted'] as const
 
-export type CompleteClaimError = (typeof COMPLETE_CLAIM_ERRORS)[number] | 'failed'
-
-export type CompleteClaimResult =
-  | { ok: true; participantId: string; eventId: string; roleGranted: boolean }
-  | { ok: false; error: CompleteClaimError }
+export type SubmitClaimError = (typeof SUBMIT_CLAIM_ERRORS)[number] | 'failed'
 
 /**
- * N40 (CLAIM-02): the claim as the Complete button makes it — link, event
- * check and privacy consent in one transaction (REL-01).
+ * claimed  — the record is now theirs (or already was).
+ * conflict — someone else holds it; their claim is stored for an admin to
+ *            decide (N42, L6/L11). No access is granted.
+ */
+export type SubmitClaimOutcome = 'claimed' | 'conflict'
+
+export type SubmitClaimResult =
+  | {
+      ok: true
+      outcome: SubmitClaimOutcome
+      participantId: string
+      eventId: string
+      roleGranted: boolean
+    }
+  | { ok: false; error: SubmitClaimError }
+
+/**
+ * N40/N42 (CLAIM-02): what the Complete button sends. One transaction that
+ * either claims the record — link, event check and privacy consent (REL-01)
+ * — or, when another account already holds it, stores a claim conflict.
+ * The choice is made under the row lock, so two runners pressing Complete
+ * at once give one claim and one conflict, never two claims.
  *
  * `eventId` and `tenantId` must come from the claim token (loadClaimTarget),
  * never from the request body, and `userId` from the verified session. The
  * RPC refuses a participant outside that event, or one that is withdrawn or
  * hidden, with the same not_found as an unknown id.
  */
-export async function completeParticipantClaim(input: {
+export async function submitParticipantClaim(input: {
   userId: string
   participantId: string
   tenantId: string
   eventId: string
   privacyAccepted: boolean
-}): Promise<CompleteClaimResult> {
+}): Promise<SubmitClaimResult> {
   const { userId, participantId, tenantId, eventId, privacyAccepted } = input
   if (![userId, participantId, tenantId, eventId].every((id) => uuid.safeParse(id).success)) {
     return { ok: false, error: 'not_found' }
   }
 
   const service = createSupabaseServiceClient()
-  const { data, error } = await service.rpc('complete_participant_claim', {
+  const { data, error } = await service.rpc('submit_participant_claim', {
     p_user_id: userId,
     p_participant_id: participantId,
     p_tenant_id: tenantId,
@@ -110,20 +127,24 @@ export async function completeParticipantClaim(input: {
   })
 
   if (error) {
-    const known = COMPLETE_CLAIM_ERRORS.find((code) => code === error.message)
+    const known = SUBMIT_CLAIM_ERRORS.find((code) => code === error.message)
     if (known) return { ok: false, error: known }
-    logger.error('complete_participant_claim failed', error)
+    logger.error('submit_participant_claim failed', error)
     return { ok: false, error: 'failed' }
   }
 
+  // jsonb, so these keys are not type-checked (F-REL-16); the shape is
+  // asserted against real Postgres in tests/integration/participant-claim-conflicts.test.ts.
   const result = data as unknown as {
     participant_id: string
     event_id: string
     role_granted: boolean
+    outcome: SubmitClaimOutcome
   }
 
   return {
     ok: true,
+    outcome: result.outcome === 'conflict' ? 'conflict' : 'claimed',
     participantId: result.participant_id,
     eventId: result.event_id,
     roleGranted: result.role_granted,

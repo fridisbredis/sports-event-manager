@@ -6,17 +6,23 @@ import { logQueryError } from '@/lib/db/query-error'
 import { locales } from '@/lib/i18n/config'
 import { iceContactInputSchema, isIceContactEmpty, normalizeIceContact } from '@/lib/ice-contact'
 import { loadClaimTarget } from '@/lib/participants/claim-target'
-import { completeParticipantClaim } from '@/lib/participants/claim-participant'
+import { submitParticipantClaim } from '@/lib/participants/claim-participant'
 import { loadClaimPrefill } from '@/lib/participants/claim-prefill'
 import { copyAvatarToParticipant } from '@/lib/participants/participant-avatar'
 
 // N40 (CLAIM-02, L6, L7, L13): the Complete button.
 //
 // The claim itself — link, event check and consent — is ONE transaction in
-// complete_participant_claim (REL-01). What follows it is best-effort, the
+// submit_participant_claim (REL-01). What follows it is best-effort, the
 // same rule as the invite confirm route: language, ICE contact and a kept
 // photo are things the runner can set later on My account, so none of them
 // may turn a claim that has already committed into a failed request.
+//
+// N42: the same button on a record someone else already holds stores a claim
+// conflict instead (outcome 'conflict'). The runner gets no access; language
+// and ICE are still saved, since they belong to the account and help the
+// admin who calls them. The photo is not: it would go on a record that is
+// not theirs.
 //
 // The event and tenant come from the token, the user from the session.
 // The body only ever names the participant, and the RPC re-checks that the
@@ -91,7 +97,7 @@ export async function POST(request: NextRequest) {
       })
     : null
 
-  const result = await completeParticipantClaim({
+  const result = await submitParticipantClaim({
     userId: user.id,
     participantId,
     tenantId: target.tenantId,
@@ -105,7 +111,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // ---- Best-effort from here: the claim has committed. ----
+  // ---- Best-effort from here: the claim (or conflict) has committed. ----
   //
   // The RLS client, not service_role: the session cookie set by
   // /api/auth/verify-otp is on this request, and the own-row policies on
@@ -150,9 +156,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // A photo already on this very row (a repeated claim) needs no copy.
+  // A photo already on this very row (a repeated claim) needs no copy, and a
+  // conflict has no row of its own to put one on.
   const source = prefill?.avatarUrl
-  if (source && !prefill.claimedByYou) {
+  if (result.outcome === 'claimed' && source && !prefill.claimedByYou) {
     await copyAvatarToParticipant(
       service,
       { tenantId: target.tenantId, participantId, userId: user.id },
@@ -161,5 +168,9 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  return NextResponse.json({ ok: true, roleGranted: result.roleGranted })
+  return NextResponse.json({
+    ok: true,
+    outcome: result.outcome,
+    roleGranted: result.roleGranted,
+  })
 }

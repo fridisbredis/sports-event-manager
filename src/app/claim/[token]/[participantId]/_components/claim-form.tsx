@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Checkbox } from '@heroui/react'
-import { Camera, Check, CircleCheck } from 'lucide-react'
+import { Camera, Check, CircleAlert, CircleCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/form-fields'
@@ -35,6 +36,13 @@ interface Props {
   event: { name: string; logoUrl: string | null }
   participant: { id: string; bib: string | null; name: string | null }
   listHref: string
+  /**
+   * N42: someone else already holds this record. The runner goes through the
+   * same steps, and Complete stores a claim conflict for an admin instead of
+   * claiming. Set from the server; the server decides again on Complete, so
+   * a record claimed while this form was open also ends as a conflict.
+   */
+  conflict?: boolean
 }
 
 type ApiResult<T = Record<string, unknown>> =
@@ -82,12 +90,18 @@ function iceToInput(contact: IceContact | null): IceContactInput {
  * account with no participant link has no role and no event (L26), and the
  * next visit to this page simply continues.
  */
-export default function ClaimForm({ token, event, participant, listHref }: Props) {
+export default function ClaimForm({
+  token,
+  event,
+  participant,
+  listHref,
+  conflict = false,
+}: Props) {
   const { t, i18n } = useTranslation('auth')
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [step, setStep] = useState<'form' | 'done'>('form')
+  const [step, setStep] = useState<'form' | 'done' | 'conflict'>('form')
 
   // ---- number and code ----
   const [phoneInput, setPhoneInput] = useState('')
@@ -289,7 +303,10 @@ export default function ClaimForm({ token, event, participant, listHref }: Props
 
     setCompleting(true)
     const normalizedIce = normalizeIceContact(ice)
-    const result = await postJson<{ roleGranted: boolean }>('/api/claim/complete', {
+    const result = await postJson<{
+      outcome: 'claimed' | 'conflict'
+      roleGranted: boolean
+    }>('/api/claim/complete', {
       token,
       participantId: participant.id,
       identityConfirmed: true,
@@ -318,6 +335,14 @@ export default function ClaimForm({ token, event, participant, listHref }: Props
         })
         toastError(t('claim.failed'))
       }
+      return
+    }
+
+    // N42: stored for the organisers; no access, so no photo either — the
+    // record it would go on is not theirs.
+    if (result.outcome === 'conflict') {
+      setCompleting(false)
+      setStep('conflict')
       return
     }
 
@@ -365,6 +390,31 @@ export default function ClaimForm({ token, event, participant, listHref }: Props
     )
   }
 
+  // CLAIM-02 conflict-submitted (N42): the card's exact message, nothing about
+  // the current claimant.
+  if (step === 'conflict') {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-8 pt-10">
+        <h1 className="text-[22px] font-bold leading-snug text-ink">{t('claim.title')}</h1>
+        <div className="mt-6">
+          <ParticipantIdentity bib={participant.bib} name={participant.name} showLabel={false} />
+        </div>
+        <div
+          className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center"
+          role="status"
+        >
+          <CircleAlert className="size-14 text-ink-label" strokeWidth={1.5} aria-hidden />
+          <p className="max-w-xs text-[15px] leading-relaxed text-ink-soft">
+            {t('claim.conflictSubmitted')}
+          </p>
+        </div>
+        <Button as={Link} href={listHref} variant="light" size="lg" fullWidth>
+          {t('claim.backToList')}
+        </Button>
+      </main>
+    )
+  }
+
   const shownPhoto = photoPreview ?? prefill?.avatarUrl ?? null
   const initials =
     participantName
@@ -392,6 +442,22 @@ export default function ClaimForm({ token, event, participant, listHref }: Props
         <div className="mt-5">
           <ParticipantIdentity bib={participant.bib} name={participant.name} />
         </div>
+
+        {conflict ? (
+          <div
+            className="mt-5 rounded-2xl bg-status-neutral-bg px-4 py-3 text-[14px] leading-relaxed text-ink-soft"
+            role="note"
+          >
+            <p className="font-semibold text-ink">{t('claim.alreadyClaimedTitle')}</p>
+            <p className="mt-1">{t('claim.conflictIntro')}</p>
+            <p className="mt-2">
+              {t('claim.conflictOwnClaim')}{' '}
+              <Link href="/login" className="font-medium text-ink underline underline-offset-2">
+                {t('claim.signIn')}
+              </Link>
+            </p>
+          </div>
+        ) : null}
 
         {/* ---- Mobile number (L2: the only required field) ---- */}
         <section className="mt-6">
@@ -549,42 +615,44 @@ export default function ClaimForm({ token, event, participant, listHref }: Props
             {t('claim.optional')}
           </h2>
 
-          <div className="mt-3 flex items-center gap-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handlePhotoPick}
-              className="sr-only"
-              id="claim-photo"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label={shownPhoto ? t('claim.photoChange') : t('claim.photoAdd')}
-              className="group relative shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-tenant-primary focus-visible:ring-offset-2"
-            >
-              <AvatarImage
-                src={shownPhoto}
-                initials={initials}
-                alt=""
-                className="h-16 w-16 bg-status-neutral-bg"
-                initialsClassName="text-lg font-semibold text-ink-soft"
+          {conflict ? null : (
+            <div className="mt-3 flex items-center gap-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handlePhotoPick}
+                className="sr-only"
+                id="claim-photo"
               />
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-tenant-primary text-white">
-                <Camera className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
-              </span>
-            </button>
-            <p className="text-[14px] leading-relaxed text-ink-soft">
-              {photoPreview
-                ? t('claim.photoChange')
-                : prefill?.avatarUrl
-                  ? t('claim.photoKept')
-                  : t('claim.photoAdd')}
-            </p>
-          </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label={shownPhoto ? t('claim.photoChange') : t('claim.photoAdd')}
+                className="group relative shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-tenant-primary focus-visible:ring-offset-2"
+              >
+                <AvatarImage
+                  src={shownPhoto}
+                  initials={initials}
+                  alt=""
+                  className="h-16 w-16 bg-status-neutral-bg"
+                  initialsClassName="text-lg font-semibold text-ink-soft"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-tenant-primary text-white">
+                  <Camera className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+                </span>
+              </button>
+              <p className="text-[14px] leading-relaxed text-ink-soft">
+                {photoPreview
+                  ? t('claim.photoChange')
+                  : prefill?.avatarUrl
+                    ? t('claim.photoKept')
+                    : t('claim.photoAdd')}
+              </p>
+            </div>
+          )}
 
-          <div className="mt-6">
+          <div className={conflict ? 'mt-3' : 'mt-6'}>
             <p className="mb-2 text-[13px] font-semibold text-ink">
               {t('iceContact.heading', { ns: 'common' })}
             </p>

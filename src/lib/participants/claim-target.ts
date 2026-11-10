@@ -15,7 +15,7 @@ import { resolveClaimEvent, type ClaimListEvent } from './claim-list'
 // cannot be used to probe ids across events.
 //
 // Withdrawn and hidden rows are not_found too: CLAIM-01 does not offer them,
-// and complete_participant_claim refuses them.
+// and submit_participant_claim refuses them.
 //
 // Only bib, name and a claimed flag leave this function, as on CLAIM-01.
 

@@ -93,14 +93,14 @@ describe('POST /api/claim/send-otp (N40)', () => {
     expect(signInWithOtp).not.toHaveBeenCalled()
   })
 
-  it('sends nothing for a row someone already claimed (the conflict path is N42)', async () => {
+  it('sends a code for a row someone already claimed, under the same limits (N42 "This is me")', async () => {
     openTarget(true)
 
     const res = await POST(request(valid))
 
-    expect(res.status).toBe(409)
-    expect((await res.json()).code).toBe('already_claimed')
-    expect(signInWithOtp).not.toHaveBeenCalled()
+    expect(res.status).toBe(200)
+    expect(checkLoginSendRateLimit).toHaveBeenCalled()
+    expect(signInWithOtp).toHaveBeenCalledWith({ phone: PHONE })
   })
 
   it('uses the sign-in bucket per number, keyed on the number without its plus', async () => {
