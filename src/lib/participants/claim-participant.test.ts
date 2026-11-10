@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
-import { claimParticipant } from './claim-participant'
+import { claimParticipant, completeParticipantClaim } from './claim-participant'
 
 vi.mock('@/lib/supabase/server', () => ({ createSupabaseServiceClient: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn() } }))
@@ -56,6 +56,59 @@ describe('claimParticipant', () => {
 
   it('does not call the RPC with a malformed id', async () => {
     expect(await claimParticipant('nope', PARTICIPANT, TENANT)).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
+    expect(rpc).not.toHaveBeenCalled()
+  })
+})
+
+describe('completeParticipantClaim (N40)', () => {
+  const rpc = vi.fn()
+  const input = {
+    userId: USER,
+    participantId: PARTICIPANT,
+    tenantId: TENANT,
+    eventId: EVENT,
+    privacyAccepted: true,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(createSupabaseServiceClient).mockReturnValue({ rpc } as never)
+  })
+
+  it('calls complete_participant_claim with the event and consent', async () => {
+    rpc.mockResolvedValue({
+      data: { participant_id: PARTICIPANT, event_id: EVENT, role_granted: false },
+      error: null,
+    })
+
+    expect(await completeParticipantClaim(input)).toEqual({
+      ok: true,
+      participantId: PARTICIPANT,
+      eventId: EVENT,
+      roleGranted: false,
+    })
+    expect(rpc).toHaveBeenCalledWith('complete_participant_claim', {
+      p_user_id: USER,
+      p_participant_id: PARTICIPANT,
+      p_tenant_id: TENANT,
+      p_event_id: EVENT,
+      p_privacy_accepted: true,
+    })
+  })
+
+  it.each(['not_found', 'already_claimed', 'already_in_event', 'privacy_not_accepted'])(
+    'returns the refusal %s as its own error',
+    async (code) => {
+      rpc.mockResolvedValue({ data: null, error: { message: code, code: 'P0001' } })
+      expect(await completeParticipantClaim(input)).toEqual({ ok: false, error: code })
+    }
+  )
+
+  it('does not call the RPC with a malformed event id', async () => {
+    expect(await completeParticipantClaim({ ...input, eventId: 'nope' })).toEqual({
       ok: false,
       error: 'not_found',
     })

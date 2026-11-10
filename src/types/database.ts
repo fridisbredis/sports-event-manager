@@ -760,6 +760,7 @@ export type Database = {
       }
       participants: {
         Row: {
+          avatar_url: string | null
           bib: string | null
           category: string | null
           club: string | null
@@ -783,6 +784,7 @@ export type Database = {
           withdrawn_at: string | null
         }
         Insert: {
+          avatar_url?: string | null
           bib?: string | null
           category?: string | null
           club?: string | null
@@ -806,6 +808,7 @@ export type Database = {
           withdrawn_at?: string | null
         }
         Update: {
+          avatar_url?: string | null
           bib?: string | null
           category?: string | null
           club?: string | null
@@ -1293,6 +1296,16 @@ export type Database = {
       claim_participant: {
         Args: {
           p_participant_id: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      complete_participant_claim: {
+        Args: {
+          p_event_id: string
+          p_participant_id: string
+          p_privacy_accepted: boolean
           p_tenant_id: string
           p_user_id: string
         }

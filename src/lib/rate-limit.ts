@@ -6,6 +6,10 @@ const PHONE_LIMIT = { limit: 3, windowSeconds: 3600 }
 const ADMIN_LIMIT = { limit: 100, windowSeconds: 3600 }
 const LOGIN_SEND_LIMIT = { limit: 5, windowSeconds: 3600 }
 const LOGIN_VERIFY_LIMIT = { limit: 10, windowSeconds: 3600 }
+// N40 (L15): SMS codes requested through one event's claim list. Viadal has
+// ~42 runners, so a race-morning rush fits well inside 100 an hour; a script
+// working through the list does not. Frida 2026-11-10.
+const CLAIM_LIST_SEND_LIMIT = { limit: 100, windowSeconds: 3600 }
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number }
 
@@ -75,6 +79,22 @@ export async function checkLoginVerifyRateLimit(phone: string): Promise<RateLimi
     loginPhoneRateLimitKey('verify', phone),
     LOGIN_VERIFY_LIMIT.limit,
     LOGIN_VERIFY_LIMIT.windowSeconds
+  )
+}
+
+/**
+ * N40 (L15): the per-claim-list half of the claim code limit. The per-number
+ * half is checkLoginSendRateLimit itself, deliberately the SAME bucket as
+ * sign-in: a code is a code, and two separate buckets would hand one number
+ * twice the SMS by alternating between /login and a claim link.
+ *
+ * Keyed by event id, which is what a claim list is (one token per event).
+ */
+export async function checkClaimListSendRateLimit(eventId: string): Promise<RateLimitResult> {
+  return hit(
+    `claim:list:${eventId}`,
+    CLAIM_LIST_SEND_LIMIT.limit,
+    CLAIM_LIST_SEND_LIMIT.windowSeconds
   )
 }
 

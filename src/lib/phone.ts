@@ -88,3 +88,35 @@ export function guessPhoneCountryFromLocale(locale: string | undefined): Country
   const region = locale?.split('-')[1]?.toUpperCase()
   return (region && LOCALE_REGION_TO_COUNTRY[region]) || DEFAULT_PHONE_COUNTRY
 }
+
+export type NormalizeSmsPhoneResult =
+  | { ok: true; phone: string }
+  | { ok: false; error: 'invalid' | 'unsupported_country' }
+
+/**
+ * N40 (CLAIM-02): one free-text mobile field, as in the wireframe, instead of
+ * the sign-in page's country picker. Read as international when it starts
+ * with '+' or '00', otherwise as a national number in `defaultCountry`
+ * ("070-123 45 67" is Swedish) — the same reading as the ICE phone.
+ *
+ * Unlike the ICE phone, this number receives an SMS code, so it must be in a
+ * country we can send to: the PHONE_COUNTRIES list, for the Twilio reason
+ * documented there. Anything else is 'unsupported_country' rather than a
+ * send that fails at Twilio with an error the runner cannot act on.
+ *
+ * Returns E.164 without the leading '+', the shape normalizePhoneToE164 and
+ * auth.users use.
+ */
+export function normalizeSmsPhone(
+  raw: string,
+  defaultCountry: CountryCode = DEFAULT_PHONE_COUNTRY
+): NormalizeSmsPhoneResult {
+  const trimmed = raw.trim()
+  const international = trimmed.startsWith('00') ? `+${trimmed.slice(2)}` : trimmed
+  const parsed = parsePhoneNumberFromString(international, defaultCountry)
+  if (!parsed || !parsed.isValid()) return { ok: false, error: 'invalid' }
+  if (!PHONE_COUNTRIES.some((c) => c.code === parsed.country)) {
+    return { ok: false, error: 'unsupported_country' }
+  }
+  return { ok: true, phone: parsed.number.replace(/^\+/, '') }
+}

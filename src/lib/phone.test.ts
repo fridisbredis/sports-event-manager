@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  normalizeSmsPhone,
   guessPhoneCountryFromLocale,
   DEFAULT_PHONE_COUNTRY,
   formatEnteredPhoneForDisplay,
@@ -49,5 +50,32 @@ describe('formatEnteredPhoneForDisplay', () => {
   it('shows anything that is not a valid number exactly as entered', () => {
     expect(formatEnteredPhoneForDisplay('ring Kalle')).toBe('ring Kalle')
     expect(formatEnteredPhoneForDisplay('12345')).toBe('12345')
+  })
+})
+
+describe('normalizeSmsPhone (N40)', () => {
+  it('reads a national number as Swedish and stores E.164 without the plus', () => {
+    expect(normalizeSmsPhone('070-123 45 67')).toEqual({ ok: true, phone: '46701234567' })
+  })
+
+  it.each(['+46 70 123 45 67', '0046 70 123 45 67'])('reads %s as international', (raw) => {
+    expect(normalizeSmsPhone(raw)).toEqual({ ok: true, phone: '46701234567' })
+  })
+
+  it('accepts the other countries we can text', () => {
+    expect(normalizeSmsPhone('+47 412 34 567')).toMatchObject({ ok: true })
+  })
+
+  it('refuses a valid number in a country we cannot text', () => {
+    // GB: Twilio 21612 from our Swedish sender (see PHONE_COUNTRIES).
+    expect(normalizeSmsPhone('+44 7400 123456')).toEqual({
+      ok: false,
+      error: 'unsupported_country',
+    })
+  })
+
+  it('refuses something that is not a number', () => {
+    expect(normalizeSmsPhone('12')).toEqual({ ok: false, error: 'invalid' })
+    expect(normalizeSmsPhone('')).toEqual({ ok: false, error: 'invalid' })
   })
 })
