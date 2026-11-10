@@ -69,10 +69,26 @@ function compareRows(a: ClaimListRow, b: ClaimListRow): number {
   return collator.compare(a.name ?? '', b.name ?? '')
 }
 
-export async function loadClaimList(
+/**
+ * The event a claim token points at, and whether its participant side is
+ * open. Shared by CLAIM-01 (the list) and CLAIM-02 (the claim form, N40), so
+ * both pages answer "which event, and is it open" the same way and from the
+ * token alone.
+ */
+export type ClaimEventResult =
+  | { kind: 'not_found' }
+  | {
+      kind: 'closed' | 'open'
+      event: ClaimListEvent
+      eventId: string
+      tenantId: string
+    }
+
+export async function resolveClaimEvent(
   service: SupabaseClient<Database>,
-  token: string
-): Promise<ClaimListResult> {
+  token: string,
+  op = 'claim-list'
+): Promise<ClaimEventResult> {
   if (!isClaimToken(token)) return { kind: 'not_found' }
 
   const { data: event, error: eventError } = await service
@@ -82,7 +98,7 @@ export async function loadClaimList(
     .maybeSingle()
 
   if (eventError) {
-    logQueryError(eventError, { op: 'claim-list', table: 'events', kind: 'select' })
+    logQueryError(eventError, { op, table: 'events', kind: 'select' })
     throw eventError
   }
   if (!event) return { kind: 'not_found' }
@@ -101,9 +117,26 @@ export async function loadClaimList(
 
   // L12 / PB3: open only when published AND the tenant is Premium or up.
   // The one shared check from N36 — not a status comparison of our own.
-  if (!isParticipantSideOpen({ status: event.status }, tier)) {
-    return { kind: 'closed', event: summary }
+  const open = isParticipantSideOpen({ status: event.status }, tier)
+
+  return {
+    kind: open ? 'open' : 'closed',
+    event: summary,
+    eventId: event.id,
+    tenantId: event.tenant_id,
   }
+}
+
+export async function loadClaimList(
+  service: SupabaseClient<Database>,
+  token: string
+): Promise<ClaimListResult> {
+  const resolved = await resolveClaimEvent(service, token)
+  if (resolved.kind === 'not_found') return { kind: 'not_found' }
+  if (resolved.kind === 'closed') return { kind: 'closed', event: resolved.event }
+
+  const summary = resolved.event
+  const event = { id: resolved.eventId, tenant_id: resolved.tenantId }
 
   // Withdrawn (struck from the Race Results list, N21) and hidden (taken
   // out of the roster by an admin, N34) rows are not offered: a runner who
