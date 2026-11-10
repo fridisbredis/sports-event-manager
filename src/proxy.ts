@@ -37,7 +37,16 @@ export async function proxy(request: NextRequest) {
   // require one. Their own rate limiting (checkLoginSendRateLimit/
   // checkLoginVerifyRateLimit) is the abuse guard here, not this middleware.
   // Exact paths, not a prefix, for the same reason as the health block above.
-  if (pathname === '/api/auth/send-otp' || pathname === '/api/auth/verify-otp') {
+  //
+  // /api/claim/send-otp (N40) is the claim form's code request: same shape,
+  // a runner with no session yet, guarded by its own per-number and
+  // per-claim-list limits. The rest of /api/claim/* runs after the code is
+  // verified and stays behind the session check below.
+  if (
+    pathname === '/api/auth/send-otp' ||
+    pathname === '/api/auth/verify-otp' ||
+    pathname === '/api/claim/send-otp'
+  ) {
     return supabaseResponse
   }
 
