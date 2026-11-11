@@ -21,8 +21,14 @@ export function Button(props: ButtonProps) {
   const isSolidPrimary =
     (props.variant ?? 'solid') === 'solid' && (props.color ?? 'default') === 'primary'
 
+  // Secondary (bordered) buttons get a white fill and the same 1px field
+  // border as Select/Input. HeroUI's bordered variant is transparent, so on
+  // the grey page background they read differently from the white fields
+  // next to them — and call sites had started patching in `bg-white`
+  // one by one. A call site's own className still wins (it comes last).
   const classes = [
     isBordered ? 'border-1' : '',
+    props.variant === 'bordered' ? 'rounded-control border-edge-field bg-white' : '',
     isSolidPrimary
       ? 'rounded-control data-[hover=true]:opacity-100 hover:bg-tenant-primary-hover'
       : '',
