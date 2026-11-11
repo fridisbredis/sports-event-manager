@@ -542,6 +542,7 @@
     "channel": "Channel",
     "participants": "Participants",
     "officials": "Officials",
+    "participantChannelUnpublished": "The participant channel opens when the event is published.",
     "newAnnouncement": "New announcement",
     "announcementPlaceholder": "Write an announcement…",
     "smsNote": "Recipients get an SMS unless they've opted out.",

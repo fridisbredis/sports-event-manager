@@ -542,6 +542,7 @@
     "channel": "Kanal",
     "participants": "Deltagare",
     "officials": "Funktionärer",
+    "participantChannelUnpublished": "Deltagarkanalen öppnar när evenemanget publiceras.",
     "newAnnouncement": "Nytt meddelande",
     "announcementPlaceholder": "Skriv ett meddelande…",
     "smsNote": "Mottagarna får ett SMS om de inte har tackat nej.",

@@ -57,6 +57,7 @@ function chain(result: unknown) {
   builder.order = vi.fn(() => builder)
   builder.range = vi.fn(() => Promise.resolve(result))
   builder.single = vi.fn(() => Promise.resolve(result))
+  builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   return builder
 }
 
@@ -77,7 +78,7 @@ function findByType(node: unknown, target: unknown): { props: Record<string, unk
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
-const TENANT = { id: TENANT_ID, name: 'Viadal', slug: 'viadal' }
+const TENANT = { id: TENANT_ID, name: 'Viadal', slug: 'viadal', tier: 'premium' }
 const PARAMS = Promise.resolve({ tenantSlug: 'viadal', eventId: 'event-1' })
 const NO_SEARCH = Promise.resolve({})
 
@@ -102,7 +103,13 @@ function announcements(channel: 'participants' | 'officials', n: number) {
   }))
 }
 
-function mockServerClient(userId: string | null, tenant: unknown, byChannel: ChannelResults = {}) {
+function mockServerClient(
+  userId: string | null,
+  tenant: unknown,
+  byChannel: ChannelResults = {},
+  // N44: the event row COMM-01 reads to decide the participant channel.
+  eventResult: unknown = { data: { status: 'published' }, error: null }
+) {
   const builders: Record<string, unknown>[] = []
   const fromMock = vi.fn((table: string) => {
     if (table === 'announcements') {
@@ -110,6 +117,7 @@ function mockServerClient(userId: string | null, tenant: unknown, byChannel: Cha
       builders.push(builder)
       return builder
     }
+    if (table === 'events') return chain(eventResult)
     return chain({ data: tenant })
   })
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
@@ -154,8 +162,10 @@ describe('CommunicationPage', () => {
 
     await CommunicationPage({ params: PARAMS, searchParams: NO_SEARCH })
 
-    expect(fromMock).toHaveBeenCalledTimes(2)
+    // Two announcement reads plus the event's status (N44).
+    expect(fromMock).toHaveBeenCalledTimes(3)
     expect(fromMock).toHaveBeenCalledWith('announcements')
+    expect(fromMock).toHaveBeenCalledWith('events')
     expect(builders).toHaveLength(2)
     for (const builder of builders) {
       expect(builder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
@@ -259,4 +269,43 @@ describe('CommunicationPage', () => {
       )
     }
   )
+
+  // N44 (PB7, PB9): what the panel is told about the participant channel.
+  describe('participant channel state', () => {
+    async function stateFor(tier: string, eventResult: unknown) {
+      mockServerClient('user-1', { ...TENANT, tier }, {}, eventResult)
+      const tree = await CommunicationPage({ params: PARAMS, searchParams: NO_SEARCH })
+      return findByType(tree, CommunicationPanel)?.props.participantChannel
+    }
+
+    it('is open for a published event on Premium', async () => {
+      expect(await stateFor('premium', { data: { status: 'published' }, error: null })).toBe('open')
+    })
+
+    it('is unpublished for a draft event on Premium', async () => {
+      expect(await stateFor('premium', { data: { status: 'draft' }, error: null })).toBe(
+        'unpublished'
+      )
+    })
+
+    it('is tier-locked on Standard, even for an event stored as published', async () => {
+      expect(await stateFor('standard', { data: { status: 'published' }, error: null })).toBe(
+        'tier'
+      )
+    })
+
+    it('is notFound when the event is not in the tenant', async () => {
+      mockServerClient('user-1', TENANT, {}, { data: null, error: null })
+      await expect(CommunicationPage({ params: PARAMS, searchParams: NO_SEARCH })).rejects.toThrow(
+        'NEXT_NOT_FOUND'
+      )
+    })
+
+    it('throws when the event read fails', async () => {
+      mockServerClient('user-1', TENANT, {}, { data: null, error: new Error('event boom') })
+      await expect(CommunicationPage({ params: PARAMS, searchParams: NO_SEARCH })).rejects.toThrow(
+        'event boom'
+      )
+    })
+  })
 })
