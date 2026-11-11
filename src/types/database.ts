@@ -1497,6 +1497,15 @@ export type Database = {
       }
       is_own_official_row: { Args: { p_official_id: string }; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
+      list_gdpr_avatar_cleanup: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          row_id: string
+          row_kind: string
+          row_tenant_id: string
+        }[]
+      }
       mark_official_event_seen: {
         Args: { p_event_id: string }
         Returns: undefined
