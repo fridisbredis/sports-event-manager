@@ -215,6 +215,7 @@ jobs:
               "SENTRY_PROJECT=${{ secrets.PROD_SENTRY_PROJECT }}" \
               "SENTRY_API_TOKEN=${{ secrets.PROD_SENTRY_API_TOKEN }}" \
               "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}" \
+              "SEND_SMS_HOOK_SECRET=${{ secrets.PROD_SEND_SMS_HOOK_SECRET }}" \
               "SMS_COST_PER_SEGMENT=${{ secrets.PROD_SMS_COST_PER_SEGMENT }}" \
               "VAPID_PUBLIC_KEY=${{ secrets.PROD_VAPID_PUBLIC_KEY }}" \
               "VAPID_PRIVATE_KEY=${{ secrets.PROD_VAPID_PRIVATE_KEY }}" \

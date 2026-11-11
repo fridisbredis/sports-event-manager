@@ -326,6 +326,14 @@ max_frequency = "1s"
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
+# B14: the Send SMS hook (/api/auth/send-sms-hook) is enabled on the hosted
+# dev and prod projects only, from the dashboard. Deliberately off here:
+# Twilio does not work locally and the test_otp numbers above need no SMS.
+# [auth.hook.send_sms]
+# enabled = true
+# uri = "http://host.docker.internal:3000/api/auth/send-sms-hook"
+# secrets = "env(SEND_SMS_HOOK_SECRET)"
+
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
 # Enabled locally with dummy credentials only to satisfy GoTrue's provider
 # check ("phone_provider_disabled" otherwise) — no real SMS is ever sent

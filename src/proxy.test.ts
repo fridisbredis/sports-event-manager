@@ -170,6 +170,15 @@ describe('proxy — claim list auth exemption (N39)', () => {
     expect(res.headers.get('location')).toBeNull()
   })
 
+  // B14: Supabase Auth calls the Send SMS hook server-to-server with no
+  // cookie. Gating it would break every sign-in; its signature is the guard.
+  it('passes /api/auth/send-sms-hook through without auth', async () => {
+    const res = await proxy(requestFor('/api/auth/send-sms-hook'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
   // Control: completing a claim happens after the code is verified, so the
   // rest of /api/claim/* still needs a session.
   it('control: does not exempt /api/claim/complete', async () => {

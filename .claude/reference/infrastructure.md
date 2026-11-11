@@ -80,6 +80,40 @@ Supabase project, and drop the allowlist entry in `scripts/perf-env.ts`.
 - Dev login can be tested via Supabase Test Phone Numbers — number `46768109304` with fixed OTP code `000000` (dev Supabase project `lhflutwvwvzawzbcuwup`), bypasses Twilio entirely
 - Prod login has always used the real Twilio sender — no Supabase Test Phone Number entry was ever added to prod (confirmed 2026-08-18; the earlier note claiming otherwise was incorrect)
 
+### Send SMS hook — one-time codes from the tenant's sender (B14)
+
+With the hook enabled, Supabase Auth no longer sends one-time codes itself.
+Every code (login, invite confirmation, claim) is POSTed to
+`/api/auth/send-sms-hook`, which sends it with the app's own Twilio env vars,
+from the tenant's alphanumeric name (N13) when the number belongs to exactly
+one tenant with a name, otherwise from `TWILIO_PHONE_NUMBER`.
+The message body names the tenant on every tier when the number belongs to
+one tenant ("Your Viadal code is …"); only the sender name is Professional.
+`src/lib/sms/otp-sender.ts` has the rule.
+
+**Blast radius:** while the hook is enabled, every sign-in in that environment
+depends on the Container App being up and on `SEND_SMS_HOOK_SECRET` matching
+the dashboard. The route fails closed (500) if the secret is unset. The
+emergency rollback is the dashboard toggle below — turning the hook off puts
+GoTrue back on its own Twilio config instantly, no deploy needed.
+
+Enabling it, per environment (dev first, verify, then prod):
+
+1. Supabase dashboard → Authentication → Hooks → **Send SMS hook** → HTTPS,
+   URL `<APP_URL>/api/auth/send-sms-hook`. Generate the secret there
+   (`v1,whsec_…`) but **do not enable yet**.
+2. Store the secret as GitHub secret `DEV_SEND_SMS_HOOK_SECRET` /
+   `PROD_SEND_SMS_HOOK_SECRET` (and in 1Password). Deploy, so the Container App
+   gets `SEND_SMS_HOOK_SECRET`.
+3. Enable the hook in the dashboard. Sign in with a real phone and check the
+   sender.
+
+Order matters: enabling the hook before the deploy has the secret means every
+code request gets a 500 and nobody can sign in.
+
+Locally the hook is off (`supabase/config.toml`): Twilio does not work locally
+and the test OTP numbers do not need it.
+
 ### `SMS_COST_PER_SEGMENT` — the rate the N24 cap enforces on
 
 Optional env var. Unset, the app uses **0.70 per segment**
@@ -112,9 +146,11 @@ figure is in use, and the cap's log lines say so.
 
 **Two costs this rate does not cover**, both deliberate:
 
-- **Login OTP.** Sent by Supabase Auth through its own Twilio credentials, so
-  it lands on the invoice but never in `sms_usage`. Every per-tenant figure is
-  an undercount by that much.
+- **Login OTP.** Sent through the Send SMS hook (B14, see above) since that
+  shipped, before that by Supabase Auth itself. Either way it lands on the
+  invoice but never in `sms_usage`, and it is never capped (N24): a cap that
+  can stop sign-in codes locks people out. Every per-tenant figure is an
+  undercount by that much.
 - **Phone number rental.** A fixed **$3 per number per month** (3 numbers =
   $9.00 in the same September summary — more than all the message traffic put
   together, which was $1.81). It is not per-segment and does not belong in
@@ -145,6 +181,8 @@ This split exists because SYS-03 originally tried to reuse `*_SENTRY_AUTH_TOKEN`
 **`DEV_VAPID_PUBLIC_KEY` / `PROD_VAPID_PUBLIC_KEY` (N31, web push)** — the VAPID public key, passed as runtime env `VAPID_PUBLIC_KEY` by both deploy workflows (not a `NEXT_PUBLIC_*` build arg: the official account page reads it server-side and hands it to the browser as a prop). Each environment has its own key pair — a push subscription is bound to the public key it was created with, so a pushed message only arrives if it is signed with the matching private key. If the secret is unset the env var is empty and the "Push notifications" row is hidden, so deploying before the secret exists is harmless. The private half (`*_VAPID_PRIVATE_KEY`) is passed as runtime env `VAPID_PRIVATE_KEY` and signs every push the announcement sender (`src/lib/push/send.ts`) makes; without it, publishing still works and sends SMS, but no push goes out (logged as a warning). The sender also uses `NEXT_PUBLIC_APP_URL` as the VAPID subject and skips push unless it is `https://`, because Apple rejects a localhost subject — so a local run never pushes, the same as SMS. Generate a pair with `npx web-push generate-vapid-keys`. Rotating a pair invalidates every existing subscription in that environment — users have to re-enable push.
 
 **`CRON_SECRET` / `PROD_CRON_SECRET`** guard the scheduled route handlers (`api/cron/sms-worker`, `api/cron/gdpr-warning` — SEC-09). The same value must also exist in that environment's Supabase Vault, since pg_cron reads its own copy to make the call (see migration 0029). The handlers fail closed with 401 when the env var is unset.
+
+**`DEV_SEND_SMS_HOOK_SECRET` / `PROD_SEND_SMS_HOOK_SECRET` (B14)** — the Standard Webhooks secret (`v1,whsec_…`) generated in that environment's Supabase dashboard for the Send SMS hook, passed as runtime env `SEND_SMS_HOOK_SECRET`. Must match the dashboard exactly; see "Send SMS hook" above for the enable order.
 
 ---
 
