@@ -3,7 +3,7 @@ import twilio from 'twilio'
 import { z } from 'zod'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { verifyStandardWebhook } from '@/lib/auth/standard-webhook'
-import { resolveOtpSender, type OtpSender } from '@/lib/sms/otp-sender'
+import { otpFallbackSenderName, resolveOtpSender, type OtpSender } from '@/lib/sms/otp-sender'
 import { toTwilioE164 } from '@/lib/phone'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { logger } from '@/lib/logger'
@@ -112,6 +112,15 @@ export async function POST(request: NextRequest) {
     sender = { from: platformSender, tenantName: null }
   }
 
+  // Where no tenant name applies, the app's own name (OTP_FALLBACK_SENDER_NAME)
+  // goes first, so the code does not come from an unknown number. The
+  // platform number stays the fallback below, exactly as for a tenant name.
+  const fallbackName = otpFallbackSenderName()
+  if (!fallbackName && process.env.OTP_FALLBACK_SENDER_NAME?.trim()) {
+    safeLog(() => logger.warn('Send SMS hook: OTP_FALLBACK_SENDER_NAME is invalid, ignored'))
+  }
+  const from = sender.from === platformSender && fallbackName ? fallbackName : sender.from
+
   // Pinned to English like the invite SMS: the code is sent before we know
   // which user preferences apply, and the body is one short line either way.
   const t = await getServerTranslation('en', 'auth')
@@ -121,23 +130,24 @@ export async function POST(request: NextRequest) {
   const to = toTwilioE164(user.phone)
 
   try {
-    await client.messages.create({ body, from: sender.from, to })
+    await client.messages.create({ body, from, to })
     return NextResponse.json({})
   } catch (err) {
     const code = (err as { code?: unknown } | null)?.code
     safeLog(() =>
       logger.error('Send SMS hook: Twilio send failed', undefined, {
-        senderKind: sender.from === platformSender ? 'platform' : 'name',
+        senderKind:
+          from === platformSender ? 'platform' : from === sender.from ? 'name' : 'fallback-name',
         twilioCode: code ?? 'none',
       })
     )
-    if (sender.from === platformSender) {
+    if (from === platformSender) {
       return hookError(502, 'Failed to send SMS')
     }
   }
 
-  // The name was refused (a destination that does not accept alphanumeric
-  // senders, for one). The platform number is what GoTrue used before B14, so
+  // The name — the tenant's or the app's — was refused (a destination that
+  // does not accept alphanumeric senders, for one). The platform number is what GoTrue used before B14, so
   // it is the known-good fallback — a sign-in must not fail over a sender name.
   // The body keeps the tenant name: it still tells the reader who this is.
   try {

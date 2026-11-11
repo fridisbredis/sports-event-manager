@@ -9,7 +9,9 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(() => ({})),
 }))
 
-vi.mock('@/lib/sms/otp-sender', () => ({
+// The tenant lookup is mocked; the env-var parsing is the real one.
+vi.mock('@/lib/sms/otp-sender', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sms/otp-sender')>()),
   resolveOtpSender: vi.fn(),
 }))
 
@@ -58,6 +60,7 @@ beforeEach(() => {
   vi.stubEnv('TWILIO_PHONE_NUMBER', PLATFORM)
   vi.stubEnv('TWILIO_ACCOUNT_SID', 'ACtest')
   vi.stubEnv('TWILIO_AUTH_TOKEN', 'token')
+  vi.stubEnv('OTP_FALLBACK_SENDER_NAME', '')
   vi.mocked(resolveOtpSender).mockResolvedValue({ from: 'Viadal', tenantName: 'Viadal Ultra' })
   messagesCreate.mockResolvedValue({ sid: 'SM1' })
 })
@@ -191,6 +194,67 @@ describe('POST /api/auth/send-sms-hook', () => {
       body: `Your code is ${OTP}`,
       from: PLATFORM,
       to: `+${PHONE}`,
+    })
+  })
+
+  describe('OTP_FALLBACK_SENDER_NAME', () => {
+    beforeEach(() => {
+      vi.stubEnv('OTP_FALLBACK_SENDER_NAME', 'ViadalEvent')
+    })
+
+    it('sends from the app name where it would otherwise use the platform number', async () => {
+      vi.mocked(resolveOtpSender).mockResolvedValue({ from: PLATFORM, tenantName: null })
+
+      const res = await POST(hookRequest())
+
+      expect(res.status).toBe(200)
+      expect(messagesCreate).toHaveBeenCalledWith({
+        body: `Your code is ${OTP}`,
+        from: 'ViadalEvent',
+        to: `+${PHONE}`,
+      })
+    })
+
+    it('keeps the tenant in the body of a lower-tier code', async () => {
+      vi.mocked(resolveOtpSender).mockResolvedValue({ from: PLATFORM, tenantName: 'Other club' })
+
+      await POST(hookRequest())
+
+      expect(messagesCreate).toHaveBeenCalledWith({
+        body: `Your Other club code is ${OTP}`,
+        from: 'ViadalEvent',
+        to: `+${PHONE}`,
+      })
+    })
+
+    it('leaves a tenant sender name in front of it', async () => {
+      await POST(hookRequest())
+
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+      expect(messagesCreate.mock.calls[0][0].from).toBe('Viadal')
+    })
+
+    it('retries from the platform number when the app name is refused', async () => {
+      vi.mocked(resolveOtpSender).mockResolvedValue({ from: PLATFORM, tenantName: null })
+      messagesCreate.mockRejectedValueOnce({ code: 21212 }).mockResolvedValueOnce({ sid: 'SM2' })
+
+      const res = await POST(hookRequest())
+
+      expect(res.status).toBe(200)
+      expect(messagesCreate).toHaveBeenCalledTimes(2)
+      expect(messagesCreate.mock.calls[1][0].from).toBe(PLATFORM)
+    })
+
+    it('ignores an invalid name and sends from the platform number', async () => {
+      vi.stubEnv('OTP_FALLBACK_SENDER_NAME', 'Viadal Event')
+      vi.mocked(resolveOtpSender).mockResolvedValue({ from: PLATFORM, tenantName: null })
+
+      const res = await POST(hookRequest())
+
+      expect(res.status).toBe(200)
+      expect(messagesCreate).toHaveBeenCalledTimes(1)
+      expect(messagesCreate.mock.calls[0][0].from).toBe(PLATFORM)
+      expect(logger.warn).toHaveBeenCalled()
     })
   })
 
