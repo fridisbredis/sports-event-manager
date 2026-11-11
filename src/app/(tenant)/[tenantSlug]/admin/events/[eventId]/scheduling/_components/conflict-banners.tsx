@@ -19,18 +19,35 @@ function ConflictBanner({
   heading: string
   children: React.ReactNode
 }) {
+  // Tinted surface, but body text stays near-neutral: a full-colour list on a
+  // full-colour box reads as one undifferentiated block.
   const styles =
     tone === 'warning'
-      ? { box: 'bg-orange-50 border-orange-200 text-orange-700', list: 'text-orange-600' }
-      : { box: 'bg-red-50 border-red-200 text-red-700', list: 'text-red-600' }
+      ? {
+          box: 'bg-amber-50/70 border-amber-200/80',
+          badge: 'bg-amber-100 text-amber-600',
+          heading: 'text-amber-900',
+        }
+      : {
+          box: 'bg-red-50/70 border-red-200/80',
+          badge: 'bg-red-100 text-red-600',
+          heading: 'text-red-900',
+        }
 
   return (
-    <div className={`no-print mb-3 rounded-md border px-4 py-3 text-sm ${styles.box}`}>
-      <div className="flex items-center gap-2">
-        {icon}
-        {heading}
+    <div className={`no-print mb-3 rounded-lg border px-4 py-3.5 ${styles.box}`}>
+      <div className="flex items-start gap-3">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${styles.badge}`}
+          aria-hidden
+        >
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className={`text-sm font-medium ${styles.heading}`}>{heading}</p>
+          <ul className="mt-2 space-y-1.5 text-sm text-gray-700">{children}</ul>
+        </div>
       </div>
-      <ul className={`mt-1.5 ml-6 space-y-0.5 text-xs ${styles.list}`}>{children}</ul>
     </div>
   )
 }
@@ -39,6 +56,21 @@ function ConflictBanner({
 export interface UnavailableDetail {
   officialName: string
   time: string
+}
+
+/**
+ * Collapse the flat list to one row per official, keeping first-seen order.
+ * The caller passes details sorted by start time, so each person's times come
+ * out chronological without re-parsing the formatted labels.
+ */
+function groupByOfficial(details: UnavailableDetail[]) {
+  const groups = new Map<string, string[]>()
+  for (const d of details) {
+    const times = groups.get(d.officialName)
+    if (times) times.push(d.time)
+    else groups.set(d.officialName, [d.time])
+  }
+  return [...groups].map(([officialName, times]) => ({ officialName, times }))
 }
 
 export function ConflictBanners({
@@ -60,7 +92,7 @@ export function ConflictBanners({
       {overCapacityCount > 0 && (
         <ConflictBanner
           tone="warning"
-          icon={<Info className="w-4 h-4 text-orange-500 shrink-0" />}
+          icon={<Info className="h-4 w-4" />}
           heading={t('scheduling.overCapacity', { count: overCapacityCount })}
         >
           {overCapacityDetails.map((d, i) => (
@@ -73,7 +105,7 @@ export function ConflictBanners({
       {doubleBookedCount > 0 && (
         <ConflictBanner
           tone="danger"
-          icon={<CircleX className="w-4 h-4 text-red-500 shrink-0" />}
+          icon={<CircleX className="h-4 w-4" />}
           heading={t('scheduling.doubleBooked', { count: doubleBookedCount })}
         >
           {doubleBookedDetails.map((d, i) => (
@@ -89,12 +121,22 @@ export function ConflictBanners({
       {unavailableDetails.length > 0 && (
         <ConflictBanner
           tone="warning"
-          icon={<CalendarOff className="w-4 h-4 text-orange-500 shrink-0" />}
+          icon={<CalendarOff className="h-4 w-4" />}
           heading={t('scheduling.unavailableAssigned', { count: unavailableDetails.length })}
         >
-          {unavailableDetails.map((d, i) => (
-            <li key={i}>
-              {d.officialName} — {d.time}
+          {groupByOfficial(unavailableDetails).map((g) => (
+            <li key={g.officialName} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="font-medium text-gray-900">{g.officialName}</span>
+              <span className="flex flex-wrap gap-1.5">
+                {g.times.map((time, i) => (
+                  <span
+                    key={i}
+                    className="rounded-md border border-amber-200 bg-white px-1.5 py-0.5 text-xs font-medium tabular-nums text-amber-800"
+                  >
+                    {time}
+                  </span>
+                ))}
+              </span>
             </li>
           ))}
         </ConflictBanner>

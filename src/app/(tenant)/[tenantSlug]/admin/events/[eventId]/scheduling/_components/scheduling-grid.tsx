@@ -230,10 +230,14 @@ export function SchedulingGrid({
 
   const unavailableDetails = useMemo(() => {
     const nameById = new Map(officials.map((o) => [o.id, o.name]))
-    return unavailableConflicts.map((a) => ({
-      officialName: nameById.get(a.official_id) ?? '—',
-      time: formatSlotLabel(new Date(a.timeslot_start), language),
-    }))
+    // Sorted by start so the banner can group per official and still list
+    // each person's times in order.
+    return [...unavailableConflicts]
+      .sort((a, b) => Date.parse(a.timeslot_start) - Date.parse(b.timeslot_start))
+      .map((a) => ({
+        officialName: nameById.get(a.official_id) ?? '—',
+        time: formatSlotLabel(new Date(a.timeslot_start), language),
+      }))
   }, [unavailableConflicts, officials, language])
 
   const overCapacityCount = useMemo(
