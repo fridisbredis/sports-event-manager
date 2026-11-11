@@ -5,7 +5,7 @@ import { getCurrentUser, getParticipantTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { formatAnnouncementTime } from '@/lib/i18n/announcement-time'
-import { participantEventInfoPath } from '@/lib/events/paths'
+import { participantEventInfoPath, participantPath } from '@/lib/events/paths'
 import { loadParticipantHome, type ParticipantHomeEvent } from '@/lib/participants/participant-home'
 import { AppCard } from '@/components/ui/app-card'
 import { AnnouncementCard } from '@/components/announcements/announcement-card'
@@ -70,7 +70,7 @@ function StageCards({ event, t }: { event: ParticipantHomeEvent; t: T }) {
   )
 }
 
-function EventInfoLink({ href, label }: { href: string; label: string }) {
+function ChevronLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
@@ -122,7 +122,7 @@ export default async function ParticipantHomePage({ params }: Props) {
                     one is meant, so each event links to its own. With one,
                     the tab already does and this would repeat it. */}
                 {single ? null : (
-                  <EventInfoLink
+                  <ChevronLink
                     href={participantEventInfoPath(tenantSlug, event.eventId)}
                     label={t('participant.home.eventInfo')}
                   />
@@ -136,13 +136,17 @@ export default async function ParticipantHomePage({ params }: Props) {
 
         {/* L28: the newest announcement on the participant channel. No empty
             state — the no-announcement wireframe simply leaves the block out.
-            The full timeline (ANN-02) is N44. */}
+            The full timeline is ANN-02 (N44), also a tab of its own. */}
         {latestAnnouncement ? (
           <section>
             <p className="section-label mb-3">{t('participant.home.latestAnnouncement')}</p>
             <AnnouncementCard
               time={formatAnnouncementTime(latestAnnouncement.publishedAt, language, t)}
               body={latestAnnouncement.body}
+            />
+            <ChevronLink
+              href={participantPath(tenantSlug, 'announcements')}
+              label={t('participant.home.allAnnouncements')}
             />
           </section>
         ) : null}

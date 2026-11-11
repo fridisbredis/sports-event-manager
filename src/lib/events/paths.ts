@@ -40,7 +40,7 @@ export function officialEventRoutePattern(subpath: string): string {
 // path resolvePostLoginRedirect already sends a participant to. Home and
 // account are tenant-wide (a runner sees every event they are entered in on
 // one page); event info is per event.
-export type ParticipantSegment = '' | 'account'
+export type ParticipantSegment = '' | 'account' | 'announcements'
 
 export function participantPath(tenantSlug: string, segment: ParticipantSegment = ''): string {
   const base = `/${tenantSlug}/participant`
