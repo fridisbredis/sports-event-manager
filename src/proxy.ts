@@ -42,10 +42,16 @@ export async function proxy(request: NextRequest) {
   // a runner with no session yet, guarded by its own per-number and
   // per-claim-list limits. The rest of /api/claim/* runs after the code is
   // verified and stays behind the session check below.
+  //
+  // /api/auth/send-sms-hook (B14) is called by Supabase Auth itself, never
+  // by a browser, and authenticates with the Standard Webhooks signature
+  // inside the route. It must never be gated on a session: every sign-in
+  // code goes through it.
   if (
     pathname === '/api/auth/send-otp' ||
     pathname === '/api/auth/verify-otp' ||
-    pathname === '/api/claim/send-otp'
+    pathname === '/api/claim/send-otp' ||
+    pathname === '/api/auth/send-sms-hook'
   ) {
     return supabaseResponse
   }
