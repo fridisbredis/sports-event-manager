@@ -144,7 +144,7 @@ figure is in use, and the cap's log lines say so.
 
 **Two costs this rate does not cover**, both deliberate:
 
-- **Login OTP.** Sent through the Send SMS hook (B14, see below) since that
+- **Login OTP.** Sent through the Send SMS hook (B14, see above) since that
   shipped, before that by Supabase Auth itself. Either way it lands on the
   invoice but never in `sms_usage`, and it is never capped (N24): a cap that
   can stop sign-in codes locks people out. Every per-tenant figure is an
