@@ -87,6 +87,8 @@ Every code (login, invite confirmation, claim) is POSTed to
 `/api/auth/send-sms-hook`, which sends it with the app's own Twilio env vars,
 from the tenant's alphanumeric name (N13) when the number belongs to exactly
 one tenant with a name, otherwise from `TWILIO_PHONE_NUMBER`.
+The message body names the tenant on every tier when the number belongs to
+one tenant ("Your Viadal code is …"); only the sender name is Professional.
 `src/lib/sms/otp-sender.ts` has the rule.
 
 **Blast radius:** while the hook is enabled, every sign-in in that environment

@@ -18,6 +18,10 @@
  * club would be wrong in a way the platform number never is. No tenant at
  * all (a system admin, a first-time claimer) also means the platform number.
  *
+ * The tenant's name in the message BODY is separate from the sender and not
+ * tier-gated: any tier gets it when the number belongs to exactly one tenant
+ * (decided 2026-11-11, B14). Only the alphanumeric sender is Professional.
+ *
  * Every lookup failure falls back to the platform number. The sender is
  * cosmetic; the code reaching the phone is not — if this throws, nobody can
  * log in.
@@ -33,7 +37,10 @@ const OP = 'POST /api/auth/send-sms-hook'
 export interface OtpSender {
   /** The Twilio `from`: a tenant's alphanumeric name or the platform number. */
   from: string
-  /** The tenant's display name for the message body, when `from` is its name. */
+  /**
+   * The tenant's display name for the message body, on any tier, when the
+   * number belongs to one tenant (or several sharing one sender name).
+   */
   tenantName: string | null
 }
 
@@ -82,13 +89,14 @@ export async function resolveOtpSender(
   if (!tenants.data || tenants.data.length !== tenantIds.size) return platform
 
   const senders = new Set(tenants.data.map((t) => resolveSmsSender(t, platformSender)))
-  if (senders.size !== 1) return platform
+  const from = senders.size === 1 ? [...senders][0] : platformSender
 
-  const [from] = senders
-  if (from === platformSender) return platform
-
-  // Several tenants sharing one sender name is allowed (one club, two
-  // tenants). Their display names may differ, so the body then uses the
-  // sender name they share rather than picking one of them.
-  return { from, tenantName: tenants.data.length === 1 ? tenants.data[0].name : from }
+  // The body name is NOT tier-gated — only the sender is (N13). A Standard
+  // tenant's code still says "Your Viadal code is …", from the platform
+  // number. One tenant: its name. Several tenants sharing one sender name
+  // (one club, two tenants): their display names may differ, so the body
+  // uses the sender name they share. Anything else: no name.
+  if (tenants.data.length === 1) return { from, tenantName: tenants.data[0].name }
+  if (from !== platformSender) return { from, tenantName: from }
+  return platform
 }

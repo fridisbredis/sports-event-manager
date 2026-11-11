@@ -89,6 +89,20 @@ describe('POST /api/auth/send-sms-hook', () => {
     })
   })
 
+  // A lower tier: platform sender, but the body still names the tenant.
+  it('names the tenant in the body when sending from the platform number', async () => {
+    vi.mocked(resolveOtpSender).mockResolvedValue({ from: PLATFORM, tenantName: 'Other club' })
+
+    const res = await POST(hookRequest())
+
+    expect(res.status).toBe(200)
+    expect(messagesCreate).toHaveBeenCalledWith({
+      body: `Your Other club code is ${OTP}`,
+      from: PLATFORM,
+      to: `+${PHONE}`,
+    })
+  })
+
   it('rejects a request signed with another key and sends nothing', async () => {
     const res = await POST(hookRequest(PAYLOAD, { key: Buffer.from('attacker') }))
 

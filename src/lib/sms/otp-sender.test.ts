@@ -102,14 +102,45 @@ describe('resolveOtpSender', () => {
     expect(calls['tenants.select']).toBeUndefined()
   })
 
-  it('uses the platform number for a tenant whose tier does not unlock the name', async () => {
+  // The sender is tier-gated, the body name is not.
+  it('uses the platform number but keeps the body name on a lower tier', async () => {
     const { service } = fakeService({
       user_roles: ok([{ tenant_id: 't1' }]),
       officials: ok([]),
       tenants: ok([{ ...VIADAL, tier: 'premium' }]),
     })
 
-    expect((await resolveOtpSender(service, USER, PLATFORM)).from).toBe(PLATFORM)
+    expect(await resolveOtpSender(service, USER, PLATFORM)).toEqual({
+      from: PLATFORM,
+      tenantName: 'Viadal Ultra',
+    })
+  })
+
+  it('names a single tenant that has no sender name at all', async () => {
+    const { service } = fakeService({
+      user_roles: ok([]),
+      officials: ok([{ tenant_id: 't2' }]),
+      tenants: ok([OTHER]),
+    })
+
+    expect(await resolveOtpSender(service, USER, PLATFORM)).toEqual({
+      from: PLATFORM,
+      tenantName: 'Other club',
+    })
+  })
+
+  // Two lower-tier tenants: no shared sender name to fall back on.
+  it('names no tenant for a number in two tenants without a shared sender name', async () => {
+    const { service } = fakeService({
+      user_roles: ok([{ tenant_id: 't2' }, { tenant_id: 't4' }]),
+      officials: ok([]),
+      tenants: ok([OTHER, { id: 't4', name: 'Third club', tier: 'premium', sms_sender_id: null }]),
+    })
+
+    expect(await resolveOtpSender(service, USER, PLATFORM)).toEqual({
+      from: PLATFORM,
+      tenantName: null,
+    })
   })
 
   it.each([

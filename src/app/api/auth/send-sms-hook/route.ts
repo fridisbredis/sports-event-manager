@@ -12,7 +12,8 @@ import { logger } from '@/lib/logger'
 // sends one-time codes itself — every code (login, invite confirmation, claim)
 // is POSTed here, and this route sends it via our own Twilio account, from the
 // tenant's sender name when the number belongs to exactly one (see
-// resolveOtpSender).
+// resolveOtpSender). The body names that tenant on every tier; only the
+// alphanumeric sender is Professional.
 //
 // The cost of that, decided on the task board: every sign-in in the
 // environment now depends on this route, system admins included. So:
