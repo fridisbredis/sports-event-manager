@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { resolveOtpSender } from './otp-sender'
+import { otpFallbackSenderName, resolveOtpSender } from './otp-sender'
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -167,5 +167,22 @@ describe('resolveOtpSender', () => {
     })
 
     expect((await resolveOtpSender(service, USER, PLATFORM)).from).toBe(PLATFORM)
+  })
+})
+
+describe('otpFallbackSenderName', () => {
+  it('accepts a valid alphanumeric name', () => {
+    expect(otpFallbackSenderName('ViadalEvent')).toBe('ViadalEvent')
+  })
+
+  it('treats unset and blank as no name', () => {
+    expect(otpFallbackSenderName(undefined)).toBeNull()
+    expect(otpFallbackSenderName('  ')).toBeNull()
+  })
+
+  it('rejects what Twilio would refuse, rather than failing sign-in', () => {
+    expect(otpFallbackSenderName('Viadal Event')).toBeNull() // 12 characters
+    expect(otpFallbackSenderName('Viadal-Event')).toBeNull()
+    expect(otpFallbackSenderName('12345')).toBeNull()
   })
 })

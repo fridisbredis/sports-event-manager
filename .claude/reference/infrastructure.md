@@ -91,6 +91,21 @@ The message body names the tenant on every tier when the number belongs to
 one tenant ("Your Viadal code is …"); only the sender name is Professional.
 `src/lib/sms/otp-sender.ts` has the rule.
 
+**Fallback sender name.** Where no tenant name applies (a system admin, a
+number in several tenants, a tenant without a sender name), the hook sends
+from `OTP_FALLBACK_SENDER_NAME` — the app's own name, `ViadalEvent` — instead
+of the bare number, and retries from `TWILIO_PHONE_NUMBER` if Twilio refuses
+it. It is a GitHub repository **variable** (not a secret; one value for dev
+and prod), passed by both deploy workflows. Unset, blank or invalid (Twilio's
+rule: at most 11 ASCII letters/digits/spaces, at least one letter — "Viadal
+Event" is 12) means the number, as before. Only the hook reads it; the SMS
+worker, invites and GDPR warnings keep `TWILIO_PHONE_NUMBER`.
+
+The **Twilio sender in the Supabase dashboard** (Authentication → SMS
+provider) is not used while the hook is enabled. It matters only after a
+rollback (hook off), so set it to the same name there too: then a rollback
+sends codes from `ViadalEvent` rather than an unknown number.
+
 **Blast radius:** while the hook is enabled, every sign-in in that environment
 depends on the Container App being up and on `SEND_SMS_HOOK_SECRET` matching
 the dashboard. The route fails closed (500) if the secret is unset. The

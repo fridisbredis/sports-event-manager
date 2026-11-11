@@ -30,7 +30,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { stripE164Plus } from '@/lib/phone'
 import { logQueryError } from '@/lib/db/query-error'
-import { resolveSmsSender } from './sender'
+import { resolveSmsSender, smsSenderIdSchema } from './sender'
 
 const OP = 'POST /api/auth/send-sms-hook'
 
@@ -99,4 +99,22 @@ export async function resolveOtpSender(
   if (tenants.data.length === 1) return { from, tenantName: tenants.data[0].name }
   if (from !== platformSender) return { from, tenantName: from }
   return platform
+}
+
+/**
+ * B14 follow-up: the name a code is sent from when no tenant name applies — a
+ * system admin, a number in several tenants, a tenant without a sender name.
+ * From OTP_FALLBACK_SENDER_NAME (the app's own name, e.g. "ViadalEvent"), so
+ * those codes do not arrive from an unknown number.
+ *
+ * Validated with the same rule as a tenant's sender (Twilio: at most 11
+ * characters, ASCII letters, digits and space, at least one letter). Unset,
+ * blank or invalid means null, and the platform number is used as before —
+ * a typo in an env var must not be able to stop sign-in.
+ */
+export function otpFallbackSenderName(
+  raw: string | undefined = process.env.OTP_FALLBACK_SENDER_NAME
+): string | null {
+  const parsed = smsSenderIdSchema.safeParse(raw ?? '')
+  return parsed.success ? parsed.data : null
 }
