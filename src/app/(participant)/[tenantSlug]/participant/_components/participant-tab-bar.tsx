@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useOptimistic, useTransition } from 'react'
-import { House, Info, User } from 'lucide-react'
+import { Bell, House, Info, User } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import { participantEventInfoPath, participantPath } from '@/lib/events/paths'
 
@@ -17,9 +17,7 @@ interface Props {
 
 // N43: the participant counterpart of the official BottomTabBar, with the
 // same tap behaviour (the highlight moves on the tap, see the comment there).
-//
-// Announcements is not a tab yet: ANN-02, the participant timeline, is N44.
-// PAR-01 shows the latest one meanwhile. N44 adds the tab.
+// Announcements (ANN-02, N44) is tenant-wide like Home, so it needs no event.
 export function ParticipantTabBar({ tenantSlug, soleEventId }: Props) {
   const pathname = usePathname()
   const router = useRouter()
@@ -35,6 +33,12 @@ export function ParticipantTabBar({ tenantSlug, soleEventId }: Props) {
       href: soleEventId ? participantEventInfoPath(tenantSlug, soleEventId) : home,
       label: t('participant.nav.eventInfo'),
       Icon: Info,
+    },
+    {
+      id: 'announcements',
+      href: participantPath(tenantSlug, 'announcements'),
+      label: t('participant.nav.announcements'),
+      Icon: Bell,
     },
     {
       id: 'account',

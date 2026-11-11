@@ -162,6 +162,7 @@
     "nav": {
       "home": "Start",
       "eventInfo": "Evenemangsinfo",
+      "announcements": "Meddelanden",
       "account": "Konto",
       "myShifts": "Mina pass"
     },
@@ -173,7 +174,8 @@
       "noStages": "Du är inte anmäld till någon etapp än.",
       "notAvailable": "Det här evenemanget är inte tillgängligt just nu. Titta in igen senare.",
       "eventInfo": "Evenemangsinfo",
-      "latestAnnouncement": "Meddelanden"
+      "latestAnnouncement": "Meddelanden",
+      "allAnnouncements": "Alla meddelanden"
     },
     "account": {
       "nameLabel": "Namn (endast läsbart)",

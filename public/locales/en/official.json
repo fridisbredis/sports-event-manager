@@ -162,6 +162,7 @@
     "nav": {
       "home": "Home",
       "eventInfo": "Event info",
+      "announcements": "Announcements",
       "account": "Account",
       "myShifts": "My shifts"
     },
@@ -173,7 +174,8 @@
       "noStages": "You are not entered in a race stage yet.",
       "notAvailable": "This event is not available right now. Please check back later.",
       "eventInfo": "Event info",
-      "latestAnnouncement": "Announcements"
+      "latestAnnouncement": "Announcements",
+      "allAnnouncements": "All announcements"
     },
     "account": {
       "nameLabel": "Name (read-only)",

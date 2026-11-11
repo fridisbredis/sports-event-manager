@@ -8,6 +8,7 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@herou
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
+import { PremiumBadge } from '@/components/ui/premium-badge'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { toastError, extractErrorMessage } from '@/lib/toast'
 import type { Announcement, AnnouncementChannel } from '@/types/app'
@@ -16,10 +17,19 @@ import { useLanguage } from '@/components/i18n-provider'
 
 type ByChannel<T> = Record<AnnouncementChannel, T>
 
+/**
+ * N44 (PB7, PB9): whether the admin can post to the participant channel.
+ * 'open' — the event's participant side is open (published, Premium+).
+ * 'unpublished' — the tier allows it, the event is draft or archived.
+ * 'tier' — Standard; greyed and marked Premium, like other tier-locked items.
+ */
+export type ParticipantChannelState = 'open' | 'unpublished' | 'tier'
+
 interface Props {
   tenantId: string
   eventId: string
   page: number
+  participantChannel: ParticipantChannelState
   announcements: ByChannel<Announcement[]>
   hasMore: ByChannel<boolean>
 }
@@ -116,6 +126,7 @@ export function CommunicationPanel({
   tenantId,
   eventId,
   page,
+  participantChannel,
   announcements: initial,
   hasMore,
 }: Props) {
@@ -123,7 +134,13 @@ export function CommunicationPanel({
   const language = useLanguage()
   const router = useRouter()
 
-  const [channel, setChannel] = useState<AnnouncementChannel>('participants')
+  const participantsOpen = participantChannel === 'open'
+
+  // The wireframe's draft state opens on the officials channel with the
+  // participant pill greyed: there is nothing to post to on the other one.
+  const [channel, setChannel] = useState<AnnouncementChannel>(
+    participantsOpen ? 'participants' : 'officials'
+  )
   const [draft, setDraft] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
@@ -258,7 +275,7 @@ export function CommunicationPanel({
         </div>
 
         {/* Channel toggle */}
-        <div className="flex items-center gap-3 mb-6">
+        <div className="mb-6 flex flex-wrap items-center gap-3">
           <span className="text-sm text-ink-soft">{t('communication.channel')}</span>
           <div className="flex gap-1">
             {(['participants', 'officials'] as AnnouncementChannel[]).map((ch) => (
@@ -266,6 +283,10 @@ export function CommunicationPanel({
                 key={ch}
                 type="button"
                 onPress={() => requestAction({ type: 'channel', channel: ch })}
+                // N44: closed, the participant pill stays visible but cannot
+                // be chosen. Hiding it would leave the admin wondering where
+                // the channel went; the note beside it says why.
+                isDisabled={ch === 'participants' && !participantsOpen}
                 color={channel === ch ? 'primary' : 'default'}
                 variant={channel === ch ? 'solid' : 'bordered'}
                 size="sm"
@@ -282,9 +303,17 @@ export function CommunicationPanel({
                 }
               >
                 {t(`communication.${ch}`)}
+                {ch === 'participants' && participantChannel === 'tier' ? (
+                  <PremiumBadge label={t('dashboard.premiumBadge')} className="ml-1" />
+                ) : null}
               </Button>
             ))}
           </div>
+          {participantChannel === 'unpublished' ? (
+            <span className="text-[13px] text-ink-muted">
+              {t('communication.participantChannelUnpublished')}
+            </span>
+          ) : null}
         </div>
 
         {/* New announcement card */}

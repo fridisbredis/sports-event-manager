@@ -123,6 +123,7 @@ function renderPanel(overrides: Partial<Parameters<typeof CommunicationPanel>[0]
     tenantId: TENANT_ID,
     eventId: 'event-1',
     page: 1,
+    participantChannel: 'open' as const,
     announcements: {
       participants: [announcement('participants', 0)],
       officials: [announcement('officials', 0)],
@@ -298,6 +299,7 @@ describe('CommunicationPanel', () => {
       <CommunicationPanel
         tenantId={TENANT_ID}
         eventId="event-1"
+        participantChannel="open"
         page={2}
         announcements={{ participants: [announcement('participants', 5)], officials: [] }}
         hasMore={{ participants: false, officials: false }}
@@ -323,6 +325,7 @@ describe('CommunicationPanel', () => {
       <CommunicationPanel
         tenantId={TENANT_ID}
         eventId="event-1"
+        participantChannel="open"
         page={1}
         announcements={{ participants: [fromServer], officials: [] }}
         hasMore={{ participants: false, officials: false }}
@@ -330,5 +333,47 @@ describe('CommunicationPanel', () => {
     )
 
     expect(screen.getAllByText('fresh announcement')).toHaveLength(1)
+  })
+
+  // N44 (PB7, PB9): the participant channel only while the event is open.
+  describe('participant channel closed', () => {
+    it('opens on officials with the participant pill disabled while unpublished', () => {
+      renderPanel({ participantChannel: 'unpublished' })
+
+      expect(screen.getByText('officials body 0')).toBeDefined()
+      expect(screen.queryByText('participants body 0')).toBeNull()
+      const pill = screen.getByText('communication.participants').closest('button')
+      expect(pill?.disabled).toBe(true)
+      expect(screen.getByText('communication.participantChannelUnpublished')).toBeDefined()
+    })
+
+    it('marks the participant pill Premium on Standard, without the publish note', () => {
+      renderPanel({ participantChannel: 'tier' })
+
+      const pill = screen.getByText('communication.participants').closest('button')
+      expect(pill?.disabled).toBe(true)
+      expect(screen.getByText('dashboard.premiumBadge')).toBeDefined()
+      expect(screen.queryByText('communication.participantChannelUnpublished')).toBeNull()
+    })
+
+    it('publishes to the officials channel when the participant one is closed', async () => {
+      renderPanel({ participantChannel: 'unpublished' })
+
+      typeDraft('Hello officials')
+      fireEvent.click(screen.getByText('communication.publish'))
+
+      await waitFor(() => expect(fetch).toHaveBeenCalled())
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body.channel).toBe('officials')
+    })
+
+    it('leaves the participant pill enabled and unannotated when open', () => {
+      renderPanel()
+
+      const pill = screen.getByText('communication.participants').closest('button')
+      expect(pill?.disabled).toBe(false)
+      expect(screen.queryByText('communication.participantChannelUnpublished')).toBeNull()
+      expect(screen.queryByText('dashboard.premiumBadge')).toBeNull()
+    })
   })
 })

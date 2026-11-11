@@ -51,6 +51,8 @@ function chain(result: unknown) {
   builder.update = vi.fn(() => builder)
   builder.limit = vi.fn(() => builder)
   builder.not = vi.fn(() => builder)
+  builder.is = vi.fn(() => builder)
+  builder.maybeSingle = vi.fn(() => Promise.resolve(result))
   builder.single = vi.fn(() => Promise.resolve(result))
   builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
@@ -65,6 +67,12 @@ function makeRequest(body: unknown) {
 }
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+
+// N44: the participant channel first reads the event's status and the
+// tenant's tier. A published event on Premium is open.
+function openEvent(status = 'published', tier = 'premium') {
+  return chain({ data: { status, tenants: { tier } }, error: null })
+}
 
 // Registered by the tests that stub console.error, and always undone in afterEach: an
 // assertion that fails mid-test must not leave console stubbed for every test after it.
@@ -219,6 +227,7 @@ describe('POST /api/announcements', () => {
     const queueBuilder = chain({ error: null })
     const fromMock = vi
       .fn()
+      .mockReturnValueOnce(openEvent())
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
       .mockReturnValueOnce(queueBuilder)
@@ -238,14 +247,100 @@ describe('POST /api/announcements', () => {
     const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
+      .mockReturnValueOnce(openEvent())
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
 
     await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
 
-    expect(fromMock).toHaveBeenNthCalledWith(1, 'participants')
+    expect(fromMock).toHaveBeenNthCalledWith(2, 'participants')
     expect(recipientsBuilder.limit).toHaveBeenCalledWith(500)
+  })
+
+  describe('participant channel gate (N44)', () => {
+    function adminWith(...builders: unknown[]) {
+      vi.mocked(requireTenantAdmin).mockResolvedValue({
+        user: { id: 'admin-1' },
+        role: 'tenant_admin',
+      } as never)
+      const fromMock = vi.fn()
+      for (const b of builders) fromMock.mockReturnValueOnce(b)
+      vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
+      return fromMock
+    }
+
+    it.each([
+      ['a draft event', openEvent('draft', 'premium')],
+      ['an archived event', openEvent('archived', 'premium')],
+      ['a published event on Standard', openEvent('published', 'standard')],
+      ['an event that is not found', chain({ data: null, error: null })],
+    ])('answers 409 without recording or sending for %s', async (_label, eventBuilder) => {
+      const fromMock = adminWith(eventBuilder)
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' })
+      )
+
+      expect(res.status).toBe(409)
+      expect(fromMock).toHaveBeenCalledTimes(1)
+      expect(fromMock).toHaveBeenCalledWith('events')
+      expect(logAuditEvent).not.toHaveBeenCalled()
+    })
+
+    it('scopes the event lookup to the tenant and the resolved event', async () => {
+      const eventBuilder = openEvent()
+      adminWith(
+        eventBuilder,
+        chain({ data: [], error: null }),
+        chain({ data: { id: 'a' }, error: null })
+      )
+
+      await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
+
+      expect(eventBuilder.eq).toHaveBeenCalledWith('tenant_id', TENANT_ID)
+      expect(eventBuilder.eq).toHaveBeenCalledWith('id', 'event-1')
+    })
+
+    it('answers 500 when the event lookup fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      restoreConsoleError = () => consoleErrorSpy.mockRestore()
+      const fromMock = adminWith(chain({ data: null, error: { message: 'boom' } }))
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' })
+      )
+
+      expect(res.status).toBe(500)
+      expect(fromMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not read the event for the officials channel (always open)', async () => {
+      const fromMock = adminWith(
+        chain({ data: [], error: null }),
+        chain({ data: { id: 'a' }, error: null })
+      )
+
+      const res = await POST(
+        makeRequest({ tenantId: TENANT_ID, channel: 'officials', body: 'Hej!' })
+      )
+
+      expect(res.status).toBe(202)
+      expect(fromMock).not.toHaveBeenCalledWith('events')
+    })
+
+    it('sends only to claimed participants who are still in the race', async () => {
+      const recipientsBuilder = chain({ data: [], error: null })
+      adminWith(openEvent(), recipientsBuilder, chain({ data: { id: 'a' }, error: null }))
+
+      await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
+
+      expect(recipientsBuilder.eq).toHaveBeenCalledWith('event_id', 'event-1')
+      expect(recipientsBuilder.eq).toHaveBeenCalledWith('sms_opt_out', false)
+      expect(recipientsBuilder.not).toHaveBeenCalledWith('user_id', 'is', null)
+      expect(recipientsBuilder.is).toHaveBeenCalledWith('hidden_at', null)
+      expect(recipientsBuilder.is).toHaveBeenCalledWith('withdrawn_at', null)
+    })
   })
 
   it('excludes participants without a phone number from the recipient query', async () => {
@@ -262,6 +357,7 @@ describe('POST /api/announcements', () => {
     const insertBuilder = chain({ data: { id: 'ann-1' }, error: null })
     const fromMock = vi
       .fn()
+      .mockReturnValueOnce(openEvent())
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: fromMock } as never)
@@ -287,6 +383,7 @@ describe('POST /api/announcements', () => {
     const queueBuilder = chain({ data: null, error: null })
     const fromMock = vi
       .fn()
+      .mockReturnValueOnce(openEvent())
       .mockReturnValueOnce(recipientsBuilder)
       .mockReturnValueOnce(insertBuilder)
       .mockReturnValue(queueBuilder)
@@ -496,13 +593,17 @@ describe('POST /api/announcements', () => {
 
   // N31: push goes in addition to the SMS, to the event's officials only.
   describe('push (N31)', () => {
-    function publishWith(queueResult: unknown) {
+    function publishWith(
+      queueResult: unknown,
+      channel: 'officials' | 'participants' = 'officials'
+    ) {
       vi.mocked(requireTenantAdmin).mockResolvedValue({
         user: { id: 'admin-1' },
         role: 'tenant_admin',
       } as never)
-      const fromMock = vi
-        .fn()
+      const fromMock = vi.fn()
+      if (channel === 'participants') fromMock.mockReturnValueOnce(openEvent())
+      fromMock
         .mockReturnValueOnce(chain({ data: [{ phone: '46701111111' }], error: null }))
         .mockReturnValueOnce(chain({ data: { id: 'ann-1' }, error: null }))
         .mockReturnValueOnce(chain(queueResult))
@@ -527,9 +628,10 @@ describe('POST /api/announcements', () => {
       })
     })
 
-    // Participants cannot sign in, so they have no devices to push to.
+    // Push to participants is not in v1.5 (N44 left it open; N31 sends to
+    // officials only).
     it('does not push a participants announcement', async () => {
-      publishWith({ error: null })
+      publishWith({ error: null }, 'participants')
 
       await POST(makeRequest({ tenantId: TENANT_ID, channel: 'participants', body: 'Hej!' }))
       await runScheduledWork()

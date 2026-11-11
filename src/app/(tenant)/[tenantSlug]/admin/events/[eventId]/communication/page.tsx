@@ -2,7 +2,8 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { parsePageParam, pageRange, splitPage } from '@/lib/pagination'
-import { CommunicationPanel } from './_components/communication-panel'
+import { canPublish, isParticipantSideOpen } from '@/lib/events/participant-side'
+import { CommunicationPanel, type ParticipantChannelState } from './_components/communication-panel'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -52,13 +53,34 @@ export default async function CommunicationPage({ params, searchParams }: Props)
       .order('published_at', { ascending: false })
       .range(from, to)
 
-  const [participantsResult, officialsResult] = await Promise.all([
+  // N44 (PB7, PB9): the participant channel is open only while the event's
+  // participant side is (N36). The route refuses to post otherwise; this
+  // decides how COMM-01 says so.
+  const eventQuery = supabase
+    .from('events')
+    .select('status')
+    .eq('tenant_id', tenant.id)
+    .eq('id', eventId)
+    .maybeSingle()
+
+  const [participantsResult, officialsResult, eventResult] = await Promise.all([
     channelQuery('participants'),
     channelQuery('officials'),
+    eventQuery,
   ])
 
-  const queryError = participantsResult.error ?? officialsResult.error
+  const queryError = participantsResult.error ?? officialsResult.error ?? eventResult.error
   if (queryError) throw queryError
+  if (!eventResult.data) notFound()
+
+  const participantChannel: ParticipantChannelState = isParticipantSideOpen(
+    eventResult.data,
+    tenant.tier
+  )
+    ? 'open'
+    : canPublish(tenant.tier)
+      ? 'unpublished'
+      : 'tier'
 
   const participants = splitPage(participantsResult.data ?? [])
   const officials = splitPage(officialsResult.data ?? [])
@@ -69,6 +91,7 @@ export default async function CommunicationPage({ params, searchParams }: Props)
         tenantId={tenant.id}
         eventId={eventId}
         page={page}
+        participantChannel={participantChannel}
         announcements={{ participants: participants.items, officials: officials.items }}
         hasMore={{ participants: participants.hasMore, officials: officials.hasMore }}
       />

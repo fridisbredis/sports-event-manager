@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { logQueryError } from '@/lib/db/query-error'
 import { resolveRequestEventId } from '@/lib/events/request-event'
 import { sendAnnouncementPush } from '@/lib/push/send'
+import { isParticipantSideOpen } from '@/lib/events/participant-side'
 
 const publishSchema = z.object({
   tenantId: z.string().uuid(),
@@ -46,6 +47,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unknown or ambiguous event' }, { status: 400 })
   }
 
+  // N44 (PB7, PB9): the participant channel is open only while the event's
+  // participant side is — published, on Premium or up (N36). COMM-01 greys
+  // the channel out in that state; this is the server half, so a stale tab or
+  // a hand-made request cannot post to runners of a draft event.
+  if (channel === 'participants') {
+    const { data: eventRow, error: eventError } = await supabase
+      .from('events')
+      .select('status, tenants!inner(tier)')
+      .eq('tenant_id', tenantId)
+      .eq('id', eventId)
+      .maybeSingle()
+
+    if (eventError) {
+      logQueryError(eventError, {
+        op: 'POST /api/announcements',
+        table: 'events',
+        kind: 'select',
+        tenantId,
+        extra: { channel },
+      })
+      return NextResponse.json({ error: 'Failed to read the event' }, { status: 500 })
+    }
+
+    if (!eventRow || !isParticipantSideOpen(eventRow, eventRow.tenants.tier)) {
+      return NextResponse.json(
+        { error: 'The participant channel opens when the event is published.' },
+        { status: 409 }
+      )
+    }
+  }
+
   // Officials keep their row (and phone number) after being removed, so the
   // officials channel must also exclude anyone who isn't a confirmed
   // official — otherwise a removed official (or a re-invited one on the
@@ -72,13 +104,22 @@ export async function POST(request: NextRequest) {
         // because that insert is a single statement the whole announcement
         // is dropped, including the messages to participants who DO have a
         // number.
+        //
+        // N44: claimed participants only (user_id set). An unclaimed record
+        // is a start-list row nobody has confirmed as theirs, and a phone an
+        // admin typed onto it is not a consent to SMS. Hidden and withdrawn
+        // records are left out too: the runner is no longer in the race,
+        // and can still read the announcement in the app.
         await supabase
           .from('participants')
           .select('phone')
           .eq('tenant_id', tenantId)
           .eq('event_id', eventId)
           .eq('sms_opt_out', false)
+          .not('user_id', 'is', null)
           .not('phone', 'is', null)
+          .is('hidden_at', null)
+          .is('withdrawn_at', null)
           .limit(MAX_ANNOUNCEMENT_RECIPIENTS)
 
   if (error) {
