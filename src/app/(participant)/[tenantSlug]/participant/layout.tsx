@@ -49,7 +49,12 @@ export default async function ParticipantLayout({ children, params }: Props) {
   return (
     <>
       <TenantThemeStyle colorPalette={effectivePalette(tenant)} />
-      <div className="flex flex-col min-h-screen bg-white">
+      {/* min-h-svh, not min-h-screen: on iOS 100vh is the viewport with the
+          browser bars collapsed, so a short page came out taller than the
+          screen with the bars showing — it scrolled by the bar height and
+          tucked the page title under the address bar. svh is the viewport with
+          the bars showing, so a page that fits never scrolls. */}
+      <div className="flex flex-col min-h-svh bg-white">
         <Suspense>
           <OfficialLinkChrome tenantSlug={tenantSlug} />
         </Suspense>
