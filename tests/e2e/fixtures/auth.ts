@@ -210,8 +210,43 @@ function roleFixture(role: RoleKey) {
       viewport,
     })
     const page = await context.newPage()
+    settleStreamingOnLoad(page)
     await use(page)
     await context.close()
+  }
+}
+
+// Makes goto() and reload() return only once a streamed page has settled.
+//
+// Most screens have a loading.tsx, so a full document load streams: the shell
+// arrives with the skeleton, and each finished segment follows inside a
+// `<div hidden id="S:n">` that React's inline script then moves into place.
+// For a moment after `load` the content is in the DOM twice — the copy React
+// has already revealed and the hidden one it has not removed yet. Nobody sees
+// the hidden copy (nor does a screen reader), but Playwright's locators match
+// hidden elements, so a strict getByText/getByLabel finds two and fails.
+//
+// Waiting here, once, keeps every spec from having to know about streaming.
+// Client-side navigations (clicks) are unaffected: they render from the RSC
+// payload and never create these containers.
+function settleStreamingOnLoad(page: Page) {
+  const settle = () =>
+    page.waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'), undefined, {
+      timeout: 15_000,
+    })
+
+  const goto = page.goto.bind(page)
+  page.goto = async (...args) => {
+    const response = await goto(...args)
+    await settle()
+    return response
+  }
+
+  const reload = page.reload.bind(page)
+  page.reload = async (...args) => {
+    const response = await reload(...args)
+    await settle()
+    return response
   }
 }
 
