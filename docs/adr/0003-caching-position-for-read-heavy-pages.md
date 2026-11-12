@@ -22,6 +22,16 @@
   `tests/integration/perf02-save-assignments-batch.test.ts` both exist as
   cited at line ~413. Re-check only if any of those source files change
   before this ADR moves to Accepted.
+- **Amended 2026-11-12:** `admin/event` (EVT-02) and the
+  `admin/workstations` list are no longer cached. The per-replica gap
+  named under "Known limitation" showed up in prod: an info section
+  added on EVT-02 did not appear after save, because `updateTag` cleared
+  only the replica that handled the write and the follow-up
+  `router.refresh()` landed on another one. Edit screens need
+  read-your-own-writes, which per-replica caching cannot give, and with
+  ~3 admins per event the saving was negligible. Both pages still read
+  through their `get_admin_*_cached` RPCs, just without `unstable_cache`.
+  The Group 1 reasoning below stands for the remaining cached pages.
 
 ## Context
 

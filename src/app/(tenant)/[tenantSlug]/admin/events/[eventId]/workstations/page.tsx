@@ -1,8 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
-import { unstable_cache } from 'next/cache'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
-import { workstationsCacheTag } from '@/lib/cache/tags'
 import WorkstationsList from './_components/workstations-list'
 
 interface Props {
@@ -43,32 +41,24 @@ export default async function WorkstationsPage({ params }: Props) {
 
   if (!tenant) notFound()
 
-  // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): reads moved behind
-  // get_admin_workstations_cached (migration 0053). Must be the
-  // service-role client — unstable_cache can't reach cookies(), and this
-  // is only safe because the RPC is SECURITY DEFINER owned by
-  // cache_rpc_reader (NOBYPASSRLS), so service_role's own BYPASSRLS never
-  // applies inside it.
-  const getAdminWorkstationsCached = unstable_cache(
-    async (tenantId: string, eventId: string) => {
-      const service = createSupabaseServiceClient()
-      const { data, error } = await service.rpc('get_admin_workstations_cached', {
-        p_tenant_id: tenantId,
-        p_event_id: eventId,
-      })
-      if (error) throw error
-      return data as unknown as AdminWorkstationsCached
-    },
-    ['admin-workstations'], // cache namespace, data-shape only — tenant
-    // scoping comes entirely from the tenantId closure argument reaching
-    // both the RPC call above and the tags array below
-    {
-      tags: [workstationsCacheTag(tenant.id)],
-      revalidate: 60,
-    }
-  )
-
-  const { event, stages, workstations } = await getAdminWorkstationsCached(tenant.id, eventId)
+  // Read uncached, on purpose. This is an edit screen: after a save the admin
+  // must see their own write on the very next render. ADR-0003 put it behind
+  // unstable_cache, but that cache is per replica (prod runs 2-3 and has no
+  // shared cacheHandler), so updateTag only cleared the replica that handled
+  // the write. A router.refresh() landing on another replica got the old
+  // payload for up to 60s — a new work area did not show until a reload. With ~3 admins per event the cache saved almost nothing here.
+  //
+  // Still the service-role client and the *_cached RPC: the RPC is SECURITY
+  // DEFINER owned by cache_rpc_reader (NOBYPASSRLS), so service_role's own
+  // BYPASSRLS never applies inside it, and tenant.id comes from
+  // getAdminTenant above, which has already authorized this admin.
+  const service = createSupabaseServiceClient()
+  const { data, error } = await service.rpc('get_admin_workstations_cached', {
+    p_tenant_id: tenant.id,
+    p_event_id: eventId,
+  })
+  if (error) throw error
+  const { event, stages, workstations } = data as unknown as AdminWorkstationsCached
 
   if (!event) notFound()
 
