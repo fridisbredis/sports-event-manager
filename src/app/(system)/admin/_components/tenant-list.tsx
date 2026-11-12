@@ -79,12 +79,16 @@ export function TenantList({ tenants, smsUsage }: Props) {
             // than every other card. Same reason AppCard passes shadow="none".
             shadow="none"
             classNames={{
-              wrapper: `${CARD_SURFACE} p-4`,
-              th: 'bg-status-neutral-bg text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg',
+              // Tighter on a phone: at 375px the card's p-4 plus HeroUI's px-3
+              // on every cell left about 310px for three columns, so the Tier
+              // column ran past the card's edge and the header band was cut
+              // off. Same columns, less air between them.
+              wrapper: `${CARD_SURFACE} p-2 sm:p-4`,
+              th: 'bg-status-neutral-bg px-2 text-[14px] font-medium text-ink-soft first:rounded-l-lg last:rounded-r-lg sm:px-3',
               // 58px row min-height from the handoff, via generous cell
               // padding — the design gives this list noticeably more air than
               // a default HeroUI table row.
-              td: 'py-5',
+              td: 'px-2 py-5 sm:px-3',
               tr: 'border-b border-edge-soft last:border-b-0',
             }}
           >
