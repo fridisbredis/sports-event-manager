@@ -1,10 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, SelectItem } from '@heroui/react'
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  SelectItem,
+} from '@heroui/react'
 import { Button } from '@/components/ui/button'
 import { SystemButton } from '../../_components/system-button'
-import { Input, Select } from '@/components/ui/form-fields'
+import { Input, Select, LISTBOX_ITEM } from '@/components/ui/form-fields'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { toastError } from '@/lib/toast'
 import { useTranslation } from '@/lib/i18n/client'
@@ -114,7 +126,7 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
       <ul className="divide-y divide-edge-soft">
         {admins.map((admin) => {
           const isSelf = admin.userId === currentUserId
-          // Why the button is dead, if it is. Self first: for the last admin
+          // Why removing is unavailable, if it is. Self first: for the last admin
           // that is also the signed-in one, "you cannot remove yourself" is
           // the reason that applies regardless of the count.
           const disabledReason = isSelf
@@ -149,28 +161,64 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
                   {t('systemAdmin.adminAddedOn', { date: formattedDates[admin.userId] ?? '' })}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {isSelf && (
+              {/* Behind a ⋯ rather than two bordered buttons: on a phone the
+                  buttons squeezed the name and number down to "Frid…", and
+                  they are rare actions next to the list itself. The reason
+                  Remove is unavailable shows as the item's description — the
+                  old `title` tooltip never appears on a touch screen. */}
+              <Dropdown placement="bottom-end">
+                <DropdownTrigger>
                   <Button
-                    variant="bordered"
+                    isIconOnly
+                    variant="light"
                     size="sm"
-                    onPress={() => setEditingName(admin.name ?? '')}
+                    className="shrink-0"
+                    aria-label={t('systemAdmin.actionsFor', {
+                      name: admin.name ?? formatPhoneForDisplay(admin.phone ?? ''),
+                    })}
                   >
-                    {t('systemAdmin.editOwnName')}
+                    <MoreHorizontal className="size-5 text-ink-soft" aria-hidden="true" />
                   </Button>
-                )}
-                <Button
-                  variant="bordered"
-                  size="sm"
-                  onPress={() => setRemoving(admin)}
-                  isDisabled={disabledReason !== undefined}
-                  // The repo's `destructive` token, as on SYS-02.
-                  className="border-destructive text-destructive"
-                  title={disabledReason}
+                </DropdownTrigger>
+                <DropdownMenu
+                  aria-label={t('systemAdmin.actionsFor', {
+                    name: admin.name ?? formatPhoneForDisplay(admin.phone ?? ''),
+                  })}
+                  itemClasses={{ base: LISTBOX_ITEM }}
+                  disabledKeys={disabledReason !== undefined ? ['remove'] : []}
+                  onAction={(key) => {
+                    if (key === 'edit') setEditingName(admin.name ?? '')
+                    else if (key === 'remove') setRemoving(admin)
+                  }}
                 >
-                  {t('systemAdmin.removeAdmin')}
-                </Button>
-              </div>
+                  {[
+                    ...(isSelf
+                      ? [
+                          <DropdownItem
+                            key="edit"
+                            startContent={
+                              <Pencil className="size-4" strokeWidth={1.75} aria-hidden="true" />
+                            }
+                          >
+                            {t('systemAdmin.editOwnName')}
+                          </DropdownItem>,
+                        ]
+                      : []),
+                    <DropdownItem
+                      key="remove"
+                      // The repo's `destructive` token, as on SYS-02.
+                      className="text-destructive"
+                      color="danger"
+                      description={disabledReason}
+                      startContent={
+                        <Trash2 className="size-4" strokeWidth={1.75} aria-hidden="true" />
+                      }
+                    >
+                      {t('systemAdmin.removeAdmin')}
+                    </DropdownItem>,
+                  ]}
+                </DropdownMenu>
+              </Dropdown>
             </li>
           )
         })}

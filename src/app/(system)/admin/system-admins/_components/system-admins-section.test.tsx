@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { SystemAdminsSection } from './system-admins-section'
 import { toastError } from '@/lib/toast'
@@ -14,6 +15,49 @@ vi.mock('@/lib/i18n/client', () => ({
 }))
 
 vi.mock('@/lib/toast', () => ({ toastError: vi.fn() }))
+
+// The row's ⋯ menu, as in the officials-list test: items render as
+// always-visible buttons named by their label, so a test clicks
+// "systemAdmin.removeAdmin" whether or not it sits in a menu. disabledKeys and
+// onAction keep their real meaning, and the description renders beside the
+// button so a disabled item's reason is visible text. Everything else in
+// HeroUI (the dialogs) stays real.
+vi.mock('@heroui/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@heroui/react')>()
+  const Dropdown = ({ children }: { children?: ReactNode }) => <div>{children}</div>
+  const DropdownTrigger = ({ children }: { children?: ReactNode }) => <>{children}</>
+  const DropdownItem = () => null
+  const DropdownMenu = ({
+    children,
+    onAction,
+    disabledKeys,
+  }: {
+    children?: ReactNode
+    onAction?: (key: string) => void
+    disabledKeys?: string[]
+  }) => (
+    <div>
+      {Children.map(children, (child) => {
+        if (!isValidElement(child)) return null
+        const key = String(child.key).replace(/^\.\$/, '')
+        const props = child.props as { children?: ReactNode; description?: ReactNode }
+        return (
+          <div>
+            <button
+              type="button"
+              disabled={disabledKeys?.includes(key)}
+              onClick={() => onAction?.(key)}
+            >
+              {props.children}
+            </button>
+            {props.description ? <span>{props.description}</span> : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+  return { ...actual, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem }
+})
 
 const { revokeSystemAdmin, updateOwnSystemAdminName } = vi.hoisted(() => ({
   revokeSystemAdmin: vi.fn(),
@@ -57,7 +101,9 @@ describe('SystemAdminsSection', () => {
 
     const ownButton = removeButtonFor('Frida')
     expect(ownButton).toBeDisabled()
-    expect(ownButton).toHaveAttribute('title', 'systemAdmin.cannotRemoveSelfHint')
+    expect(
+      within(screen.getByText('Frida').closest('li')!).getByText('systemAdmin.cannotRemoveSelfHint')
+    ).toBeInTheDocument()
     expect(
       within(screen.getByText('Frida').closest('li')!).getByText('systemAdmin.systemAdminYou')
     ).toBeInTheDocument()
@@ -101,7 +147,9 @@ describe('SystemAdminsSection', () => {
 
     const button = removeButtonFor('Peter')
     expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('title', 'systemAdmin.lastSystemAdminHint')
+    expect(
+      within(screen.getByText('Peter').closest('li')!).getByText('systemAdmin.lastSystemAdminHint')
+    ).toBeInTheDocument()
   })
 
   it('removes another admin after confirming, naming them in the dialog', async () => {

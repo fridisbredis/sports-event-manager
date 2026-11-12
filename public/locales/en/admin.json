@@ -604,6 +604,7 @@
     "saveError": "Something went wrong. Please try again."
   },
   "systemAdmin": {
+    "actionsFor": "Actions for {{name}}",
     "sidebarLabel": "System admin",
     "logOut": "Log out",
     "tenants": "Tenants",
