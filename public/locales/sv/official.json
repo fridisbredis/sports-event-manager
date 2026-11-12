@@ -117,7 +117,8 @@
     "confirmBody": "{{name}} bockade av den här. Vill du avmarkera den ändå?",
     "confirmCancel": "Nej, behåll",
     "confirmConfirm": "Ja, avmarkera",
-    "saveFailed": "Kunde inte spara. Försök igen."
+    "saveFailed": "Kunde inte spara. Försök igen.",
+    "saving": "Sparar…"
   },
   "availability": {
     "pageTitle": "Tillgänglighet",
@@ -181,6 +182,8 @@
       "nameLabel": "Namn (endast läsbart)",
       "nameHint": "Som på startlistan i Race Results.",
       "myRace": "Mitt lopp",
+      "myRaceEmpty": "Inga loppuppgifter än",
+      "myRaceEmptyHint": "Ditt startnummer och din klass syns här när arrangörerna har lagt in dem.",
       "myShiftsHeading": "Dina pass",
       "myShifts": "Mina pass",
       "myShiftsSub": "Du är funktionär här också"

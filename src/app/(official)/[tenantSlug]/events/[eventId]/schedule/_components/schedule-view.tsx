@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { CalendarCheck, CalendarOff, CalendarX, ChevronDown, TriangleAlert } from 'lucide-react'
 import { AppCard } from '@/components/ui/app-card'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ShiftListSkeleton } from '@/components/ui/page-skeleton'
 import { useRouter } from 'next/navigation'
 import {
   useEffect,
@@ -960,17 +961,23 @@ export function ScheduleView({
   // shifts alone showed the "nothing on this day" empty state on a day the
   // official had booked off — hiding the very declaration that put the day in
   // the tab list, which is the day they would most want confirmed.
+  // A day is on its way in. The old day's shifts must not stay on screen under
+  // the new day's tab — that mismatch was the moment of "wait, is this
+  // Friday?" — so the content gives way to a skeleton until the fetch lands.
+  const isLoadingDay = shownDay !== selectedDay
+
   const selectedDayIsEmpty =
     !hasNoAssignmentsAtAll && assignments.length === 0 && timeOff.length === 0
 
   return (
     <div className="px-5 pt-10 pb-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      {/* Header. The owner note sits under the title as a quiet subtitle, not
+          as a bordered pill beside it: on a phone the pill ran right up
+          against the title, and its border made a statement read as a
+          control. */}
+      <div className="mb-6">
         <h1 className="page-title">{strings.title}</h1>
-        <span className="rounded-full border border-edge px-3 py-1 text-sm font-medium text-ink-faint">
-          {strings.scheduleOwner}
-        </span>
+        <p className="mt-1.5 text-sm text-ink-faint">{strings.scheduleOwner}</p>
       </div>
 
       {/* View toggle. A sliding segmented control: one grey track holding a
@@ -1033,12 +1040,14 @@ export function ScheduleView({
           state every absence twice. The work-area view groups by station
           rather than by clock, so it has no timeline to fold them into and
           keeps the block above. */}
-      {selectedDay && view === 'work-area' ? (
+      {selectedDay && view === 'work-area' && !isLoadingDay ? (
         <TimeOffStrip timeOff={timeOff} day={selectedDay} strings={strings} />
       ) : null}
 
       {/* Content */}
-      {hasNoAssignmentsAtAll ? (
+      {isLoadingDay ? (
+        <ShiftListSkeleton />
+      ) : hasNoAssignmentsAtAll ? (
         <EmptyState
           Icon={CalendarCheck}
           title={strings.noAssignments}

@@ -117,7 +117,8 @@
     "confirmBody": "{{name}} checked this off. Uncheck it anyway?",
     "confirmCancel": "No, keep it",
     "confirmConfirm": "Yes, uncheck",
-    "saveFailed": "Could not save. Try again."
+    "saveFailed": "Could not save. Try again.",
+    "saving": "Saving…"
   },
   "availability": {
     "pageTitle": "Availability",
@@ -181,6 +182,8 @@
       "nameLabel": "Name (read-only)",
       "nameHint": "As on the Race Results start list.",
       "myRace": "My race",
+      "myRaceEmpty": "No race details yet",
+      "myRaceEmptyHint": "Your bib and class show up here once the organisers have added them.",
       "myShiftsHeading": "Your shifts",
       "myShifts": "My shifts",
       "myShiftsSub": "You are an official here too"

@@ -2,7 +2,15 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, Calendar, ChevronRight, ExternalLink, FileText, LogOut } from 'lucide-react'
+import {
+  ArrowUpRight,
+  Calendar,
+  Flag,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+  LogOut,
+} from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
@@ -102,15 +110,25 @@ export function ParticipantAccountForm({
 
   return (
     <div className="px-5 pt-6 pb-8">
-      <div className="mb-8">
+      {/* mb-12, not the mb-8 between the other fields: the next field's
+          outside label is absolutely positioned and rises into this margin,
+          so mb-8 left only a sliver between this hint and that label. */}
+      <div className="mb-12">
         <Input
           label={t('participant.account.nameLabel')}
           value={name}
           labelPlacement="outside"
           isReadOnly
-          description={t('participant.account.nameHint')}
+          aria-describedby="participant-name-hint"
           classNames={readOnlyField}
         />
+        {/* Our own note rather than HeroUI's `description`: that slot inherits
+            the 16px field-text token (the iOS zoom fix) and its own inset, so
+            the hint came out as large as the value above it and pushed in from
+            the edge. Same treatment as the ICE note further down. */}
+        <p id="participant-name-hint" className="mt-2 text-xs text-gray-400">
+          {t('participant.account.nameHint')}
+        </p>
       </div>
 
       <div className="mb-8">
@@ -154,12 +172,39 @@ export function ParticipantAccountForm({
           and My account stays reachable while an event is closed (PB10). */}
       <p className="section-label mb-2.5">{t('participant.account.myRace')}</p>
       <div className="mb-8 flex flex-col gap-3">
+        {/* Nothing imported yet — no row at all, or a row with no stage, bib,
+            category or results link. Either way the card used to render as an
+            empty white box, which read as broken rather than "not yet". */}
+        {myRace.every(
+          (entry) =>
+            entry.stageNames.length === 0 && !entry.bib && !entry.category && !entry.raceResultsUrl
+        ) ? (
+          <AppCard bodyClassName="px-4 py-4">
+            <div className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-tenant-primary-tint text-tenant-primary-tint-text">
+                <Flag className="size-4" strokeWidth={1.8} aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-[15px] font-semibold text-ink">
+                  {t('participant.account.myRaceEmpty')}
+                </p>
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {t('participant.account.myRaceEmptyHint')}
+                </p>
+              </div>
+            </div>
+          </AppCard>
+        ) : null}
         {myRace.map((entry) => {
           const facts = [
             ...entry.stageNames,
             entry.bib ? `${t('participant.home.bib')} ${entry.bib}` : null,
             entry.category ? `${t('participant.home.category')} ${entry.category}` : null,
           ].filter(Boolean)
+          // An entry with nothing to show is covered by the empty card above
+          // when every entry is bare; among several events, a bare one is
+          // simply left out rather than drawn as a blank box.
+          if (facts.length === 0 && !entry.raceResultsUrl) return null
           return (
             <AppCard key={entry.eventId} bodyClassName="px-4 py-4">
               {myRace.length > 1 ? (
