@@ -75,6 +75,26 @@ export function AdminPageSkeleton({ className = ADMIN_PAGE_PADDING }: { classNam
   )
 }
 
+// MYSCH-01's day content while another day is fetched: only the shift cards,
+// not a whole page, because the title, view toggle and day tabs above stay
+// where they are — the tabs already show the day being asked for.
+export function ShiftListSkeleton() {
+  return (
+    <LoadingRegion className="flex flex-col gap-4">
+      {[0, 1].map((i) => (
+        <div key={i} className={`${CARD_SURFACE} flex flex-col gap-3 px-5 py-5`}>
+          <Bone className="h-5 w-1/2" />
+          <Bone className="h-4 w-1/3" />
+          <div className="mt-2 flex flex-col gap-2">
+            <Bone className="h-3 w-4/5" />
+            <Bone className="h-3 w-3/5" />
+          </div>
+        </div>
+      ))}
+    </LoadingRegion>
+  )
+}
+
 // Mobile-first screens (official and participant): page title, then a stack
 // of cards — the shape of home, event info, announcements and the schedule
 // list.

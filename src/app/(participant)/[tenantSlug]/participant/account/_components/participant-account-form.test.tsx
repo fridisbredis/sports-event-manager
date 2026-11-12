@@ -90,6 +90,25 @@ describe('ParticipantAccountForm', () => {
     )
   })
 
+  it('says the race details are not in yet instead of drawing a blank card', () => {
+    const bare = {
+      eventId: 'e1',
+      eventName: 'Viadal 2026',
+      stageNames: [],
+      bib: null,
+      category: null,
+      raceResultsUrl: null,
+    }
+    const { rerender } = render(<ParticipantAccountForm {...baseProps} myRace={[bare]} />)
+    expect(screen.getByText('participant.account.myRaceEmpty')).toBeTruthy()
+
+    rerender(<ParticipantAccountForm {...baseProps} myRace={[]} />)
+    expect(screen.getByText('participant.account.myRaceEmpty')).toBeTruthy()
+
+    rerender(<ParticipantAccountForm {...baseProps} />)
+    expect(screen.queryByText('participant.account.myRaceEmpty')).toBeNull()
+  })
+
   it('writes the SMS switch to the participant route, for this tenant', async () => {
     render(<ParticipantAccountForm {...baseProps} />)
 

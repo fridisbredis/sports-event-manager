@@ -91,6 +91,7 @@ const CHECKLIST_STRINGS = {
   confirmCancel: 'No, keep it',
   confirmConfirm: 'Yes, uncheck',
   saveFailed: 'Could not save. Try again.',
+  saving: 'Saving…',
 }
 
 const CHECKLIST_PROPS = {

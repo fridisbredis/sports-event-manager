@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useOptimistic, useState, useTransition } from 'react'
 import {
   Modal,
   ModalContent,
@@ -10,6 +10,7 @@ import {
   Button,
   useDisclosure,
 } from '@heroui/react'
+import { Loader2 } from 'lucide-react'
 import { workAreaDotColor, type WorkAreaColor } from '@/lib/theme/work-area-colors'
 import { toggleChecklistItem } from '../actions'
 import { dateLocaleFor } from '@/lib/i18n/date-locale'
@@ -48,6 +49,8 @@ export interface ChecklistStrings {
   confirmCancel: string
   confirmConfirm: string
   saveFailed: string
+  /** Shown in place of the "checked by" line while a toggle is saving. */
+  saving: string
 }
 
 /** Fills `{{key}}` placeholders, matching i18next's interpolation syntax. */
@@ -112,6 +115,13 @@ export function ChecklistItemRow({
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // The tick follows the tap at once, then the server. Waiting for the round
+  // trip left the box unchanged (and greyed out) for a second or more on a
+  // phone, which read as a missed tap. useOptimistic rather than useState is
+  // what keeps the old guarantee: the value lives only as long as the
+  // transition, so a rejected write (RLS, a lost race) snaps the box back to
+  // what the database says the moment the action returns.
+  const [optimisticChecked, setOptimisticChecked] = useOptimistic(check !== null)
   // Above the informational early return below: hooks cannot be called
   // conditionally, and that return sits between here and the only use.
   const language = useLanguage()
@@ -130,13 +140,14 @@ export function ChecklistItemRow({
     )
   }
 
-  const isChecked = check !== null
+  const isChecked = optimisticChecked
   const isOwnCheck = check?.checked_by !== null && check?.checked_by === currentUserId
   const actorName = check?.actorName ?? strings.someone
 
   function submit(nextChecked: boolean) {
     setError(null)
     startTransition(async () => {
+      setOptimisticChecked(nextChecked)
       const result = await toggleChecklistItem({
         tenantSlug,
         todoId: todo.id,
@@ -145,9 +156,9 @@ export function ChecklistItemRow({
         timeslotEnd,
         checked: nextChecked,
       })
-      // The optimistic-free path: the row re-renders from the server's own
-      // state after revalidatePath, so a rejected write (RLS, a lost race)
-      // can never leave the box looking ticked when the database disagrees.
+      // On success the row re-renders from the server's own state after
+      // revalidatePath, inside this same transition, so the optimistic value
+      // hands over to the real one without a flicker back.
       if (result.error) setError(strings.saveFailed)
     })
   }
@@ -156,7 +167,7 @@ export function ChecklistItemRow({
     // Unchecking a colleague's tick is the only destructive direction — ask
     // first. "No" must do nothing at all, so the box is never updated here;
     // it only ever follows the server.
-    if (!nextChecked && isChecked && !isOwnCheck) {
+    if (!nextChecked && check !== null && !isOwnCheck) {
       onOpen()
       return
     }
@@ -168,7 +179,11 @@ export function ChecklistItemRow({
       <input
         type="checkbox"
         checked={isChecked}
+        // Disabled while saving so a second tap cannot race the first, but
+        // not faded: the box already shows the new state, and greying it out
+        // made a successful tap look like a failed one.
         disabled={isPending}
+        aria-busy={isPending || undefined}
         onChange={(e) => handleChange(e.target.checked)}
         aria-label={
           labelWithTime
@@ -178,7 +193,7 @@ export function ChecklistItemRow({
               )}\u2013${formatTimeOfDay(timeslotEnd, language)}`
             : `${strings.toggleLabel}: ${todo.instruction_text}`
         }
-        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-wait disabled:opacity-50"
+        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-wait"
       />
       <span className="min-w-0 flex-1">
         <span
@@ -189,7 +204,15 @@ export function ChecklistItemRow({
         {/* The "who and when" the shift can see. Rendered from the current
             state row rather than the event log: the log is the audit trail,
             this line is just the latest fact. */}
-        {check ? (
+        {isPending ? (
+          <span className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
+            <Loader2
+              className="size-3 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+            {strings.saving}
+          </span>
+        ) : check ? (
           <span className="mt-0.5 block text-xs text-gray-400">
             {fill(strings.checkedBy, {
               name: actorName,

@@ -470,6 +470,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     confirmCancel: t('checklist.confirmCancel'),
     confirmConfirm: t('checklist.confirmConfirm'),
     saveFailed: t('checklist.saveFailed'),
+    saving: t('checklist.saving'),
   }
 
   return (

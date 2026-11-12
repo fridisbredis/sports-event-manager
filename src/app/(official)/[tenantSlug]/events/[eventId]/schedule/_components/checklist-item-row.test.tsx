@@ -17,6 +17,7 @@ const STRINGS = {
   confirmCancel: 'No, keep it',
   confirmConfirm: 'Yes, uncheck',
   saveFailed: 'Could not save. Try again.',
+  saving: 'Saving…',
 }
 
 const ME = '11111111-1111-1111-1111-111111111111'
