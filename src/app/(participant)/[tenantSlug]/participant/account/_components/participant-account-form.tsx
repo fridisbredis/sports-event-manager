@@ -110,7 +110,10 @@ export function ParticipantAccountForm({
 
   return (
     <div className="px-5 pt-6 pb-8">
-      <div className="mb-8">
+      {/* mb-12, not the mb-8 between the other fields: the next field's
+          outside label is absolutely positioned and rises into this margin,
+          so mb-8 left only a sliver between this hint and that label. */}
+      <div className="mb-12">
         <Input
           label={t('participant.account.nameLabel')}
           value={name}
