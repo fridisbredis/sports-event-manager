@@ -6,18 +6,27 @@ import { logger } from '@/lib/logger'
 import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { resolveSmsSender } from '@/lib/sms/sender'
+import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
 
 // SEC-09: triggered daily by the gdpr-warning-sms-trigger pg_cron job (migration
 // 0029) via pg_net. Sends the 23-month inactivity warning SMS to officials and
 // participants, and marks them so the same warning isn't re-sent every day.
 // Never called directly by a browser — CRON_SECRET is the only guard, so an
 // unset/mismatched secret must fail closed (401), not "no auth configured, proceed".
+//
+// B18: the same daily tick also removes the profile photos of everyone due for
+// anonymization (src/lib/gdpr/avatar-cleanup.ts). It runs first, before any
+// SMS configuration check, so a Twilio problem cannot keep a photo past the
+// retention limit. Its failures are logged and retried on the next tick; they
+// never stop the warnings.
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET
   const authHeader = request.headers.get('Authorization')
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const avatars = await removeExpiredAvatars(createSupabaseServiceClient())
 
   const fromNumber = process.env.TWILIO_PHONE_NUMBER
   if (!fromNumber) {
@@ -204,5 +213,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, sent, failed, unmarked })
+  return NextResponse.json({ ok: true, sent, failed, unmarked, avatars })
 }

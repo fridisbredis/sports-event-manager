@@ -178,22 +178,29 @@ export default async function DashboardPage({ params }: Props) {
         draftLabel={t('dashboard.draft')}
       />
 
-      {/* One column on a phone, the handoff's 3:2 split from md up. The fixed
-          two-column rule squeezed both cards to roughly 180px on a 390px
-          screen, which wrapped "Published — visible to officials" onto four
-          lines and clipped the officials counts at the right edge. */}
-      <div className="grid grid-cols-1 gap-5 mb-5 md:grid-cols-[3fr_2fr]">
-        <PublishSection
-          tierAllowsPublish={tierAllowsPublish}
-          canPublish={canPublish}
-          isPublished={isPublished}
-          hasName={hasName}
-          hasRaceStage={hasRaceStage}
-          tenantSlug={tenantSlug}
-          tenantId={tenantId}
-          eventId={event?.id ?? null}
-        />
-        <div className="flex flex-col gap-5">
+      {/* One row of three on wide screens: publish status beside the two
+          stat cards. Stacking the stat cards next to publish stretched the
+          publish card to double height, leaving it mostly empty. Between md
+          and lg, publish takes the full width and the stat cards share the
+          row below. On a phone, everything is one column. */}
+      <div
+        className={`grid grid-cols-1 gap-5 mb-5 md:grid-cols-2 ${
+          claimCounts ? 'lg:grid-cols-[2fr_1fr_1fr]' : 'lg:grid-cols-[2fr_1fr]'
+        }`}
+      >
+        <div className="md:col-span-2 lg:col-span-1 [&>*]:h-full">
+          <PublishSection
+            tierAllowsPublish={tierAllowsPublish}
+            canPublish={canPublish}
+            isPublished={isPublished}
+            hasName={hasName}
+            hasRaceStage={hasRaceStage}
+            tenantSlug={tenantSlug}
+            tenantId={tenantId}
+            eventId={event?.id ?? null}
+          />
+        </div>
+        <div className={`[&>*]:h-full ${claimCounts ? '' : 'md:col-span-2 lg:col-span-1'}`}>
           <OfficialsCard
             title={t('dashboard.officials')}
             invited={officialsInvited}
@@ -201,24 +208,24 @@ export default async function DashboardPage({ params }: Props) {
             confirmed={officialsConfirmed}
             confirmedLabel={t('dashboard.confirmed')}
           />
-          {claimCounts && (
-            <ParticipantsCard
-              title={t('dashboard.participants')}
-              claimed={claimCounts.claimed}
-              total={claimCounts.total}
-              claimedLabel={t('dashboard.participantsClaimed', {
-                claimed: claimCounts.claimed,
-                total: claimCounts.total,
-              })}
-              conflictsLabel={
-                claimCounts.conflicts > 0
-                  ? t('dashboard.participantsConflicts', { count: claimCounts.conflicts })
-                  : null
-              }
-              href={adminEventPath(tenantSlug, eventId, 'participants')}
-            />
-          )}
         </div>
+        {claimCounts && (
+          <ParticipantsCard
+            title={t('dashboard.participants')}
+            claimed={claimCounts.claimed}
+            total={claimCounts.total}
+            claimedLabel={t('dashboard.participantsClaimed', {
+              claimed: claimCounts.claimed,
+              total: claimCounts.total,
+            })}
+            conflictsLabel={
+              claimCounts.conflicts > 0
+                ? t('dashboard.participantsConflicts', { count: claimCounts.conflicts })
+                : null
+            }
+            href={adminEventPath(tenantSlug, eventId, 'participants')}
+          />
+        )}
       </div>
 
       <div className="mb-5">

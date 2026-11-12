@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { POST } from './route'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import twilio from 'twilio'
+import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
@@ -15,6 +16,10 @@ vi.mock('twilio', () => ({
 
 vi.mock('@/lib/sms/usage', () => ({
   recordSmsUsage: vi.fn(),
+}))
+
+vi.mock('@/lib/gdpr/avatar-cleanup', () => ({
+  removeExpiredAvatars: vi.fn(),
 }))
 
 vi.mock('@/lib/logger', () => ({
@@ -71,6 +76,7 @@ beforeEach(() => {
   process.env.TWILIO_PHONE_NUMBER = '+15550001111'
   messagesCreate.mockResolvedValue({})
   vi.mocked(twilio).mockReturnValue({ messages: { create: messagesCreate } } as never)
+  vi.mocked(removeExpiredAvatars).mockResolvedValue({ cleared: 0, failed: 0, listFailed: false })
 })
 
 // N13: the warning goes out from the person's own tenant's sender.
@@ -114,5 +120,50 @@ describe('POST /api/cron/gdpr-warning — N13 sender', () => {
     expect(messagesCreate).toHaveBeenCalledWith(
       expect.objectContaining({ to: '+46701111111', from: '+15550001111' })
     )
+  })
+})
+
+// B18: the same tick removes expired profile photos.
+describe('POST /api/cron/gdpr-warning — B18 avatar cleanup', () => {
+  it('does not touch photos when the cron secret is wrong', async () => {
+    const request = new NextRequest('http://localhost/api/cron/gdpr-warning', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer wrong' },
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(401)
+    expect(removeExpiredAvatars).not.toHaveBeenCalled()
+  })
+
+  it('still removes photos when SMS is not configured', async () => {
+    delete process.env.TWILIO_PHONE_NUMBER
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({ officials: [], tenants: { data: [] } }) as never
+    )
+
+    const response = await POST(makeRequest())
+
+    expect(response.status).toBe(500)
+    expect(removeExpiredAvatars).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the cleanup result alongside the warnings', async () => {
+    vi.mocked(removeExpiredAvatars).mockResolvedValue({ cleared: 2, failed: 1, listFailed: false })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({ officials: [], tenants: { data: [] } }) as never
+    )
+
+    const response = await POST(makeRequest())
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      ok: true,
+      sent: 0,
+      failed: 0,
+      unmarked: 0,
+      avatars: { cleared: 2, failed: 1, listFailed: false },
+    })
   })
 })
