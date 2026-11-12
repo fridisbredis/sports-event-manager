@@ -9,8 +9,8 @@ import { canPublish, displayedEventStatus } from '@/lib/events/participant-side'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { EmptyState, EmptyStateCard } from '@/components/ui/empty-state'
-import { EventCard } from './_components/event-card'
-import { CreateEventDialog, type CopySource } from './_components/create-event-dialog'
+import { EventCard } from '../_components/event-card'
+import { CreateEventDialog, type CopySource } from '../_components/create-event-dialog'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>

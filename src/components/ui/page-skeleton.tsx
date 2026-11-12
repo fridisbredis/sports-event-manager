@@ -4,10 +4,10 @@ import { Skeleton } from '@heroui/react'
 import { useTranslation } from '@/lib/i18n/client'
 import { CARD_SURFACE } from './card-styles'
 
-// Route-level loading states, rendered by the loading.tsx files under the two
-// [eventId] segments. Without them a tap on a nav link left the previous screen
-// standing, untouched, until the next one had rendered on the server — the app
-// read as frozen rather than busy.
+// Route-level loading states, rendered by the loading.tsx files across the
+// admin, official, participant and system surfaces. Without them a tap on a
+// nav link left the previous screen standing, untouched, until the next one
+// had rendered on the server — the app read as frozen rather than busy.
 //
 // Deliberately generic: one shape per surface, standing in for "a page is
 // coming", not a pixel copy of each screen. They mirror the page padding and
@@ -34,11 +34,16 @@ function Bone({ className }: { className: string }) {
   return <Skeleton className={`rounded-md ${className}`} />
 }
 
-// Admin (web-first): page header, a row of summary cards, then a list card —
-// the shape of the dashboard and of every list screen beneath it.
-export function AdminPageSkeleton() {
+// Admin padding, which every tenant admin screen uses.
+const ADMIN_PAGE_PADDING = 'px-4 py-6 md:px-8 md:py-8'
+
+// Web-first admin screens (tenant and system admin): page header, a row of
+// summary cards, then a list card — the shape of the dashboard and of every
+// list screen. `className` carries the page's own padding/width where it
+// differs from the tenant admin default (system admin centres at 1240px).
+export function AdminPageSkeleton({ className = ADMIN_PAGE_PADDING }: { className?: string }) {
   return (
-    <LoadingRegion className="px-4 py-6 md:px-8 md:py-8">
+    <LoadingRegion className={className}>
       <div className="mb-8 flex flex-col gap-3">
         <Bone className="h-8 w-64 max-w-full" />
         <Bone className="h-4 w-40" />
@@ -70,9 +75,10 @@ export function AdminPageSkeleton() {
   )
 }
 
-// Official (mobile-first): page title, then a stack of cards — the shape of
-// home, event info, announcements and the schedule list.
-export function OfficialPageSkeleton() {
+// Mobile-first screens (official and participant): page title, then a stack
+// of cards — the shape of home, event info, announcements and the schedule
+// list.
+export function MobilePageSkeleton() {
   return (
     <LoadingRegion className="px-5 pt-10 pb-6">
       <Bone className="mb-6 h-8 w-48" />

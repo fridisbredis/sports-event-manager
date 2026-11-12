@@ -1,4 +1,4 @@
-import { OfficialPageSkeleton } from '@/components/ui/page-skeleton'
+import { MobilePageSkeleton } from '@/components/ui/page-skeleton'
 
 // Instant feedback while an official event screen renders on the server — on a
 // phone on event day, a tap that leaves the screen untouched reads as "nothing
@@ -11,5 +11,5 @@ import { OfficialPageSkeleton } from '@/components/ui/page-skeleton'
 // its notFound() for a caller without an officials row is asserted as a 404
 // in tests/e2e/access-control.spec.ts.
 export default function Loading() {
-  return <OfficialPageSkeleton />
+  return <MobilePageSkeleton />
 }

@@ -9,7 +9,7 @@ import { participantEventInfoPath, participantPath } from '@/lib/events/paths'
 import { loadParticipantHome, type ParticipantHomeEvent } from '@/lib/participants/participant-home'
 import { AppCard } from '@/components/ui/app-card'
 import { AnnouncementCard } from '@/components/announcements/announcement-card'
-import { NotAvailable } from './_components/not-available'
+import { NotAvailable } from '../_components/not-available'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>

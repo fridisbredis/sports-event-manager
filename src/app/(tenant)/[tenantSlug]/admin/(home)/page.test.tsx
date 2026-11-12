@@ -22,7 +22,7 @@ vi.mock('@/lib/supabase/server', () => {
   return { createSupabaseServerClient: vi.fn(async () => ({ from: () => chain })) }
 })
 // A client component; the page test only cares what it is handed.
-vi.mock('./_components/create-event-dialog', () => ({ CreateEventDialog: () => null }))
+vi.mock('../_components/create-event-dialog', () => ({ CreateEventDialog: () => null }))
 vi.mock('@/lib/events/tenant-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/events/tenant-events')>()),
   readTenantEvents: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('@/lib/i18n/server', () => ({
 vi.mock('@/lib/i18n/user-language', () => ({ getUserLanguage: vi.fn(async () => 'en') }))
 // An async server component; the page test only cares which events it is
 // handed, which the element's props carry.
-vi.mock('./_components/event-card', () => ({ EventCard: () => null }))
+vi.mock('../_components/event-card', () => ({ EventCard: () => null }))
 
 const params = Promise.resolve({ tenantSlug: 'viadal' })
 const search = (status?: string) => Promise.resolve(status ? { status } : {})
