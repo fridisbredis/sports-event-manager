@@ -8,6 +8,7 @@ import { formatAnnouncementTime } from '@/lib/i18n/announcement-time'
 import { participantEventInfoPath, participantPath } from '@/lib/events/paths'
 import { loadParticipantHome, type ParticipantHomeEvent } from '@/lib/participants/participant-home'
 import { AppCard } from '@/components/ui/app-card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { AnnouncementCard } from '@/components/announcements/announcement-card'
 import { NotAvailable } from '../_components/not-available'
 
@@ -36,7 +37,16 @@ function MyResultsLink({ url, label }: { url: string; label: string }) {
 // stages sees the same bib on both cards — which is true.
 function StageCards({ event, t }: { event: ParticipantHomeEvent; t: T }) {
   if (event.stages.length === 0) {
-    return <p className="text-[15px] text-ink-muted">{t('participant.home.noStages')}</p>
+    // An empty state rather than a bare line of text: on a single-event home
+    // this is the whole screen, and one grey sentence under the title read
+    // as a page that had failed to load.
+    return (
+      <EmptyState
+        Icon={Flag}
+        title={t('participant.home.noStagesTitle')}
+        description={t('participant.home.noStages')}
+      />
+    )
   }
 
   const facts = [
@@ -129,7 +139,10 @@ export default async function ParticipantHomePage({ params }: Props) {
                 )}
               </>
             ) : (
-              <NotAvailable message={t('participant.home.notAvailable')} />
+              <NotAvailable
+                title={t('participant.home.notAvailableTitle')}
+                message={t('participant.home.notAvailable')}
+              />
             )}
           </section>
         ))}
