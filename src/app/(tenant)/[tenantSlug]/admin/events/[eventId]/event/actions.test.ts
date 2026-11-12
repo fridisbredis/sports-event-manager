@@ -284,7 +284,7 @@ describe('saveEvent', () => {
     })
   })
 
-  it('allows removing the Race stage from a draft event, revalidates, and invalidates all three Group 1 cache tags', async () => {
+  it('allows removing the Race stage from a draft event, revalidates, and invalidates the cached event-info and dashboard tags', async () => {
     vi.mocked(hasAdminAccessToTenant).mockResolvedValue(true)
     const statusBuilder = statusBuilderFor('draft')
     const eventsBuilder = chain({ error: null })
@@ -304,8 +304,6 @@ describe('saveEvent', () => {
       'page'
     )
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-event-info`)
-    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-event`)
-    expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-workstations`)
     // PERF-06 / F-PERF-04 Phase 3
     expect(updateTag).toHaveBeenCalledWith(`tenant-${TENANT_ID}-admin-dashboard`)
   })

@@ -9,12 +9,7 @@ import { logger } from '@/lib/logger'
 import { translateDbError, translateStorageError } from '@/lib/actions/db-error-message'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import {
-  eventInfoCacheTag,
-  adminEventCacheTag,
-  workstationsCacheTag,
-  adminDashboardCacheTag,
-} from '@/lib/cache/tags'
+import { eventInfoCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { translateActionError as tError } from '@/lib/actions/action-error'
 import { normalizeResultsUrl } from './_utils'
 import { adminEventRoutePattern } from '@/lib/events/paths'
@@ -182,13 +177,10 @@ export async function saveEvent(input: SaveEventInput): Promise<SaveEventResult>
   revalidatePath(adminEventRoutePattern('dashboard'), 'page')
 
   // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): saveEvent touches events,
-  // event_stages and event_distances — every Group 1
-  // cached page reads at least one of those tables, so all three tags are
-  // invalidated. updateTag (not revalidateTag) so the admin who just saved
-  // sees their own write immediately on next render.
+  // event_stages and event_distances, which the cached event-info page reads.
+  // admin/event and admin/workstations read uncached (amended 2026-11-12).
+  // updateTag (not revalidateTag) so the write shows on the next render.
   updateTag(eventInfoCacheTag(input.tenantId))
-  updateTag(adminEventCacheTag(input.tenantId))
-  updateTag(workstationsCacheTag(input.tenantId))
 
   // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached summary reads events
   // (name, dates, status) and event_stages (race-stage count) — both changed
@@ -305,7 +297,6 @@ export async function uploadEventLogo(formData: FormData): Promise<UploadLogoRes
   revalidatePath(adminEventRoutePattern('event'), 'page')
   revalidatePath(adminEventRoutePattern('dashboard'), 'page')
   updateTag(eventInfoCacheTag(parsedTenantId.data))
-  updateTag(adminEventCacheTag(parsedTenantId.data))
   updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return { publicUrl: data.publicUrl }
@@ -375,7 +366,6 @@ export async function removeEventLogo(
   revalidatePath(adminEventRoutePattern('event'), 'page')
   revalidatePath(adminEventRoutePattern('dashboard'), 'page')
   updateTag(eventInfoCacheTag(parsedTenantId.data))
-  updateTag(adminEventCacheTag(parsedTenantId.data))
   updateTag(adminDashboardCacheTag(parsedTenantId.data))
 
   return {}

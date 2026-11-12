@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { translateDbError } from '@/lib/actions/db-error-message'
-import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
+import { eventInfoCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { logQueryError } from '@/lib/db/query-error'
 import { translateActionError as tError } from '@/lib/actions/action-error'
 import { adminEventRoutePattern } from '@/lib/events/paths'
@@ -164,11 +164,9 @@ function revalidatePublishStatus(tenantId: string) {
   revalidatePath(adminEventRoutePattern('dashboard'), 'page')
 
   // PERF-06 / F-PERF-04 Phase 2 (ADR-0003): publishing only changes
-  // events.status, which event-info and admin/event both read (workstations
-  // doesn't read status, so no tag for it here). updateTag (not
-  // revalidateTag) so the admin who just published sees it immediately.
+  // events.status, which the cached event-info page reads (admin/event reads
+  // it uncached). updateTag (not revalidateTag) so it shows immediately.
   updateTag(eventInfoCacheTag(tenantId))
-  updateTag(adminEventCacheTag(tenantId))
 
   // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached summary also reads
   // events.status (the published/draft badge and canPublish/isPublished).

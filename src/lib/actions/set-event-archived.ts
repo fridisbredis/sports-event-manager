@@ -8,7 +8,7 @@ import { maxActiveEvents } from '@/lib/tiers/features'
 import { logQueryError } from '@/lib/db/query-error'
 import { translateDbError } from '@/lib/actions/db-error-message'
 import { translateActionError as tError } from '@/lib/actions/action-error'
-import { eventInfoCacheTag, adminEventCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
+import { eventInfoCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
 import { adminEventRoutePattern } from '@/lib/events/paths'
 
 const eventIdSchema = z.string().uuid()
@@ -99,10 +99,9 @@ export async function setEventArchived(
   revalidatePath(adminEventRoutePattern('event'), 'page')
   revalidatePath('/[tenantSlug]/events', 'page')
 
-  // The status is read by the cached event config, event info and dashboard
-  // summaries, as for publishEvent.
+  // The status is read by the cached event info and dashboard summaries, as
+  // for publishEvent.
   updateTag(eventInfoCacheTag(tenant.id))
-  updateTag(adminEventCacheTag(tenant.id))
   updateTag(adminDashboardCacheTag(tenant.id))
 
   return {}

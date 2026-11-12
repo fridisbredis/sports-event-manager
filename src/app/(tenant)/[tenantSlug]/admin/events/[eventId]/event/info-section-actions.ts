@@ -16,7 +16,7 @@ import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { translateDbError, translateStorageError } from '@/lib/actions/db-error-message'
 import { translateActionError as tError } from '@/lib/actions/action-error'
-import { eventInfoCacheTag, adminEventCacheTag } from '@/lib/cache/tags'
+import { eventInfoCacheTag } from '@/lib/cache/tags'
 import { adminEventRoutePattern } from '@/lib/events/paths'
 import { normalizeResultsUrl } from './_utils'
 import {
@@ -69,7 +69,6 @@ async function removeImageIfUnreferenced(supabase: ServerClient, path: string) {
 function invalidate(tenantId: string) {
   revalidatePath(adminEventRoutePattern('event'), 'page')
   updateTag(eventInfoCacheTag(tenantId))
-  updateTag(adminEventCacheTag(tenantId))
 }
 
 /**

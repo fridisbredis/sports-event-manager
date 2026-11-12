@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { hasAdminAccessToTenant } from '@/lib/auth/tenant'
 import { logger } from '@/lib/logger'
 import { translateDbError } from '@/lib/actions/db-error-message'
-import { workstationsCacheTag, adminDashboardCacheTag } from '@/lib/cache/tags'
+import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import type { Json } from '@/types/database'
 import type { ChecklistItemType } from '@/types/app'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
@@ -129,9 +129,6 @@ export async function createWorkstation(
     }
 
   revalidatePath(adminEventRoutePattern('workstations'), 'page')
-  // updateTag (not revalidateTag) so the admin who just created this
-  // workstation sees it immediately on next render.
-  updateTag(workstationsCacheTag(parsedTenantId.data))
   // PERF-06 / F-PERF-04 Phase 3: the dashboard's cached over_capacity/
   // double_booked warnings are computed via scheduling_warning_counts, which
   // joins against workstations.capacity_ceiling.
@@ -222,9 +219,6 @@ export async function updateWorkstation(
     }
 
   revalidatePath(adminEventRoutePattern('workstations'), 'page')
-  // updateTag (not revalidateTag) so the admin who just updated this
-  // workstation sees the change immediately on next render.
-  updateTag(workstationsCacheTag(parsedTenantId.data))
   // PERF-06 / F-PERF-04 Phase 3: capacity_ceiling feeds the dashboard's
   // cached over_capacity/double_booked warnings via scheduling_warning_counts.
   updateTag(adminDashboardCacheTag(parsedTenantId.data))
@@ -277,9 +271,6 @@ export async function deleteWorkstation(
     }
 
   revalidatePath(adminEventRoutePattern('workstations'), 'page')
-  // updateTag (not revalidateTag) so the admin who just deleted this
-  // workstation sees it gone immediately on next render.
-  updateTag(workstationsCacheTag(parsedTenantId.data))
   // PERF-06 / F-PERF-04 Phase 3: removing a workstation removes its
   // capacity_ceiling from scheduling_warning_counts' join, changing the
   // dashboard's cached warning counts.
