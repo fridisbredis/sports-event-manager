@@ -20,7 +20,7 @@ import { CARD_SURFACE } from './card-styles'
 //
 // The bones are aria-hidden; the region announces itself once as busy.
 
-function LoadingRegion({ className, children }: { className: string; children: React.ReactNode }) {
+function LoadingRegion({ className, children }: { className?: string; children: React.ReactNode }) {
   const { t } = useTranslation('common')
   return (
     <div role="status" aria-busy="true" className={className}>
@@ -80,17 +80,23 @@ export function AdminPageSkeleton({ className = ADMIN_PAGE_PADDING }: { classNam
 // where they are — the tabs already show the day being asked for.
 export function ShiftListSkeleton() {
   return (
-    <LoadingRegion className="flex flex-col gap-4">
-      {[0, 1].map((i) => (
-        <div key={i} className={`${CARD_SURFACE} flex flex-col gap-3 px-5 py-5`}>
-          <Bone className="h-5 w-1/2" />
-          <Bone className="h-4 w-1/3" />
-          <div className="mt-2 flex flex-col gap-2">
-            <Bone className="h-3 w-4/5" />
-            <Bone className="h-3 w-3/5" />
+    <LoadingRegion>
+      {/* The gap lives on this inner stack, not on LoadingRegion: the region
+          wraps its children in an aria-hidden div, so a gap on the outer
+          element spaced that one wrapper and left the cards touching. gap-3 is
+          the real work-area card list's own spacing. */}
+      <div className="flex flex-col gap-3">
+        {[0, 1].map((i) => (
+          <div key={i} className={`${CARD_SURFACE} flex flex-col gap-3 px-5 py-5`}>
+            <Bone className="h-5 w-1/2" />
+            <Bone className="h-4 w-1/3" />
+            <div className="mt-2 flex flex-col gap-2">
+              <Bone className="h-3 w-4/5" />
+              <Bone className="h-3 w-3/5" />
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </LoadingRegion>
   )
 }

@@ -46,7 +46,10 @@ export default async function ParticipantEventInfoPage({ params }: Props) {
     return (
       <div className="px-5 pt-10 pb-6">
         <h1 className="page-title mb-6">{t('eventInfo.title')}</h1>
-        <NotAvailable message={t('participant.home.notAvailable')} />
+        <NotAvailable
+          title={t('participant.home.notAvailableTitle')}
+          message={t('participant.home.notAvailable')}
+        />
       </div>
     )
   }
