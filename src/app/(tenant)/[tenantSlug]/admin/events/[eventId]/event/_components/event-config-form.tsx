@@ -302,8 +302,10 @@ export default function EventConfigForm({
     <div>
       <UnsavedChangesDialog {...dialogProps} />
       {/* Page header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
+      {/* Below sm the title is too long to share a row: the status chip goes
+          under it and the actions under that, instead of pushing off-screen. */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
           <h1 className="page-title">{t('eventConfig.title')}</h1>
           <Chip
             variant="flat"
