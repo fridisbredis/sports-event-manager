@@ -122,6 +122,8 @@ describe('ParticipantEventInfoPage', () => {
     render(await ParticipantEventInfoPage({ params: params() }))
 
     expect(screen.getByText('participant.home.notAvailable')).toBeTruthy()
+
+    expect(screen.getByText('participant.home.notAvailableTitle')).toBeTruthy()
     expect(screen.queryByText('Parking')).toBeNull()
     expect(screen.queryByText('6dagars')).toBeNull()
   })
@@ -133,5 +135,7 @@ describe('ParticipantEventInfoPage', () => {
     render(await ParticipantEventInfoPage({ params: params() }))
 
     expect(screen.getByText('participant.home.notAvailable')).toBeTruthy()
+
+    expect(screen.getByText('participant.home.notAvailableTitle')).toBeTruthy()
   })
 })

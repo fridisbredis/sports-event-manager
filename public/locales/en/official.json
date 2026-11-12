@@ -172,8 +172,10 @@
       "bib": "Bib",
       "category": "Class",
       "myResults": "My results",
-      "noStages": "You are not entered in a race stage yet.",
-      "notAvailable": "This event is not available right now. Please check back later.",
+      "noStagesTitle": "No race stage yet",
+      "noStages": "Once you're entered in a race stage, it shows up here.",
+      "notAvailableTitle": "Not open yet",
+      "notAvailable": "The organisers haven't opened this event yet. Check back later.",
       "eventInfo": "Event info",
       "latestAnnouncement": "Announcements",
       "allAnnouncements": "All announcements"

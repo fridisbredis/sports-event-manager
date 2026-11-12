@@ -172,8 +172,10 @@
       "bib": "Startnr",
       "category": "Klass",
       "myResults": "Mina resultat",
-      "noStages": "Du är inte anmäld till någon etapp än.",
-      "notAvailable": "Det här evenemanget är inte tillgängligt just nu. Titta in igen senare.",
+      "noStagesTitle": "Ingen etapp än",
+      "noStages": "När du är anmäld till en etapp syns den här.",
+      "notAvailableTitle": "Inte öppet än",
+      "notAvailable": "Arrangörerna har inte öppnat evenemanget än. Titta in igen senare.",
       "eventInfo": "Evenemangsinfo",
       "latestAnnouncement": "Meddelanden",
       "allAnnouncements": "Alla meddelanden"

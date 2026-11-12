@@ -41,7 +41,10 @@ export default async function ParticipantAnnouncementsPage({ params, searchParam
       <h1 className="page-title mb-6">{t('announcements.title')}</h1>
 
       {!result.open ? (
-        <NotAvailable message={t('participant.home.notAvailable')} />
+        <NotAvailable
+          title={t('participant.home.notAvailableTitle')}
+          message={t('participant.home.notAvailable')}
+        />
       ) : result.items.length > 0 ? (
         <>
           <div className="flex flex-col gap-3">
