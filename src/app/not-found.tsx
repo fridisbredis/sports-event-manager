@@ -7,7 +7,7 @@ export default async function NotFound() {
 
   return (
     <main
-      className={`${display.variable} flex min-h-screen flex-col items-center justify-center bg-white px-6 py-24 text-center`}
+      className={`${display.variable} flex min-h-svh flex-col items-center justify-center bg-white px-6 py-24 text-center`}
       style={{ fontFamily: 'var(--font-display)' }}
     >
       <p className="text-xs font-medium uppercase tracking-[0.3em] text-gray-400">

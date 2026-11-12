@@ -37,7 +37,7 @@ export default function ClaimListView({ token, event, participants }: Props) {
     `/claim/${encodeURIComponent(token)}/${encodeURIComponent(row.id)}`
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-12 pt-10">
+    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-4 pb-12 pt-10">
       <header className="flex flex-col items-center text-center">
         {event.logoUrl ? (
           <Image
