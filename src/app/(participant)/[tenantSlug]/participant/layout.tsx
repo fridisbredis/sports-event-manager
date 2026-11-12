@@ -4,7 +4,8 @@ import { Calendar } from 'lucide-react'
 import { getCurrentUser, getParticipantTenant, hasOfficialScreens } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import { SurfaceSwitchLink } from '@/components/navigation/surface-switch-link'
+import { SurfaceSwitchBar } from '@/components/navigation/surface-switch-bar'
+import { officialShiftsPath } from '@/lib/events/official-event'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 import { ParticipantTabBar } from './_components/participant-tab-bar'
 
@@ -14,18 +15,18 @@ interface Props {
 }
 
 // A participant who is also an official lands on the official surface after
-// sign-in; this strip is their way back (and SurfaceSwitchLink on the official
-// layout is the way here). Suspended chrome, as in the official layout: no
+// sign-in; this strip is their way back (and SurfaceLinksChrome on the official
+// layout is the way here). It opens their schedule directly when they have one
+// event, rather than the event picker. Suspended chrome, as in the official layout: no
 // route's reachability depends on it.
 export async function OfficialLinkChrome({ tenantSlug }: { tenantSlug: string }) {
   if (!(await hasOfficialScreens(tenantSlug))) return null
-  const t = await getServerTranslation(await getUserLanguage(), 'official')
+  const [t, href] = await Promise.all([
+    getUserLanguage().then((lang) => getServerTranslation(lang, 'official')),
+    officialShiftsPath(tenantSlug),
+  ])
   return (
-    <SurfaceSwitchLink
-      href={`/${tenantSlug}/events`}
-      label={t('participant.nav.myShifts')}
-      Icon={Calendar}
-    />
+    <SurfaceSwitchBar links={[{ href, label: t('participant.nav.myShifts'), Icon: Calendar }]} />
   )
 }
 

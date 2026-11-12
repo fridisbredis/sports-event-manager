@@ -205,7 +205,9 @@ export function ParticipantAccountForm({
 
       <p className="section-label mb-2.5">{tCommon('language.label')}</p>
       <AppCard className="mb-8" bodyClassName="px-4 py-4">
-        <div className="flex flex-col gap-3">
+        {/* Same row as the official account screen: in a flex-col the
+            switcher stretched to the card's full width. */}
+        <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[15px] font-semibold text-ink">{t('account.languageLabel')}</p>
             <p className="mt-0.5 text-sm text-ink-muted">{t('account.languageHint')}</p>

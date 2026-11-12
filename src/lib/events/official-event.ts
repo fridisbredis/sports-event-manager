@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
+import { officialEventPath } from '@/lib/events/paths'
 
 const eventIdSchema = z.string().uuid()
 
@@ -175,4 +176,13 @@ export const getOfficialEvent = cache(
 export async function getSoleOfficialEventId(tenantSlug: string): Promise<string | null> {
   const events = await listOfficialEvents(tenantSlug)
   return events.length === 1 ? events[0].id : null
+}
+
+// Where "My shifts" on the participant surfaces leads: straight to the
+// schedule when the caller has one event, the event picker when they have
+// several. Mirrors the landing logic above so the link never asks the caller
+// to pick when there is nothing to pick between.
+export async function officialShiftsPath(tenantSlug: string): Promise<string> {
+  const eventId = await getSoleOfficialEventId(tenantSlug)
+  return eventId ? officialEventPath(tenantSlug, eventId, 'schedule') : `/${tenantSlug}/events`
 }
