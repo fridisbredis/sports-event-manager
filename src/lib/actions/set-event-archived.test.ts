@@ -97,7 +97,7 @@ describe('setEventArchived', () => {
       { method: 'neq', args: ['status', 'archived'] },
     ])
     expect(revalidatePath).toHaveBeenCalledWith('/[tenantSlug]/admin', 'page')
-    expect(updateTag).toHaveBeenCalledTimes(3)
+    expect(updateTag).toHaveBeenCalledTimes(2)
   })
 
   it('brings an archived event back as a draft', async () => {
