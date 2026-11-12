@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
-import { Flag } from 'lucide-react'
+import { Flag, LayoutDashboard } from 'lucide-react'
 import {
   getCurrentUser,
   getOfficialTenant,
@@ -10,8 +10,10 @@ import {
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { participantPath } from '@/lib/events/paths'
-import { SurfaceSwitchLink } from '@/components/navigation/surface-switch-link'
-import { AdminViewLink } from './_components/admin-view-link'
+import {
+  SurfaceSwitchBar,
+  type SurfaceSwitchTarget,
+} from '@/components/navigation/surface-switch-bar'
 import { BottomTabBar } from './_components/bottom-tab-bar'
 import { getSoleOfficialEventId } from '@/lib/events/official-event'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
@@ -21,30 +23,31 @@ interface Props {
   params: Promise<{ tenantSlug: string }>
 }
 
-// The cross-surface link, which the gate below does not need.
+// The cross-surface links, which the gate below does not need.
 //
-// An admin who is also on the roster gets a way back to their own surface.
-// No route's reachability depends on this answer, so suspending it costs no
-// guarantee — unlike the access check itself, which stays in the layout body.
-export async function AdminLinkChrome({ tenantSlug }: { tenantSlug: string }) {
-  const showAdminLink = await hasAdminScreens(tenantSlug)
+// An admin who is also on the roster gets a way back to their own surface,
+// and (N43) an official who has also claimed a participant record lands here
+// after sign-in (official outranks participant in ROLE_PRIORITY), so they get
+// a way to PAR-01; the participant layout has the way back. Both share one
+// strip. No route's reachability depends on these answers, so suspending them
+// costs no guarantee — unlike the access check itself, which stays in the
+// layout body.
+export async function SurfaceLinksChrome({ tenantSlug }: { tenantSlug: string }) {
+  const [isAdmin, isParticipant] = await Promise.all([
+    hasAdminScreens(tenantSlug),
+    hasParticipantScreens(tenantSlug),
+  ])
+  if (!isAdmin && !isParticipant) return null
 
-  return showAdminLink ? <AdminViewLink tenantSlug={tenantSlug} /> : null
-}
-
-// N43: an official who has also claimed a participant record lands here after
-// sign-in (official outranks participant in ROLE_PRIORITY). This strip is
-// their way to PAR-01; the participant layout has the way back.
-export async function ParticipantLinkChrome({ tenantSlug }: { tenantSlug: string }) {
-  if (!(await hasParticipantScreens(tenantSlug))) return null
   const t = await getServerTranslation(await getUserLanguage(), 'official')
-  return (
-    <SurfaceSwitchLink
-      href={participantPath(tenantSlug)}
-      label={t('nav.participantView')}
-      Icon={Flag}
-    />
-  )
+  const links: SurfaceSwitchTarget[] = []
+  if (isAdmin) {
+    links.push({ href: `/${tenantSlug}/admin`, label: t('nav.adminView'), Icon: LayoutDashboard })
+  }
+  if (isParticipant) {
+    links.push({ href: participantPath(tenantSlug), label: t('nav.participantView'), Icon: Flag })
+  }
+  return <SurfaceSwitchBar links={links} />
 }
 
 export default async function OfficialLayout({ children, params }: Props) {
@@ -86,10 +89,7 @@ export default async function OfficialLayout({ children, params }: Props) {
             link appearing a moment late is better than a grey bar where it
             will be. */}
         <Suspense>
-          <AdminLinkChrome tenantSlug={tenantSlug} />
-        </Suspense>
-        <Suspense>
-          <ParticipantLinkChrome tenantSlug={tenantSlug} />
+          <SurfaceLinksChrome tenantSlug={tenantSlug} />
         </Suspense>
         <div className="flex-1 pb-16">{children}</div>
         <BottomTabBar

@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import OfficialLayout, { AdminLinkChrome } from './layout'
-import { getCurrentUser, getOfficialTenant, hasAdminScreens } from '@/lib/auth/tenant'
+import OfficialLayout, { SurfaceLinksChrome } from './layout'
+import {
+  getCurrentUser,
+  getOfficialTenant,
+  hasAdminScreens,
+  hasParticipantScreens,
+} from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
-import { AdminViewLink } from './_components/admin-view-link'
+import { SurfaceSwitchBar } from '@/components/navigation/surface-switch-bar'
 
 // getOfficialTenant resolves the tenant only after the official-surface
 // access check passes, so a null return means either "no such tenant" or
@@ -12,6 +17,15 @@ vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getOfficialTenant: vi.fn(),
   hasAdminScreens: vi.fn(),
+  hasParticipantScreens: vi.fn(),
+}))
+
+vi.mock('@/lib/i18n/server', () => ({
+  getServerTranslation: vi.fn(async () => (key: string) => key),
+}))
+
+vi.mock('@/lib/i18n/user-language', () => ({
+  getUserLanguage: vi.fn(async () => 'en'),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -31,8 +45,8 @@ vi.mock('./_components/bottom-tab-bar', () => ({
   BottomTabBar: vi.fn(() => null),
 }))
 
-vi.mock('./_components/admin-view-link', () => ({
-  AdminViewLink: vi.fn(() => null),
+vi.mock('@/components/navigation/surface-switch-bar', () => ({
+  SurfaceSwitchBar: vi.fn(() => null),
 }))
 
 // TenantThemeStyle is stubbed because it renders a raw <style> tag, but
@@ -66,10 +80,11 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 // The layout no longer queries Supabase itself — it resolves the caller and the
 // tenant through the memoised helpers, which carry the access check.
-function mockUser(userId: string | null, tenant: unknown, isAdmin = false) {
+function mockUser(userId: string | null, tenant: unknown, isAdmin = false, isParticipant = false) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
   vi.mocked(getOfficialTenant).mockResolvedValue(tenant as never)
   vi.mocked(hasAdminScreens).mockResolvedValue(isAdmin)
+  vi.mocked(hasParticipantScreens).mockResolvedValue(isParticipant)
 }
 
 beforeEach(() => {
@@ -194,15 +209,25 @@ describe('OfficialLayout', () => {
 
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
-    // AdminViewLink is rendered by the suspended AdminLinkChrome, which the
+    // The bar is rendered by the suspended SurfaceLinksChrome, which the
     // gate above does not depend on — so the layout's tree holds the chrome
-    // element and the link is one await deeper.
-    const chrome = findByType(result, AdminLinkChrome)
+    // element and the bar is one await deeper.
+    const chrome = findByType(result, SurfaceLinksChrome)
     expect(chrome).not.toBeNull()
 
-    const link = findByType(await AdminLinkChrome(chrome!.props as never), AdminViewLink)
-    expect(link).not.toBeNull()
-    expect(link!.props).toEqual({ tenantSlug: 'viadal' })
+    const bar = findByType(await SurfaceLinksChrome(chrome!.props as never), SurfaceSwitchBar)
+    expect(bar).not.toBeNull()
+    const links = bar!.props.links as { href: string }[]
+    expect(links.map((l) => l.href)).toEqual(['/viadal/admin'])
+  })
+
+  // An admin who is also an official and a participant used to get two
+  // stacked strips; both links now share one bar.
+  it('puts the admin view and My race in one bar for a caller with both', async () => {
+    mockUser('user-1', { id: TENANT_ID, slug: 'viadal', is_active: true }, true, true)
+    const bar = findByType(await SurfaceLinksChrome({ tenantSlug: 'viadal' }), SurfaceSwitchBar)
+    const links = bar!.props.links as { href: string }[]
+    expect(links.map((l) => l.href)).toEqual(['/viadal/admin', '/viadal/participant'])
   })
 
   it('hides the admin view from a plain official', async () => {
@@ -216,6 +241,7 @@ describe('OfficialLayout', () => {
 
     const result = await OfficialLayout({ children: 'CHILD_CONTENT', params: PARAMS })
 
-    expect(findByType(result, AdminViewLink)).toBeNull()
+    const chrome = findByType(result, SurfaceLinksChrome)
+    expect(await SurfaceLinksChrome(chrome!.props as never)).toBeNull()
   })
 })

@@ -5,6 +5,7 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { fetchOwnIceContact } from '@/lib/ice-contact-read'
 import { loadParticipantHome } from '@/lib/participants/participant-home'
+import { officialShiftsPath } from '@/lib/events/official-event'
 import { ParticipantAccountForm } from './_components/participant-account-form'
 
 interface Props {
@@ -44,6 +45,8 @@ export default async function ParticipantAccountPage({ params }: Props) {
     hasOfficialScreens(tenantSlug),
   ])
 
+  const officialHref = isOfficial ? await officialShiftsPath(tenantSlug) : null
+
   if (error) throw error
   if (!records || records.length === 0) notFound()
 
@@ -73,7 +76,7 @@ export default async function ParticipantAccountPage({ params }: Props) {
           raceResultsUrl: e.raceResultsUrl,
         }))}
         language={language}
-        officialHref={isOfficial ? `/${tenantSlug}/events` : null}
+        officialHref={officialHref}
       />
     </div>
   )
