@@ -74,6 +74,8 @@ describe('ParticipantAnnouncementsPage (ANN-02, N44)', () => {
     await renderPage()
 
     expect(screen.getByText('participant.home.notAvailable')).toBeDefined()
+
+    expect(screen.getByText('participant.home.notAvailableTitle')).toBeDefined()
     expect(screen.queryByText('announcements.noAnnouncements')).toBeNull()
   })
 
