@@ -492,6 +492,7 @@ export default function EventConfigForm({
             {/* Stages */}
             <StageList
               stages={stages}
+              guideHref={`/${tenantSlug}/admin/events/${eventId}/dashboard?guide=1#onboarding-glossary`}
               onChange={(updated) => {
                 setStages(updated)
                 setSaveSuccess(false)
