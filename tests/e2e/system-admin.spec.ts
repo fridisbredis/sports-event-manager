@@ -256,7 +256,14 @@ test.describe('System admins', () => {
 
     const ownRow = page.getByRole('listitem').filter({ hasText: 'You' })
     await expect(ownRow).toHaveCount(1)
-    await expect(ownRow.getByRole('button', { name: 'Remove' })).toBeDisabled()
+
+    // Edit name and Remove live behind the row's ⋯ menu. Remove is there but
+    // disabled, with the reason as the item's description.
+    await ownRow.getByRole('button', { name: /^Actions for / }).click()
+    const remove = page.getByRole('menuitem', { name: 'Remove' })
+    await expect(remove).toBeDisabled()
+    await expect(remove).toContainText('You cannot remove yourself')
+    await expect(page.getByRole('menuitem', { name: 'Edit name' })).toBeEnabled()
   })
 
   test('add modal requires a name and a valid number, and can be cancelled', async ({
