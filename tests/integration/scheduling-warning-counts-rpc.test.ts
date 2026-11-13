@@ -6,12 +6,14 @@ import {
   serviceClient,
   cleanupTenant,
 } from './helpers'
+import type { AssignmentStatus } from '@/types/app'
 
 // scheduling_warning_counts (supabase/migrations/0040) backs the admin
 // dashboard's "Over capacity" / "Double-booked" tile. It used to be
 // hardcoded to 0/0 with no query at all. These tests cover:
 //   - the counts match src/lib/scheduling/grid-logic.ts's own semantics
 //     (distinct workstations/officials flagged, not one count per slot)
+//   - only assigned rows for the requested event contribute to warnings
 //   - tenant isolation: a caller in tenant A never sees tenant B's warnings
 //   - the auth path: `assignments` has only a FOR ALL tenant_admin policy, no
 //     separate member-read policy, so a non-admin caller must see 0/0
@@ -68,6 +70,7 @@ describe('scheduling_warning_counts RPC', () => {
     slotIndex: number
     timeslotStart?: string
     timeslotEnd?: string
+    status?: AssignmentStatus
   }) {
     const admin = serviceClient()
     // An assignment's event is its workstation's, and the fixtures span
@@ -86,8 +89,31 @@ describe('scheduling_warning_counts RPC', () => {
       timeslot_start: fields.timeslotStart ?? T1,
       timeslot_end: fields.timeslotEnd ?? T1_END,
       slot_index: fields.slotIndex,
-      status: 'assigned',
+      status: fields.status ?? 'assigned',
     })
+    if (error) throw error
+  }
+
+  async function seedUnassignedStatus(fields: {
+    tenantId: string
+    eventId: string
+    officialId: string
+    status: Exclude<AssignmentStatus, 'assigned'>
+    timeslotStart?: string
+    timeslotEnd?: string
+  }) {
+    const { error } = await serviceClient()
+      .from('assignments')
+      .insert({
+        tenant_id: fields.tenantId,
+        event_id: fields.eventId,
+        official_id: fields.officialId,
+        workstation_id: null,
+        timeslot_start: fields.timeslotStart ?? T1,
+        timeslot_end: fields.timeslotEnd ?? T1_END,
+        slot_index: 0,
+        status: fields.status,
+      })
     if (error) throw error
   }
 
@@ -199,7 +225,7 @@ describe('scheduling_warning_counts RPC', () => {
     workstationB = wsB
 
     const officialRows = []
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const { data, error } = await admin
         .from('officials')
         .insert({
@@ -386,6 +412,58 @@ describe('scheduling_warning_counts RPC', () => {
         earliest_day: '2026-09-20',
       },
     ])
+
+    await deleteAllAssignments(tenantA.id)
+    await deleteAllUnavailability(tenantA.id)
+  })
+
+  it('ignores non-assigned statuses when counting warnings', async () => {
+    await seedUnavailability({
+      tenantId: tenantA.id,
+      officialId: officials[2].id,
+      startsAt: T1,
+      endsAt: T1_END,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA.id,
+      slotIndex: 0,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[1].id,
+      workstationId: workstationA.id,
+      slotIndex: 1,
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[3].id,
+      workstationId: workstationA.id,
+      slotIndex: 2,
+      status: 'available',
+    })
+    await seedAssignment({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      workstationId: workstationA2.id,
+      slotIndex: 0,
+      status: 'on_break',
+    })
+    await seedUnassignedStatus({
+      tenantId: tenantA.id,
+      eventId: eventA.id,
+      officialId: officials[2].id,
+      status: 'blocked',
+    })
+
+    const { data, error } = await clientAdminA.rpc('scheduling_warning_counts', {
+      p_tenant_id: tenantA.id,
+      p_event_id: eventA.id,
+    })
+
+    expect(error).toBeNull()
+    expect(data?.map(normalizeWarningCounts)).toEqual([noWarnings()])
 
     await deleteAllAssignments(tenantA.id)
     await deleteAllUnavailability(tenantA.id)
@@ -639,6 +717,12 @@ describe('scheduling_warning_counts RPC', () => {
       .single()
     if (wsA2EventError) throw wsA2EventError
 
+    await seedUnavailability({
+      tenantId: tenantA.id,
+      officialId: officials[0].id,
+      startsAt: EARLY_T,
+      endsAt: EARLY_T_END,
+    })
     await seedAssignment({
       tenantId: tenantA.id,
       officialId: officials[0].id,
@@ -668,6 +752,7 @@ describe('scheduling_warning_counts RPC', () => {
     await admin.from('workstations').delete().eq('id', wsA2Event.id)
     await admin.from('event_stages').delete().eq('id', stageA2.id)
     await admin.from('events').delete().eq('id', eventA2.id)
+    await deleteAllUnavailability(tenantA.id)
   })
 
   it('returns 0/0 for a non-admin caller instead of an error (RLS-filtered, not authorized)', async () => {
