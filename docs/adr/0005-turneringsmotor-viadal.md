@@ -1,11 +1,11 @@
-# ADR-001: Turneringsappens backend blir en delad turneringsmotor för Viadal
+# ADR-0005: Turneringsappens backend blir en delad turneringsmotor för Viadal
 
-| | |
-|---|---|
-| Status | Föreslagen |
-| Datum | 2026-11-13 |
-| Berör | Turneringsappen (.NET + Angular) och Viadal (React/HeroUI + Supabase) |
-| Beslutsfattare | Frida |
+|                |                                                                       |
+| -------------- | --------------------------------------------------------------------- |
+| Status         | Föreslagen                                                            |
+| Datum          | 2026-11-13                                                            |
+| Berör          | Turneringsappen (.NET + Angular) och Viadal (React/HeroUI + Supabase) |
+| Beslutsfattare | Frida                                                                 |
 
 Lägg den här filen i båda repona, under `docs/adr/`. Avsnitt markerade **[att verifiera]** bygger på antaganden om nuvarande kod som ska kontrolleras innan implementation.
 
@@ -32,12 +32,12 @@ Frågan är hur turneringsfunktionen ska komma in i Viadal utan att reglerna fö
 
 ## 3. Alternativ som övervägts
 
-| Alternativ | Varför inte (eller inte nu) |
-|---|---|
-| 1. Bara länk med SSO, inga ändringar i motorn | Snabbast, men leder till en återvändsgränd: motorn vet inget om sammanhang eller externa spelare. Ingår som första leverans, men byggt enligt detta beslut. |
-| 2. Angular-appen som webbkomponent (Angular Elements) i Viadal | Två ramverk på samma sida, stor kodmängd, krockande stilar (Tailwind och Angular Material). |
-| 3. **En motor, två framändar** | **Valt.** Reglerna finns på ett ställe och det känns inbyggt i Viadal på sikt. Priset är två framändar att underhålla. |
-| 4. Bygga om allt i Viadal (Supabase + React) | Reglerna hamnar i två kodbaser som glider isär, eftersom den fristående appen ska finnas kvar. |
+| Alternativ                                                     | Varför inte (eller inte nu)                                                                                                                                 |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Bara länk med SSO, inga ändringar i motorn                  | Snabbast, men leder till en återvändsgränd: motorn vet inget om sammanhang eller externa spelare. Ingår som första leverans, men byggt enligt detta beslut. |
+| 2. Angular-appen som webbkomponent (Angular Elements) i Viadal | Två ramverk på samma sida, stor kodmängd, krockande stilar (Tailwind och Angular Material).                                                                 |
+| 3. **En motor, två framändar**                                 | **Valt.** Reglerna finns på ett ställe och det känns inbyggt i Viadal på sikt. Priset är två framändar att underhålla.                                      |
+| 4. Bygga om allt i Viadal (Supabase + React)                   | Reglerna hamnar i två kodbaser som glider isär, eftersom den fristående appen ska finnas kvar.                                                              |
 
 ## 4. Arkitektur
 
@@ -71,20 +71,20 @@ Drift: motorn körs som en egen container app i samma Azure Container Apps-milj�
 
 ### 5.1 Sammanhang på varje turnering
 
-| Fält | Typ | Exempel |
-|---|---|---|
-| `ContextType` | enum `Standalone` / `Viadal` | `Viadal` |
-| `ContextId` | string, null för `Standalone` | Viadals event-id |
+| Fält          | Typ                           | Exempel          |
+| ------------- | ----------------------------- | ---------------- |
+| `ContextType` | enum `Standalone` / `Viadal`  | `Viadal`         |
+| `ContextId`   | string, null för `Standalone` | Viadals event-id |
 
 - **Varje** fråga mot turneringar filtreras på sammanhanget från inloggningen, aldrig på ett värde som klienten skickar. Lägg det som ett globalt filter (EF Core query filter) så att det inte kan glömmas bort.
 - Det ska finnas tester som bevisar att en användare i ett sammanhang inte kan läsa eller ändra något i ett annat.
 
 ### 5.2 Externa spelare
 
-| Fält | Typ | Exempel |
-|---|---|---|
+| Fält          | Typ                                                  | Exempel                 |
+| ------------- | ---------------------------------------------------- | ----------------------- |
 | `ExternalRef` | string, unik per sammanhang, null för egna användare | `viadal:official:8f3c…` |
-| `DisplayName` | string | `Anna Berg` |
+| `DisplayName` | string                                               | `Anna Berg`             |
 
 - En spelare är antingen en egen användare i turneringsappen eller en extern referens.
 - Namnet sparas för visning. Det uppdateras när spelarlistan hämtas på nytt från Viadal.
@@ -93,10 +93,10 @@ Drift: motorn körs som en egen container app i samma Azure Container Apps-milj�
 
 Motorn tar emot två slags tokens, som två autentiseringsscheman i ASP.NET Core:
 
-| Schema | Utfärdare | Används av |
-|---|---|---|
+| Schema       | Utfärdare                                                                            | Används av           |
+| ------------ | ------------------------------------------------------------------------------------ | -------------------- |
 | `Standalone` | Microsoft Entra ID (inloggning med jobbmejl), validerat med `Microsoft.Identity.Web` | Den fristående appen |
-| `Viadal` | Viadal, se 6.1 | Officials via Viadal |
+| `Viadal`     | Viadal, se 6.1                                                                       | Officials via Viadal |
 
 Rättigheter beräknas av motorn utifrån token och turneringens data, enligt rolltabellen i `design/SPEC.md` §2. I Viadal-sammanhang gäller dessutom:
 
@@ -126,17 +126,17 @@ Turneringar i Viadal-sammanhang **raderas ett år efter att turneringen avslutat
 
 ### 5.5 API-ytor (förslag)
 
-| Metod | Sökväg | Syfte |
-|---|---|---|
-| `GET` | `/api/tournaments` | Turneringar i inloggningens sammanhang |
-| `POST` | `/api/tournaments` | Skapa (namn, slutdatum, spelare) |
-| `POST` | `/api/tournaments/{id}/draw` | Lotta |
-| `GET` | `/api/tournaments/{id}` | Turnering med träd, rundor och matcher |
-| `PUT` | `/api/matches/{id}/winner` | Sätt eller byt vinnare (`If-Match`) |
-| `DELETE` | `/api/matches/{id}/winner` | Ångra vinnare (`If-Match`) |
-| `POST` | `/api/tournaments/{id}/clear` | Rensa resultat (arrangör) |
-| `DELETE` | `/api/tournaments/{id}` | Ta bort (arrangör) |
-| `GET` | `/api/players` | Tillgängliga spelare i sammanhanget. I Viadal hämtas de från Viadal, se 6.2 |
+| Metod    | Sökväg                        | Syfte                                                                       |
+| -------- | ----------------------------- | --------------------------------------------------------------------------- |
+| `GET`    | `/api/tournaments`            | Turneringar i inloggningens sammanhang                                      |
+| `POST`   | `/api/tournaments`            | Skapa (namn, slutdatum, spelare)                                            |
+| `POST`   | `/api/tournaments/{id}/draw`  | Lotta                                                                       |
+| `GET`    | `/api/tournaments/{id}`       | Turnering med träd, rundor och matcher                                      |
+| `PUT`    | `/api/matches/{id}/winner`    | Sätt eller byt vinnare (`If-Match`)                                         |
+| `DELETE` | `/api/matches/{id}/winner`    | Ångra vinnare (`If-Match`)                                                  |
+| `POST`   | `/api/tournaments/{id}/clear` | Rensa resultat (arrangör)                                                   |
+| `DELETE` | `/api/tournaments/{id}`       | Ta bort (arrangör)                                                          |
+| `GET`    | `/api/players`                | Tillgängliga spelare i sammanhanget. I Viadal hämtas de från Viadal, se 6.2 |
 
 Publicera API:t som OpenAPI. Det blir kontraktet för både Angular-appen och en framtida Viadal-modul.
 
@@ -150,16 +150,16 @@ En server-endpoint som körs med officialens vanliga Supabase-session.
 2. Kontrollerar att officialen är bekräftad (`invite_status = confirmed`) på eventet.
 3. Signerar en JWT:
 
-| Claim | Värde |
-|---|---|
-| `iss` | `https://app.viadalevent.se` |
-| `aud` | `tournament-engine` |
-| `sub` | `viadal:official:{officialId}` |
-| `name` | Officialens visningsnamn |
-| `ctx` | `viadal:event:{eventId}` |
-| `tenant` | Tenant-id |
-| `tier` | `premium` eller `professional` |
-| `exp` | Nu + 15 minuter |
+| Claim    | Värde                          |
+| -------- | ------------------------------ |
+| `iss`    | `https://app.viadalevent.se`   |
+| `aud`    | `tournament-engine`            |
+| `sub`    | `viadal:official:{officialId}` |
+| `name`   | Officialens visningsnamn       |
+| `ctx`    | `viadal:event:{eventId}`       |
+| `tenant` | Tenant-id                      |
+| `tier`   | `premium` eller `professional` |
+| `exp`    | Nu + 15 minuter                |
 
 - Signera asymmetriskt (ES256 eller RS256). Den privata nyckeln finns bara i Viadal. Viadal publicerar den publika nyckeln på `/.well-known/jwks.json`, och motorn hämtar den därifrån. Det gör nyckelbyte möjligt utan nya deploys.
 - Klienten hämtar en ny token innan den gamla går ut.
@@ -185,19 +185,19 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ## 8. Nivåer
 
-| | Standard | Premium | Professional |
-|---|---|---|---|
-| Turneringar mellan officials | – | ✓ | ✓ |
-| Extra (välj en eller två senare): admin-turneringar som del av eventet, matchförslag utifrån pass och tillgänglighet, resultattavla för storskärm, historik mellan event | – | – | ✓ |
+|                                                                                                                                                                          | Standard | Premium | Professional |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- | ------------ |
+| Turneringar mellan officials                                                                                                                                             | –        | ✓       | ✓            |
+| Extra (välj en eller två senare): admin-turneringar som del av eventet, matchförslag utifrån pass och tillgänglighet, resultattavla för storskärm, historik mellan event | –        | –       | ✓            |
 
 ## 9. Införande
 
-| Steg | Innehåll | Klart när |
-|---|---|---|
-| 1. Motor med sammanhang | 5.1, 5.2, 5.4 och globalt filter, gärna som del av refaktoreringen | Fristående appen fungerar som förut. Testerna för isolering mellan sammanhang går igenom. |
-| 2. Viadal-inloggning | 5.3, 6.1, 6.2, JWKS | Motorn accepterar en Viadal-token och listar eventets officials. En standard-kund får `403`. |
-| 3. Inlänkning | 6.3 och 7, med appen i Viadal-tema via design-tokens | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal. |
-| 4. Viadal-modul | React/HeroUI-modul mot samma API | Görs bara om steg 3 visar att funktionen används. |
+| Steg                    | Innehåll                                                           | Klart när                                                                                    |
+| ----------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| 1. Motor med sammanhang | 5.1, 5.2, 5.4 och globalt filter, gärna som del av refaktoreringen | Fristående appen fungerar som förut. Testerna för isolering mellan sammanhang går igenom.    |
+| 2. Viadal-inloggning    | 5.3, 6.1, 6.2, JWKS                                                | Motorn accepterar en Viadal-token och listar eventets officials. En standard-kund får `403`. |
+| 3. Inlänkning           | 6.3 och 7, med appen i Viadal-tema via design-tokens               | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
+| 4. Viadal-modul         | React/HeroUI-modul mot samma API                                   | Görs bara om steg 3 visar att funktionen används.                                            |
 
 ## 10. Konsekvenser
 
@@ -216,13 +216,13 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ## 11. Besvarade frågor (2026-11-13)
 
-| Fråga | Beslut | Se |
-|---|---|---|
-| Ska eventets admin se och kunna rensa officials turneringar? | Nej | 5.3 |
-| Hur länge sparas turneringar efter ett event? | Ett år efter att turneringen avslutats | 5.7 |
-| Vad händer om en official tas bort mitt i en turnering? | Platsen blir en bye | 5.6 |
-| Behövs realtidsuppdatering? | Nej | 5.4 |
-| Hur loggar man in i den fristående appen? | Microsoft-konto med jobbmejl (Entra ID) | 5.3 |
+| Fråga                                                        | Beslut                                  | Se  |
+| ------------------------------------------------------------ | --------------------------------------- | --- |
+| Ska eventets admin se och kunna rensa officials turneringar? | Nej                                     | 5.3 |
+| Hur länge sparas turneringar efter ett event?                | Ett år efter att turneringen avslutats  | 5.7 |
+| Vad händer om en official tas bort mitt i en turnering?      | Platsen blir en bye                     | 5.6 |
+| Behövs realtidsuppdatering?                                  | Nej                                     | 5.4 |
+| Hur loggar man in i den fristående appen?                    | Microsoft-konto med jobbmejl (Entra ID) | 5.3 |
 
 ## 12. Öppna frågor
 
@@ -238,6 +238,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ```md
 ## Integration med Viadal
+
 - Läs docs/adr/ADR-001-turneringsmotor-viadal.md innan du rör auth, datamodell eller API.
 - Varje turnering har ContextType/ContextId. Filtrera alltid på sammanhanget från
   inloggningen, aldrig på ett värde från klienten.
@@ -248,7 +249,8 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ```md
 ## Turneringar (premium/professional)
-- Läs docs/adr/ADR-001-turneringsmotor-viadal.md.
+
+- Läs docs/adr/0005-turneringsmotor-viadal.md.
 - Turneringsdata ägs av turneringsmotorn. Lägg inga turneringstabeller i Supabase.
 - /api/tournament-token och /api/internal/events/:id/officials är de enda integrationspunkterna.
 ```
