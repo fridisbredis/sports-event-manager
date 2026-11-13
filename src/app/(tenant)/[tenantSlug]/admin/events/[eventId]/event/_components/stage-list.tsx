@@ -1,18 +1,21 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { StageInput } from '../actions'
 import StageModal from './stage-modal'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { useTranslation } from '@/lib/i18n/client'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight } from '@gravity-ui/icons'
+import { CircleHelp } from 'lucide-react'
 import { formatStageTime, stageTimeRangeParts } from '@/lib/i18n/stage-range'
 import { useLanguage } from '@/components/i18n-provider'
 
 interface Props {
   stages: StageInput[]
   onChange: (stages: StageInput[]) => void
+  guideHref: string
 }
 
 const DEFAULT_STAGES: StageInput[] = [
@@ -62,12 +65,13 @@ function sortStagesByStartTime(stages: StageInput[]): StageInput[] {
     .map((s, i) => ({ ...s, position: i }))
 }
 
-export default function StageList({ stages, onChange }: Props) {
+export default function StageList({ stages, onChange, guideHref }: Props) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
   const [modalTarget, setModalTarget] = useState<{ index: number | null }>({ index: null })
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [showStageHelp, setShowStageHelp] = useState(false)
   const isModalOpen = modalTarget.index !== null || modalTarget.index === -1
 
   const effectiveStages = sortStagesByStartTime(stages.length > 0 ? stages : DEFAULT_STAGES)
@@ -130,10 +134,22 @@ export default function StageList({ stages, onChange }: Props) {
       <div className="overflow-hidden rounded-large">
         {/* Header row */}
         <div className="flex items-center justify-between border-b border-edge px-4 py-3.5">
-          <span className="section-label">
-            {t('eventConfig.stagesLabel')}
-            <span className="text-destructive">*</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="section-label">
+              {t('eventConfig.stagesLabel')}
+              <span className="text-destructive">*</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowStageHelp((open) => !open)}
+              aria-expanded={showStageHelp}
+              aria-controls="stage-help"
+              aria-label={t('eventConfig.stageHelpToggle')}
+              className="flex size-8 items-center justify-center rounded-full bg-tenant-primary-tint text-tenant-primary-tint-text transition-colors hover:bg-tenant-accent-tint"
+            >
+              <CircleHelp className="size-4" aria-hidden="true" />
+            </button>
+          </div>
           <Button
             type="button"
             variant="bordered"
@@ -144,6 +160,21 @@ export default function StageList({ stages, onChange }: Props) {
             {t('eventConfig.addStage')}
           </Button>
         </div>
+
+        {showStageHelp && (
+          <div id="stage-help" className="border-b border-edge-soft bg-ink px-4 py-4 text-white">
+            <h3 className="font-semibold">{t('eventConfig.stageHelpTitle')}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-gray-200">
+              {t('eventConfig.stageHelpBody')}
+            </p>
+            <Link
+              href={guideHref}
+              className="mt-2 inline-flex text-sm font-medium text-cyan-200 underline underline-offset-2 hover:text-white"
+            >
+              {t('eventConfig.stageHelpMore')}
+            </Link>
+          </div>
+        )}
 
         {/* Stage rows */}
         <div className="divide-y divide-edge-soft">

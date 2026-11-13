@@ -20,6 +20,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
+  CircleHelp,
   type LucideIcon,
 } from 'lucide-react'
 import { PremiumBadge } from '@/components/ui/premium-badge'
@@ -214,6 +215,23 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
         )}
       </nav>
       <div className="border-t border-gray-100 py-2">
+        {eventId && (
+          <Link
+            href={`/${tenantSlug}/admin/events/${eventId}/dashboard?guide=1#onboarding-glossary`}
+            title={opts.isCollapsed ? t('navigation.helpGuide') : undefined}
+            onClick={opts.onNavigate}
+            className={`flex items-center gap-3 px-6 py-2.5 text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
+              opts.isCollapsed ? 'justify-center px-0' : ''
+            }`}
+          >
+            <CircleHelp className="size-[18px] shrink-0" strokeWidth={1.5} />
+            {!opts.isCollapsed && (
+              <span className="truncate" title={t('navigation.helpGuide')}>
+                {t('navigation.helpGuide')}
+              </span>
+            )}
+          </Link>
+        )}
         {/* The official surface for this same tenant. Shown to every admin,
             not gated on showAccount: access there comes from the admin role
             (see resolveOfficialSurfaceAccess), while an officials row only

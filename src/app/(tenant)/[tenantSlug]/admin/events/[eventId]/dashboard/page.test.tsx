@@ -6,11 +6,17 @@ import { redirect } from 'next/navigation'
 import { OfficialsCard } from './_components/officials-card'
 import { PublishSection } from './_components/publish-section'
 import { ParticipantsCard } from './_components/participants-card'
+import { AdminOnboardingGuide } from './_components/admin-onboarding-guide'
 import { fetchClaimCounts } from '@/lib/participants/claim-status'
+import { fetchAdminGuideCounts } from '@/lib/onboarding/admin-guide-counts'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
   createSupabaseServerClient: vi.fn(async () => ({})),
+}))
+
+vi.mock('@/lib/onboarding/admin-guide-counts', () => ({
+  fetchAdminGuideCounts: vi.fn(async () => ({ workAreaCount: 2, assignedShiftCount: 5 })),
 }))
 
 // N41: tested on its own (claim-status.test.ts, and against Postgres in
@@ -55,6 +61,9 @@ vi.mock('./_components/dashboard-header', () => ({
 }))
 vi.mock('./_components/publish-section', () => ({
   PublishSection: vi.fn(() => null),
+}))
+vi.mock('./_components/admin-onboarding-guide', () => ({
+  AdminOnboardingGuide: vi.fn(() => null),
 }))
 vi.mock('./_components/officials-card', () => ({
   OfficialsCard: vi.fn(() => null),
@@ -169,6 +178,26 @@ describe('DashboardPage', () => {
     expect(card).not.toBeNull()
     expect(card!.props.invited).toBe(4)
     expect(card!.props.confirmed).toBe(11)
+  })
+
+  it('passes live setup progress and the help-guide request to the onboarding guide', async () => {
+    mockDashboardRpc({ data: dashboardPayload(), error: null })
+
+    const result = await DashboardPage({
+      params: PARAMS,
+      searchParams: Promise.resolve({ guide: '1' }),
+    })
+
+    expect(fetchAdminGuideCounts).toHaveBeenCalledWith(expect.anything(), TENANT_ID, EVENT.id)
+    expect(findByType(result, AdminOnboardingGuide)?.props).toMatchObject({
+      forceOpen: true,
+      eventConfigComplete: true,
+      workAreaCount: 2,
+      confirmedOfficialCount: 11,
+      assignedShiftCount: 5,
+      isPublished: false,
+      tierAllowsPublish: false,
+    })
   })
 
   it('renders successfully with zero officials and race-stage counts', async () => {
