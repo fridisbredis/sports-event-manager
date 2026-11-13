@@ -166,7 +166,13 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
                   they are rare actions next to the list itself. The reason
                   Remove is unavailable shows as the item's description — the
                   old `title` tooltip never appears on a touch screen. */}
-              <Dropdown placement="bottom-end">
+              {/* The popover sizes to its content, so the one-line reason
+                  under Remove would stretch it past the screen edge on a
+                  phone. Cap the width and let the reason wrap instead. */}
+              <Dropdown
+                placement="bottom-end"
+                classNames={{ content: 'max-w-[min(16rem,calc(100vw-2rem))]' }}
+              >
                 <DropdownTrigger>
                   <Button
                     isIconOnly
@@ -184,7 +190,10 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
                   aria-label={t('systemAdmin.actionsFor', {
                     name: admin.name ?? formatPhoneForDisplay(admin.phone ?? ''),
                   })}
-                  itemClasses={{ base: LISTBOX_ITEM }}
+                  itemClasses={{
+                    base: `${LISTBOX_ITEM} items-start`,
+                    description: 'mt-0.5 whitespace-normal leading-snug',
+                  }}
                   disabledKeys={disabledReason !== undefined ? ['remove'] : []}
                   onAction={(key) => {
                     if (key === 'edit') setEditingName(admin.name ?? '')
@@ -211,7 +220,7 @@ export function SystemAdminsSection({ admins, currentUserId, formattedDates }: P
                       color="danger"
                       description={disabledReason}
                       startContent={
-                        <Trash2 className="size-4" strokeWidth={1.75} aria-hidden="true" />
+                        <Trash2 className="mt-0.5 size-4" strokeWidth={1.75} aria-hidden="true" />
                       }
                     >
                       {t('systemAdmin.removeAdmin')}
