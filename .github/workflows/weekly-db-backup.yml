@@ -57,7 +57,13 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned to match quality.yml and the deploy workflows. This job
+          # ran on `latest` and failed two Sundays in a row without anyone
+          # noticing (2026-11-08: HTTP 504 resolving the release; 2026-11-15:
+          # CLI v3 rejects `[inbucket]` in supabase/config.toml). A schedule
+          # nobody watches is the worst place for a version that moves by
+          # itself. Bump this together with the other pins.
+          version: 2.116.0
 
       - name: Compute this week's rotation slot
         id: slot

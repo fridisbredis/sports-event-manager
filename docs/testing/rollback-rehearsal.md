@@ -963,3 +963,46 @@ på `events.status` (kosmetisk, inte återställd).
 **Lärdom:** att en rollback "går igenom utan fel" bevisar nästan ingenting. Fynd 1
 gick igenom utan fel och var det allvarligaste. Jämför resultatet mot
 målschemat, inte mot exit-koden.
+
+### Körning 2026-11-16 — Del 6 steg A omtagen (N25), FAIL: två slottar saknas
+
+Omtagen eftersom N25-kortet kräver att "vilken av fyra slottar är aktuell" övas
+med fyra slottar innan något byggs. Vecka 47, så v43–v46 borde finnas.
+
+**Steg A: 9 s, inklusive `op read`.** Men det fanns bara två slottar:
+
+| Slot | `isoweek` | `capturedat`         | Förväntat         |
+| ---- | --------- | -------------------- | ----------------- |
+| 0    | 44        | 2026-11-01T10:37:35Z | ok                |
+| 1    | —         | `BlobNotFound`       | v45, 2026-11-08   |
+| 2    | —         | `BlobNotFound`       | v46, 2026-11-15   |
+| 3    | 43        | 2026-10-25T08:33:11Z | ok (utan Storage) |
+
+Den nyaste backupen var alltså 15 dagar gammal, och ingen visste om det.
+
+**Fynd 1 (åtgärdat) — veckojobbet hade failat två söndagar i rad.** Båda
+failade på `supabase/setup-cli` med `version: latest`, som enda workflow i
+repot:
+
+- 2026-11-08: HTTP 504 när releasen skulle hämtas. Tillfälligt fel, men bara
+  `latest` behöver slå upp releasen över nätet på varje körning.
+- 2026-11-15: `latest` hade blivit CLI v3, som vägrar `[inbucket]` i
+  `supabase/config.toml` ("no longer supported. Use [local_smtp] instead").
+  Det skulle ha failat varje söndag tills någon märkte det.
+
+Åtgärd: pinnad till 2.116.0, samma version som `quality.yml` och
+deploy-workflowsen. Byte till CLI v3 blir en egen ändring för alla workflows
+samtidigt, med `config.toml` migrerad.
+
+**Fynd 2 (ej åtgärdat) — felet syntes ingenstans.** Runbookens §7 sa redan att
+inget larmar på ett failat veckojobb, och att GitHubs mejl är den enda
+signalen. Nu är det bekräftat i praktiken: två failade körningar på 15 dagar,
+upptäckta av en övning och inte av ett larm. En slot som saknas ser ut precis
+som en slot som aldrig hunnit skrivas. Det är samma skillnad som fynd 3 från
+2026-10-19 varnade för, fast åt andra hållet.
+
+**Konsekvens för N25.** Att välja rätt slot är inte bara att jämföra fyra
+`capturedat`. Automationen måste också visa _hur gammal den nyaste slotten är_
+och säga till när en vecka saknas. Annars väljer den tryggt "den nyaste" utan
+att någon ser att den är två veckor gammal. Fyra slottar finns tidigast efter
+körningen söndag 2026-12-13 (v50 → slot 2). Steg A tas om först då.
