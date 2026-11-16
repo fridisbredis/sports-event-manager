@@ -16,7 +16,7 @@ test.describe('EVT-01 dashboard', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 
     for (const section of ['Publish Status', 'Officials', 'Scheduling Warnings', 'Admin Areas']) {
-      await expect(page.getByRole('heading', { name: section })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 2, name: section })).toBeVisible()
     }
 
     // Draft/Published chip — one or the other, never both.
@@ -31,8 +31,8 @@ test.describe('EVT-01 dashboard', () => {
 
     // The seed creates one invited official (+46709900003) alongside the
     // confirmed ones, so both counters have something to show.
-    await expect(page.getByText('Invited')).toBeVisible()
-    await expect(page.getByText('Confirmed')).toBeVisible()
+    await expect(page.getByText('Invited', { exact: true })).toBeVisible()
+    await expect(page.getByText('Confirmed', { exact: true })).toBeVisible()
   })
 
   test('scheduling warnings card reports over-capacity and double-booked', async ({
