@@ -325,7 +325,11 @@ Building this properly is the open half of card N9.
 - **Nothing alerts on a failed weekly job.** A failing run leaves the previous
   cycle's blob in that slot, so coverage degrades quietly. GitHub emails the
   repo owner on a failed scheduled workflow by default; that is the only
-  signal, and it is worth confirming it actually arrives.
+  signal, and it is worth confirming it actually arrives. **This has already
+  happened once:** the runs on 2026-11-08 and 2026-11-15 both failed (an
+  unpinned CLI version, since pinned) and nobody noticed until the Del 6 step
+  A rehearsal on 2026-11-16 found two of four slots missing. Seeing fewer than
+  four slots after week 46 means jobs have failed. Check the run history.
 - **No per-tenant restore.** §6.
 - **Storage files are not in Supabase's own backups** — only in ours, and
   only from ISO week 44 onward. A Supabase scheduled backup (§4) contains the
