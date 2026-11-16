@@ -7,6 +7,7 @@ import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { resolveSmsSender } from '@/lib/sms/sender'
 import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
+import { checkBackupFreshness } from '@/lib/backup/check-freshness'
 
 // SEC-09: triggered daily by the gdpr-warning-sms-trigger pg_cron job (migration
 // 0029) via pg_net. Sends the 23-month inactivity warning SMS to officials and
@@ -19,6 +20,13 @@ import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
 // SMS configuration check, so a Twilio problem cannot keep a photo past the
 // retention limit. Its failures are logged and retried on the next tick; they
 // never stop the warnings.
+//
+// N46: the same tick also checks that the weekly prod backup is still landing
+// (src/lib/backup/check-freshness.ts). It has nothing to do with GDPR — it is
+// here because this is the app's one daily job, and a second pg_cron job and
+// route for one HTTP call would be more to keep running, not less. Like the
+// avatars it runs before the SMS checks and never throws, so neither concern
+// can block the other.
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET
   const authHeader = request.headers.get('Authorization')
@@ -27,6 +35,7 @@ export async function POST(request: NextRequest) {
   }
 
   const avatars = await removeExpiredAvatars(createSupabaseServiceClient())
+  const backup = await checkBackupFreshness()
 
   const fromNumber = process.env.TWILIO_PHONE_NUMBER
   if (!fromNumber) {
@@ -213,5 +222,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, sent, failed, unmarked, avatars })
+  return NextResponse.json({ ok: true, sent, failed, unmarked, avatars, backup })
 }

@@ -14,6 +14,7 @@ would still have worked.
 3. Supabase scheduled backups
 4. Restoring from a Supabase backup
    4b. The weekly slot backups
+   4c. The freshness alert (N46)
 5. The pre-migration snapshot path
 6. Restoring a single tenant
 7. Known gaps
@@ -259,6 +260,57 @@ intended failure mode, but it means a silently failing job degrades coverage
 without any slot looking wrong. Check the workflow's run history if the dates
 on the slots look stale.
 
+## 4c. The freshness alert (N46)
+
+Once a day (the 04:00 UTC `gdpr-warning` cron tick) the app lists the weekly
+slots and checks how old the newest one is. If it is older than **7.5 days**,
+or there are no slots, or the list call fails, it logs an error, and that
+error reaches **Sentry**. Code: `src/lib/backup/check-freshness.ts`.
+
+It checks the result, not the workflow, so it catches a failed run, a run
+that never started (GitHub disables scheduled workflows in a public repo
+after 60 days without commits), and a run that uploaded nothing.
+
+**When it fires:** open the run history of `weekly-db-backup.yml`, fix the
+cause, then run the workflow by hand (`workflow_dispatch` on `main`) so a
+fresh slot exists. The next day's check clears it. Resolve the Sentry issue
+then. Sentry alerts again if it comes back.
+
+**The credential** is `PROD_BACKUP_SLOTS_LIST_URL`: the `db-snapshots`
+container URL with a SAS token carrying only `l` (list). Listing returns names
+and metadata; it **cannot download** an archive. That matters, because the
+archives are full prod dumps with real phone numbers. Do not widen it to `r`,
+and do not swap it for a role on the health-reader service principal:
+Storage Blob Data Reader would let that principal download every dump.
+
+Creating or renewing it (the token expires; an expired token fires the alert,
+which is how you find out):
+
+```
+export BLOB_CONN_STR="$(op read \
+  "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" \
+  --account extrapreneurab.1password.com)"
+SAS="$(az storage container generate-sas --connection-string "$BLOB_CONN_STR" \
+  --name db-snapshots --permissions l --https-only \
+  --expiry "$(date -u -v+1y +%Y-%m-%dT%H:%MZ)" -o tsv)"
+URL="https://sportsevtmgrprodsnaps.blob.core.windows.net/db-snapshots?${SAS}"
+
+# Verify before storing it: listing must work, downloading must be refused.
+curl -s "${URL}&restype=container&comp=list&prefix=weekly-slot&include=metadata" | grep -c '<Blob>'
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://sportsevtmgrprodsnaps.blob.core.windows.net/db-snapshots/weekly-slot-0.tar.gz?${SAS}"   # expect 403
+
+gh secret set PROD_BACKUP_SLOTS_LIST_URL --body "$URL"
+```
+
+Then redeploy prod: the value reaches the app as a runtime env var, set by
+`deploy-prod.yml`. Note the expiry date in 1Password next to the
+connection string.
+
+If the secret is missing in prod, the check logs an error every day rather
+than skipping quietly. Missing anywhere else (local, dev) is expected and
+silent.
+
 ## 5. The pre-migration snapshot path
 
 `scripts/ops/snapshot-prod-db.sh` takes a full roles + schema + data dump to
@@ -322,14 +374,13 @@ Building this properly is the open half of card N9.
 - **No PITR.** Granularity is one backup per day within the first week, and one
   per week beyond it. A loss at 23:00 costs a full day of writes, not a few
   minutes — and reaching back three weeks costs up to seven days.
-- **Nothing alerts on a failed weekly job.** A failing run leaves the previous
-  cycle's blob in that slot, so coverage degrades quietly. GitHub emails the
-  repo owner on a failed scheduled workflow by default; that is the only
-  signal, and it is worth confirming it actually arrives. **This has already
-  happened once:** the runs on 2026-11-08 and 2026-11-15 both failed (an
-  unpinned CLI version, since pinned) and nobody noticed until the Del 6 step
-  A rehearsal on 2026-11-16 found two of four slots missing. Seeing fewer than
-  four slots after week 46 means jobs have failed. Check the run history.
+- **A failed weekly job is caught only by the freshness alert (§4c).** It
+  fires about a day after a missed Sunday, not when the run fails. It was
+  added after the runs on 2026-11-08 and 2026-11-15 both failed (an unpinned
+  CLI version, since pinned) and nobody noticed until the Del 6 step A
+  rehearsal on 2026-11-16 found two of four slots missing. It covers only
+  the weekly slots. Supabase's daily backups are still unmonitored (see the
+  last item).
 - **No per-tenant restore.** §6.
 - **Storage files are not in Supabase's own backups** — only in ours, and
   only from ISO week 44 onward. A Supabase scheduled backup (§4) contains the

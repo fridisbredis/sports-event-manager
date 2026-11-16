@@ -4,6 +4,7 @@ import { POST } from './route'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import twilio from 'twilio'
 import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
+import { checkBackupFreshness } from '@/lib/backup/check-freshness'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
@@ -20,6 +21,10 @@ vi.mock('@/lib/sms/usage', () => ({
 
 vi.mock('@/lib/gdpr/avatar-cleanup', () => ({
   removeExpiredAvatars: vi.fn(),
+}))
+
+vi.mock('@/lib/backup/check-freshness', () => ({
+  checkBackupFreshness: vi.fn(),
 }))
 
 vi.mock('@/lib/logger', () => ({
@@ -77,6 +82,7 @@ beforeEach(() => {
   messagesCreate.mockResolvedValue({})
   vi.mocked(twilio).mockReturnValue({ messages: { create: messagesCreate } } as never)
   vi.mocked(removeExpiredAvatars).mockResolvedValue({ cleared: 0, failed: 0, listFailed: false })
+  vi.mocked(checkBackupFreshness).mockResolvedValue({ status: 'unconfigured' })
 })
 
 // N13: the warning goes out from the person's own tenant's sender.
@@ -164,6 +170,51 @@ describe('POST /api/cron/gdpr-warning — B18 avatar cleanup', () => {
       failed: 0,
       unmarked: 0,
       avatars: { cleared: 2, failed: 1, listFailed: false },
+      backup: { status: 'unconfigured' },
+    })
+  })
+})
+
+// N46: the same tick checks that the weekly prod backup is still landing.
+describe('POST /api/cron/gdpr-warning — N46 backup freshness', () => {
+  it('does not check when the cron secret is wrong', async () => {
+    const request = new NextRequest('http://localhost/api/cron/gdpr-warning', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer wrong' },
+    })
+
+    await POST(request)
+
+    expect(checkBackupFreshness).not.toHaveBeenCalled()
+  })
+
+  it('still checks when SMS is not configured', async () => {
+    delete process.env.TWILIO_PHONE_NUMBER
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({ officials: [], tenants: { data: [] } }) as never
+    )
+
+    await POST(makeRequest())
+
+    expect(checkBackupFreshness).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the result alongside the warnings', async () => {
+    vi.mocked(checkBackupFreshness).mockResolvedValue({
+      status: 'stale',
+      newest: 'weekly-slot-0.tar.gz',
+      ageDays: 14.7,
+    })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({ officials: [], tenants: { data: [] } }) as never
+    )
+
+    const response = await POST(makeRequest())
+
+    expect((await response.json()).backup).toEqual({
+      status: 'stale',
+      newest: 'weekly-slot-0.tar.gz',
+      ageDays: 14.7,
     })
   })
 })
