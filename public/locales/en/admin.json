@@ -14,7 +14,8 @@
     "closeMenu": "Close menu",
     "participants": "Participants",
     "allEvents": "All events",
-    "settings": "Settings"
+    "settings": "Settings",
+    "helpGuide": "Help and guide"
   },
   "dashboard": {
     "eventName": "Untitled event",
@@ -55,7 +56,77 @@
     "participants": "Participants",
     "participantsClaimed": "{{claimed}} of {{total}} claimed",
     "participantsConflicts_one": "{{count}} conflict",
-    "participantsConflicts_other": "{{count}} conflicts"
+    "participantsConflicts_other": "{{count}} conflicts",
+    "onboardingGuide": {
+      "sectionLabel": "Getting started",
+      "title": "Get started with your event",
+      "intro": "Five steps from event setup to publishing. You can move between steps, but they build on each other in this order.",
+      "progress": "{{completed}} of {{total}} complete",
+      "progressLabel": "Guide progress",
+      "glossaryLabel": "What is what?",
+      "dismiss": "I know this – hide the guide",
+      "dismissNote": "The guide will appear again when you create another event, or from Help and guide.",
+      "edit": "Edit",
+      "addWorkArea": "Add work area",
+      "inviteOfficials": "Invite officials",
+      "openScheduling": "Open scheduling",
+      "publishEvent": "Publish event",
+      "schedulingLocked": "Unlocks when the event has work areas and confirmed officials.",
+      "status": {
+        "complete": "Complete",
+        "current": "Next step",
+        "upcoming": "Not started",
+        "locked": "Locked"
+      },
+      "steps": {
+        "eventConfig": {
+          "title": "Event configuration",
+          "description": "Add the event name and stages. The Race stage times determine the event dates."
+        },
+        "workAreas": {
+          "title": "Work areas",
+          "description": "Create the places and tasks that need staffing. Set opening hours and the maximum number of officials at a time."
+        },
+        "officials": {
+          "title": "Officials",
+          "description": "Invite by SMS and track who has confirmed. Only confirmed officials can be scheduled."
+        },
+        "scheduling": {
+          "title": "Scheduling",
+          "description": "Add confirmed officials to work-area shifts."
+        },
+        "publishing": {
+          "title": "Publish",
+          "description": "Publishing opens the participant claim list and participant pages. Officials can see event information while it is still a draft."
+        }
+      },
+      "glossary": {
+        "stage": {
+          "term": "Stage",
+          "description": "A phase of the event, such as setup, the competition, or teardown."
+        },
+        "raceStage": {
+          "term": "Race stage",
+          "description": "The stage that is the competition itself. Its times determine the event dates, and participants can see it."
+        },
+        "granularity": {
+          "term": "Scheduling granularity",
+          "description": "How the schedule is divided into time slots. Fixed at 60 minutes in the current version."
+        },
+        "workArea": {
+          "term": "Work area",
+          "description": "A place or task staffed by officials, such as an aid station, timing, or social media."
+        },
+        "official": {
+          "term": "Official",
+          "description": "Invited by SMS and schedulable after confirming."
+        },
+        "published": {
+          "term": "Published",
+          "description": "The participant claim list and participant pages are open. Officials can see the event while it is still a draft."
+        }
+      }
+    }
   },
   "eventConfig": {
     "title": "Event configuration",
@@ -88,6 +159,10 @@
     "scheduleSetup": "Schedule & Setup",
     "datesDuration": "Dates / duration",
     "schedulingGranularity": "Scheduling granularity",
+    "stageHelpToggle": "Show stage explanation",
+    "stageHelpTitle": "Stages are phases of the event",
+    "stageHelpBody": "For example, Setup before the race, Race during it, and Teardown after. Mark the competition itself as Race – its times determine the event dates.",
+    "stageHelpMore": "More in What is what?",
     "granularityLockedNote": "Dates are derived from the Race stage times. Scheduling granularity is fixed at 60 min in current version.",
     "stagesLabel": "Stages",
     "addStage": "+ Add stage",

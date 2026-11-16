@@ -7,6 +7,7 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { adminDashboardCacheTag } from '@/lib/cache/tags'
 import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
+import { AdminOnboardingGuide } from './_components/admin-onboarding-guide'
 import { OfficialsCard } from './_components/officials-card'
 import { ParticipantsCard } from './_components/participants-card'
 import { hasFeature } from '@/lib/tiers/features'
@@ -22,9 +23,11 @@ import {
   canPublish as tierAllowsPublishing,
   displayedEventStatus,
 } from '@/lib/events/participant-side'
+import { fetchAdminGuideCounts } from '@/lib/onboarding/admin-guide-counts'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
+  searchParams?: Promise<{ guide?: string | string[] }>
 }
 
 interface AdminDashboardCached {
@@ -48,8 +51,10 @@ interface AdminDashboardCached {
   earliest_stage_id: string | null
 }
 
-export default async function DashboardPage({ params }: Props) {
+export default async function DashboardPage({ params, searchParams }: Props) {
   const { tenantSlug, eventId } = await params
+  const { guide: guideParam } = (await searchParams) ?? {}
+  const forceOpenGuide = guideParam === '1'
   const language = await getUserLanguage()
   const t = await getServerTranslation(language, 'admin')
 
@@ -158,6 +163,9 @@ export default async function DashboardPage({ params }: Props) {
   const totalWarnings = overCapacity + doubleBooked + timeOffClash
 
   const tenantId = tenant.id
+  const guideCounts = event
+    ? await fetchAdminGuideCounts(await createSupabaseServerClient(), tenant.id, event.id)
+    : { workAreaCount: 0, assignedShiftCount: 0 }
 
   const dateRange = event ? formatDateRange(event.start_date, event.end_date, language) : null
   const eventName = event?.name?.trim() || t('dashboard.eventName')
@@ -178,6 +186,18 @@ export default async function DashboardPage({ params }: Props) {
         draftLabel={t('dashboard.draft')}
       />
 
+      <AdminOnboardingGuide
+        tenantSlug={tenantSlug}
+        eventId={eventId}
+        forceOpen={forceOpenGuide}
+        eventConfigComplete={hasName && hasRaceStage}
+        workAreaCount={guideCounts.workAreaCount}
+        confirmedOfficialCount={officialsConfirmed}
+        assignedShiftCount={guideCounts.assignedShiftCount}
+        isPublished={isPublished}
+        tierAllowsPublish={tierAllowsPublish}
+      />
+
       {/* One row of three on wide screens: publish status beside the two
           stat cards. Stacking the stat cards next to publish stretched the
           publish card to double height, leaving it mostly empty. Between md
@@ -189,16 +209,18 @@ export default async function DashboardPage({ params }: Props) {
         }`}
       >
         <div className="md:col-span-2 lg:col-span-1 [&>*]:h-full">
-          <PublishSection
-            tierAllowsPublish={tierAllowsPublish}
-            canPublish={canPublish}
-            isPublished={isPublished}
-            hasName={hasName}
-            hasRaceStage={hasRaceStage}
-            tenantSlug={tenantSlug}
-            tenantId={tenantId}
-            eventId={event?.id ?? null}
-          />
+          <div id="publish-status" className="[&>*]:h-full">
+            <PublishSection
+              tierAllowsPublish={tierAllowsPublish}
+              canPublish={canPublish}
+              isPublished={isPublished}
+              hasName={hasName}
+              hasRaceStage={hasRaceStage}
+              tenantSlug={tenantSlug}
+              tenantId={tenantId}
+              eventId={event?.id ?? null}
+            />
+          </div>
         </div>
         <div className={`[&>*]:h-full ${claimCounts ? '' : 'md:col-span-2 lg:col-span-1'}`}>
           <OfficialsCard

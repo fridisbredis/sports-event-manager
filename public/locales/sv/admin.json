@@ -14,7 +14,8 @@
     "closeMenu": "Stäng meny",
     "participants": "Deltagare",
     "allEvents": "Alla event",
-    "settings": "Inställningar"
+    "settings": "Inställningar",
+    "helpGuide": "Hjälp och guide"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",
@@ -55,7 +56,77 @@
     "participants": "Deltagare",
     "participantsClaimed": "{{claimed}} av {{total}} registrerade",
     "participantsConflicts_one": "{{count}} konflikt",
-    "participantsConflicts_other": "{{count}} konflikter"
+    "participantsConflicts_other": "{{count}} konflikter",
+    "onboardingGuide": {
+      "sectionLabel": "Kom igång",
+      "title": "Kom igång med ditt event",
+      "intro": "Fem steg från eventinställningar till publicering. Du kan hoppa mellan stegen, men de bygger på varandra i den här ordningen.",
+      "progress": "{{completed}} av {{total}} klart",
+      "progressLabel": "Framsteg i guiden",
+      "glossaryLabel": "Vad är vad?",
+      "dismiss": "Jag kan det här – dölj guiden",
+      "dismissNote": "Guiden visas igen när du skapar ett nytt event eller via Hjälp och guide.",
+      "edit": "Redigera",
+      "addWorkArea": "Lägg till arbetsområde",
+      "inviteOfficials": "Bjud in funktionärer",
+      "openScheduling": "Öppna schemaläggning",
+      "publishEvent": "Publicera eventet",
+      "schedulingLocked": "Låses upp när det finns arbetsområden och bekräftade funktionärer.",
+      "status": {
+        "complete": "Klart",
+        "current": "Nästa steg",
+        "upcoming": "Ej påbörjat",
+        "locked": "Låst"
+      },
+      "steps": {
+        "eventConfig": {
+          "title": "Evenemangsinställningar",
+          "description": "Lägg in namn och etapper. Tävlingsetappens tider bestämmer eventets datum."
+        },
+        "workAreas": {
+          "title": "Arbetsområden",
+          "description": "Skapa platser och uppgifter som ska bemannas. Ange öppettider och högsta antal funktionärer samtidigt."
+        },
+        "officials": {
+          "title": "Funktionärer",
+          "description": "Bjud in via SMS och följ vilka som har bekräftat. Bara bekräftade funktionärer kan planeras in."
+        },
+        "scheduling": {
+          "title": "Schemaläggning",
+          "description": "Lägg in bekräftade funktionärer i arbetsområdenas pass."
+        },
+        "publishing": {
+          "title": "Publicera",
+          "description": "Publicering öppnar deltagarnas registreringssida och deltagarsidor. Funktionärer kan se eventinformation redan när eventet är ett utkast."
+        }
+      },
+      "glossary": {
+        "stage": {
+          "term": "Etapp",
+          "description": "En fas i eventet, till exempel uppbyggnad, tävling eller nedmontering."
+        },
+        "raceStage": {
+          "term": "Tävlingsetapp",
+          "description": "Etappen som är själva tävlingen. Dess tider bestämmer eventets datum och den visas för deltagarna."
+        },
+        "granularity": {
+          "term": "Schemaintervall",
+          "description": "Hur schemat delas upp i tidsluckor. Låst till 60 minuter i nuvarande version."
+        },
+        "workArea": {
+          "term": "Arbetsområde",
+          "description": "En plats eller uppgift som funktionärer bemannar, till exempel en depå, tidtagning eller sociala medier."
+        },
+        "official": {
+          "term": "Funktionär",
+          "description": "Bjuds in via SMS och kan planeras in när personen har bekräftat."
+        },
+        "published": {
+          "term": "Publicerat",
+          "description": "Deltagarnas registreringssida och deltagarsidor är öppna. Funktionärer kan se eventet redan som utkast."
+        }
+      }
+    }
   },
   "eventConfig": {
     "title": "Evenemangsinställningar",
@@ -88,6 +159,10 @@
     "scheduleSetup": "Schema och upplägg",
     "datesDuration": "Datum / längd",
     "schedulingGranularity": "Schemaintervall",
+    "stageHelpToggle": "Visa förklaring om etapper",
+    "stageHelpTitle": "Etapper är eventets faser",
+    "stageHelpBody": "Till exempel Setup före loppet, Race under och Teardown efter. Markera själva tävlingen som Tävling – dess tider bestämmer eventets datum.",
+    "stageHelpMore": "Mer i Vad är vad?",
     "granularityLockedNote": "Datumen hämtas från tävlingsetappens tider. Schemaintervallet är låst till 60 min i nuvarande version.",
     "stagesLabel": "Etapper",
     "addStage": "+ Lägg till etapp",
