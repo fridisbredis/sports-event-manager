@@ -199,7 +199,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 | ----------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | 1. Motor med sammanhang | 5.1, 5.2, 5.4 och globalt filter, gärna som del av refaktoreringen | Fristående appen fungerar som förut. Testerna för isolering mellan sammanhang går igenom.    |
 | 2. Viadal-inloggning    | 5.3, 6.1, 6.2, JWKS                                                | Motorn accepterar en Viadal-token och listar eventets officials. En standard-kund får `403`. |
-| 3. Inlänkning           | 6.3 och 7, med appen i Viadal-tema via design-tokens               | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
+| 3. Inlänkning           | 6.3 och 7. Viadal-temat är uppskjutet (se 11)                      | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
 | 4. Viadal-modul         | React/HeroUI-modul mot samma API                                   | Görs bara om steg 3 visar att funktionen används.                                            |
 
 ## 10. Konsekvenser
@@ -219,16 +219,17 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ## 11. Besvarade frågor
 
-| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                      | Se   |
-| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---- |
-| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                         | 5.3  |
-| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                      | 5.6  |
-| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                         | 5.5  |
-| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                         | 5.4  |
-| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                     | 5.3  |
-| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                               | 11.1 |
-| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                              | 11.2 |
-| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se` | 11.3 |
+| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                               | Se   |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---- |
+| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                                  | 5.3  |
+| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                               | 5.6  |
+| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                                  | 5.5  |
+| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                                  | 5.4  |
+| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                              | 5.3  |
+| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                                        | 11.1 |
+| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                                       | 11.2 |
+| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se`          | 11.3 |
+| Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Nej, uppskjutet. Appen visas i sitt eget utseende tills vidare; temat tas upp igen när funktionen visat sig användas | 9    |
 
 ### 11.1 Inbjudna utanför företaget
 
