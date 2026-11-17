@@ -92,6 +92,16 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Update Container App image and env vars
+        env:
+          # ADR-0005 tournament engine. Through env rather than ${{ secrets.* }}
+          # in the script body: the signing keys are JSON full of double
+          # quotes, which would break the quoting below and reach the app
+          # mangled. Unset secrets give empty values, which the app treats as
+          # "not configured" and fails closed, so this is safe to deploy first.
+          TOURNAMENT_SIGNING_KEY_CURRENT: ${{ secrets.TOURNAMENT_SIGNING_KEY_CURRENT }}
+          TOURNAMENT_SIGNING_KEY_NEXT: ${{ secrets.TOURNAMENT_SIGNING_KEY_NEXT }}
+          TOURNAMENT_TOKEN_ISSUER: ${{ secrets.TOURNAMENT_TOKEN_ISSUER }}
+          TOURNAMENT_ENGINE_SECRET: ${{ secrets.TOURNAMENT_ENGINE_SECRET }}
         run: |
           az containerapp update \
             --name sports-event-manager-dev \
@@ -119,7 +129,11 @@ jobs:
               "VAPID_PRIVATE_KEY=${{ secrets.DEV_VAPID_PRIVATE_KEY }}" \
               "AZURE_HEALTH_TENANT_ID=${{ secrets.AZURE_HEALTH_TENANT_ID }}" \
               "AZURE_HEALTH_CLIENT_ID=${{ secrets.AZURE_HEALTH_CLIENT_ID }}" \
-              "AZURE_HEALTH_CLIENT_SECRET=${{ secrets.AZURE_HEALTH_CLIENT_SECRET }}"
+              "AZURE_HEALTH_CLIENT_SECRET=${{ secrets.AZURE_HEALTH_CLIENT_SECRET }}" \
+              "TOURNAMENT_SIGNING_KEY_CURRENT=$TOURNAMENT_SIGNING_KEY_CURRENT" \
+              "TOURNAMENT_SIGNING_KEY_NEXT=$TOURNAMENT_SIGNING_KEY_NEXT" \
+              "TOURNAMENT_TOKEN_ISSUER=$TOURNAMENT_TOKEN_ISSUER" \
+              "TOURNAMENT_ENGINE_SECRET=$TOURNAMENT_ENGINE_SECRET"
 
       - name: Verify deployment
         run: |
