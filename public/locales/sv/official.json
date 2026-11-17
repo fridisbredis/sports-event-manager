@@ -6,8 +6,7 @@
     "announcements": "Meddelanden",
     "account": "Konto",
     "adminView": "Adminvy",
-    "participantView": "Mitt lopp",
-    "tournaments": "Turneringar"
+    "participantView": "Mitt lopp"
   },
   "home": {
     "title": "Funktionärsstart",
@@ -21,6 +20,8 @@
     "myScheduleSub": "Dina pass",
     "announcements": "Meddelanden",
     "announcementsSub": "Senaste nytt för funktionärer",
+    "tournaments": "Turneringar",
+    "tournamentsSub": "Spela mot andra funktionärer",
     "accountTitle": "Personligt konto",
     "accountSub": "Dina uppgifter och inställningar"
   },

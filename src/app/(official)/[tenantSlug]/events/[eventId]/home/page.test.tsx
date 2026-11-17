@@ -153,4 +153,54 @@ describe('OfficialHomePage', () => {
       expect(flat.includes('/viadal/account')).toBe(shown)
     }
   )
+
+  // ADR-0005 §6.3: a card here, not a tab. Same gate as the tournaments page
+  // (offersTournaments): a roster row, a tier with tournaments, the app configured.
+  it.each([
+    ['shows', 'professional', 'off-1', 'https://tournaments.test', true],
+    ['shows', 'premium', 'off-1', 'https://tournaments.test', true],
+    ['hides', 'standard', 'off-1', 'https://tournaments.test', false],
+    ['hides', 'professional', null, 'https://tournaments.test', false],
+    ['hides', 'professional', 'off-1', '', false],
+  ])(
+    '%s the tournaments card on %s with officialId %s and app %j',
+    async (_v, tier, officialId, appUrl, shown) => {
+      vi.stubEnv('TOURNAMENT_APP_URL', appUrl)
+      vi.mocked(getOfficialTenant).mockResolvedValue({
+        id: TENANT_ID,
+        slug: 'viadal',
+        color_palette: 'default',
+        tier,
+        is_active: true,
+        officialId,
+      })
+      mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
+      mockOfficialHomeRpc({ data: { name: null }, error: null })
+
+      const flat = JSON.stringify(await OfficialHomePage({ params: PARAMS }))
+
+      expect(flat.includes('/tournaments')).toBe(shown)
+      vi.unstubAllEnvs()
+    }
+  )
+
+  // The cards mirror the tab bar in its order; tournaments have no tab, so they come last.
+  it('puts the tournaments card after the cards that have a tab', async () => {
+    vi.stubEnv('TOURNAMENT_APP_URL', 'https://tournaments.test')
+    vi.mocked(getOfficialTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'default',
+      tier: 'premium',
+      is_active: true,
+      officialId: 'off-1',
+    })
+    mockUser('user-1', vi.fn().mockReturnValue(chain({ data: null })))
+    mockOfficialHomeRpc({ data: { name: null }, error: null })
+
+    const flat = JSON.stringify(await OfficialHomePage({ params: PARAMS }))
+
+    expect(flat.indexOf('/tournaments')).toBeGreaterThan(flat.indexOf('/viadal/account'))
+    vi.unstubAllEnvs()
+  })
 })

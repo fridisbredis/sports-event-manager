@@ -82,7 +82,9 @@ export default async function OfficialLayout({ children, params }: Props) {
   const showAccount = tenant.officialId != null
   // N23: where the event tabs point on a screen without an event in its URL.
   const defaultEventId = await getSoleOfficialEventId(tenantSlug)
-  // ADR-0005: tournaments between the event's officials, premium and up.
+  // ADR-0005: tournaments between the event's officials, premium and up. The
+  // entry is a card on Home; the responder lives here so the tournament app
+  // can ask this tab for a new token whichever page is open.
   const showTournaments = offersTournaments(tenant)
 
   return (
@@ -105,7 +107,6 @@ export default async function OfficialLayout({ children, params }: Props) {
           tenantSlug={tenantSlug}
           showAccount={showAccount}
           defaultEventId={defaultEventId}
-          showTournaments={showTournaments}
         />
         {/* Here, not on the tournaments page, so the tournament app can ask
             this tab for a new token whichever Viadal page is open. */}

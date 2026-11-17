@@ -6,8 +6,7 @@
     "announcements": "Announcements",
     "account": "Account",
     "adminView": "Admin view",
-    "participantView": "My race",
-    "tournaments": "Tournaments"
+    "participantView": "My race"
   },
   "home": {
     "title": "Official Home",
@@ -21,6 +20,8 @@
     "myScheduleSub": "Your shifts",
     "announcements": "Announcements",
     "announcementsSub": "Latest updates for officials",
+    "tournaments": "Tournaments",
+    "tournamentsSub": "Play against other officials",
     "accountTitle": "Personal account",
     "accountSub": "Your details & settings"
   },

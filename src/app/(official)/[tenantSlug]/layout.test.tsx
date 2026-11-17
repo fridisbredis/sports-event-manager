@@ -167,9 +167,6 @@ describe('OfficialLayout', () => {
       tenantSlug: 'viadal',
       showAccount: true,
       defaultEventId: 'event-1',
-      // No tier on this tenant, and no TOURNAMENT_APP_URL in tests: offersTournaments
-      // (src/lib/tournament/app-url.ts, tested on its own) says no.
-      showTournaments: false,
     })
 
     const flat = JSON.stringify(result)
