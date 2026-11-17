@@ -122,7 +122,7 @@ Om en official tas bort från eventet (`invite_status = removed`) medan en turne
 
 ### 5.6 Gallring
 
-Turneringar i Viadal-sammanhang **raderas ett år efter att turneringen avslutats**, inklusive spelarnas namn och referenser. Ett schemalagt jobb i motorn sköter det, till exempel en gång per dygn. Turneringar i den fristående appen omfattas inte av den regeln.
+Turneringar i Viadal-sammanhang **raderas ett år efter att turneringen avslutats**, inklusive spelarnas namn och referenser. En turnering som aldrig avslutas raderas **ett år efter att den skapades** (beslut 2026-11-17), så att namnen inte ligger kvar längre än i en avslutad. Ett schemalagt jobb sköter det en gång per dygn, se 11.2. Turneringar i den fristående appen omfattas inte av den regeln.
 
 ### 5.7 API-ytor (förslag)
 
@@ -230,6 +230,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 | Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                                       | 11.2 |
 | Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se`          | 11.3 |
 | Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Nej, uppskjutet. Appen visas i sitt eget utseende tills vidare; temat tas upp igen när funktionen visat sig användas | 9    |
+| Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                                    | 5.6  |
 
 ### 11.1 Inbjudna utanför företaget
 
@@ -242,7 +243,7 @@ Alternativen som valdes bort: (b) alla Microsoft-konton och åtkomststyrning i a
 Bekräftat i koden 2026-11-17: Azure SQL Database (`Microsoft.Sql/servers` i `infra/sqlserver.bicep`, `UseSqlServer` i `Program.cs`), via EF Core. Det ger följande:
 
 - **Versionskontroll (5.4):** `Match` och `Tournament` har en `Guid Version` som concurrency token och byts vid varje sparning. Det valdes framför SQL Servers `rowversion` så att testerna kan köras mot SQLite i minnet. EF Core kastar `DbUpdateConcurrencyException` när versionen är inaktuell, och API:t översätter det till `409 Conflict`. Klienten skickar ännu inte sin version (`If-Match`), så det läggs till i steg 1.
-- **Gallring (5.6):** körs som ett **Azure Container Apps Job** med schema (cron), i samma miljö som motorn (avsnitt 4). Jobbet raderar Viadal-turneringar som avslutades för mer än ett år sedan. Ett separat jobb i stället för en bakgrundstjänst i API:t gör att gallringen körs exakt en gång, även när API:t kör flera repliker. API:t körs i dag på App Service F1 utan Always On, så en bakgrundstjänst där skulle dessutom inte köras när ingen använder appen.
+- **Gallring (5.6):** ändrat 2026-11-17. Motorn körs på App Service F1, inte i Container Apps, så det finns ingen miljö att lägga ett Container Apps Job i. I stället anropar ett **schemalagt GitHub Actions-flöde** (`Retention.yml`, en gång per dygn) endpointen `POST /api/internal/retention`, som skyddas av en delad hemlighet (`Retention:Secret`) och gör själva raderingen. En enda anropare gör att gallringen körs exakt en gång, och anropet väcker appen även när ingen använder den. Tiden räknas från när finalen avgjordes (`Match.DecidedAt`, som sätts vid varje sparning), eller från när turneringen skapades om den aldrig avslutades. Spelarna i ett event som inte har några turneringar kvar raderas också; medan eventet används hämtas de på nytt från Viadal (6.2). Flyttar motorn till Container Apps blir flödet ett Container Apps Job.
 
 ### 11.3 Egen origin, inte en sökväg under Viadal
 
