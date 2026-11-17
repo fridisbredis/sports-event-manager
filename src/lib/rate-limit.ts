@@ -10,6 +10,10 @@ const LOGIN_VERIFY_LIMIT = { limit: 10, windowSeconds: 3600 }
 // ~42 runners, so a race-morning rush fits well inside 100 an hour; a script
 // working through the list does not. Frida 2026-11-10.
 const CLAIM_LIST_SEND_LIMIT = { limit: 100, windowSeconds: 3600 }
+// ADR-0005: tournament tokens live 15 minutes and the client fetches a new one
+// before the old expires, so normal use is a handful per window. 60 leaves room
+// for a reload-happy phone and several tabs; a loop does not fit.
+const TOURNAMENT_TOKEN_LIMIT = { limit: 60, windowSeconds: 900 }
 
 export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number }
 
@@ -90,6 +94,15 @@ export async function checkLoginVerifyRateLimit(phone: string): Promise<RateLimi
  *
  * Keyed by event id, which is what a claim list is (one token per event).
  */
+/** ADR-0005: tournament tokens issued to one official, across all their events. */
+export async function checkTournamentTokenRateLimit(officialId: string): Promise<RateLimitResult> {
+  return hit(
+    `tournament:token:${officialId}`,
+    TOURNAMENT_TOKEN_LIMIT.limit,
+    TOURNAMENT_TOKEN_LIMIT.windowSeconds
+  )
+}
+
 export async function checkClaimListSendRateLimit(eventId: string): Promise<RateLimitResult> {
   return hit(
     `claim:list:${eventId}`,
