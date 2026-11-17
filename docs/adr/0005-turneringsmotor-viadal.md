@@ -171,8 +171,8 @@ En server-endpoint som körs med officialens vanliga Supabase-session.
 
 ### 6.3 Gränssnitt
 
-- En flik **Turneringar** i officials mobilvy, som bara visas för premium och professional.
-- Steg 3: fliken öppnar turneringsappen med token. Steg 4: fliken är en egen React-modul.
+- Ett kort **Turneringar** i listan "Gå till" på officials startsida, som bara visas för premium och professional. Det ligger sist, efter korten som motsvarar en flik. Ändrat 2026-11-17 från en flik i flikraden: med sex flikar klipptes tre etiketter av på en 375 px bred telefon, och turneringar är något man gör på rasterna, inte en del av arbetet.
+- Steg 3: kortet leder till en sida som öppnar turneringsappen med token. Steg 4: sidan blir en egen React-modul.
 
 ## 7. Hur token kommer över (steg 3)
 
