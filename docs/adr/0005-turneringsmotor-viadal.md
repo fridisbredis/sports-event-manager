@@ -122,7 +122,7 @@ Om en official tas bort från eventet (`invite_status = removed`) medan en turne
 
 ### 5.6 Gallring
 
-Turneringar i Viadal-sammanhang **raderas ett år efter att turneringen avslutats**, inklusive spelarnas namn och referenser. Ett schemalagt jobb i motorn sköter det, till exempel en gång per dygn. Turneringar i den fristående appen omfattas inte av den regeln.
+Turneringar i Viadal-sammanhang **raderas ett år efter att turneringen avslutats**, inklusive spelarnas namn och referenser. En turnering som aldrig avslutas raderas **ett år efter att den skapades** (beslut 2026-11-17), så att namnen inte ligger kvar längre än i en avslutad. Ett schemalagt jobb sköter det en gång per dygn, se 11.2. Turneringar i den fristående appen omfattas inte av den regeln.
 
 ### 5.7 API-ytor (förslag)
 
@@ -184,6 +184,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 - När token håller på att gå ut ber appen Viadal om en ny via `postMessage` till `window.opener`. Båda sidor kontrollerar `event.origin` mot den andra sidans exakta domän.
 - Saknas `window.opener` (Viadal-fliken stängd, eller länken öppnad på annat sätt) skickas officialen tillbaka till Viadal för att öppna turneringen på nytt.
 - **Inbäddning (iframe) väljs bort i steg 3.** Den kräver CSP-regler för `frame-ancestors`, krånglar med kakor och ger dålig mobilupplevelse.
+- **Turneringsappen har en egen origin, inte en sökväg under Viadals.** Den ligger aldrig på till exempel `app.viadalevent.se/tournament`, eftersom den då kunde läsa officialens Viadal-session. Se 11.3.
 
 ## 8. Nivåer
 
@@ -198,7 +199,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 | ----------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | 1. Motor med sammanhang | 5.1, 5.2, 5.4 och globalt filter, gärna som del av refaktoreringen | Fristående appen fungerar som förut. Testerna för isolering mellan sammanhang går igenom.    |
 | 2. Viadal-inloggning    | 5.3, 6.1, 6.2, JWKS                                                | Motorn accepterar en Viadal-token och listar eventets officials. En standard-kund får `403`. |
-| 3. Inlänkning           | 6.3 och 7, med appen i Viadal-tema via design-tokens               | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
+| 3. Inlänkning           | 6.3 och 7. Viadal-temat är uppskjutet (se 11)                      | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
 | 4. Viadal-modul         | React/HeroUI-modul mot samma API                                   | Görs bara om steg 3 visar att funktionen används.                                            |
 
 ## 10. Konsekvenser
@@ -218,15 +219,18 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ## 11. Besvarade frågor
 
-| Fråga (besvarad 2026-11-13 om inget annat anges)                              | Beslut                                                                        | Se   |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---- |
-| Ska eventets admin se och kunna rensa officials turneringar?                  | Nej                                                                           | 5.3  |
-| Hur länge sparas turneringar efter ett event?                                 | Ett år efter att turneringen avslutats                                        | 5.6  |
-| Vad händer om en official tas bort mitt i en turnering?                       | Platsen blir en bye                                                           | 5.5  |
-| Behövs realtidsuppdatering?                                                   | Nej                                                                           | 5.4  |
-| Hur loggar man in i den fristående appen?                                     | Microsoft-konto med jobbmejl (Entra ID)                                       | 5.3  |
-| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06) | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph | 11.1 |
-| Vilken databas använder turneringsappen? (2026-11-17)                         | Azure SQL Database via EF Core                                                | 11.2 |
+| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                               | Se   |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---- |
+| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                                  | 5.3  |
+| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                               | 5.6  |
+| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                                  | 5.5  |
+| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                                  | 5.4  |
+| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                              | 5.3  |
+| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                                        | 11.1 |
+| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                                       | 11.2 |
+| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se`          | 11.3 |
+| Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Nej, uppskjutet. Appen visas i sitt eget utseende tills vidare; temat tas upp igen när funktionen visat sig användas | 9    |
+| Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                                    | 5.6  |
 
 ### 11.1 Inbjudna utanför företaget
 
@@ -239,7 +243,22 @@ Alternativen som valdes bort: (b) alla Microsoft-konton och åtkomststyrning i a
 Bekräftat i koden 2026-11-17: Azure SQL Database (`Microsoft.Sql/servers` i `infra/sqlserver.bicep`, `UseSqlServer` i `Program.cs`), via EF Core. Det ger följande:
 
 - **Versionskontroll (5.4):** `Match` och `Tournament` har en `Guid Version` som concurrency token och byts vid varje sparning. Det valdes framför SQL Servers `rowversion` så att testerna kan köras mot SQLite i minnet. EF Core kastar `DbUpdateConcurrencyException` när versionen är inaktuell, och API:t översätter det till `409 Conflict`. Klienten skickar ännu inte sin version (`If-Match`), så det läggs till i steg 1.
-- **Gallring (5.6):** körs som ett **Azure Container Apps Job** med schema (cron), i samma miljö som motorn (avsnitt 4). Jobbet raderar Viadal-turneringar som avslutades för mer än ett år sedan. Ett separat jobb i stället för en bakgrundstjänst i API:t gör att gallringen körs exakt en gång, även när API:t kör flera repliker. API:t körs i dag på App Service F1 utan Always On, så en bakgrundstjänst där skulle dessutom inte köras när ingen använder appen.
+- **Gallring (5.6):** ändrat 2026-11-17. Motorn körs på App Service F1, inte i Container Apps, så det finns ingen miljö att lägga ett Container Apps Job i. I stället anropar ett **schemalagt GitHub Actions-flöde** (`Retention.yml`, en gång per dygn) endpointen `POST /api/internal/retention`, som skyddas av en delad hemlighet (`Retention:Secret`) och gör själva raderingen. En enda anropare gör att gallringen körs exakt en gång, och anropet väcker appen även när ingen använder den. Tiden räknas från när finalen avgjordes (`Match.DecidedAt`, som sätts vid varje sparning), eller från när turneringen skapades om den aldrig avslutades. Spelarna i ett event som inte har några turneringar kvar raderas också; medan eventet används hämtas de på nytt från Viadal (6.2). Flyttar motorn till Container Apps blir flödet ett Container Apps Job.
+
+### 11.3 Egen origin, inte en sökväg under Viadal
+
+Frågan 2026-11-17 var om turneringsappen kan nås på Viadals egen adress, till exempel `app.viadalevent.se/tournament`, i stället för på en egen. Svaret är nej.
+
+Webbläsaren skiljer sidor åt per origin (protokoll, värd och port), inte per sökväg. Under `app.viadalevent.se/tournament` skulle turneringsappens JavaScript köra i samma origin som Viadal. Viadals inloggningskakor från `@supabase/ssr` sätts med `httpOnly: false`, `path: "/"` och 400 dagars livslängd, eftersom webbläsarklienten behöver läsa dem. Turneringsappen skulle då kunna läsa officialens Supabase-session och Viadals `localStorage`, något den aldrig behöver. Ett XSS-fel eller ett komprometterat npm-paket i turneringsappen, som har eget repo, egna beroenden och egen driftsättning, skulle räcka för att ta över Viadal-konton.
+
+Hela upplägget i avsnitt 6 och 7 bygger på att apparna är olika origins: en kortlivad token per event, `postMessage` med kontroll av den andra sidans exakta origin och en servernyckel mellan servrarna. Samma origin skulle göra token överflödig och ge turneringsappen mer än den ska ha.
+
+Det blir dessutom krångligare i drift: Viadals container skulle behöva proxa all trafik till turneringsappen (`rewrites` i Next och nya undantag i `proxy.ts`), och Angular-appen skulle behöva byggas med en annan `base-href` än den fristående appen.
+
+Därför:
+
+- **Tills vidare** nås turneringsappen på Static Web App:ens egen adress (`*.azurestaticapps.net`). Det enda officialen ser av det är adressen i den nya fliken.
+- **Senare** får den en subdomän, till exempel `turnering.viadalevent.se`: en CNAME-post i DNS och en egen domän på Static Web App:en, med gratis certifikat. Den ligger under Viadals varumärke men är en egen origin, så kakorna hålls isär. Ingen kod ändras, bara Viadals `TOURNAMENT_APP_URL` och turneringsappens `VIADAL_ORIGIN`.
 
 ## 12. Öppna frågor
 
