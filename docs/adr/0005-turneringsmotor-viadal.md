@@ -108,7 +108,7 @@ Rättigheter beräknas av motorn utifrån token och turneringens data, enligt ro
 
 ### 5.4 Samtidighet
 
-Varje match har en version (`RowVersion`). Den som markerar en vinnare skickar versionen hon såg (`If-Match`). Är den inaktuell svarar motorn `409 Conflict`, och klienten visar "Någon hann före" enligt SPEC.md §7.
+Varje match har en version (`Version`, en `Guid` som byts vid varje sparning, se `IVersioned` i turneringsappen). Den finns redan och hindrar att två samtidiga anrop skriver över varandra. Det som tillkommer: den som markerar en vinnare skickar versionen hon såg (`If-Match`). Är den inaktuell svarar motorn `409 Conflict`, och klienten visar "Någon hann före" enligt SPEC.md §7.
 
 Det finns **ingen realtidsuppdatering** (ingen SignalR eller polling). Klienten hämtar data när en vy öppnas och när användaren drar för att uppdatera. Krockar fångas av versionskontrollen ovan.
 
@@ -216,23 +216,34 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 - Två framändar att underhålla från steg 4.
 - Spelarnamn är en kopia som kan bli inaktuell tills listan hämtas igen.
 
-## 11. Besvarade frågor (2026-11-13)
+## 11. Besvarade frågor
 
-| Fråga                                                        | Beslut                                  | Se  |
-| ------------------------------------------------------------ | --------------------------------------- | --- |
-| Ska eventets admin se och kunna rensa officials turneringar? | Nej                                     | 5.3 |
-| Hur länge sparas turneringar efter ett event?                | Ett år efter att turneringen avslutats  | 5.6 |
-| Vad händer om en official tas bort mitt i en turnering?      | Platsen blir en bye                     | 5.5 |
-| Behövs realtidsuppdatering?                                  | Nej                                     | 5.4 |
-| Hur loggar man in i den fristående appen?                    | Microsoft-konto med jobbmejl (Entra ID) | 5.3 |
+| Fråga (besvarad 2026-11-13 om inget annat anges)                              | Beslut                                                                        | Se   |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---- |
+| Ska eventets admin se och kunna rensa officials turneringar?                  | Nej                                                                           | 5.3  |
+| Hur länge sparas turneringar efter ett event?                                 | Ett år efter att turneringen avslutats                                        | 5.6  |
+| Vad händer om en official tas bort mitt i en turnering?                       | Platsen blir en bye                                                           | 5.5  |
+| Behövs realtidsuppdatering?                                                   | Nej                                                                           | 5.4  |
+| Hur loggar man in i den fristående appen?                                     | Microsoft-konto med jobbmejl (Entra ID)                                       | 5.3  |
+| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06) | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph | 11.1 |
+| Vilken databas använder turneringsappen? (2026-11-17)                         | Azure SQL Database via EF Core                                                | 11.2 |
+
+### 11.1 Inbjudna utanför företaget
+
+Beslutat i turneringsappen 2026-11-06 (dess ROADMAP.md, steg D): alternativ (a). Appen tar bara emot konton i den egna Entra-katalogen, och en arrangör bjuder in en extern person från appen via Microsoft Graph. Personen blir B2B-gäst och kopplas via objekt-id:t från Graph, aldrig via e-postadressen. En inbjuden ser bara sina egna turneringar och inga e-postadresser, och bjuder inte in andra. Rollen heter "Invited" i kod och gränssnitt. Påverkar inte Viadal-integrationen.
+
+Alternativen som valdes bort: (b) alla Microsoft-konton och åtkomststyrning i appen, (c) inloggning med engångskod via e-post.
+
+### 11.2 Databas
+
+Bekräftat i koden 2026-11-17: Azure SQL Database (`Microsoft.Sql/servers` i `infra/sqlserver.bicep`, `UseSqlServer` i `Program.cs`), via EF Core. Det ger följande:
+
+- **Versionskontroll (5.4):** `Match` och `Tournament` har en `Guid Version` som concurrency token och byts vid varje sparning. Det valdes framför SQL Servers `rowversion` så att testerna kan köras mot SQLite i minnet. EF Core kastar `DbUpdateConcurrencyException` när versionen är inaktuell, och API:t översätter det till `409 Conflict`. Klienten skickar ännu inte sin version (`If-Match`), så det läggs till i steg 1.
+- **Gallring (5.6):** körs som ett **Azure Container Apps Job** med schema (cron), i samma miljö som motorn (avsnitt 4). Jobbet raderar Viadal-turneringar som avslutades för mer än ett år sedan. Ett separat jobb i stället för en bakgrundstjänst i API:t gör att gallringen körs exakt en gång, även när API:t kör flera repliker. API:t körs i dag på App Service F1 utan Always On, så en bakgrundstjänst där skulle dessutom inte köras när ingen använder appen.
 
 ## 12. Öppna frågor
 
-1. **Inbjudna utanför företaget i den fristående appen.** Med inloggning via jobbmejl: hur loggar en person från ett annat företag in? Alternativ: (a) bjuda in dem som gäster i företagets Entra ID (B2B), (b) låta appen ta emot alla Microsoft-konton, arbete och privat, och styra åtkomst i appen, (c) en enkel inloggning med engångskod via e-post för inbjudna. Påverkar inte Viadal-integrationen, men behöver bestämmas innan rollen "Invited" byggs.
-2. Turneringsappen använder en databas i Azure, antagen vara **Azure SQL Database** (vanligast ihop med .NET och EF Core) **[att bekräfta]**. Det ger följande:
-   - **Versionskontroll (5.4):** SQL Server har en inbyggd kolumntyp, `rowversion`, som uppdateras automatiskt vid varje ändring. I EF Core blir det en `byte[]`-egenskap märkt `[Timestamp]`. EF Core kastar då `DbUpdateConcurrencyException` när versionen är inaktuell, och API:t översätter det till `409 Conflict`.
-   - **Gallring (5.6):** körs som ett **Azure Container Apps Job** med schema (cron), i samma miljö som motorn. Jobbet raderar Viadal-turneringar som avslutades för mer än ett år sedan. Ett separat jobb i stället för en bakgrundstjänst i API:t gör att gallringen körs exakt en gång, även när API:t kör flera repliker.
-   - Om det i stället är Cosmos DB används dokumentets `_etag` för versionskontrollen, och gallringen kan göras med inbyggd TTL (time to live) på dokumenten.
+Inga just nu.
 
 ## 13. Till CLAUDE.md
 
