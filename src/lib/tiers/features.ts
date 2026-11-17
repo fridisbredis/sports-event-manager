@@ -36,6 +36,10 @@ export const TIER_FEATURES = {
   // number). Lower tiers send from the platform number; see
   // resolveSmsSender in src/lib/sms/sender.ts.
   smsSenderId: 'professional',
+  // ADR-0005: tournaments between an event's officials, run by the separate
+  // tournament engine. /api/tournament-token refuses a token below this tier,
+  // which is what keeps the engine closed to standard tenants.
+  tournaments: 'premium',
 } as const satisfies Record<string, Tier>
 
 export type TierFeature = keyof typeof TIER_FEATURES

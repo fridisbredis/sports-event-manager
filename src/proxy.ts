@@ -32,6 +32,14 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // ADR-0005: the public keys the tournament engine validates Viadal's
+  // tournament tokens with. Fetched by the engine's server, never with a
+  // session, and public by design (public keys only). Exact path, like the
+  // health checks above.
+  if (pathname === '/.well-known/jwks.json') {
+    return supabaseResponse
+  }
+
   // F-SEC-08: these routes ARE the login flow (send/verify OTP) — by
   // definition there is no session yet when they're called, so they can't
   // require one. Their own rate limiting (checkLoginSendRateLimit/
