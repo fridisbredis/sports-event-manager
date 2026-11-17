@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { logger } from '@/lib/logger'
 
+const ENGINE_OFFICIALS_PATH =
+  /^\/api\/internal\/events\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/officials$/i
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -37,6 +40,15 @@ export async function proxy(request: NextRequest) {
   // session, and public by design (public keys only). Exact path, like the
   // health checks above.
   if (pathname === '/.well-known/jwks.json') {
+    return supabaseResponse
+  }
+
+  // ADR-0005 §6.2: the tournament engine fetches an event's officials server
+  // to server, with TOURNAMENT_ENGINE_SECRET checked inside the route, never a
+  // session. The path has the event id in it, so an exact string cannot match
+  // it; the regex is anchored at both ends and allows a uuid and nothing else,
+  // so no other /api/internal path is let through by it.
+  if (ENGINE_OFFICIALS_PATH.test(pathname)) {
     return supabaseResponse
   }
 
