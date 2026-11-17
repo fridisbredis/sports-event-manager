@@ -202,6 +202,29 @@ describe('proxy — tournament engine JWKS exemption (ADR-0005)', () => {
   })
 })
 
+describe('proxy — tournament engine officials exemption (ADR-0005)', () => {
+  const EVENT = '11111111-1111-4111-8111-111111111111'
+
+  // The engine authenticates with TOURNAMENT_ENGINE_SECRET inside the route.
+  it('passes /api/internal/events/<uuid>/officials through without auth', async () => {
+    const res = await proxy(requestFor(`/api/internal/events/${EVENT}/officials`))
+
+    expect(res.status).not.toBe(401)
+  })
+
+  it.each([
+    ['another internal path', `/api/internal/events/${EVENT}/participants`],
+    ['a path under it', `/api/internal/events/${EVENT}/officials/extra`],
+    ['an id that is not a uuid', '/api/internal/events/abc/officials'],
+    ['a traversal attempt', `/api/internal/events/${EVENT}/../secrets/officials`],
+    ['the bare prefix', '/api/internal/events/'],
+  ])('control: still requires a session for %s', async (_, path) => {
+    const res = await proxy(requestFor(path))
+
+    expect(res.status).toBe(401)
+  })
+})
+
 describe('proxy — malformed session cookie', () => {
   // getClaims() can throw a plain Error instead of returning { error } — a
   // token whose segments are valid base64url but decode to non-JSON makes
