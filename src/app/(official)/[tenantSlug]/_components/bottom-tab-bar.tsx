@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useOptimistic, useTransition } from 'react'
-import { Bell, Calendar, House, Info, Trophy, User } from 'lucide-react'
+import { Bell, Calendar, House, Info, User } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import { officialEventPath } from '@/lib/events/paths'
 
@@ -16,17 +16,9 @@ interface Props {
   // the caller's only event. null when they have several or none, which
   // sends those tabs to the event picker instead.
   defaultEventId: string | null
-  // ADR-0005: the tournaments tab, for an official on the roster of a tenant
-  // whose tier includes tournaments (offersTournaments).
-  showTournaments?: boolean
 }
 
-export function BottomTabBar({
-  tenantSlug,
-  showAccount,
-  defaultEventId,
-  showTournaments = false,
-}: Props) {
+export function BottomTabBar({ tenantSlug, showAccount, defaultEventId }: Props) {
   const pathname = usePathname()
   const { eventId: urlEventId } = useParams<{ eventId?: string }>()
   const eventId = urlEventId ?? defaultEventId
@@ -60,16 +52,6 @@ export function BottomTabBar({
       label: t('nav.announcements'),
       Icon: Bell,
     },
-    ...(showTournaments
-      ? [
-          {
-            id: 'tournaments',
-            href: eventTab('tournaments'),
-            label: t('nav.tournaments'),
-            Icon: Trophy,
-          },
-        ]
-      : []),
     ...(showAccount
       ? [{ id: 'account', href: `/${tenantSlug}/account`, label: t('nav.account'), Icon: User }]
       : []),
