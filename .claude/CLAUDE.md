@@ -146,6 +146,12 @@ One concept, one word, in both locales. New user-facing strings must use these:
 
 A grep cannot enforce this — the same word is right on one surface and wrong on another — so it lives here, where parallel sessions read it.
 
+### Tournaments (premium/professional)
+
+- Read `docs/adr/0005-turneringsmotor-viadal.md` before touching anything tournament-related.
+- Tournament data is owned by the tournament engine (separate .NET repo). Don't add tournament tables to Supabase.
+- `/api/tournament-token` and `/api/internal/events/:id/officials` are the only integration points.
+
 ### Deployment
 
 - Tag Docker images with `github.sha`, never `latest` — Azure doesn't detect updates on unchanged tags
