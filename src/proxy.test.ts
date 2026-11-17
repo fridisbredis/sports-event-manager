@@ -186,6 +186,22 @@ describe('proxy — claim list auth exemption (N39)', () => {
   })
 })
 
+describe('proxy — tournament engine JWKS exemption (ADR-0005)', () => {
+  // The engine's server fetches the public keys without a session.
+  it('serves /.well-known/jwks.json without auth', async () => {
+    const res = await proxy(requestFor('/.well-known/jwks.json'))
+
+    expect(res.status).not.toBe(401)
+    expect(res.headers.get('location')).toBeNull()
+  })
+
+  it('control: does not exempt anything else under /.well-known', async () => {
+    const res = await proxy(requestFor('/.well-known/other.json'))
+
+    expect(res.headers.get('location')).toContain('/login')
+  })
+})
+
 describe('proxy — malformed session cookie', () => {
   // getClaims() can throw a plain Error instead of returning { error } — a
   // token whose segments are valid base64url but decode to non-JSON makes
