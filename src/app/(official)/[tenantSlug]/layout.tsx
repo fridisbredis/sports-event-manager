@@ -15,6 +15,8 @@ import {
   type SurfaceSwitchTarget,
 } from '@/components/navigation/surface-switch-bar'
 import { BottomTabBar } from './_components/bottom-tab-bar'
+import { TournamentTokenResponder } from './_components/tournament-token-responder'
+import { offersTournaments, tournamentAppUrl } from '@/lib/tournament/app-url'
 import { getSoleOfficialEventId } from '@/lib/events/official-event'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 
@@ -80,6 +82,8 @@ export default async function OfficialLayout({ children, params }: Props) {
   const showAccount = tenant.officialId != null
   // N23: where the event tabs point on a screen without an event in its URL.
   const defaultEventId = await getSoleOfficialEventId(tenantSlug)
+  // ADR-0005: tournaments between the event's officials, premium and up.
+  const showTournaments = offersTournaments(tenant)
 
   return (
     <>
@@ -101,7 +105,11 @@ export default async function OfficialLayout({ children, params }: Props) {
           tenantSlug={tenantSlug}
           showAccount={showAccount}
           defaultEventId={defaultEventId}
+          showTournaments={showTournaments}
         />
+        {/* Here, not on the tournaments page, so the tournament app can ask
+            this tab for a new token whichever Viadal page is open. */}
+        {showTournaments ? <TournamentTokenResponder appOrigin={tournamentAppUrl()!} /> : null}
       </div>
     </>
   )

@@ -75,6 +75,25 @@ describe('BottomTabBar', () => {
     expect(hrefs).not.toContain('/seed-klubben/account')
   })
 
+  // ADR-0005: premium and up, for an official on the roster (offersTournaments).
+  it('adds the tournaments tab for the current event when tournaments are offered', () => {
+    mockPathname.mockReturnValue('/seed-klubben/events/e1/home')
+    render(
+      <BottomTabBar tenantSlug="seed-klubben" showAccount defaultEventId={null} showTournaments />
+    )
+
+    const hrefs = screen.getAllByRole('link').map((el) => el.getAttribute('href'))
+    expect(hrefs).toHaveLength(6)
+    expect(hrefs).toContain('/seed-klubben/events/e1/tournaments')
+  })
+
+  it('has no tournaments tab otherwise', () => {
+    renderBar('/seed-klubben/events/e1/home')
+
+    const hrefs = screen.getAllByRole('link').map((el) => el.getAttribute('href'))
+    expect(hrefs).not.toContain('/seed-klubben/events/e1/tournaments')
+  })
+
   it('marks exactly the tab matching the current path', () => {
     renderBar('/seed-klubben/events/e1/schedule')
 

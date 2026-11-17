@@ -204,6 +204,7 @@ jobs:
           TOURNAMENT_SIGNING_KEY_NEXT: ${{ secrets.PROD_TOURNAMENT_SIGNING_KEY_NEXT }}
           TOURNAMENT_TOKEN_ISSUER: ${{ secrets.PROD_TOURNAMENT_TOKEN_ISSUER }}
           TOURNAMENT_ENGINE_SECRET: ${{ secrets.PROD_TOURNAMENT_ENGINE_SECRET }}
+          TOURNAMENT_APP_URL: ${{ secrets.PROD_TOURNAMENT_APP_URL }}
         run: |
           az containerapp update \
             --name sports-event-manager-prod \
@@ -237,7 +238,8 @@ jobs:
               "TOURNAMENT_SIGNING_KEY_CURRENT=$TOURNAMENT_SIGNING_KEY_CURRENT" \
               "TOURNAMENT_SIGNING_KEY_NEXT=$TOURNAMENT_SIGNING_KEY_NEXT" \
               "TOURNAMENT_TOKEN_ISSUER=$TOURNAMENT_TOKEN_ISSUER" \
-              "TOURNAMENT_ENGINE_SECRET=$TOURNAMENT_ENGINE_SECRET"
+              "TOURNAMENT_ENGINE_SECRET=$TOURNAMENT_ENGINE_SECRET" \
+              "TOURNAMENT_APP_URL=$TOURNAMENT_APP_URL"
 
       - name: Verify prod health probes survived deploy
         run: |

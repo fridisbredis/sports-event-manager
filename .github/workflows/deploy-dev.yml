@@ -102,6 +102,7 @@ jobs:
           TOURNAMENT_SIGNING_KEY_NEXT: ${{ secrets.TOURNAMENT_SIGNING_KEY_NEXT }}
           TOURNAMENT_TOKEN_ISSUER: ${{ secrets.TOURNAMENT_TOKEN_ISSUER }}
           TOURNAMENT_ENGINE_SECRET: ${{ secrets.TOURNAMENT_ENGINE_SECRET }}
+          TOURNAMENT_APP_URL: ${{ secrets.TOURNAMENT_APP_URL }}
         run: |
           az containerapp update \
             --name sports-event-manager-dev \
@@ -133,7 +134,8 @@ jobs:
               "TOURNAMENT_SIGNING_KEY_CURRENT=$TOURNAMENT_SIGNING_KEY_CURRENT" \
               "TOURNAMENT_SIGNING_KEY_NEXT=$TOURNAMENT_SIGNING_KEY_NEXT" \
               "TOURNAMENT_TOKEN_ISSUER=$TOURNAMENT_TOKEN_ISSUER" \
-              "TOURNAMENT_ENGINE_SECRET=$TOURNAMENT_ENGINE_SECRET"
+              "TOURNAMENT_ENGINE_SECRET=$TOURNAMENT_ENGINE_SECRET" \
+              "TOURNAMENT_APP_URL=$TOURNAMENT_APP_URL"
 
       - name: Verify deployment
         run: |
