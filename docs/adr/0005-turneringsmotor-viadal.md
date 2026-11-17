@@ -2,10 +2,10 @@
 
 |                |                                                                       |
 | -------------- | --------------------------------------------------------------------- |
-| Status         | Föreslagen                                                            |
+| Status         | Accepterad (2026-11-16)                                               |
 | Datum          | 2026-11-13                                                            |
 | Berör          | Turneringsappen (.NET + Angular) och Viadal (React/HeroUI + Supabase) |
-| Beslutsfattare | Frida                                                                 |
+| Beslutsfattare | Frida, med mandat från Peter (scope och nivåer, 2026-11-16)           |
 
 Lägg den här filen i båda repona, under `docs/adr/`. Avsnitt markerade **[att verifiera]** bygger på antaganden om nuvarande kod som ska kontrolleras innan implementation.
 
@@ -112,7 +112,7 @@ Varje match har en version (`RowVersion`). Den som markerar en vinnare skickar v
 
 Det finns **ingen realtidsuppdatering** (ingen SignalR eller polling). Klienten hämtar data när en vy öppnas och när användaren drar för att uppdatera. Krockar fångas av versionskontrollen ovan.
 
-### 5.6 Official som tas bort mitt i en turnering
+### 5.5 Official som tas bort mitt i en turnering
 
 Om en official tas bort från eventet (`invite_status = removed`) medan en turnering pågår:
 
@@ -120,11 +120,11 @@ Om en official tas bort från eventet (`invite_status = removed`) medan en turne
 - Matcher som redan är avgjorda eller låsta lämnas orörda, så att trädet fortfarande går att följa.
 - Motorn upptäcker borttagningen genom att hämta spelarlistan från Viadal (6.2) när en pågående turnering öppnas, cachat några minuter. En spelare som saknas i listan räknas som borttagen. Viadal behöver inte meddela motorn separat.
 
-### 5.7 Gallring
+### 5.6 Gallring
 
 Turneringar i Viadal-sammanhang **raderas ett år efter att turneringen avslutats**, inklusive spelarnas namn och referenser. Ett schemalagt jobb i motorn sköter det, till exempel en gång per dygn. Turneringar i den fristående appen omfattas inte av den regeln.
 
-### 5.5 API-ytor (förslag)
+### 5.7 API-ytor (förslag)
 
 | Metod    | Sökväg                        | Syfte                                                                       |
 | -------- | ----------------------------- | --------------------------------------------------------------------------- |
@@ -180,8 +180,10 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 - Token ligger i URL-fragmentet (efter `#`). Fragment skickas inte till servrar och hamnar inte i serverloggar.
 - Angular-appen läser fragmentet, sparar token i minnet (inte i localStorage) och tar bort fragmentet ur adressfältet direkt.
-- När token håller på att gå ut ber appen Viadal om en ny via `postMessage`, eller skickar officialen tillbaka till Viadal.
-- **Inbäddning (iframe) väljs bort i steg 3.** Den kräver CSP-regler för `frame-ancestors`, krånglar med kakor och ger dålig mobilupplevelse. Ny flik eller samma fönster räcker.
+- Viadal öppnar appen i en **ny flik med `window.open`**, så att appen har `window.opener` att prata med.
+- När token håller på att gå ut ber appen Viadal om en ny via `postMessage` till `window.opener`. Båda sidor kontrollerar `event.origin` mot den andra sidans exakta domän.
+- Saknas `window.opener` (Viadal-fliken stängd, eller länken öppnad på annat sätt) skickas officialen tillbaka till Viadal för att öppna turneringen på nytt.
+- **Inbäddning (iframe) väljs bort i steg 3.** Den kräver CSP-regler för `frame-ancestors`, krånglar med kakor och ger dålig mobilupplevelse.
 
 ## 8. Nivåer
 
@@ -219,8 +221,8 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 | Fråga                                                        | Beslut                                  | Se  |
 | ------------------------------------------------------------ | --------------------------------------- | --- |
 | Ska eventets admin se och kunna rensa officials turneringar? | Nej                                     | 5.3 |
-| Hur länge sparas turneringar efter ett event?                | Ett år efter att turneringen avslutats  | 5.7 |
-| Vad händer om en official tas bort mitt i en turnering?      | Platsen blir en bye                     | 5.6 |
+| Hur länge sparas turneringar efter ett event?                | Ett år efter att turneringen avslutats  | 5.6 |
+| Vad händer om en official tas bort mitt i en turnering?      | Platsen blir en bye                     | 5.5 |
 | Behövs realtidsuppdatering?                                  | Nej                                     | 5.4 |
 | Hur loggar man in i den fristående appen?                    | Microsoft-konto med jobbmejl (Entra ID) | 5.3 |
 
@@ -229,7 +231,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 1. **Inbjudna utanför företaget i den fristående appen.** Med inloggning via jobbmejl: hur loggar en person från ett annat företag in? Alternativ: (a) bjuda in dem som gäster i företagets Entra ID (B2B), (b) låta appen ta emot alla Microsoft-konton, arbete och privat, och styra åtkomst i appen, (c) en enkel inloggning med engångskod via e-post för inbjudna. Påverkar inte Viadal-integrationen, men behöver bestämmas innan rollen "Invited" byggs.
 2. Turneringsappen använder en databas i Azure, antagen vara **Azure SQL Database** (vanligast ihop med .NET och EF Core) **[att bekräfta]**. Det ger följande:
    - **Versionskontroll (5.4):** SQL Server har en inbyggd kolumntyp, `rowversion`, som uppdateras automatiskt vid varje ändring. I EF Core blir det en `byte[]`-egenskap märkt `[Timestamp]`. EF Core kastar då `DbUpdateConcurrencyException` när versionen är inaktuell, och API:t översätter det till `409 Conflict`.
-   - **Gallring (5.7):** körs som ett **Azure Container Apps Job** med schema (cron), i samma miljö som motorn. Jobbet raderar Viadal-turneringar som avslutades för mer än ett år sedan. Ett separat jobb i stället för en bakgrundstjänst i API:t gör att gallringen körs exakt en gång, även när API:t kör flera repliker.
+   - **Gallring (5.6):** körs som ett **Azure Container Apps Job** med schema (cron), i samma miljö som motorn. Jobbet raderar Viadal-turneringar som avslutades för mer än ett år sedan. Ett separat jobb i stället för en bakgrundstjänst i API:t gör att gallringen körs exakt en gång, även när API:t kör flera repliker.
    - Om det i stället är Cosmos DB används dokumentets `_etag` för versionskontrollen, och gallringen kan göras med inbyggd TTL (time to live) på dokumenten.
 
 ## 13. Till CLAUDE.md
@@ -239,7 +241,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 ```md
 ## Integration med Viadal
 
-- Läs docs/adr/ADR-001-turneringsmotor-viadal.md innan du rör auth, datamodell eller API.
+- Läs docs/adr/0005-turneringsmotor-viadal.md (samma fil och nummer som i Viadals repo) innan du rör auth, datamodell eller API.
 - Varje turnering har ContextType/ContextId. Filtrera alltid på sammanhanget från
   inloggningen, aldrig på ett värde från klienten.
 - Spelare kan vara externa (ExternalRef). Anta inte att en spelare är en egen användare.
