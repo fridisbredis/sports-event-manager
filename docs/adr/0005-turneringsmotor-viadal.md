@@ -151,16 +151,17 @@ En server-endpoint som körs med officialens vanliga Supabase-session.
 2. Kontrollerar att officialen är bekräftad (`invite_status = confirmed`) på eventet.
 3. Signerar en JWT:
 
-| Claim    | Värde                          |
-| -------- | ------------------------------ |
-| `iss`    | `https://app.viadalevent.se`   |
-| `aud`    | `tournament-engine`            |
-| `sub`    | `viadal:official:{officialId}` |
-| `name`   | Officialens visningsnamn       |
-| `ctx`    | `viadal:event:{eventId}`       |
-| `tenant` | Tenant-id                      |
-| `tier`   | `premium` eller `professional` |
-| `exp`    | Nu + 15 minuter                |
+| Claim    | Värde                                                                    |
+| -------- | ------------------------------------------------------------------------ |
+| `iss`    | `https://app.viadalevent.se`                                             |
+| `aud`    | `tournament-engine`                                                      |
+| `sub`    | `viadal:official:{officialId}`                                           |
+| `name`   | Officialens visningsnamn                                                 |
+| `ctx`    | `viadal:event:{eventId}`                                                 |
+| `tenant` | Tenant-id                                                                |
+| `tier`   | `premium` eller `professional`                                           |
+| `locale` | `en` eller `sv`, officialens språkval i Viadal (tillagt 2026-11-18, N55) |
+| `exp`    | Nu + 15 minuter                                                          |
 
 - Signera asymmetriskt (ES256 eller RS256). Den privata nyckeln finns bara i Viadal. Viadal publicerar den publika nyckeln på `/.well-known/jwks.json`, och motorn hämtar den därifrån. Det gör nyckelbyte möjligt utan nya deploys.
 - Klienten hämtar en ny token innan den gamla går ut.

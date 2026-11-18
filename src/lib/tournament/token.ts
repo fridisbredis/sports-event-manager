@@ -17,6 +17,11 @@ export type TournamentTokenSubject = {
   eventId: string
   tenantId: string
   tier: string
+  /**
+   * The official's Viadal language (user_preferences, the default when they
+   * never chose one), so the tournament app speaks the same language (N55).
+   */
+  locale: string
 }
 
 export type TournamentToken = { token: string; expiresAt: string }
@@ -43,6 +48,7 @@ export async function signTournamentToken(
     ctx: `viadal:event:${subject.eventId}`,
     tenant: subject.tenantId,
     tier: subject.tier,
+    locale: subject.locale,
   })
     .setProtectedHeader({ alg: SIGNING_ALG, kid: signing.kid, typ: 'JWT' })
     .setIssuer(issuer)

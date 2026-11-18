@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkTournamentTokenRateLimit, type RateLimitResult } from '@/lib/rate-limit'
 import { hasFeature } from '@/lib/tiers/features'
 import { signTournamentToken } from '@/lib/tournament/token'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { logger } from '@/lib/logger'
 
 // ADR-0005 §6.1: issues the token an official takes to the tournament engine,
@@ -96,6 +97,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // The official's Viadal language, so the tournament app matches it (N55).
+  // Never throws: a failed read falls back to the default locale.
+  const locale = await getUserLanguage()
+
   let signed
   try {
     signed = await signTournamentToken({
@@ -104,6 +109,7 @@ export async function POST(request: NextRequest) {
       eventId,
       tenantId: tenant.id,
       tier: tenant.tier,
+      locale,
     })
   } catch (err) {
     // A malformed key: a deploy mistake, never the caller's.
