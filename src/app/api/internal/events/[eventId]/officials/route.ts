@@ -5,7 +5,8 @@ import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 
 // ADR-0005 §6.2: the tournament engine's player list for one Viadal event —
-// the event's confirmed officials, as id and display name only. The engine
+// the event's confirmed officials, as id, display name and profile picture
+// URL only (N57). The engine
 // calls it server to server when a tournament is opened; an official missing
 // from the list counts as removed, and their open matches become byes (§5.5).
 //
@@ -15,7 +16,10 @@ import { logger } from '@/lib/logger'
 //
 // Service role, because there is no user to apply RLS to. That makes this
 // handler the only scoping layer, so every query names the event's tenant
-// as well as the event, and only id and name ever leave: no phone, no email.
+// as well as the event, and only id, name and avatar URL ever leave: no
+// phone, no email. The avatar is the public URL in the 'avatars' bucket, never
+// the image; when Viadal deletes the picture (a new one, B18 anonymisation)
+// the link stops working and the app shows initials (ADR-0005 §6.2).
 // An event has 10-15 officials (well inside PostgREST's 1000-row page).
 
 export const dynamic = 'force-dynamic'
@@ -73,11 +77,11 @@ export async function GET(
   }
 
   const officialIds = (memberships ?? []).map((m) => m.official_id)
-  let officials: { id: string; name: string }[] = []
+  let officials: { id: string; name: string; avatar_url: string | null }[] = []
   if (officialIds.length > 0) {
     const { data, error } = await service
       .from('officials')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .in('id', officialIds)
       .eq('tenant_id', event.tenant_id)
       // Invited, declined and removed officials are left out; for the engine a
@@ -92,7 +96,14 @@ export async function GET(
   }
 
   return NextResponse.json(
-    { officials: officials.map(({ id, name }) => ({ id, displayName: name })) },
+    {
+      officials: officials.map(({ id, name, avatar_url }) => ({
+        id,
+        displayName: name,
+        // An empty string is no picture, the same as null.
+        avatarUrl: avatar_url || null,
+      })),
+    },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }

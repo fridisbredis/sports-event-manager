@@ -81,13 +81,14 @@ Drift: motorn körs som en egen container app i samma Azure Container Apps-milj�
 
 ### 5.2 Externa spelare
 
-| Fält          | Typ                                                  | Exempel                 |
-| ------------- | ---------------------------------------------------- | ----------------------- |
-| `ExternalRef` | string, unik per sammanhang, null för egna användare | `viadal:official:8f3c…` |
-| `DisplayName` | string                                               | `Anna Berg`             |
+| Fält          | Typ                                                   | Exempel                 |
+| ------------- | ----------------------------------------------------- | ----------------------- |
+| `ExternalRef` | string, unik per sammanhang, null för egna användare  | `viadal:official:8f3c…` |
+| `DisplayName` | string                                                | `Anna Berg`             |
+| `AvatarUrl`   | string, null om bild saknas (tillagt 2026-11-18, N57) | `https://…/avatars/…`   |
 
 - En spelare är antingen en egen användare i turneringsappen eller en extern referens.
-- Namnet sparas för visning. Det uppdateras när spelarlistan hämtas på nytt från Viadal.
+- Namnet och bildlänken sparas för visning. De uppdateras när spelarlistan hämtas på nytt från Viadal.
 
 ### 5.3 Inloggning: två scheman
 
@@ -167,7 +168,8 @@ En server-endpoint som körs med officialens vanliga Supabase-session.
 ### 6.2 Spelarlista: `GET /api/internal/events/{eventId}/officials`
 
 - Anropas bara av motorn, server till server, med en servernyckel. Nyckeln förvaras som hemlighet i Azure och i 1Password, inte i koden.
-- Returnerar bekräftade officials: `id`, `displayName`. Inga telefonnummer eller e-postadresser. Motorn behöver dem inte.
+- Returnerar bekräftade officials: `id`, `displayName`, `avatarUrl`. Inga telefonnummer eller e-postadresser. Motorn behöver dem inte.
+- `avatarUrl` (tillagt 2026-11-18, N57) är den publika länken till funktionärens profilbild i Viadals bucket `avatars`, eller `null`. Motorn sparar bara länken på spelaren, aldrig bilden, och uppdaterar den vid varje hämtning. För en spelare som inte längre finns i listan töms den. När Viadal raderar bilden (ny bild, anonymiseringen i SEC-09) slutar länken fungera och appen visar initialer. Länken går inte att gissa men är inte skyddad, så den räknas som en personuppgift som lämnar Viadal. Gallringen (5.6) tar bort den tillsammans med spelaren.
 
 ### 6.3 Gränssnitt
 
