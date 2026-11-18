@@ -81,13 +81,14 @@ Drift: motorn körs som en egen container app i samma Azure Container Apps-milj�
 
 ### 5.2 Externa spelare
 
-| Fält          | Typ                                                  | Exempel                 |
-| ------------- | ---------------------------------------------------- | ----------------------- |
-| `ExternalRef` | string, unik per sammanhang, null för egna användare | `viadal:official:8f3c…` |
-| `DisplayName` | string                                               | `Anna Berg`             |
+| Fält          | Typ                                                   | Exempel                 |
+| ------------- | ----------------------------------------------------- | ----------------------- |
+| `ExternalRef` | string, unik per sammanhang, null för egna användare  | `viadal:official:8f3c…` |
+| `DisplayName` | string                                                | `Anna Berg`             |
+| `AvatarUrl`   | string, null om bild saknas (tillagt 2026-11-18, N57) | `https://…/avatars/…`   |
 
 - En spelare är antingen en egen användare i turneringsappen eller en extern referens.
-- Namnet sparas för visning. Det uppdateras när spelarlistan hämtas på nytt från Viadal.
+- Namnet och bildlänken sparas för visning. De uppdateras när spelarlistan hämtas på nytt från Viadal.
 
 ### 5.3 Inloggning: två scheman
 
