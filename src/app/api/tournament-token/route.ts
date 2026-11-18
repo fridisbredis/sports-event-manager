@@ -6,6 +6,7 @@ import { checkTournamentTokenRateLimit, type RateLimitResult } from '@/lib/rate-
 import { hasFeature } from '@/lib/tiers/features'
 import { signTournamentToken } from '@/lib/tournament/token'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { effectivePalette, paletteValues } from '@/lib/theme/tenant-theme-style'
 import { logger } from '@/lib/logger'
 
 // ADR-0005 §6.1: issues the token an official takes to the tournament engine,
@@ -110,6 +111,11 @@ export async function POST(request: NextRequest) {
       tenantId: tenant.id,
       tier: tenant.tier,
       locale,
+      // The palette the official sees in Viadal, through the same tier gate
+      // (N52). Tournaments and the colour theme both start at premium today,
+      // so this is the tenant's own choice; the gate keeps it right if either
+      // tier ever moves.
+      palette: paletteValues(effectivePalette(tenant)),
     })
   } catch (err) {
     // A malformed key: a deploy mistake, never the caller's.

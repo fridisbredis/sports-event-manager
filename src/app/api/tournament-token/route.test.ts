@@ -14,6 +14,7 @@ import { checkTournamentTokenRateLimit } from '@/lib/rate-limit'
 import { signTournamentToken } from '@/lib/tournament/token'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { logger } from '@/lib/logger'
+import { TENANT_PALETTES } from '@/lib/theme/tenant-colors'
 import { POST } from './route'
 
 const EVENT_ID = '11111111-1111-4111-8111-111111111111'
@@ -95,7 +96,19 @@ describe('POST /api/tournament-token', () => {
       tenantId: 'ten-1',
       tier: 'premium',
       locale: 'en',
+      // The fixture's 'default' is no palette, so the default's values.
+      palette: TENANT_PALETTES.blue,
     })
+  })
+
+  it("carries the colour values of the tenant's palette", async () => {
+    vi.mocked(getOfficialTenant).mockResolvedValue({ ...tenant, color_palette: 'purple' })
+
+    await post({ tenantSlug: 'viadal', eventId: EVENT_ID })
+
+    expect(signTournamentToken).toHaveBeenCalledWith(
+      expect.objectContaining({ palette: TENANT_PALETTES.purple })
+    )
   })
 
   it("carries the official's Viadal language", async () => {

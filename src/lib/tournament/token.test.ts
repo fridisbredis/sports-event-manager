@@ -7,6 +7,7 @@ import {
   jwtVerify,
 } from 'jose'
 import { publicJwks } from './keys'
+import { TENANT_PALETTES } from '@/lib/theme/tenant-colors'
 import { TOURNAMENT_AUDIENCE, signTournamentToken } from './token'
 
 const subject = {
@@ -16,6 +17,7 @@ const subject = {
   tenantId: 'ten-1',
   tier: 'premium',
   locale: 'sv',
+  palette: TENANT_PALETTES.purple,
 }
 
 beforeEach(async () => {
@@ -47,6 +49,7 @@ describe('signTournamentToken', () => {
       tenant: 'ten-1',
       tier: 'premium',
       locale: 'sv',
+      palette: TENANT_PALETTES.purple,
     })
     expect(decodeProtectedHeader(signed!.token)).toMatchObject({ alg: 'ES256', kid: 'k1' })
   })

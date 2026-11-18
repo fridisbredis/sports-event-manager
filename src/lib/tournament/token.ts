@@ -1,4 +1,5 @@
 import { SignJWT } from 'jose'
+import type { TenantPalette } from '@/lib/theme/tenant-colors'
 import { SIGNING_ALG, currentSigningKey } from './keys'
 
 // ADR-0005 §6.1: the token an official takes to the tournament engine. The
@@ -22,6 +23,13 @@ export type TournamentTokenSubject = {
    * never chose one), so the tournament app speaks the same language (N55).
    */
   locale: string
+  /**
+   * The colour values of the tenant's palette (TENANT_PALETTES), so the
+   * tournament app's /viadal pages wear the tenant's colours (N52). The values
+   * rather than the palette's name: the table then lives only here, and a new
+   * palette needs no change in the app.
+   */
+  palette: TenantPalette
 }
 
 export type TournamentToken = { token: string; expiresAt: string }
@@ -49,6 +57,7 @@ export async function signTournamentToken(
     tenant: subject.tenantId,
     tier: subject.tier,
     locale: subject.locale,
+    palette: subject.palette,
   })
     .setProtectedHeader({ alg: SIGNING_ALG, kid: signing.kid, typ: 'JWT' })
     .setIssuer(issuer)

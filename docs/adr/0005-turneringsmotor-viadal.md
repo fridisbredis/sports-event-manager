@@ -151,17 +151,18 @@ En server-endpoint som körs med officialens vanliga Supabase-session.
 2. Kontrollerar att officialen är bekräftad (`invite_status = confirmed`) på eventet.
 3. Signerar en JWT:
 
-| Claim    | Värde                                                                    |
-| -------- | ------------------------------------------------------------------------ |
-| `iss`    | `https://app.viadalevent.se`                                             |
-| `aud`    | `tournament-engine`                                                      |
-| `sub`    | `viadal:official:{officialId}`                                           |
-| `name`   | Officialens visningsnamn                                                 |
-| `ctx`    | `viadal:event:{eventId}`                                                 |
-| `tenant` | Tenant-id                                                                |
-| `tier`   | `premium` eller `professional`                                           |
-| `locale` | `en` eller `sv`, officialens språkval i Viadal (tillagt 2026-11-18, N55) |
-| `exp`    | Nu + 15 minuter                                                          |
+| Claim     | Värde                                                                    |
+| --------- | ------------------------------------------------------------------------ |
+| `iss`     | `https://app.viadalevent.se`                                             |
+| `aud`     | `tournament-engine`                                                      |
+| `sub`     | `viadal:official:{officialId}`                                           |
+| `name`    | Officialens visningsnamn                                                 |
+| `ctx`     | `viadal:event:{eventId}`                                                 |
+| `tenant`  | Tenant-id                                                                |
+| `tier`    | `premium` eller `professional`                                           |
+| `locale`  | `en` eller `sv`, officialens språkval i Viadal (tillagt 2026-11-18, N55) |
+| `palette` | Färgvärdena i kundens palett, se 7.1 (tillagt 2026-11-18, N52)           |
+| `exp`     | Nu + 15 minuter                                                          |
 
 - Signera asymmetriskt (ES256 eller RS256). Den privata nyckeln finns bara i Viadal. Viadal publicerar den publika nyckeln på `/.well-known/jwks.json`, och motorn hämtar den därifrån. Det gör nyckelbyte möjligt utan nya deploys.
 - Klienten hämtar en ny token innan den gamla går ut.
@@ -189,6 +190,15 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 - **Inbäddning (iframe) väljs bort i steg 3.** Den kräver CSP-regler för `frame-ancestors`, krånglar med kakor och ger dålig mobilupplevelse.
 - **Turneringsappen har en egen origin, inte en sökväg under Viadals.** Den ligger aldrig på till exempel `app.viadalevent.se/tournament`, eftersom den då kunde läsa officialens Viadal-session. Se 11.3.
 
+### 7.1 Viadals utseende (N52)
+
+En flik som Viadal öppnat visas i Viadals utseende, så att turneringarna känns som en del av Viadal. Den fristående appen behåller sitt eget.
+
+- Claimet `palette` bär **färgvärdena** i kundens palett (`TENANT_PALETTES` i Viadal, "H S% L%"), inte bara palettens namn. Tabellen finns då bara i Viadal, och en ny palett kräver ingen ändring i appen. Ett test i Viadal kan inte se appens repo, så en kopierad tabell hade inte gått att hålla i takt. Paletten går genom samma nivåspärr som i Viadal (`effectivePalette`). Den innehåller inga personuppgifter.
+- Appen tar bara emot värden som är exakt sådana tripletter, och bara om alla roller den använder finns med. Allt annat ger Viadals utseende i appens egen blå.
+- Viadals typsnitt (Manrope i rubriker, systemtypsnittet i brödtext), radier, kortyta och neutrala färger. Bara ljust läge, eftersom Viadal inte har något mörkt. Valet ljust/mörkt visas inte.
+- Utseendet och färgerna ligger fast för en sidladdning, precis som språket. En ny palett syns nästa gång officialen öppnar Turneringar.
+
 ## 8. Nivåer
 
 |                                                                                                                                                                          | Standard | Premium | Professional |
@@ -202,7 +212,7 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 | ----------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | 1. Motor med sammanhang | 5.1, 5.2, 5.4 och globalt filter, gärna som del av refaktoreringen | Fristående appen fungerar som förut. Testerna för isolering mellan sammanhang går igenom.    |
 | 2. Viadal-inloggning    | 5.3, 6.1, 6.2, JWKS                                                | Motorn accepterar en Viadal-token och listar eventets officials. En standard-kund får `403`. |
-| 3. Inlänkning           | 6.3 och 7. Viadal-temat är uppskjutet (se 11)                      | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
+| 3. Inlänkning           | 6.3 och 7. Viadal-temat lades till 2026-11-18 (7.1)                | Officials på ett premium-event kan skapa, lotta och spela en turnering från Viadal.          |
 | 4. Viadal-modul         | React/HeroUI-modul mot samma API                                   | Görs bara om steg 3 visar att funktionen används.                                            |
 
 ## 10. Konsekvenser
@@ -222,18 +232,18 @@ Viadal öppnar turneringsappen på `https://turnering.viadalevent.se/viadal#toke
 
 ## 11. Besvarade frågor
 
-| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                               | Se   |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---- |
-| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                                  | 5.3  |
-| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                               | 5.6  |
-| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                                  | 5.5  |
-| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                                  | 5.4  |
-| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                              | 5.3  |
-| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                                        | 11.1 |
-| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                                       | 11.2 |
-| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se`          | 11.3 |
-| Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Nej, uppskjutet. Appen visas i sitt eget utseende tills vidare; temat tas upp igen när funktionen visat sig användas | 9    |
-| Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                                    | 5.6  |
+| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                      | Se   |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---- |
+| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                         | 5.3  |
+| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                      | 5.6  |
+| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                         | 5.5  |
+| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                         | 5.4  |
+| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                     | 5.3  |
+| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                               | 11.1 |
+| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                              | 11.2 |
+| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se` | 11.3 |
+| Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Först uppskjutet. Ändrat 2026-11-18 (N52): ja, med kundens palett, bara i flikar som Viadal öppnat          | 7.1  |
+| Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                           | 5.6  |
 
 ### 11.1 Inbjudna utanför företaget
 
