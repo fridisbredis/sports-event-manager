@@ -15,6 +15,7 @@ const subject = {
   eventId: 'evt-1',
   tenantId: 'ten-1',
   tier: 'premium',
+  locale: 'sv',
 }
 
 beforeEach(async () => {
@@ -45,6 +46,7 @@ describe('signTournamentToken', () => {
       ctx: 'viadal:event:evt-1',
       tenant: 'ten-1',
       tier: 'premium',
+      locale: 'sv',
     })
     expect(decodeProtectedHeader(signed!.token)).toMatchObject({ alg: 'ES256', kid: 'k1' })
   })

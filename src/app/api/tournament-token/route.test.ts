@@ -5,12 +5,14 @@ vi.mock('@/lib/auth/tenant', () => ({ getOfficialTenant: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({ createSupabaseServerClient: vi.fn() }))
 vi.mock('@/lib/rate-limit', () => ({ checkTournamentTokenRateLimit: vi.fn() }))
 vi.mock('@/lib/tournament/token', () => ({ signTournamentToken: vi.fn() }))
+vi.mock('@/lib/i18n/user-language', () => ({ getUserLanguage: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), error: vi.fn() } }))
 
 import { getOfficialTenant } from '@/lib/auth/tenant'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkTournamentTokenRateLimit } from '@/lib/rate-limit'
 import { signTournamentToken } from '@/lib/tournament/token'
+import { getUserLanguage } from '@/lib/i18n/user-language'
 import { logger } from '@/lib/logger'
 import { POST } from './route'
 
@@ -64,6 +66,7 @@ function post(body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getOfficialTenant).mockResolvedValue(tenant)
+  vi.mocked(getUserLanguage).mockResolvedValue('en')
   sessionClient({ membership: { event_id: EVENT_ID }, official: { name: 'Anna Berg' } })
   vi.mocked(checkTournamentTokenRateLimit).mockResolvedValue({
     allowed: true,
@@ -91,7 +94,16 @@ describe('POST /api/tournament-token', () => {
       eventId: EVENT_ID,
       tenantId: 'ten-1',
       tier: 'premium',
+      locale: 'en',
     })
+  })
+
+  it("carries the official's Viadal language", async () => {
+    vi.mocked(getUserLanguage).mockResolvedValue('sv')
+
+    await post({ tenantSlug: 'viadal', eventId: EVENT_ID })
+
+    expect(signTournamentToken).toHaveBeenCalledWith(expect.objectContaining({ locale: 'sv' }))
   })
 
   it('scopes both lookups to the official, the event and the tenant', async () => {
