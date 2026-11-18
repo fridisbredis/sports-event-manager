@@ -1,5 +1,10 @@
 import { hasFeature } from '@/lib/tiers/features'
-import { DEFAULT_TENANT_PALETTE, TENANT_PALETTES, type TenantPaletteKey } from './tenant-colors'
+import {
+  DEFAULT_TENANT_PALETTE,
+  TENANT_PALETTES,
+  type TenantPalette,
+  type TenantPaletteKey,
+} from './tenant-colors'
 
 function isTenantPaletteKey(value: string): value is TenantPaletteKey {
   return value in TENANT_PALETTES
@@ -22,12 +27,17 @@ export function effectivePalette(tenant: { tier: string; color_palette: string |
     : DEFAULT_TENANT_PALETTE
 }
 
+// The colour values a palette name stands for; an unknown name (a palette
+// since removed, or a typo on the row) gets the default's.
+export function paletteValues(colorPalette: string): TenantPalette {
+  return TENANT_PALETTES[isTenantPaletteKey(colorPalette) ? colorPalette : DEFAULT_TENANT_PALETTE]
+}
+
 // The variable/value pairs a palette resolves to. Shared so the client can
 // repaint the theme on a preview without duplicating the token list — one
 // place to add a token, not two that drift.
 export function tenantThemeVars(colorPalette: string): [string, string][] {
-  const key = isTenantPaletteKey(colorPalette) ? colorPalette : DEFAULT_TENANT_PALETTE
-  const palette = TENANT_PALETTES[key]
+  const palette = paletteValues(colorPalette)
 
   return [
     ['--heroui-primary', palette.primary],
