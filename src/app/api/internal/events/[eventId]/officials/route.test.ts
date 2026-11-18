@@ -59,8 +59,12 @@ const event = { data: { tenant_id: 'ten-1' }, error: null }
 const memberships = { data: [{ official_id: 'off-1' }, { official_id: 'off-2' }], error: null }
 const confirmed = {
   data: [
-    { id: 'off-1', name: 'Anna Berg' },
-    { id: 'off-2', name: 'Bo Ek' },
+    {
+      id: 'off-1',
+      name: 'Anna Berg',
+      avatar_url: 'https://storage.test/avatars/ten-1/off-1/1.jpg',
+    },
+    { id: 'off-2', name: 'Bo Ek', avatar_url: null },
   ],
   error: null,
 }
@@ -75,7 +79,7 @@ afterEach(() => {
 })
 
 describe('GET /api/internal/events/[eventId]/officials', () => {
-  it("lists the event's confirmed officials as id and display name, uncached", async () => {
+  it("lists the event's confirmed officials as id, display name and avatar URL, uncached", async () => {
     serviceClient({ events: event, official_events: memberships, officials: confirmed })
 
     const res = await get(EVENT_ID, `Bearer ${SECRET}`)
@@ -84,9 +88,27 @@ describe('GET /api/internal/events/[eventId]/officials', () => {
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(await res.json()).toEqual({
       officials: [
-        { id: 'off-1', displayName: 'Anna Berg' },
-        { id: 'off-2', displayName: 'Bo Ek' },
+        {
+          id: 'off-1',
+          displayName: 'Anna Berg',
+          avatarUrl: 'https://storage.test/avatars/ten-1/off-1/1.jpg',
+        },
+        { id: 'off-2', displayName: 'Bo Ek', avatarUrl: null },
       ],
+    })
+  })
+
+  it('sends an empty avatar URL as no picture', async () => {
+    serviceClient({
+      events: event,
+      official_events: { data: [{ official_id: 'off-1' }], error: null },
+      officials: { data: [{ id: 'off-1', name: 'Anna Berg', avatar_url: '' }], error: null },
+    })
+
+    const res = await get(EVENT_ID, `Bearer ${SECRET}`)
+
+    expect(await res.json()).toEqual({
+      officials: [{ id: 'off-1', displayName: 'Anna Berg', avatarUrl: null }],
     })
   })
 
@@ -120,7 +142,7 @@ describe('GET /api/internal/events/[eventId]/officials', () => {
 
     await get(EVENT_ID, `Bearer ${SECRET}`)
 
-    expect(calls.officials.select).toBe('id, name')
+    expect(calls.officials.select).toBe('id, name, avatar_url')
   })
 
   it('answers an empty list for an event without officials, without querying officials', async () => {
