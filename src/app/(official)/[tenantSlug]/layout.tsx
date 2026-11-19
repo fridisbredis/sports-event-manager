@@ -108,8 +108,8 @@ export default async function OfficialLayout({ children, params }: Props) {
           showAccount={showAccount}
           defaultEventId={defaultEventId}
         />
-        {/* Here, not on the tournaments page, so the tournament app can ask
-            this tab for a new token whichever Viadal page is open. */}
+        {/* Here, not on the home page that opens the app, so the tournament
+            app can ask this tab for a new token whichever Viadal page is open. */}
         {showTournaments ? <TournamentTokenResponder appOrigin={tournamentAppUrl()!} /> : null}
       </div>
     </>

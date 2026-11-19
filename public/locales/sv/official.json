@@ -21,7 +21,8 @@
     "announcements": "Meddelanden",
     "announcementsSub": "Senaste nytt för funktionärer",
     "tournaments": "Turneringar",
-    "tournamentsSub": "Spela mot andra funktionärer",
+    "tournamentsSub": "Spela mot andra funktionärer · öppnas i ny flik",
+    "breaks": "Till rasterna",
     "accountTitle": "Personligt konto",
     "accountSub": "Dina uppgifter och inställningar"
   },
@@ -194,9 +195,6 @@
     }
   },
   "tournaments": {
-    "title": "Turneringar",
-    "intro": "Kör snabba utslagsturneringar med de andra funktionärerna på evenemanget, till exempel på rasterna. De öppnas i en ny flik.",
-    "open": "Öppna turneringar",
     "popupBlocked": "Webbläsaren stoppade den nya fliken. Tillåt popup-fönster för den här sidan och försök igen.",
     "forbidden": "Turneringarna är bara för bekräftade funktionärer på evenemanget.",
     "unavailable": "Turneringarna går inte att öppna just nu. Försök igen om en stund."

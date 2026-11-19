@@ -175,8 +175,9 @@ En server-endpoint som körs med officialens vanliga Supabase-session.
 
 ### 6.3 Gränssnitt
 
-- Ett kort **Turneringar** i listan "Gå till" på officials startsida, som bara visas för premium och professional. Det ligger sist, efter korten som motsvarar en flik. Ändrat 2026-11-17 från en flik i flikraden: med sex flikar klipptes tre etiketter av på en 375 px bred telefon, och turneringar är något man gör på rasterna, inte en del av arbetet.
-- Steg 3: kortet leder till en sida som öppnar turneringsappen med token. Steg 4: sidan blir en egen React-modul.
+- Ett kort **Turneringar** på officials startsida, som bara visas för premium och professional. Ändrat 2026-11-17 från en flik i flikraden: med sex flikar klipptes tre etiketter av på en 375 px bred telefon, och turneringar är något man gör på rasterna, inte en del av arbetet.
+- Steg 3: kortet öppnar turneringsappen med token direkt, i en ny flik. Ändrat 2026-11-19: tidigare ledde kortet till en egen sida med en knapp som öppnade appen. Det mellansteget är borttaget. Eftersom kortet lämnar Viadal, till skillnad från korten i "Gå till" som motsvarar flikarna, ligger det under en egen rubrik ("Till rasterna"), är fyllt i kundens primärfärg och har en pil ut i stället för en chevron.
+- Steg 4: turneringarna blir en egen React-modul i Viadal, med en egen sida som kortet leder till.
 
 ## 7. Hur token kommer över (steg 3)
 

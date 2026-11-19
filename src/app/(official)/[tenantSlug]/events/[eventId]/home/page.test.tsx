@@ -154,8 +154,9 @@ describe('OfficialHomePage', () => {
     }
   )
 
-  // ADR-0005 §6.3: a card here, not a tab. Same gate as the tournaments page
-  // (offersTournaments): a roster row, a tier with tournaments, the app configured.
+  // ADR-0005 §6.3: a card here, not a tab, gated by offersTournaments: a roster
+  // row, a tier with tournaments, the app configured. The card opens the app
+  // itself, so it is found by its section label rather than by a link.
   it.each([
     ['shows', 'professional', 'off-1', 'https://tournaments.test', true],
     ['shows', 'premium', 'off-1', 'https://tournaments.test', true],
@@ -179,7 +180,8 @@ describe('OfficialHomePage', () => {
 
       const flat = JSON.stringify(await OfficialHomePage({ params: PARAMS }))
 
-      expect(flat.includes('/tournaments')).toBe(shown)
+      expect(flat.includes('home.breaks')).toBe(shown)
+      expect(flat.includes('/events/event-1/tournaments')).toBe(false)
       vi.unstubAllEnvs()
     }
   )
@@ -200,7 +202,7 @@ describe('OfficialHomePage', () => {
 
     const flat = JSON.stringify(await OfficialHomePage({ params: PARAMS }))
 
-    expect(flat.indexOf('/tournaments')).toBeGreaterThan(flat.indexOf('/viadal/account'))
+    expect(flat.indexOf('home.breaks')).toBeGreaterThan(flat.indexOf('/viadal/account'))
     vi.unstubAllEnvs()
   })
 })
