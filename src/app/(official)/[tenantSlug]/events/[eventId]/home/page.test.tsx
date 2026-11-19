@@ -154,10 +154,9 @@ describe('OfficialHomePage', () => {
     }
   )
 
-  // ADR-0005 §6.3: a card here, not a tab. Same gate as the tournaments page
-  // (offersTournaments): a roster row, a tier with tournaments, the app configured.
-  // The card opens the app itself, so it is found by its section label, not a
-  // link to the tournaments page.
+  // ADR-0005 §6.3: a card here, not a tab, gated by offersTournaments: a roster
+  // row, a tier with tournaments, the app configured. The card opens the app
+  // itself, so it is found by its section label rather than by a link.
   it.each([
     ['shows', 'professional', 'off-1', 'https://tournaments.test', true],
     ['shows', 'premium', 'off-1', 'https://tournaments.test', true],

@@ -19,10 +19,9 @@ const MESSAGES: Record<Exclude<OpenResult, 'opened'>, string> = {
 
 /**
  * HOME-01's way into the tournament app (ADR-0005 §6.3). Opens the app
- * straight from the click instead of going through the tournaments page, so
- * the official is one tap from playing. A button, not a link: the app needs
- * a token first, and openTournaments must run inside the click to open the
- * tab before it awaits one.
+ * straight from the click, so the official is one tap from playing. A button,
+ * not a link: the app needs a token first, and openTournaments must run inside
+ * the click to open the tab before it awaits one.
  *
  * Deliberately unlike the nav cards above it: filled in the tenant colour
  * rather than white, and an outward arrow rather than a chevron, because it

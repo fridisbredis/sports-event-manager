@@ -188,9 +188,9 @@ export default async function OfficialHomePage({ params }: Props) {
       {/* ADR-0005 §6.3: tournaments between the event's officials, premium
           and up. Not a sixth tab, which truncated three labels on a 375 px
           phone; tournaments are a break-time extra, not daily work. Set apart
-          under its own label and opened straight from here, without the
-          tournaments page in between — it leaves for the tournament app in
-          another tab, unlike the cards above, which mirror the tab bar. */}
+          under its own label and opened straight from here: it leaves for the
+          tournament app in another tab, unlike the cards above, which mirror
+          the tab bar. */}
       {offersTournaments(tenant) ? (
         <>
           <p className="section-label mt-8 mb-3">{t('home.breaks')}</p>

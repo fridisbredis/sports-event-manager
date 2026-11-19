@@ -19,7 +19,7 @@ beforeEach(() => {
 })
 
 describe('TournamentsCard', () => {
-  // HOME-01 opens the app directly, skipping the tournaments page.
+  // HOME-01 opens the app directly; there is no tournaments page in between.
   it('opens the tournament app for this event on click', async () => {
     openTournaments.mockResolvedValue('opened')
 
