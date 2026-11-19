@@ -844,3 +844,78 @@ export const hasParticipantScreens = cache(async (tenantSlug: string): Promise<b
 export const hasOfficialScreens = cache(async (tenantSlug: string): Promise<boolean> => {
   return (await getOfficialTenant(tenantSlug)) != null
 })
+
+// B19: one tenant the current user holds a role in themselves, with the
+// surfaces those roles open. Built for the system admin layout, which until
+// now had no way into a tenant: a user who is system_admin AND tenant_admin or
+// official somewhere lands on /admin (ROLE_PRIORITY), and an app on the home
+// screen has no address bar to type the tenant's URL into.
+export type OwnTenantSurfaces = {
+  slug: string
+  name: string
+  admin: boolean
+  official: boolean
+}
+
+// Keyed on the user's OWN tenant-scoped rows, never on system_admin. ADR-0004:
+// a system admin as such does not see or reach tenants, so a system admin with
+// no tenant_admin or official row gets an empty list. That rules out
+// hasOfficialScreens for the official answer: resolveOfficialSurfaceAccess
+// lets any system_admin through every tenant (the exception N33 left on the
+// official surfaces). The official link instead needs the user's own confirmed
+// officials row (officialId) in an active tenant — the same two conditions a
+// plain official is held to. The admin answer goes through hasAdminScreens,
+// which already needs a tenant_admin row there since N33, plus is_active and
+// the tier cap.
+//
+// Chrome only: no route's access depends on this list, every target page runs
+// its own guard. A failed tenants read therefore logs and offers no links,
+// rather than failing the system admin pages around it.
+export const getOwnTenantSurfaces = cache(async (): Promise<OwnTenantSurfaces[]> => {
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const roles = await getUserRoles(user.id)
+  const slugs = [
+    ...new Set(
+      roles
+        .filter((r) => r.tenant_id !== null && (r.role === 'tenant_admin' || r.role === 'official'))
+        .map((r) => r.tenantSlug)
+        .filter((slug) => slug !== '')
+    ),
+  ]
+  if (slugs.length === 0) return []
+
+  const service = createSupabaseServiceClient()
+  const { data, error } = await service.from('tenants').select('slug, name').in('slug', slugs)
+  if (error) {
+    logger.error('Failed to read tenant names for the surface links', error)
+    return []
+  }
+
+  const surfaces = await Promise.all(
+    (data ?? []).map(async (tenant) => {
+      const [admin, official] = await Promise.all([
+        hasAdminScreens(tenant.slug),
+        getOfficialTenant(tenant.slug),
+      ])
+      return {
+        slug: tenant.slug,
+        name: tenant.name,
+        admin,
+        official: official != null && official.is_active && official.officialId != null,
+      }
+    })
+  )
+
+  return surfaces.filter((s) => s.admin || s.official).sort((a, b) => a.name.localeCompare(b.name))
+})
+
+// B19: whether to offer the way back to /admin from a tenant's admin pages.
+// Same question requireSystemAdmin asks (a system_admin row, whatever its
+// tenant_id), answered as a boolean for chrome.
+export const hasSystemAdminScreens = cache(async (): Promise<boolean> => {
+  const user = await getCurrentUser()
+  if (!user) return false
+  return (await getUserRoles(user.id)).some((r) => r.role === 'system_admin')
+})

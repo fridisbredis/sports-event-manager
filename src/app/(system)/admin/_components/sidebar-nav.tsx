@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
-import { Activity, FileText, LayoutPanelLeft, LogOut, Menu, UserCog } from 'lucide-react'
+import { Activity, Building2, FileText, LayoutPanelLeft, LogOut, Menu, UserCog } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 
 interface Labels {
@@ -16,10 +16,23 @@ interface Labels {
   /** Sidebar heading, repeated as the drawer's own heading. */
   sidebarLabel: string
   openMenu: string
+  /** B19: heading over the user's own tenants. */
+  ownTenants: string
+  /** B19: shown after a tenant the user reaches only as an official. */
+  ownTenantOfficialHint: string
+}
+
+// B19: one tenant where the user holds a role of their own.
+export type OwnTenantLink = {
+  name: string
+  href: string
+  /** True when the row leads to the official view, not the admin view. */
+  officialOnly: boolean
 }
 
 interface Props {
   labels: Labels
+  ownTenants: OwnTenantLink[]
 }
 
 // The system-admin sidebar deliberately does NOT use the tenant theme tint the
@@ -30,7 +43,7 @@ interface Props {
 const ACTIVE_ITEM = 'bg-status-neutral-bg font-semibold text-ink shadow-[inset_3px_0_0_#111827]'
 const IDLE_ITEM = 'text-ink-soft hover:bg-gray-50 hover:text-ink'
 
-export function SidebarNav({ labels }: Props) {
+export function SidebarNav({ labels, ownTenants }: Props) {
   const pathname = usePathname()
   // Drawer state for the phone menu. The rail is hidden below md, so without
   // this there is no navigation at all on a phone — the same gap the tenant
@@ -94,6 +107,34 @@ export function SidebarNav({ labels }: Props) {
             {labels.systemStatus}
           </span>
         </Link>
+        {/* B19: the tenants where this person holds a role of their own. A
+            section of the nav rather than a strip above the page: it stays out
+            of the way on a phone (inside the drawer), and reads as "where you
+            can go" next to the other links. Never active — these leave the
+            system admin surface for the tenant's own. */}
+        {ownTenants.length > 0 && (
+          <div className="mt-2 border-t border-edge-soft pt-2">
+            <p className="section-label px-6 pb-1 pt-3">{labels.ownTenants}</p>
+            {ownTenants.map((tenant) => (
+              <Link
+                key={tenant.href}
+                href={tenant.href}
+                onClick={onNavigate}
+                className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${IDLE_ITEM}`}
+              >
+                <Building2 className="size-[18px] shrink-0" strokeWidth={1.5} />
+                <span className="truncate" title={tenant.name}>
+                  {tenant.name}
+                </span>
+                {tenant.officialOnly && (
+                  <span className="ml-auto shrink-0 text-xs text-ink-faint">
+                    {labels.ownTenantOfficialHint}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
       <div className="border-t border-edge-soft py-2">
         {/* System admin has no account screen, so this footer is the only

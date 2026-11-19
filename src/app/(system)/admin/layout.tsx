@@ -1,8 +1,9 @@
 import { ShieldCheck } from 'lucide-react'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import { LanguageSelect } from '@/components/language-select'
-import { SidebarNav } from './_components/sidebar-nav'
+import { SidebarNav, type OwnTenantLink } from './_components/sidebar-nav'
 
 interface Props {
   children: React.ReactNode
@@ -32,7 +33,21 @@ export default async function SystemAdminLayout({ children }: Props) {
     logOut: t('systemAdmin.logOut'),
     sidebarLabel: t('systemAdmin.sidebarLabel'),
     openMenu: t('navigation.openMenu'),
+    ownTenants: t('systemAdmin.ownTenants'),
+    ownTenantOfficialHint: t('systemAdmin.ownTenantOfficialHint'),
   }
+
+  // B19: the tenants where this person holds a role of their own, so a user
+  // who is also tenant admin or official there can get to it without typing a
+  // URL — which an app on the home screen cannot do at all. One row per
+  // tenant: the admin view where they are admin (its sidebar has the link on
+  // to the official view), else the official view. A system admin as such
+  // gets none (ADR-0004); see getOwnTenantSurfaces.
+  const ownTenants: OwnTenantLink[] = (await getOwnTenantSurfaces()).map((s) => ({
+    name: s.name,
+    href: s.admin ? `/${s.slug}/admin` : `/${s.slug}/events`,
+    officialOnly: !s.admin,
+  }))
 
   return (
     <div className="app-surface flex min-h-screen">
@@ -44,7 +59,7 @@ export default async function SystemAdminLayout({ children }: Props) {
           <span className="section-label">{t('systemAdmin.sidebarLabel')}</span>
           <ShieldCheck className="size-4 shrink-0 text-ink-faint" strokeWidth={2} />
         </div>
-        <SidebarNav labels={labels} />
+        <SidebarNav labels={labels} ownTenants={ownTenants} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         {/* The language control sits here rather than in the sidebar so it
@@ -59,7 +74,7 @@ export default async function SystemAdminLayout({ children }: Props) {
               this layout already has a bar to put the control in, so nothing
               needs to float over the page. */}
           <div className="md:hidden">
-            <SidebarNav labels={labels} />
+            <SidebarNav labels={labels} ownTenants={ownTenants} />
           </div>
           <LanguageSelect current={language} />
         </div>

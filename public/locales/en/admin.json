@@ -15,7 +15,8 @@
     "participants": "Participants",
     "allEvents": "All events",
     "settings": "Settings",
-    "helpGuide": "Help and guide"
+    "helpGuide": "Help and guide",
+    "systemAdminView": "System admin"
   },
   "dashboard": {
     "eventName": "Untitled event",
@@ -772,7 +773,9 @@
     "editOwnName": "Edit name",
     "editOwnNameTitle": "Edit your name",
     "editOwnNameHint": "Shown to the other system admins in this list.",
-    "save": "Save"
+    "save": "Save",
+    "ownTenants": "Your tenants",
+    "ownTenantOfficialHint": "Official view"
   },
   "health": {
     "title": "System status",
