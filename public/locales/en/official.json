@@ -21,7 +21,8 @@
     "announcements": "Announcements",
     "announcementsSub": "Latest updates for officials",
     "tournaments": "Tournaments",
-    "tournamentsSub": "Play against other officials",
+    "tournamentsSub": "Play against other officials · opens in a new tab",
+    "breaks": "For the breaks",
     "accountTitle": "Personal account",
     "accountSub": "Your details & settings"
   },
@@ -194,9 +195,6 @@
     }
   },
   "tournaments": {
-    "title": "Tournaments",
-    "intro": "Play quick knockout tournaments with the other officials at this event, for example during breaks. They open in a new tab.",
-    "open": "Open tournaments",
     "popupBlocked": "Your browser blocked the new tab. Allow pop-ups for this site and try again.",
     "forbidden": "Tournaments are only for confirmed officials at this event.",
     "unavailable": "Tournaments can't be opened right now. Try again in a moment."
