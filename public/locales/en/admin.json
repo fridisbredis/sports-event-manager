@@ -774,8 +774,8 @@
     "editOwnNameTitle": "Edit your name",
     "editOwnNameHint": "Shown to the other system admins in this list.",
     "save": "Save",
-    "ownTenantAdmin": "{{tenant}}: admin",
-    "ownTenantOfficial": "{{tenant}}: official view"
+    "ownTenants": "Your tenants",
+    "ownTenantOfficialHint": "Official view"
   },
   "health": {
     "title": "System status",

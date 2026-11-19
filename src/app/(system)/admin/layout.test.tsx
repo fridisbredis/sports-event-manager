@@ -1,60 +1,67 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { OwnTenantLinks } from './layout'
+import SystemAdminLayout from './layout'
 import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
-import {
-  SurfaceSwitchBar,
-  type SurfaceSwitchTarget,
-} from '@/components/navigation/surface-switch-bar'
+import { SidebarNav } from './_components/sidebar-nav'
 
-// B19: the strip on the system admin pages that leads to the tenants where the
-// user holds a role of their own. Which tenants qualify is decided (and tested)
-// in getOwnTenantSurfaces; this checks what the strip makes of the answer.
+// B19: the system admin menu's "Your tenants" section. Which tenants qualify is
+// decided (and tested) in getOwnTenantSurfaces; this checks what the layout
+// hands the menu.
 
 vi.mock('@/lib/auth/tenant', () => ({
   getOwnTenantSurfaces: vi.fn(),
 }))
 
 vi.mock('@/lib/i18n/server', () => ({
-  getServerTranslation: vi.fn(
-    async () => (key: string, opts?: { tenant?: string }) => `${key}:${opts?.tenant ?? ''}`
-  ),
+  getServerTranslation: vi.fn(async () => (key: string) => key),
 }))
 
 vi.mock('@/lib/i18n/user-language', () => ({
   getUserLanguage: vi.fn(async () => 'en'),
 }))
 
-vi.mock('@/components/navigation/surface-switch-bar', () => ({
-  SurfaceSwitchBar: vi.fn(() => null),
+vi.mock('@/components/language-select', () => ({
+  LanguageSelect: vi.fn(() => null),
 }))
+
+vi.mock('./_components/sidebar-nav', () => ({
+  SidebarNav: vi.fn(() => null),
+}))
+
+function allByType(node: unknown, target: unknown, out: { props: Record<string, unknown> }[] = []) {
+  if (!node || typeof node !== 'object') return out
+  const el = node as { type?: unknown; props?: { children?: unknown } }
+  if (el.type === target) out.push(el as { props: Record<string, unknown> })
+  const children = el.props?.children
+  for (const child of Array.isArray(children) ? children : [children]) allByType(child, target, out)
+  return out
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
-function linksOf(node: unknown): SurfaceSwitchTarget[] {
-  const el = node as { type: unknown; props: { links: SurfaceSwitchTarget[] } }
-  expect(el.type).toBe(SurfaceSwitchBar)
-  return el.props.links
-}
-
-describe('OwnTenantLinks', () => {
-  it('renders nothing for a system admin with no tenant roles of their own (ADR-0004)', async () => {
+describe('SystemAdminLayout', () => {
+  it('gives the menu no tenants for a system admin with no tenant roles (ADR-0004)', async () => {
     vi.mocked(getOwnTenantSurfaces).mockResolvedValue([])
-    expect(await OwnTenantLinks()).toBeNull()
+
+    const navs = allByType(await SystemAdminLayout({ children: null }), SidebarNav)
+    expect(navs).toHaveLength(2)
+    for (const nav of navs) expect(nav.props.ownTenants).toEqual([])
   })
 
-  it('links to the admin view and the official view the user holds', async () => {
+  it('links each tenant once: the admin view where admin, else the official view', async () => {
     vi.mocked(getOwnTenantSurfaces).mockResolvedValue([
       { slug: 'alpha', name: 'Alpha IK', admin: false, official: true },
       { slug: 'viadal', name: 'Viadal', admin: true, official: true },
     ])
 
-    const links = linksOf(await OwnTenantLinks())
-    expect(links.map(({ href, label }) => ({ href, label }))).toEqual([
-      { href: '/alpha/events', label: 'systemAdmin.ownTenantOfficial:Alpha IK' },
-      { href: '/viadal/admin', label: 'systemAdmin.ownTenantAdmin:Viadal' },
-      { href: '/viadal/events', label: 'systemAdmin.ownTenantOfficial:Viadal' },
-    ])
+    const navs = allByType(await SystemAdminLayout({ children: null }), SidebarNav)
+    // Rail and drawer trigger get the same list.
+    for (const nav of navs) {
+      expect(nav.props.ownTenants).toEqual([
+        { name: 'Alpha IK', href: '/alpha/events', officialOnly: true },
+        { name: 'Viadal', href: '/viadal/admin', officialOnly: false },
+      ])
+    }
   })
 })

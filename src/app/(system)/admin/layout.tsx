@@ -1,50 +1,12 @@
-import { Suspense } from 'react'
-import { LayoutDashboard, ShieldCheck, Smartphone } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import { LanguageSelect } from '@/components/language-select'
-import {
-  SurfaceSwitchBar,
-  type SurfaceSwitchTarget,
-} from '@/components/navigation/surface-switch-bar'
-import { SidebarNav } from './_components/sidebar-nav'
+import { SidebarNav, type OwnTenantLink } from './_components/sidebar-nav'
 
 interface Props {
   children: React.ReactNode
-}
-
-// B19: the way from /admin to the tenants where this person holds a role of
-// their own. A user who is system admin and also tenant admin or official
-// lands here after sign-in, and an app on the home screen has no address bar,
-// so without these links the tenant was out of reach.
-//
-// Only the user's own roles count (getOwnTenantSurfaces). A system admin as
-// such reaches no tenant (ADR-0004) and sees no strip. Suspended because it is
-// chrome: every target page runs its own access check.
-export async function OwnTenantLinks() {
-  const surfaces = await getOwnTenantSurfaces()
-  if (surfaces.length === 0) return null
-
-  const t = await getServerTranslation(await getUserLanguage(), 'admin')
-  const links: SurfaceSwitchTarget[] = []
-  for (const s of surfaces) {
-    if (s.admin) {
-      links.push({
-        href: `/${s.slug}/admin`,
-        label: t('systemAdmin.ownTenantAdmin', { tenant: s.name }),
-        Icon: LayoutDashboard,
-      })
-    }
-    if (s.official) {
-      links.push({
-        href: `/${s.slug}/events`,
-        label: t('systemAdmin.ownTenantOfficial', { tenant: s.name }),
-        Icon: Smartphone,
-      })
-    }
-  }
-  return <SurfaceSwitchBar links={links} />
 }
 
 // The top bar and the sidebar header beside it share a top edge, so their
@@ -71,7 +33,21 @@ export default async function SystemAdminLayout({ children }: Props) {
     logOut: t('systemAdmin.logOut'),
     sidebarLabel: t('systemAdmin.sidebarLabel'),
     openMenu: t('navigation.openMenu'),
+    ownTenants: t('systemAdmin.ownTenants'),
+    ownTenantOfficialHint: t('systemAdmin.ownTenantOfficialHint'),
   }
+
+  // B19: the tenants where this person holds a role of their own, so a user
+  // who is also tenant admin or official there can get to it without typing a
+  // URL — which an app on the home screen cannot do at all. One row per
+  // tenant: the admin view where they are admin (its sidebar has the link on
+  // to the official view), else the official view. A system admin as such
+  // gets none (ADR-0004); see getOwnTenantSurfaces.
+  const ownTenants: OwnTenantLink[] = (await getOwnTenantSurfaces()).map((s) => ({
+    name: s.name,
+    href: s.admin ? `/${s.slug}/admin` : `/${s.slug}/events`,
+    officialOnly: !s.admin,
+  }))
 
   return (
     <div className="app-surface flex min-h-screen">
@@ -83,7 +59,7 @@ export default async function SystemAdminLayout({ children }: Props) {
           <span className="section-label">{t('systemAdmin.sidebarLabel')}</span>
           <ShieldCheck className="size-4 shrink-0 text-ink-faint" strokeWidth={2} />
         </div>
-        <SidebarNav labels={labels} />
+        <SidebarNav labels={labels} ownTenants={ownTenants} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         {/* The language control sits here rather than in the sidebar so it
@@ -98,13 +74,10 @@ export default async function SystemAdminLayout({ children }: Props) {
               this layout already has a bar to put the control in, so nothing
               needs to float over the page. */}
           <div className="md:hidden">
-            <SidebarNav labels={labels} />
+            <SidebarNav labels={labels} ownTenants={ownTenants} />
           </div>
           <LanguageSelect current={language} />
         </div>
-        <Suspense>
-          <OwnTenantLinks />
-        </Suspense>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>

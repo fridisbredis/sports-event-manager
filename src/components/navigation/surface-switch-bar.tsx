@@ -13,9 +13,7 @@ interface Props {
 
 // The strip above the official and participant screens that moves a user to
 // their other surfaces in the same tenant: "Admin view" and "My race" above
-// the official screens, "My shifts" above the participant screens. Also (B19)
-// above the system admin pages, leading to the tenants where that user holds
-// a role of their own.
+// the official screens, "My shifts" above the participant screens.
 //
 // One strip holding every link side by side, not one strip per link: an
 // admin who is also an official and a participant used to get two full-width

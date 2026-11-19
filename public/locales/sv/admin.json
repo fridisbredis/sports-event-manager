@@ -774,8 +774,8 @@
     "editOwnNameTitle": "Ändra ditt namn",
     "editOwnNameHint": "Visas för de andra systemadministratörerna i den här listan.",
     "save": "Spara",
-    "ownTenantAdmin": "{{tenant}}: admin",
-    "ownTenantOfficial": "{{tenant}}: funktionärsvy"
+    "ownTenants": "Dina kunder",
+    "ownTenantOfficialHint": "Funktionärsvy"
   },
   "health": {
     "title": "Systemstatus",
