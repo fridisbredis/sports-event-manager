@@ -245,6 +245,7 @@ En flik som Viadal öppnat visas i Viadals utseende, så att turneringarna känn
 | Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se` | 11.3 |
 | Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Först uppskjutet. Ändrat 2026-11-18 (N52): ja, med kundens palett, bara i flikar som Viadal öppnat          | 7.1  |
 | Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                           | 5.6  |
+| Ska turneringsappen gå att lägga på hemskärmen och skicka egna push-notiser? (2026-11-19, N59)             | Nej. Behövs push för turneringar skickar Viadal dem via sin befintliga push (N31), på motorns begäran       | 11.4 |
 
 ### 11.1 Inbjudna utanför företaget
 
@@ -273,6 +274,28 @@ Därför:
 
 - **Tills vidare** nås turneringsappen på Static Web App:ens egen adress (`*.azurestaticapps.net`). Det enda officialen ser av det är adressen i den nya fliken.
 - **Senare** får den en subdomän, till exempel `turnering.viadalevent.se`: en CNAME-post i DNS och en egen domän på Static Web App:en, med gratis certifikat. Den ligger under Viadals varumärke men är en egen origin, så kakorna hålls isär. Ingen kod ändras, bara Viadals `TOURNAMENT_APP_URL` och turneringsappens `VIADAL_ORIGIN`.
+
+### 11.4 Push för turneringar går via Viadal, inte via en installerad turneringsapp
+
+Frågan 2026-11-19 (N59) var om en official ska kunna lägga turneringsappen på hemskärmen och få push-notiser när något händer i en turnering. Svaret är nej till en installerad turneringsapp. Behövs push för turneringar skickar Viadal dem.
+
+**Inloggningen avgör frågan.** Öppnad från en ikon på hemskärmen har appen ingen token i fragmentet, ingen flagga i `sessionStorage` (en installerad app får ett eget lagringsutrymme) och inget `window.opener` (`web/src/app/core/viadal-session.ts`). Då är den inte i Viadal-läge och startar i stället den fristående inloggningen via Entra ID, som officials inte har konto i. För att den skulle fungera på egen hand skulle appen behöva spara en långlivad inloggning per official. Det strider mot avsnitt 7: token ligger bara i minnet, gäller i 15 minuter och förnyas bara av Viadal-fliken.
+
+**Viadal skickar i stället.** När ett utskick behövs anropar motorn en ny endpoint i Viadal, server till server, med samma servernyckel som i 6.2. Den skickar bara vilken sorts händelse det gäller och vilka officials (`viadal:official:{id}`) som berörs. Viadal slår upp mottagarnas enheter via `officials.user_id` och `push_subscriptions`, skriver texten på varje officials eget språk och skickar med samma VAPID-nycklar som till utskicken (N31). Det ger följande:
+
+- **Adressen spelar ingen roll.** Notisen kommer från Viadals origin, så ingenting väntar på turneringsappens subdomän (11.3), och inga prenumerationer går förlorade när adressen byts.
+- **En installation, inte två.** Officials lägger redan Viadal på hemskärmen för utskicken, och på iPhone är det enda sättet att få web push. En andra installation och ett andra tillstånd för samma personer vore sämre för dem och dubbelt så mycket att felsöka.
+- **Inga nya personuppgifter i motorn.** Motorn sparar inga push-endpoints. Den känner redan spelarna som externa referenser (5.2), och gallringen (5.6) ändras inte.
+- **Notisen öppnar Viadal.** Viadals service worker öppnar bara adresser på sin egen origin. Därifrån är kortet Turneringar ett tryck bort (6.3).
+
+**Händelser som är värda en notis**, bara till spelarna i turneringen:
+
+- Nästa match är klar: "Du möter Anna i kvartsfinalen", till de två spelarna, när en avgjord match fyller en plats i nästa omgång.
+- Lottningen är gjord: "Du är med i turneringen", till de lottade spelarna.
+
+Inga notiser om varje resultat till alla, och inga till eventets admin (5.3) eller till officials som inte är med i turneringen. "Din match är nästa" går inte att veta, eftersom matcherna inte har någon tid utan spelas på rasterna.
+
+**Byggs först när turneringarna visat sig användas**, samma regel som steg 4 i avsnitt 9. Byggkortet är N60. Innan dess ska en sak kontrolleras på en riktig iPhone: att kortet Turneringar i en Viadal som lagts på hemskärmen öppnar appen inloggad, och att token fortfarande förnyas efter 15 minuter. Ingen har testat om `window.opener` finns kvar när appen öppnas inifrån en installerad Viadal. Om det inte fungerar är det redan i dag ett fel, oavsett push.
 
 ## 12. Öppna frågor
 
