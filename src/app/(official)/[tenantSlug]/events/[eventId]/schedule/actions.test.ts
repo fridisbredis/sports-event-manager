@@ -43,8 +43,43 @@ type Captured = {
  * `auditError` let a test fail one leg independently, which is the point of
  * most of the cases below.
  */
+type OfficialRow = { tenant_id: string; user_id: string; invite_status: string; name: string }
+
+/**
+ * An officials table that applies the filters it is given, so a test can hold
+ * more than one row for the caller and get PostgREST's real answer back:
+ * maybeSingle() over two rows is PGRST116, not the first row.
+ */
+function officialsTable(rows: OfficialRow[]) {
+  let matching = rows
+  const chain = {
+    select: vi.fn(() => chain),
+    eq: vi.fn((column: keyof OfficialRow, value: string) => {
+      matching = matching.filter((row) => row[column] === value)
+      return chain
+    }),
+    limit: vi.fn((n: number) => {
+      matching = matching.slice(0, n)
+      return chain
+    }),
+    maybeSingle: vi.fn(() =>
+      Promise.resolve(
+        matching.length > 1
+          ? { data: null, error: { code: 'PGRST116', message: 'multiple rows' } }
+          : { data: matching[0] ? { name: matching[0].name } : null, error: null }
+      )
+    ),
+  }
+  return chain
+}
+
 function mockClient(
-  opts: { checksError?: unknown; auditError?: unknown; officialName?: string | null } = {}
+  opts: {
+    checksError?: unknown
+    auditError?: unknown
+    officialName?: string | null
+    officialRows?: OfficialRow[]
+  } = {}
 ): Captured {
   const captured: Captured = {
     upsert: vi.fn(() => Promise.resolve({ error: opts.checksError ?? null })),
@@ -61,16 +96,19 @@ function mockClient(
   captured.delete = vi.fn(() => deleteChain)
   captured.eq = deleteChain.eq
 
-  const officialsChain = {
-    select: vi.fn(() => officialsChain),
-    eq: vi.fn(() => officialsChain),
-    maybeSingle: vi.fn(() =>
-      Promise.resolve({
-        data: opts.officialName === undefined ? { name: 'Alice' } : { name: opts.officialName },
-        error: null,
-      })
-    ),
-  }
+  const officialsChain = officialsTable(
+    opts.officialRows ??
+      (opts.officialName === null
+        ? []
+        : [
+            {
+              tenant_id: TENANT_ID,
+              user_id: USER_ID,
+              invite_status: 'confirmed',
+              name: opts.officialName ?? 'Alice',
+            },
+          ])
+  )
 
   vi.mocked(createSupabaseServerClient).mockResolvedValue({
     from: vi.fn((table: string) => {
@@ -226,6 +264,21 @@ describe('toggleChecklistItem audit trail', () => {
     expect(captured.insert).toHaveBeenCalledWith(
       expect.objectContaining({ actor_name: null, actor_user_id: USER_ID })
     )
+  })
+
+  // Sentry VIADAL-EVENT-PROD-6: removal is a soft delete, so a re-invited
+  // official has an old 'removed' row beside their 'confirmed' one.
+  it('names a re-invited official, not "someone", despite their removed row', async () => {
+    const captured = mockClient({
+      officialRows: [
+        { tenant_id: TENANT_ID, user_id: USER_ID, invite_status: 'removed', name: 'Old Alice' },
+        { tenant_id: TENANT_ID, user_id: USER_ID, invite_status: 'confirmed', name: 'Alice' },
+      ],
+    })
+
+    await toggleChecklistItem(BASE_INPUT)
+
+    expect(captured.insert).toHaveBeenCalledWith(expect.objectContaining({ actor_name: 'Alice' }))
   })
 })
 

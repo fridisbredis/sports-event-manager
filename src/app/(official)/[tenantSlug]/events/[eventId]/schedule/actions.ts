@@ -115,12 +115,20 @@ export async function toggleChecklistItem(
   // auth.users row being deleted (which nulls actor_user_id) and renders
   // without a join. A null name degrades to the UI's "someone" fallback
   // rather than blocking the write.
+  //
+  // Removal is a soft delete, so a re-invited official holds both a 'removed'
+  // and a 'confirmed' row for this (tenant, user) — migration 0020 permits it.
+  // Without the status filter and limit(1), maybeSingle() turns that into
+  // PGRST116 and every tick they make is audited as "someone" (Sentry
+  // VIADAL-EVENT-PROD-6). Same shape as the guard in canViewOfficialSurfaces.
   try {
     const { data: official, error: nameError } = await supabase
       .from('officials')
       .select('name')
       .eq('tenant_id', tenant.id)
       .eq('user_id', user.id)
+      .eq('invite_status', 'confirmed')
+      .limit(1)
       .maybeSingle()
 
     // Never fatal — the audit row is worth more with a null name than not

@@ -53,7 +53,7 @@ function mockAuthedUser(user: { id: string; phone?: string } | null) {
 
 function chain(result: unknown) {
   const builder: Record<string, unknown> = {}
-  for (const method of ['select', 'eq']) {
+  for (const method of ['select', 'eq', 'limit']) {
     builder[method] = vi.fn(() => builder)
   }
   builder.maybeSingle = vi.fn(() => Promise.resolve(result))
