@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import TenantLayout, { SidebarChrome } from './layout'
-import { getCurrentUser, getAdminTenant, hasAccountScreen } from '@/lib/auth/tenant'
+import {
+  getCurrentUser,
+  getAdminTenant,
+  hasAccountScreen,
+  hasSystemAdminScreens,
+} from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from './_components/sidebar-nav'
 import { DEFAULT_TENANT_PALETTE } from '@/lib/theme/tenant-colors'
@@ -13,6 +18,7 @@ vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getAdminTenant: vi.fn(),
   hasAccountScreen: vi.fn(),
+  hasSystemAdminScreens: vi.fn(async () => false),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -173,5 +179,28 @@ describe('TenantLayout', () => {
     vi.mocked(hasAccountScreen).mockResolvedValue(true)
     nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
     expect(nav!.props.showAccount).toBe(true)
+  })
+
+  // B19: the way back to /admin for an admin who is also system admin. A home
+  // screen app has no address bar, so without it /admin was out of reach.
+  it('passes showSystemAdmin through to SidebarNav', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(getAdminTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      tier: 'professional',
+      is_active: true,
+    })
+    vi.mocked(hasAccountScreen).mockResolvedValue(true)
+    const chromeProps = { tenantSlug: 'viadal', adminLabel: 'Admin' }
+
+    vi.mocked(hasSystemAdminScreens).mockResolvedValue(false)
+    let nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
+    expect(nav!.props.showSystemAdmin).toBe(false)
+
+    vi.mocked(hasSystemAdminScreens).mockResolvedValue(true)
+    nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
+    expect(nav!.props.showSystemAdmin).toBe(true)
   })
 })

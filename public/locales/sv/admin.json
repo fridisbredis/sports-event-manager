@@ -15,7 +15,8 @@
     "participants": "Deltagare",
     "allEvents": "Alla event",
     "settings": "Inställningar",
-    "helpGuide": "Hjälp och guide"
+    "helpGuide": "Hjälp och guide",
+    "systemAdminView": "Systemadmin"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",
@@ -772,7 +773,9 @@
     "editOwnName": "Ändra namn",
     "editOwnNameTitle": "Ändra ditt namn",
     "editOwnNameHint": "Visas för de andra systemadministratörerna i den här listan.",
-    "save": "Spara"
+    "save": "Spara",
+    "ownTenantAdmin": "{{tenant}}: admin",
+    "ownTenantOfficial": "{{tenant}}: funktionärsvy"
   },
   "health": {
     "title": "Systemstatus",

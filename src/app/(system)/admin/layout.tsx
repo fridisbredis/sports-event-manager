@@ -1,11 +1,50 @@
-import { ShieldCheck } from 'lucide-react'
+import { Suspense } from 'react'
+import { LayoutDashboard, ShieldCheck, Smartphone } from 'lucide-react'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import { LanguageSelect } from '@/components/language-select'
+import {
+  SurfaceSwitchBar,
+  type SurfaceSwitchTarget,
+} from '@/components/navigation/surface-switch-bar'
 import { SidebarNav } from './_components/sidebar-nav'
 
 interface Props {
   children: React.ReactNode
+}
+
+// B19: the way from /admin to the tenants where this person holds a role of
+// their own. A user who is system admin and also tenant admin or official
+// lands here after sign-in, and an app on the home screen has no address bar,
+// so without these links the tenant was out of reach.
+//
+// Only the user's own roles count (getOwnTenantSurfaces). A system admin as
+// such reaches no tenant (ADR-0004) and sees no strip. Suspended because it is
+// chrome: every target page runs its own access check.
+export async function OwnTenantLinks() {
+  const surfaces = await getOwnTenantSurfaces()
+  if (surfaces.length === 0) return null
+
+  const t = await getServerTranslation(await getUserLanguage(), 'admin')
+  const links: SurfaceSwitchTarget[] = []
+  for (const s of surfaces) {
+    if (s.admin) {
+      links.push({
+        href: `/${s.slug}/admin`,
+        label: t('systemAdmin.ownTenantAdmin', { tenant: s.name }),
+        Icon: LayoutDashboard,
+      })
+    }
+    if (s.official) {
+      links.push({
+        href: `/${s.slug}/events`,
+        label: t('systemAdmin.ownTenantOfficial', { tenant: s.name }),
+        Icon: Smartphone,
+      })
+    }
+  }
+  return <SurfaceSwitchBar links={links} />
 }
 
 // The top bar and the sidebar header beside it share a top edge, so their
@@ -63,6 +102,9 @@ export default async function SystemAdminLayout({ children }: Props) {
           </div>
           <LanguageSelect current={language} />
         </div>
+        <Suspense>
+          <OwnTenantLinks />
+        </Suspense>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>

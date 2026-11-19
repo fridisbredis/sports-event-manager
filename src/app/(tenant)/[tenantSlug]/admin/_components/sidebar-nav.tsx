@@ -21,6 +21,7 @@ import {
   PanelLeftOpen,
   Menu,
   CircleHelp,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { PremiumBadge } from '@/components/ui/premium-badge'
@@ -37,11 +38,20 @@ interface Props {
   // Premium, but greyed out and not a link. The page and its server actions
   // enforce the same tier independently.
   showParticipants: boolean
+  // B19: true when the caller also holds system_admin. The way back to /admin,
+  // which an app on the home screen otherwise has no address bar to reach.
+  showSystemAdmin: boolean
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
 
-export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipants }: Props) {
+export function SidebarNav({
+  tenantSlug,
+  adminLabel,
+  showAccount,
+  showParticipants,
+  showSystemAdmin,
+}: Props) {
   const pathname = usePathname()
   // N23: the event-scoped links follow the event in the URL. On a
   // tenant-level screen (TEN-01's event list, Settings, Account) there is no
@@ -238,6 +248,25 @@ export function SidebarNav({ tenantSlug, adminLabel, showAccount, showParticipan
             decides whether their own schedule has anything in it. */}
         {navLink('home', t('navigation.officialView'), Smartphone, opts)}
         {showAccount && navLink('admin/account', t('navigation.account'), UserCircle, opts)}
+        {/* Not navLink: that builds /<tenantSlug>/…, and the system admin
+            pages live at /admin, outside any tenant. */}
+        {showSystemAdmin && (
+          <Link
+            href="/admin"
+            title={opts.isCollapsed ? t('navigation.systemAdminView') : undefined}
+            onClick={opts.onNavigate}
+            className={`flex items-center gap-3 px-6 py-2.5 text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
+              opts.isCollapsed ? 'justify-center px-0' : ''
+            }`}
+          >
+            <ShieldCheck className="size-[18px] shrink-0" strokeWidth={1.5} />
+            {!opts.isCollapsed && (
+              <span className="truncate" title={t('navigation.systemAdminView')}>
+                {t('navigation.systemAdminView')}
+              </span>
+            )}
+          </Link>
+        )}
         <LogoutButton
           title={opts.isCollapsed ? t('navigation.logOut') : undefined}
           className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
