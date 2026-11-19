@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Bell, Calendar, ChevronRight, Info, Trophy, User, type LucideIcon } from 'lucide-react'
+import { Bell, Calendar, ChevronRight, Info, User, type LucideIcon } from 'lucide-react'
 import { unstable_cache } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
@@ -10,7 +10,8 @@ import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { officialHomeCacheTag } from '@/lib/cache/tags'
 import { AvatarImage } from '@/components/ui/avatar-image'
 import { officialEventPath } from '@/lib/events/paths'
-import { offersTournaments } from '@/lib/tournament/app-url'
+import { offersTournaments, tournamentAppUrl } from '@/lib/tournament/app-url'
+import { TournamentsCard } from './_components/tournaments-card'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -144,20 +145,6 @@ export default async function OfficialHomePage({ params }: Props) {
           },
         ]
       : []),
-    // ADR-0005 §6.3: tournaments between the event's officials, premium and up.
-    // A card here rather than a sixth tab, which truncated three labels on a
-    // 375 px phone; tournaments are a break-time extra, not daily work. Last,
-    // after the cards that mirror a tab, in the tab bar's order.
-    ...(offersTournaments(tenant)
-      ? [
-          {
-            href: officialEventPath(tenantSlug, eventId, 'tournaments'),
-            title: t('home.tournaments'),
-            subtitle: t('home.tournamentsSub'),
-            Icon: Trophy,
-          },
-        ]
-      : []),
   ]
 
   return (
@@ -197,6 +184,19 @@ export default async function OfficialHomePage({ params }: Props) {
           <NavCard key={card.href} {...card} />
         ))}
       </div>
+
+      {/* ADR-0005 §6.3: tournaments between the event's officials, premium
+          and up. Not a sixth tab, which truncated three labels on a 375 px
+          phone; tournaments are a break-time extra, not daily work. Set apart
+          under its own label and opened straight from here, without the
+          tournaments page in between — it leaves for the tournament app in
+          another tab, unlike the cards above, which mirror the tab bar. */}
+      {offersTournaments(tenant) ? (
+        <>
+          <p className="section-label mt-8 mb-3">{t('home.breaks')}</p>
+          <TournamentsCard appUrl={tournamentAppUrl()!} tenantSlug={tenantSlug} eventId={eventId} />
+        </>
+      ) : null}
     </div>
   )
 }
