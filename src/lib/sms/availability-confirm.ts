@@ -86,11 +86,19 @@ export async function sendAvailabilityConfirmSms({
     return
   }
 
+  // This runs after the confirm, so the row to honour is the confirmed one. A
+  // re-invited official also keeps their old 'removed' row with the same
+  // phone (0020's unique index skips removed rows), and without the status
+  // filter and limit(1) maybeSingle() errors on the pair — the official would
+  // silently get no confirmation SMS, and the removed row's opt-out could
+  // otherwise be the one read.
   const { data: official, error } = await service
     .from('officials')
     .select('sms_opt_out')
     .eq('tenant_id', tenantId)
     .eq('phone', phone)
+    .eq('invite_status', 'confirmed')
+    .limit(1)
     .maybeSingle()
 
   if (error) {

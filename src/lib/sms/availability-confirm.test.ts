@@ -118,7 +118,7 @@ describe('sendAvailabilityConfirmSms — N13 sender', () => {
 
   function chain(result: unknown) {
     const builder: Record<string, unknown> = {}
-    for (const method of ['select', 'eq']) builder[method] = vi.fn(() => builder)
+    for (const method of ['select', 'eq', 'limit']) builder[method] = vi.fn(() => builder)
     builder.maybeSingle = vi.fn(() => Promise.resolve(result))
     return builder
   }
@@ -181,5 +181,90 @@ describe('sendAvailabilityConfirmSms — N13 sender', () => {
 
     const { body } = messagesCreate.mock.calls[0][0]
     expect(body).toContain('availability for viadal is confirmed')
+  })
+})
+
+// Removal is a soft delete and 0020's phone index skips removed rows, so a
+// re-invited official has two rows with the same (tenant, phone).
+describe('sendAvailabilityConfirmSms — re-invited official', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  type Row = { tenant_id: string; phone: string; invite_status: string; sms_opt_out: boolean }
+
+  /** Applies its filters, so two matching rows get PostgREST's PGRST116. */
+  function officialsTable(rows: Row[]) {
+    let matching = rows
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn((column: keyof Row, value: string) => {
+        matching = matching.filter((row) => row[column] === value)
+        return chain
+      }),
+      limit: vi.fn((n: number) => {
+        matching = matching.slice(0, n)
+        return chain
+      }),
+      maybeSingle: vi.fn(() =>
+        Promise.resolve(
+          matching.length > 1
+            ? { data: null, error: { code: 'PGRST116', message: 'multiple rows' } }
+            : { data: matching[0] ?? null, error: null }
+        )
+      ),
+    }
+    return chain
+  }
+
+  function tenantsTable() {
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      maybeSingle: vi.fn(() =>
+        Promise.resolve({
+          data: { tier: 'premium', sms_sender_id: null, name: 'Viadal' },
+          error: null,
+        })
+      ),
+    }
+    return chain
+  }
+
+  async function sendWith(rows: Row[]) {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.example.com')
+    vi.stubEnv('TWILIO_PHONE_NUMBER', '+15550001111')
+    messagesCreate.mockResolvedValue({})
+    vi.mocked(twilio).mockReturnValue({ messages: { create: messagesCreate } } as never)
+
+    await sendAvailabilityConfirmSms({
+      service: {
+        from: vi.fn((table: string) =>
+          table === 'officials' ? officialsTable(rows) : tenantsTable()
+        ),
+      } as never,
+      tenantId: 't1',
+      tenantSlug: 'viadal',
+      phone: '46701111111',
+      op: 'test',
+    })
+  }
+
+  it('still sends the confirmation despite the old removed row', async () => {
+    await sendWith([
+      { tenant_id: 't1', phone: '46701111111', invite_status: 'removed', sms_opt_out: false },
+      { tenant_id: 't1', phone: '46701111111', invite_status: 'confirmed', sms_opt_out: false },
+    ])
+
+    expect(messagesCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it("honours the confirmed row's opt-out, not the removed row's", async () => {
+    await sendWith([
+      { tenant_id: 't1', phone: '46701111111', invite_status: 'removed', sms_opt_out: false },
+      { tenant_id: 't1', phone: '46701111111', invite_status: 'confirmed', sms_opt_out: true },
+    ])
+
+    expect(messagesCreate).not.toHaveBeenCalled()
   })
 })
