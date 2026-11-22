@@ -233,19 +233,19 @@ En flik som Viadal öppnat visas i Viadals utseende, så att turneringarna känn
 
 ## 11. Besvarade frågor
 
-| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                      | Se   |
-| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---- |
-| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                         | 5.3  |
-| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                      | 5.6  |
-| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                         | 5.5  |
-| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                         | 5.4  |
-| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                     | 5.3  |
-| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                               | 11.1 |
-| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                              | 11.2 |
-| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: tills vidare Static Web App:ens adress, senare en subdomän som `turnering.viadalevent.se` | 11.3 |
-| Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Först uppskjutet. Ändrat 2026-11-18 (N52): ja, med kundens palett, bara i flikar som Viadal öppnat          | 7.1  |
-| Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                           | 5.6  |
-| Ska turneringsappen gå att lägga på hemskärmen och skicka egna push-notiser? (2026-11-19, N59)             | Nej. Behövs push för turneringar skickar Viadal dem via sin befintliga push (N31), på motorns begäran       | 11.4 |
+| Fråga (besvarad 2026-11-13 om inget annat anges)                                                           | Beslut                                                                                                             | Se   |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---- |
+| Ska eventets admin se och kunna rensa officials turneringar?                                               | Nej                                                                                                                | 5.3  |
+| Hur länge sparas turneringar efter ett event?                                                              | Ett år efter att turneringen avslutats                                                                             | 5.6  |
+| Vad händer om en official tas bort mitt i en turnering?                                                    | Platsen blir en bye                                                                                                | 5.5  |
+| Behövs realtidsuppdatering?                                                                                | Nej                                                                                                                | 5.4  |
+| Hur loggar man in i den fristående appen?                                                                  | Microsoft-konto med jobbmejl (Entra ID)                                                                            | 5.3  |
+| Hur loggar inbjudna utanför företaget in i den fristående appen? (2026-11-06)                              | Som B2B-gäster i företagets Entra ID, inbjudna från appen via Microsoft Graph                                      | 11.1 |
+| Vilken databas använder turneringsappen? (2026-11-17)                                                      | Azure SQL Database via EF Core                                                                                     | 11.2 |
+| Kan turneringsappen ligga under Viadals adress, till exempel `app.viadalevent.se/tournament`? (2026-11-17) | Nej. Egen origin: subdomänen `turnering.viadalevent.se` (från november 2026; innan dess Static Web App:ens adress) | 11.3 |
+| Ska turneringsappen visas i Viadal-tema via design-tokens i steg 3? (2026-11-17)                           | Först uppskjutet. Ändrat 2026-11-18 (N52): ja, med kundens palett, bara i flikar som Viadal öppnat                 | 7.1  |
+| Raderas en turnering som aldrig avslutas? (2026-11-17)                                                     | Ja, ett år efter att den skapades                                                                                  | 5.6  |
+| Ska turneringsappen gå att lägga på hemskärmen och skicka egna push-notiser? (2026-11-19, N59)             | Nej. Behövs push för turneringar skickar Viadal dem via sin befintliga push (N31), på motorns begäran              | 11.4 |
 
 ### 11.1 Inbjudna utanför företaget
 
@@ -272,8 +272,8 @@ Det blir dessutom krångligare i drift: Viadals container skulle behöva proxa a
 
 Därför:
 
-- **Tills vidare** nås turneringsappen på Static Web App:ens egen adress (`*.azurestaticapps.net`). Det enda officialen ser av det är adressen i den nya fliken.
-- **Senare** får den en subdomän, till exempel `turnering.viadalevent.se`: en CNAME-post i DNS och en egen domän på Static Web App:en, med gratis certifikat. Den ligger under Viadals varumärke men är en egen origin, så kakorna hålls isär. Ingen kod ändras, bara Viadals `TOURNAMENT_APP_URL` och turneringsappens `VIADAL_ORIGIN`.
+- Turneringsappen nås på subdomänen `turnering.viadalevent.se`: en CNAME-post i DNS och en egen domän på Static Web App:en, med gratis certifikat. Den ligger under Viadals varumärke men är en egen origin, så kakorna hålls isär. Static Web App:ens egen adress (`*.azurestaticapps.net`) fortsätter fungera; före november 2026 var den den enda.
+- Bytet kräver ingen kodändring i Viadal, bara att Viadals `TOURNAMENT_APP_URL` pekar på den nya adressen. I turneringsappen ska den nya adressen in som redirect-URI på Tournament Web och i API:ets `Cors__AllowedOrigins` (Bicep-parametern `frontendHostname`). Turneringsappens `VIADAL_ORIGIN` ändras inte: den är Viadals adress, inte turneringsappens.
 
 ### 11.4 Push för turneringar går via Viadal, inte via en installerad turneringsapp
 
