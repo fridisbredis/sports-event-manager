@@ -273,7 +273,7 @@ Det blir dessutom krångligare i drift: Viadals container skulle behöva proxa a
 
 Därför:
 
-- Turneringsappen nås på subdomänen `turnering.viadalevent.se`: en CNAME-post i DNS och en egen domän på Static Web App:en, med gratis certifikat. Den ligger under Viadals varumärke men är en egen origin, så kakorna hålls isär. Static Web App:ens egen adress (`*.azurestaticapps.net`) fortsätter fungera; före november 2026 var den den enda.
+- Turneringsappen nås på subdomänen `turnering.viadalevent.se`: en CNAME-post i DNS och en egen domän på Static Web App:en, med gratis certifikat. Den ligger under Viadals varumärke men är en egen origin, så kakorna hålls isär. Före november 2026 nåddes den på Static Web App:ens egen adress (`*.azurestaticapps.net`). Den adressen serverar fortfarande sidan, men API:ets CORS tillåter bara den nya.
 - Bytet kräver ingen kodändring i Viadal, bara att Viadals `TOURNAMENT_APP_URL` pekar på den nya adressen. I turneringsappen ska den nya adressen in som redirect-URI på Tournament Web och i API:ets `Cors__AllowedOrigins` (Bicep-parametern `frontendHostname`). Turneringsappens `VIADAL_ORIGIN` ändras inte: den är Viadals adress, inte turneringsappens.
 
 ### 11.4 Push för turneringar går via Viadal, inte via en installerad turneringsapp
