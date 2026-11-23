@@ -6,7 +6,8 @@
     "announcements": "Announcements",
     "account": "Account",
     "adminView": "Admin view",
-    "participantView": "My race"
+    "participantView": "My race",
+    "systemAdminView": "System admin"
   },
   "home": {
     "title": "Official Home",
