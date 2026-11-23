@@ -1,10 +1,18 @@
 import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
-import { Calendar } from 'lucide-react'
-import { getCurrentUser, getParticipantTenant, hasOfficialScreens } from '@/lib/auth/tenant'
+import { Calendar, ShieldCheck } from 'lucide-react'
+import {
+  getCurrentUser,
+  getParticipantTenant,
+  hasOfficialScreens,
+  hasSystemAdminScreens,
+} from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import { SurfaceSwitchBar } from '@/components/navigation/surface-switch-bar'
+import {
+  SurfaceSwitchBar,
+  type SurfaceSwitchTarget,
+} from '@/components/navigation/surface-switch-bar'
 import { officialShiftsPath } from '@/lib/events/official-event'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
 import { ParticipantTabBar } from './_components/participant-tab-bar'
@@ -19,15 +27,28 @@ interface Props {
 // layout is the way here). It opens their schedule directly when they have one
 // event, rather than the event picker. Suspended chrome, as in the official layout: no
 // route's reachability depends on it.
+//
+// B19: a system admin also gets the way back to /admin, first in the strip, as
+// on the official layout — the home-screen app has no address bar.
 export async function OfficialLinkChrome({ tenantSlug }: { tenantSlug: string }) {
-  if (!(await hasOfficialScreens(tenantSlug))) return null
-  const [t, href] = await Promise.all([
-    getUserLanguage().then((lang) => getServerTranslation(lang, 'official')),
-    officialShiftsPath(tenantSlug),
+  const [isSystemAdmin, isOfficial] = await Promise.all([
+    hasSystemAdminScreens(),
+    hasOfficialScreens(tenantSlug),
   ])
-  return (
-    <SurfaceSwitchBar links={[{ href, label: t('participant.nav.myShifts'), Icon: Calendar }]} />
-  )
+  if (!isSystemAdmin && !isOfficial) return null
+  const t = await getServerTranslation(await getUserLanguage(), 'official')
+  const links: SurfaceSwitchTarget[] = []
+  if (isSystemAdmin) {
+    links.push({ href: '/admin', label: t('nav.systemAdminView'), Icon: ShieldCheck })
+  }
+  if (isOfficial) {
+    links.push({
+      href: await officialShiftsPath(tenantSlug),
+      label: t('participant.nav.myShifts'),
+      Icon: Calendar,
+    })
+  }
+  return <SurfaceSwitchBar links={links} />
 }
 
 export default async function ParticipantLayout({ children, params }: Props) {
