@@ -67,6 +67,7 @@
       "progressLabel": "Guide progress",
       "glossaryLabel": "What is what?",
       "dismiss": "I know this – hide the guide",
+      "dismissFailed": "Couldn't hide the guide. Try again.",
       "dismissNote": "The guide will appear again when you create another event, or from Help and guide.",
       "edit": "Edit",
       "addWorkArea": "Add work area",

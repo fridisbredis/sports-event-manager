@@ -67,6 +67,7 @@
       "progressLabel": "Framsteg i guiden",
       "glossaryLabel": "Vad är vad?",
       "dismiss": "Jag kan det här – dölj guiden",
+      "dismissFailed": "Det gick inte att dölja guiden. Försök igen.",
       "dismissNote": "Guiden visas igen när du skapar ett nytt event eller via Hjälp och guide.",
       "edit": "Redigera",
       "addWorkArea": "Lägg till arbetsområde",

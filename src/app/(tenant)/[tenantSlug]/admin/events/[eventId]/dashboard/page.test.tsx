@@ -9,6 +9,7 @@ import { ParticipantsCard } from './_components/participants-card'
 import { AdminOnboardingGuide } from './_components/admin-onboarding-guide'
 import { fetchClaimCounts } from '@/lib/participants/claim-status'
 import { fetchAdminGuideCounts } from '@/lib/onboarding/admin-guide-counts'
+import { fetchAdminGuideDismissed } from '@/lib/onboarding/admin-guide-dismissal'
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServiceClient: vi.fn(),
@@ -17,6 +18,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/onboarding/admin-guide-counts', () => ({
   fetchAdminGuideCounts: vi.fn(async () => ({ workAreaCount: 2, assignedShiftCount: 5 })),
+}))
+
+vi.mock('@/lib/onboarding/admin-guide-dismissal', () => ({
+  fetchAdminGuideDismissed: vi.fn(async () => true),
 }))
 
 // N41: tested on its own (claim-status.test.ts, and against Postgres in
@@ -189,8 +194,10 @@ describe('DashboardPage', () => {
     })
 
     expect(fetchAdminGuideCounts).toHaveBeenCalledWith(expect.anything(), TENANT_ID, EVENT.id)
+    expect(fetchAdminGuideDismissed).toHaveBeenCalledWith(expect.anything(), 'user-1', EVENT.id)
     expect(findByType(result, AdminOnboardingGuide)?.props).toMatchObject({
       forceOpen: true,
+      initiallyDismissed: true,
       eventConfigComplete: true,
       workAreaCount: 2,
       confirmedOfficialCount: 11,

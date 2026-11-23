@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AnchorHTMLAttributes } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import svAdmin from '@/../public/locales/sv/admin.json'
 import { AdminOnboardingGuide } from './admin-onboarding-guide'
 
@@ -47,6 +47,7 @@ const PROPS = {
   tenantSlug: 'viadal',
   eventId: 'event-1',
   forceOpen: false,
+  initiallyDismissed: false,
   eventConfigComplete: true,
   workAreaCount: 1,
   confirmedOfficialCount: 2,
@@ -55,10 +56,25 @@ const PROPS = {
   tierAllowsPublish: true,
 }
 
+const HIDE = 'Jag kan det här – dölj guiden'
+const LEGACY_KEY = 'admin-onboarding-dismissed:event-1'
+
+const fetchMock = vi.fn()
+
 beforeEach(() => {
   window.localStorage.clear()
   vi.clearAllMocks()
+  fetchMock.mockResolvedValue({ ok: true })
+  vi.stubGlobal('fetch', fetchMock)
 })
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+function callsTo(method: 'PUT' | 'DELETE') {
+  return fetchMock.mock.calls.filter(([, init]) => init?.method === method)
+}
 
 describe('AdminOnboardingGuide', () => {
   it('renders labels from the selected locale instead of translation keys', () => {
@@ -70,34 +86,76 @@ describe('AdminOnboardingGuide', () => {
     expect(screen.queryByText('onboardingGuide.title')).toBeNull()
   })
 
-  it('remembers when an admin hides the guide for this event', async () => {
-    render(<AdminOnboardingGuide {...PROPS} />)
+  it('renders nothing when the user has already hidden the guide for this event', () => {
+    const { container } = render(<AdminOnboardingGuide {...PROPS} initiallyDismissed />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Jag kan det här – dölj guiden' }))
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Jag kan det här – dölj guiden' })).toBeNull()
-    })
-    expect(window.localStorage.getItem('admin-onboarding-dismissed:event-1')).toBe('true')
+    expect(container).toBeEmptyDOMElement()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('reopens a dismissed guide from the help link request', async () => {
-    window.localStorage.setItem('admin-onboarding-dismissed:event-1', 'true')
-    const { rerender } = render(<AdminOnboardingGuide {...PROPS} />)
+  it('saves the hidden guide on the user, not in the browser', async () => {
+    render(<AdminOnboardingGuide {...PROPS} />)
 
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Jag kan det här – dölj guiden' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: HIDE }))
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: HIDE })).toBeNull())
+    expect(fetchMock).toHaveBeenCalledWith('/api/account/onboarding-guide', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: 'event-1' }),
     })
+    expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull()
+  })
 
-    rerender(<AdminOnboardingGuide {...PROPS} forceOpen />)
+  it('brings the guide back with an error when the save fails', async () => {
+    fetchMock.mockResolvedValue({ ok: false })
+    render(<AdminOnboardingGuide {...PROPS} />)
 
-    expect(
-      await screen.findByRole('button', { name: 'Jag kan det här – dölj guiden' })
-    ).toBeTruthy()
-    expect(replace).toHaveBeenCalledWith(
-      '/viadal/admin/events/event-1/dashboard#onboarding-glossary',
-      { scroll: false }
+    fireEvent.click(screen.getByRole('button', { name: HIDE }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Det gick inte att dölja guiden. Försök igen.'
     )
-    expect(window.localStorage.getItem('admin-onboarding-dismissed:event-1')).toBeNull()
+    expect(screen.getByRole('button', { name: HIDE })).toBeInTheDocument()
+  })
+
+  it('reopens a hidden guide from the help link and deletes the saved choice', async () => {
+    render(<AdminOnboardingGuide {...PROPS} initiallyDismissed forceOpen />)
+
+    expect(screen.getByRole('button', { name: HIDE })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(
+        '/viadal/admin/events/event-1/dashboard#onboarding-glossary',
+        { scroll: false }
+      )
+    )
+    expect(callsTo('DELETE')).toHaveLength(1)
+    // The row is gone before the URL is cleaned, so the re-render reads it as shown.
+    expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(replace.mock.invocationCallOrder[0])
+  })
+
+  it('does not call the API when the help link opens a guide that was never hidden', async () => {
+    render(<AdminOnboardingGuide {...PROPS} forceOpen />)
+
+    await waitFor(() => expect(replace).toHaveBeenCalled())
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('carries over a choice made in localStorage before it moved onto the user', async () => {
+    window.localStorage.setItem(LEGACY_KEY, 'true')
+    render(<AdminOnboardingGuide {...PROPS} />)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: HIDE })).toBeNull())
+    expect(callsTo('PUT')).toHaveLength(1)
+    await waitFor(() => expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull())
+  })
+
+  it('keeps the localStorage choice for another try when carrying it over fails', async () => {
+    fetchMock.mockResolvedValue({ ok: false })
+    window.localStorage.setItem(LEGACY_KEY, 'true')
+    render(<AdminOnboardingGuide {...PROPS} />)
+
+    await waitFor(() => expect(callsTo('PUT')).toHaveLength(1))
+    expect(window.localStorage.getItem(LEGACY_KEY)).toBe('true')
   })
 })
