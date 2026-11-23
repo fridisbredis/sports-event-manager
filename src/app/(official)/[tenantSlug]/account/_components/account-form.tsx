@@ -9,6 +9,7 @@ import {
   FileText,
   LogOut,
   ArrowLeftRight,
+  Building2,
 } from 'lucide-react'
 import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
@@ -21,6 +22,7 @@ import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
 import { IceContactFields } from '@/components/ice-contact-fields'
 import type { IceContact } from '@/lib/ice-contact'
+import type { OwnTenantLink } from '@/lib/navigation/own-tenant-links'
 import { useIceContactEditor } from '@/lib/hooks/use-ice-contact-editor'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n/config'
@@ -40,6 +42,11 @@ interface AccountFormProps {
   layout?: 'mobile' | 'desktop'
   /** N23: the event picker, for an official with more than one event. */
   changeEventHref?: string | null
+  /**
+   * B20: the user's other tenants. Only the official account page passes it;
+   * an admin has the same list in the sidebar.
+   */
+  otherOrganisations?: OwnTenantLink[]
   /**
    * N31: VAPID public key. Only the official account page passes it, since
    * announcements go to officials; absent, the push row is not rendered.
@@ -61,6 +68,7 @@ export default function AccountForm({
   language,
   layout = 'mobile',
   changeEventHref = null,
+  otherOrganisations = [],
   vapidPublicKey = null,
   iceContact = null,
 }: AccountFormProps) {
@@ -415,6 +423,46 @@ export default function AccountForm({
                 className="size-5 shrink-0 text-ink-label"
               />
             </Link>
+          </>
+        )}
+
+        {/* B20: the user's other organisations, one card with a row each —
+            the same card as "Change event" above, since both answer "where
+            else can I go". The admin view is marked, as the exception: from
+            here an official expects the official view. */}
+        {otherOrganisations.length > 0 && (
+          <>
+            <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
+              {t('otherOrganisations.sectionHeading')}
+            </p>
+            <div
+              className={`${CARD_SURFACE} ${isDesktop ? 'mb-10' : 'mb-8'} divide-y divide-edge-soft overflow-hidden`}
+            >
+              {otherOrganisations.map((org) => (
+                <Link
+                  key={org.href}
+                  href={org.href}
+                  className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-surface"
+                >
+                  <Building2
+                    aria-hidden="true"
+                    strokeWidth={1.7}
+                    className="size-8 shrink-0 text-tenant-primary"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-semibold text-ink">{org.name}</p>
+                    {!org.officialOnly && (
+                      <p className="mt-0.5 text-sm text-ink-muted">{t('nav.adminView')}</p>
+                    )}
+                  </div>
+                  <ChevronRight
+                    aria-hidden="true"
+                    strokeWidth={1.5}
+                    className="size-5 shrink-0 text-ink-label"
+                  />
+                </Link>
+              ))}
+            </div>
           </>
         )}
 

@@ -16,7 +16,8 @@
     "allEvents": "Alla event",
     "settings": "Inställningar",
     "helpGuide": "Hjälp och guide",
-    "systemAdminView": "Systemadmin"
+    "systemAdminView": "Systemadmin",
+    "otherOrganisations": "Andra organisationer"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",

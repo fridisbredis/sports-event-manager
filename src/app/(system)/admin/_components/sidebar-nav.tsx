@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
 import { Activity, Building2, FileText, LayoutPanelLeft, LogOut, Menu, UserCog } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
+import type { OwnTenantLink } from '@/lib/navigation/own-tenant-links'
 
 interface Labels {
   tenants: string
@@ -20,14 +21,6 @@ interface Labels {
   ownTenants: string
   /** B19: shown after a tenant the user reaches only as an official. */
   ownTenantOfficialHint: string
-}
-
-// B19: one tenant where the user holds a role of their own.
-export type OwnTenantLink = {
-  name: string
-  href: string
-  /** True when the row leads to the official view, not the admin view. */
-  officialOnly: boolean
 }
 
 interface Props {

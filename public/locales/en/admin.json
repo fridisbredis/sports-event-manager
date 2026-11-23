@@ -16,7 +16,8 @@
     "allEvents": "All events",
     "settings": "Settings",
     "helpGuide": "Help and guide",
-    "systemAdminView": "System admin"
+    "systemAdminView": "System admin",
+    "otherOrganisations": "Other organisations"
   },
   "dashboard": {
     "eventName": "Untitled event",
