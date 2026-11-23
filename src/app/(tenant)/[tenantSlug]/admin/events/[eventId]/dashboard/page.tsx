@@ -24,6 +24,7 @@ import {
   displayedEventStatus,
 } from '@/lib/events/participant-side'
 import { fetchAdminGuideCounts } from '@/lib/onboarding/admin-guide-counts'
+import { fetchAdminGuideDismissed } from '@/lib/onboarding/admin-guide-dismissal'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -163,9 +164,13 @@ export default async function DashboardPage({ params, searchParams }: Props) {
   const totalWarnings = overCapacity + doubleBooked + timeOffClash
 
   const tenantId = tenant.id
-  const guideCounts = event
-    ? await fetchAdminGuideCounts(await createSupabaseServerClient(), tenant.id, event.id)
-    : { workAreaCount: 0, assignedShiftCount: 0 }
+  const guideClient = await createSupabaseServerClient()
+  const [guideCounts, guideDismissed] = event
+    ? await Promise.all([
+        fetchAdminGuideCounts(guideClient, tenant.id, event.id),
+        fetchAdminGuideDismissed(guideClient, user.id, event.id),
+      ])
+    : [{ workAreaCount: 0, assignedShiftCount: 0 }, false]
 
   const dateRange = event ? formatDateRange(event.start_date, event.end_date, language) : null
   const eventName = event?.name?.trim() || t('dashboard.eventName')
@@ -190,6 +195,7 @@ export default async function DashboardPage({ params, searchParams }: Props) {
         tenantSlug={tenantSlug}
         eventId={eventId}
         forceOpen={forceOpenGuide}
+        initiallyDismissed={guideDismissed}
         eventConfigComplete={hasName && hasRaceStage}
         workAreaCount={guideCounts.workAreaCount}
         confirmedOfficialCount={officialsConfirmed}
