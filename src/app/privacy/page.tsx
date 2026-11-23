@@ -1,10 +1,13 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { getCurrentUser } from '@/lib/auth/tenant'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Privacy policy — Sports Event Manager',
+  // N64: the root layout is noindex; this page is public and opts in.
+  robots: { index: true, follow: true },
 }
 
 // Reached signed out as often as signed in: it is linked from sign-in and from
