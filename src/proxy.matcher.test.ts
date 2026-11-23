@@ -22,6 +22,13 @@ describe('proxy — matcher', () => {
     expect(unstable_doesMiddlewareMatch({ config, url: '/icon-512.png' })).toBe(false)
   })
 
+  // N64: crawlers fetch robots.txt without cookies. Through the proxy it
+  // would be redirected to /login, and a crawler that gets HTML instead of
+  // rules treats the site as having none.
+  it('does not run on /robots.txt', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/robots.txt' })).toBe(false)
+  })
+
   // Control: proves the helper sees the matcher at all, so the two cases above
   // cannot pass on a config that matches nothing.
   it('control: runs on an app page', () => {

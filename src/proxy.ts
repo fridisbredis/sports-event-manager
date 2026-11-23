@@ -159,8 +159,10 @@ export async function proxy(request: NextRequest) {
 // manifest.webmanifest is excluded because browsers fetch it without cookies
 // (N31) — through the proxy it would be redirected to /login. sw.js likewise:
 // a redirect on the service worker script fetch makes registration fail.
+// robots.txt (N64): crawlers fetch it without cookies, and a redirect to the
+// /login HTML would leave them with no rules at all.
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
