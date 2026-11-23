@@ -8,6 +8,9 @@ import { Providers } from '@/components/providers'
 export const metadata: Metadata = {
   title: 'Sports Event Manager',
   description: 'Plan and execute your sport event',
+  // N64: noindex by default, so a future public route stays out of search
+  // results until it opts in. /login and /privacy do, with index: true.
+  robots: { index: false, follow: false },
   // iOS reads its home screen title from here rather than the manifest's
   // short_name. The icon comes from src/app/apple-icon.png.
   appleWebApp: { capable: true, title: 'Event Manager', statusBarStyle: 'default' },
