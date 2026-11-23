@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
 import { redirect, notFound } from 'next/navigation'
-import { Flag, LayoutDashboard } from 'lucide-react'
+import { Flag, LayoutDashboard, ShieldCheck } from 'lucide-react'
 import {
   getCurrentUser,
   getOfficialTenant,
   hasAdminScreens,
   hasParticipantScreens,
+  hasSystemAdminScreens,
 } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
@@ -34,15 +35,24 @@ interface Props {
 // strip. No route's reachability depends on these answers, so suspending them
 // costs no guarantee — unlike the access check itself, which stays in the
 // layout body.
+//
+// B19: a system admin who is an official here reaches this view from the
+// "Your tenants" menu on /admin, so they also get the way back. In the
+// home-screen app there is no address bar, and without it the only way back
+// was to log out and in again. First in the strip: it leaves the tenant.
 export async function SurfaceLinksChrome({ tenantSlug }: { tenantSlug: string }) {
-  const [isAdmin, isParticipant] = await Promise.all([
+  const [isSystemAdmin, isAdmin, isParticipant] = await Promise.all([
+    hasSystemAdminScreens(),
     hasAdminScreens(tenantSlug),
     hasParticipantScreens(tenantSlug),
   ])
-  if (!isAdmin && !isParticipant) return null
+  if (!isSystemAdmin && !isAdmin && !isParticipant) return null
 
   const t = await getServerTranslation(await getUserLanguage(), 'official')
   const links: SurfaceSwitchTarget[] = []
+  if (isSystemAdmin) {
+    links.push({ href: '/admin', label: t('nav.systemAdminView'), Icon: ShieldCheck })
+  }
   if (isAdmin) {
     links.push({ href: `/${tenantSlug}/admin`, label: t('nav.adminView'), Icon: LayoutDashboard })
   }

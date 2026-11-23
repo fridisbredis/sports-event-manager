@@ -5,6 +5,7 @@ import {
   getOfficialTenant,
   hasAdminScreens,
   hasParticipantScreens,
+  hasSystemAdminScreens,
 } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { BottomTabBar } from './_components/bottom-tab-bar'
@@ -18,6 +19,7 @@ vi.mock('@/lib/auth/tenant', () => ({
   getOfficialTenant: vi.fn(),
   hasAdminScreens: vi.fn(),
   hasParticipantScreens: vi.fn(),
+  hasSystemAdminScreens: vi.fn(),
 }))
 
 vi.mock('@/lib/i18n/server', () => ({
@@ -80,11 +82,18 @@ const PARAMS = Promise.resolve({ tenantSlug: 'viadal' })
 
 // The layout no longer queries Supabase itself — it resolves the caller and the
 // tenant through the memoised helpers, which carry the access check.
-function mockUser(userId: string | null, tenant: unknown, isAdmin = false, isParticipant = false) {
+function mockUser(
+  userId: string | null,
+  tenant: unknown,
+  isAdmin = false,
+  isParticipant = false,
+  isSystemAdmin = false
+) {
   vi.mocked(getCurrentUser).mockResolvedValue((userId ? { id: userId } : null) as never)
   vi.mocked(getOfficialTenant).mockResolvedValue(tenant as never)
   vi.mocked(hasAdminScreens).mockResolvedValue(isAdmin)
   vi.mocked(hasParticipantScreens).mockResolvedValue(isParticipant)
+  vi.mocked(hasSystemAdminScreens).mockResolvedValue(isSystemAdmin)
 }
 
 beforeEach(() => {
@@ -228,6 +237,24 @@ describe('OfficialLayout', () => {
     const bar = findByType(await SurfaceLinksChrome({ tenantSlug: 'viadal' }), SurfaceSwitchBar)
     const links = bar!.props.links as { href: string }[]
     expect(links.map((l) => l.href)).toEqual(['/viadal/admin', '/viadal/participant'])
+  })
+
+  // B19: a system admin who is an official here (but not this tenant's admin)
+  // reaches this view from the system admin menu. In the home-screen app there
+  // is no address bar, so without this link the only way back is to log out.
+  it('offers the way back to /admin to a system admin', async () => {
+    mockUser('user-1', { id: TENANT_ID, slug: 'viadal', is_active: true }, false, false, true)
+    const bar = findByType(await SurfaceLinksChrome({ tenantSlug: 'viadal' }), SurfaceSwitchBar)
+    const links = bar!.props.links as { href: string; label: string }[]
+    expect(links.map((l) => l.href)).toEqual(['/admin'])
+    expect(links[0].label).toBe('nav.systemAdminView')
+  })
+
+  it('puts /admin first when the system admin also has the other surfaces', async () => {
+    mockUser('user-1', { id: TENANT_ID, slug: 'viadal', is_active: true }, true, true, true)
+    const bar = findByType(await SurfaceLinksChrome({ tenantSlug: 'viadal' }), SurfaceSwitchBar)
+    const links = bar!.props.links as { href: string }[]
+    expect(links.map((l) => l.href)).toEqual(['/admin', '/viadal/admin', '/viadal/participant'])
   })
 
   it('hides the admin view from a plain official', async () => {

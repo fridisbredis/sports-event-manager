@@ -6,7 +6,8 @@
     "announcements": "Meddelanden",
     "account": "Konto",
     "adminView": "Adminvy",
-    "participantView": "Mitt lopp"
+    "participantView": "Mitt lopp",
+    "systemAdminView": "Systemadmin"
   },
   "home": {
     "title": "Funktionärsstart",
