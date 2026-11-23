@@ -8,9 +8,9 @@ import type { MetadataRoute } from 'next'
 // proxy matcher must keep excluding it — otherwise it is redirected to /login
 // and installation silently loses its name and icons.
 //
-// The icons are rendered from src/app/icon.svg. The maskable one has a
+// The icons are rendered from src/app/icon.svg (the Viadal mark). The maskable one has a
 // full-bleed background with the glyph inside the safe zone, so Android
-// launchers can crop it to a circle or squircle without clipping the flag.
+// launchers can crop it to a circle or squircle without clipping the mark.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Sports Event Manager',
