@@ -22,11 +22,13 @@ import {
   Menu,
   CircleHelp,
   ShieldCheck,
+  Building2,
   type LucideIcon,
 } from 'lucide-react'
 import { PremiumBadge } from '@/components/ui/premium-badge'
 import { useTranslation } from '@/lib/i18n/client'
 import { LogoutButton } from '@/components/logout-button'
+import type { OwnTenantLink } from '@/lib/navigation/own-tenant-links'
 
 interface Props {
   tenantSlug: string
@@ -41,6 +43,8 @@ interface Props {
   // B19: true when the caller also holds system_admin. The way back to /admin,
   // which an app on the home screen otherwise has no address bar to reach.
   showSystemAdmin: boolean
+  /** B20: the user's other tenants, where they hold a role of their own. */
+  otherTenants: OwnTenantLink[]
 }
 
 const COLLAPSE_STORAGE_KEY = 'admin-sidebar-collapsed'
@@ -51,6 +55,7 @@ export function SidebarNav({
   showAccount,
   showParticipants,
   showSystemAdmin,
+  otherTenants,
 }: Props) {
   const pathname = usePathname()
   // N23: the event-scoped links follow the event in the URL. On a
@@ -222,6 +227,43 @@ export function SidebarNav({
             badge: item.badge,
             locked: item.locked,
           })
+        )}
+        {/* B20: the user's other tenants. Without it, someone who is admin in
+            one club and official in another reached only the tenant picked at
+            sign-in; the home-screen app has no address bar to type the other
+            into. Never active: these leave this tenant. Same shape as the
+            system admin menu's "Your tenants" (B19). */}
+        {otherTenants.length > 0 && (
+          <div className="mt-2 border-t border-gray-100 pt-2">
+            {!opts.isCollapsed && (
+              <p className="section-label px-6 pb-1 pt-3">{t('navigation.otherOrganisations')}</p>
+            )}
+            {otherTenants.map((tenant) => (
+              <Link
+                key={tenant.href}
+                href={tenant.href}
+                title={opts.isCollapsed ? tenant.name : undefined}
+                onClick={opts.onNavigate}
+                className={`flex items-center gap-3 px-6 py-2.5 text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
+                  opts.isCollapsed ? 'justify-center px-0' : ''
+                }`}
+              >
+                <Building2 className="size-[18px] shrink-0" strokeWidth={1.5} />
+                {!opts.isCollapsed && (
+                  <>
+                    <span className="truncate" title={tenant.name}>
+                      {tenant.name}
+                    </span>
+                    {tenant.officialOnly && (
+                      <span className="ml-auto shrink-0 text-xs text-ink-faint">
+                        {t('navigation.officialView')}
+                      </span>
+                    )}
+                  </>
+                )}
+              </Link>
+            ))}
+          </div>
         )}
       </nav>
       <div className="border-t border-gray-100 py-2">

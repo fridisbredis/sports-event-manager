@@ -3,7 +3,8 @@ import { listMemberEvents } from '@/lib/events/official-event'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant, getOwnTenantSurfaces } from '@/lib/auth/tenant'
+import { toOwnTenantLinks } from '@/lib/navigation/own-tenant-links'
 import AccountForm from './_components/account-form'
 import { countOfficialShifts } from '@/lib/scheduling/shift-count'
 import { fetchOwnIceContact } from '@/lib/ice-contact-read'
@@ -53,6 +54,11 @@ export default async function OfficialAccountPage({ params }: Props) {
 
   const hasSeveralEvents = (await listMemberEvents(tenantSlug)).length > 1
 
+  // B20: the user's other tenants, so someone who is an official in two clubs
+  // can reach the second without typing its URL — which the home-screen app
+  // cannot do at all. Their own roles only; this tenant left out.
+  const otherOrganisations = toOwnTenantLinks(await getOwnTenantSurfaces(), tenantSlug)
+
   // N37: the user's own row, read through RLS like everything else here.
   const iceContact = await fetchOwnIceContact(supabase, user.id, 'official/account')
 
@@ -79,6 +85,7 @@ export default async function OfficialAccountPage({ params }: Props) {
         shiftCount={shiftCount}
         i18nNamespace="official"
         changeEventHref={hasSeveralEvents ? `/${tenantSlug}/events` : null}
+        otherOrganisations={otherOrganisations}
         language={language}
         // N31: read at request time and handed down, rather than a
         // NEXT_PUBLIC_ variable. Those are baked in at build time and need a

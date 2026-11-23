@@ -195,6 +195,36 @@ describe('AccountForm layout split', () => {
   })
 })
 
+// B20: a user with roles in several tenants reached only the one picked at
+// sign-in. The home-screen app has no address bar, so Account lists the others.
+describe('AccountForm other organisations', () => {
+  it('shows nothing for a user with one organisation', () => {
+    render(<AccountForm {...baseProps} />)
+    expect(screen.queryByText('otherOrganisations.sectionHeading')).toBeNull()
+  })
+
+  it('links each other organisation, marking the ones that open the admin view', () => {
+    render(
+      <AccountForm
+        {...baseProps}
+        otherOrganisations={[
+          { name: 'A-klubben', href: '/a-klubben/admin', officialOnly: false },
+          { name: 'B-klubben', href: '/b-klubben/events', officialOnly: true },
+        ]}
+      />
+    )
+    expect(screen.getByText('otherOrganisations.sectionHeading')).toBeTruthy()
+
+    const a = screen.getByText('A-klubben').closest('a')
+    expect(a?.getAttribute('href')).toBe('/a-klubben/admin')
+    expect(a?.textContent).toContain('nav.adminView')
+
+    const b = screen.getByText('B-klubben').closest('a')
+    expect(b?.getAttribute('href')).toBe('/b-klubben/events')
+    expect(b?.textContent).not.toContain('nav.adminView')
+  })
+})
+
 describe('AccountForm autosave', () => {
   beforeEach(() => {
     vi.useFakeTimers()

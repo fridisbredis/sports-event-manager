@@ -149,6 +149,9 @@
     "setByOrganisers": "Satt av arrangörerna",
     "notOwned": "Arrangörerna satte den här – bara de kan ta bort den."
   },
+  "otherOrganisations": {
+    "sectionHeading": "Andra organisationer"
+  },
   "events": {
     "title": "Dina event",
     "subtitle": "Välj vilket event du vill öppna.",

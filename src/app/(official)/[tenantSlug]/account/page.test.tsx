@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import OfficialAccountPage from './page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
+import { getCurrentUser, getOfficialTenant, getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import AccountForm from './_components/account-form'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -26,6 +26,7 @@ vi.mock('@/lib/events/official-event', () => ({
 vi.mock('@/lib/auth/tenant', () => ({
   getCurrentUser: vi.fn(),
   getOfficialTenant: vi.fn(),
+  getOwnTenantSurfaces: vi.fn(async () => []),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -184,6 +185,7 @@ describe('OfficialAccountPage', () => {
       shiftCount: 2,
       i18nNamespace: 'official',
       changeEventHref: null,
+      otherOrganisations: [],
       language: 'en',
       avatarUrl: undefined,
       vapidPublicKey: null,
@@ -193,6 +195,25 @@ describe('OfficialAccountPage', () => {
 
   // N31: the key is read at request time from the container's env, not baked
   // in at build time — and with it unset the push row stays hidden.
+  // B20: the user's other tenants, this one left out.
+  it('passes the other organisations, not this one, to the form', async () => {
+    mockResolvedTenant()
+    const fromMock = vi.fn()
+    fromMock
+      .mockReturnValueOnce(chain({ data: { id: 'off-1', name: 'Anna', phone: '0701234567' } }))
+      .mockReturnValueOnce(chain({ data: [] }))
+    mockUser('user-1', fromMock)
+    vi.mocked(getOwnTenantSurfaces).mockResolvedValue([
+      { slug: 'a-klubben', name: 'A-klubben', admin: true, official: false },
+      { slug: 'viadal', name: 'Viadal', admin: false, official: true },
+    ])
+
+    const form = findByType(await OfficialAccountPage({ params: PARAMS }), AccountForm)
+    expect(form!.props.otherOrganisations).toEqual([
+      { name: 'A-klubben', href: '/a-klubben/admin', officialOnly: false },
+    ])
+  })
+
   it('passes VAPID_PUBLIC_KEY through to the form', async () => {
     vi.stubEnv('VAPID_PUBLIC_KEY', 'BKey')
     mockResolvedTenant()

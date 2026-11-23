@@ -5,6 +5,7 @@ import {
   getAdminTenant,
   hasAccountScreen,
   hasSystemAdminScreens,
+  getOwnTenantSurfaces,
 } from '@/lib/auth/tenant'
 import { redirect } from 'next/navigation'
 import { SidebarNav } from './_components/sidebar-nav'
@@ -19,6 +20,7 @@ vi.mock('@/lib/auth/tenant', () => ({
   getAdminTenant: vi.fn(),
   hasAccountScreen: vi.fn(),
   hasSystemAdminScreens: vi.fn(async () => false),
+  getOwnTenantSurfaces: vi.fn(async () => []),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -202,5 +204,31 @@ describe('TenantLayout', () => {
     vi.mocked(hasSystemAdminScreens).mockResolvedValue(true)
     nav = findByType(await SidebarChrome(chromeProps), SidebarNav)
     expect(nav!.props.showSystemAdmin).toBe(true)
+  })
+
+  // B20: a user with roles in several tenants gets the others in the sidebar;
+  // the tenant they are in is left out.
+  it('passes the other tenants, not this one, to SidebarNav', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
+    vi.mocked(getAdminTenant).mockResolvedValue({
+      id: TENANT_ID,
+      slug: 'viadal',
+      color_palette: 'blue',
+      tier: 'professional',
+      is_active: true,
+    })
+    vi.mocked(hasAccountScreen).mockResolvedValue(true)
+    vi.mocked(getOwnTenantSurfaces).mockResolvedValue([
+      { slug: 'b-klubben', name: 'B-klubben', admin: false, official: true },
+      { slug: 'viadal', name: 'Viadal', admin: true, official: false },
+    ])
+
+    const nav = findByType(
+      await SidebarChrome({ tenantSlug: 'viadal', adminLabel: 'Admin' }),
+      SidebarNav
+    )
+    expect(nav!.props.otherTenants).toEqual([
+      { name: 'B-klubben', href: '/b-klubben/events', officialOnly: true },
+    ])
   })
 })
