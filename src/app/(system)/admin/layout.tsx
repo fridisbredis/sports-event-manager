@@ -3,7 +3,8 @@ import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import { LanguageSelect } from '@/components/language-select'
-import { SidebarNav, type OwnTenantLink } from './_components/sidebar-nav'
+import { toOwnTenantLinks } from '@/lib/navigation/own-tenant-links'
+import { SidebarNav } from './_components/sidebar-nav'
 
 interface Props {
   children: React.ReactNode
@@ -43,11 +44,7 @@ export default async function SystemAdminLayout({ children }: Props) {
   // tenant: the admin view where they are admin (its sidebar has the link on
   // to the official view), else the official view. A system admin as such
   // gets none (ADR-0004); see getOwnTenantSurfaces.
-  const ownTenants: OwnTenantLink[] = (await getOwnTenantSurfaces()).map((s) => ({
-    name: s.name,
-    href: s.admin ? `/${s.slug}/admin` : `/${s.slug}/events`,
-    officialOnly: !s.admin,
-  }))
+  const ownTenants = toOwnTenantLinks(await getOwnTenantSurfaces())
 
   return (
     <div className="app-surface flex min-h-screen">

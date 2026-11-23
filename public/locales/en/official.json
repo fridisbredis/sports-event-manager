@@ -149,6 +149,9 @@
     "setByOrganisers": "Set by organisers",
     "notOwned": "The organisers set this — only they can remove it."
   },
+  "otherOrganisations": {
+    "sectionHeading": "Other organisations"
+  },
   "events": {
     "title": "Your events",
     "subtitle": "Choose the event you want to open.",

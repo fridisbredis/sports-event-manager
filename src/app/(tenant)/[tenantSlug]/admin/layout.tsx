@@ -3,9 +3,11 @@ import { redirect, notFound } from 'next/navigation'
 import {
   getCurrentUser,
   getAdminTenant,
+  getOwnTenantSurfaces,
   hasAccountScreen,
   hasSystemAdminScreens,
 } from '@/lib/auth/tenant'
+import { toOwnTenantLinks } from '@/lib/navigation/own-tenant-links'
 import { hasFeature } from '@/lib/tiers/features'
 import { SidebarNav } from './_components/sidebar-nav'
 import { getServerTranslation } from '@/lib/i18n/server'
@@ -33,9 +35,11 @@ export async function SidebarChrome({
   // ACCT-01 is backed by an `officials` row, which an admin who reaches this
   // tenant by role alone does not have — see hasAccountScreen.
   // B19: the way back to /admin for an admin who is also system admin.
-  const [showAccount, showSystemAdmin] = await Promise.all([
+  // B20: the user's other tenants, this one left out.
+  const [showAccount, showSystemAdmin, ownTenants] = await Promise.all([
     hasAccountScreen(tenantSlug),
     hasSystemAdminScreens(),
+    getOwnTenantSurfaces(),
   ])
 
   // N21: PART-01 is Premium and up. A Standard tenant still sees the menu
@@ -52,6 +56,7 @@ export async function SidebarChrome({
       showAccount={showAccount}
       showParticipants={showParticipants}
       showSystemAdmin={showSystemAdmin}
+      otherTenants={toOwnTenantLinks(ownTenants, tenantSlug)}
     />
   )
 }
