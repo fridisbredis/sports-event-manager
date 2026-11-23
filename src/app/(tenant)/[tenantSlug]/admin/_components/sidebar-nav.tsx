@@ -229,10 +229,11 @@ export function SidebarNav({
           })
         )}
         {/* B20: the user's other tenants. Without it, someone who is admin in
-            one club and official in another reached only the tenant picked at
-            sign-in; the home-screen app has no address bar to type the other
-            into. Never active: these leave this tenant. Same shape as the
-            system admin menu's "Your tenants" (B19). */}
+            two clubs reached only the tenant picked at sign-in; the
+            home-screen app has no address bar to type the other into. Never
+            active: these leave this tenant. Same shape as the system admin
+            menu's "Your tenants" (B19). B21: admin tenants only, the layout
+            filters out official-only ones (see SidebarChrome). */}
         {otherTenants.length > 0 && (
           <div className="mt-2 border-t border-gray-100 pt-2">
             {!opts.isCollapsed && (
@@ -250,16 +251,9 @@ export function SidebarNav({
               >
                 <Building2 className="size-[18px] shrink-0" strokeWidth={1.5} />
                 {!opts.isCollapsed && (
-                  <>
-                    <span className="truncate" title={tenant.name}>
-                      {tenant.name}
-                    </span>
-                    {tenant.officialOnly && (
-                      <span className="ml-auto shrink-0 text-xs text-ink-faint">
-                        {t('navigation.officialView')}
-                      </span>
-                    )}
-                  </>
+                  <span className="truncate" title={tenant.name}>
+                    {tenant.name}
+                  </span>
                 )}
               </Link>
             ))}

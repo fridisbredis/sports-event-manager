@@ -56,7 +56,12 @@ export async function SidebarChrome({
       showAccount={showAccount}
       showParticipants={showParticipants}
       showSystemAdmin={showSystemAdmin}
-      otherTenants={toOwnTenantLinks(ownTenants, tenantSlug)}
+      // B21: only tenants where the user is admin. An official-only row here
+      // was labelled "Official view", next to the bottom link of the same name
+      // that opens THIS tenant's official view: two identical labels, two
+      // destinations. Official-only tenants stay one step away, on the
+      // official view's Account page (B20), which lists every tenant.
+      otherTenants={toOwnTenantLinks(ownTenants, tenantSlug).filter((t) => !t.officialOnly)}
     />
   )
 }
