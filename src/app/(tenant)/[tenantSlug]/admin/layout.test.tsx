@@ -207,8 +207,9 @@ describe('TenantLayout', () => {
   })
 
   // B20: a user with roles in several tenants gets the others in the sidebar;
-  // the tenant they are in is left out.
-  it('passes the other tenants, not this one, to SidebarNav', async () => {
+  // the tenant they are in is left out. B21: only those where they are admin,
+  // official-only tenants are reached from the official view's Account page.
+  it('passes the other tenants where the user is admin, not this one, to SidebarNav', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({ id: 'user-1' } as never)
     vi.mocked(getAdminTenant).mockResolvedValue({
       id: TENANT_ID,
@@ -219,6 +220,7 @@ describe('TenantLayout', () => {
     })
     vi.mocked(hasAccountScreen).mockResolvedValue(true)
     vi.mocked(getOwnTenantSurfaces).mockResolvedValue([
+      { slug: 'a-klubben', name: 'A-klubben', admin: true, official: true },
       { slug: 'b-klubben', name: 'B-klubben', admin: false, official: true },
       { slug: 'viadal', name: 'Viadal', admin: true, official: false },
     ])
@@ -228,7 +230,7 @@ describe('TenantLayout', () => {
       SidebarNav
     )
     expect(nav!.props.otherTenants).toEqual([
-      { name: 'B-klubben', href: '/b-klubben/events', officialOnly: true },
+      { name: 'A-klubben', href: '/a-klubben/admin', officialOnly: false },
     ])
   })
 })
