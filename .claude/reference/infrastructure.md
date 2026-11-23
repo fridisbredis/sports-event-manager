@@ -19,6 +19,7 @@ always confirm you're pointed at the right account and vault before running an
 - Subscription ID: `dc64af83-c062-48db-abae-4cb73a478bb2`
 - Region: `swedencentral`
 - Shared Container Apps Environment: `kanban-env` in `kanban-app-rg` (free tier allows 1 env per region per subscription, so dev and prod Container Apps both use this same environment)
+- Also on `kanban-env` since 2026-11-19 (N54): the tournament engine's API, Container App `tournament-api-prod`, owned by the separate repo `extrapreneur/tournament-app` and living in its own resource group `resourcegroup-extrapreneur-tournament-prod` (identity `id-tournament-api-prod`, registry `acrtournamentprod`, Sentry project `tournament-app`). Always one replica. Its deploy SP (`github-actions-tournament`) joins `kanban-env` through a custom role "Container Apps Environment Joiner" (read + join). There is one engine and it trusts only prod Viadal (ADR-0005); dev Viadal cannot reach it (N56). Its own docs: `DEPLOY.md` in that repo.
 
 ## Dev environment
 
