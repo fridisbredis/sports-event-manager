@@ -227,6 +227,7 @@ jobs:
               "SENTRY_API_TOKEN=${{ secrets.PROD_SENTRY_API_TOKEN }}" \
               "CRON_SECRET=${{ secrets.PROD_CRON_SECRET }}" \
               "BACKUP_SLOTS_LIST_URL=${{ secrets.PROD_BACKUP_SLOTS_LIST_URL }}" \
+              "RESTORE_PREVIEW_READ_URL=${{ secrets.PROD_RESTORE_PREVIEW_READ_URL }}" \
               "SEND_SMS_HOOK_SECRET=${{ secrets.PROD_SEND_SMS_HOOK_SECRET }}" \
               "OTP_FALLBACK_SENDER_NAME=${{ vars.OTP_FALLBACK_SENDER_NAME }}" \
               "SMS_COST_PER_SEGMENT=${{ secrets.PROD_SMS_COST_PER_SEGMENT }}" \

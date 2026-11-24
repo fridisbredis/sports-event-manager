@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import SystemBackupsPage from './page'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { listWeeklySlots } from '@/lib/backup/list-slots'
+import { listRestorePreviews } from '@/lib/backup/restore-previews'
 import { notFound } from 'next/navigation'
 
 vi.mock('@/lib/auth/tenant', () => ({
@@ -13,6 +14,22 @@ vi.mock('@/lib/backup/list-slots', () => ({
   listWeeklySlots: vi.fn(),
 }))
 
+vi.mock('@/lib/backup/restore-previews', () => ({
+  listRestorePreviews: vi.fn(),
+}))
+
+const TENANTS = [
+  { id: '354fbfd8-e8ea-4853-a3cd-88ecda3aa154', name: 'Micke testar' },
+  { id: '27814a31-6bc9-47a4-98b2-eee538c7a7d0', name: 'Viadal' },
+]
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(async () => ({
+    from: () => ({
+      select: () => ({ order: () => ({ range: async () => ({ data: TENANTS, error: null }) }) }),
+    }),
+  })),
+}))
+
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
@@ -20,7 +37,14 @@ vi.mock('next/navigation', () => ({
 }))
 
 type Fact = { label: string; value: string; tone?: string }
-type CardProps = { title?: string; status?: string; facts?: Fact[]; note?: string }
+type CardProps = {
+  title?: string
+  status?: string
+  facts?: Fact[]
+  note?: string
+  unavailable?: string
+  rows?: { tenantId: string; name: string; previewed: string | null }[]
+}
 
 // Same approach as the health page test: read the props each card was given
 // from the returned element tree instead of rendering it.
@@ -49,6 +73,8 @@ beforeEach(() => {
   // Only Date: faking timers too stalls the translation loader the page awaits.
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.mocked(requireSystemAdmin).mockResolvedValue({ user: { id: 'user-1' } } as never)
+  vi.mocked(listRestorePreviews).mockResolvedValue({ status: 'ok', previews: [] })
+  vi.mocked(listWeeklySlots).mockResolvedValue({ status: 'ok', slots: [] })
 })
 
 afterEach(() => {
@@ -147,5 +173,49 @@ describe('SystemBackupsPage', () => {
 
     expect(card?.status).toBe('unknown')
     expect(card?.note).toMatch(note)
+  })
+
+  describe('restore previews (N25 step 2)', () => {
+    it('shows every tenant, with its newest preview where there is one', async () => {
+      vi.setSystemTime(new Date('2026-11-24T16:00:00Z'))
+      vi.mocked(listRestorePreviews).mockResolvedValue({
+        status: 'ok',
+        previews: [
+          {
+            tenantId: TENANTS[0].id,
+            generatedAt: new Date('2026-11-24T14:00:00Z'),
+            slot: '3',
+            isoWeek: 47,
+          },
+        ],
+      })
+
+      const card = findByTitle(await SystemBackupsPage(), 'Restore previews')
+
+      expect(card?.unavailable).toBeUndefined()
+      expect(card?.rows).toEqual([
+        {
+          tenantId: TENANTS[0].id,
+          name: 'Micke testar',
+          previewed: 'Previewed 2 hours ago · slot 3, week 47',
+        },
+        { tenantId: TENANTS[1].id, name: 'Viadal', previewed: null },
+      ])
+    })
+
+    it('says so when previews are not configured, and still lists the slots', async () => {
+      vi.mocked(listRestorePreviews).mockResolvedValue({ status: 'unconfigured' })
+
+      const result = await SystemBackupsPage()
+
+      expect(findByTitle(result, 'Restore previews')?.unavailable).toMatch(/Only production/)
+      expect(findByTitle(result, 'Last four weeks')).toBeDefined()
+    })
+
+    it('keeps the restore card when the slots cannot be listed', async () => {
+      vi.mocked(listWeeklySlots).mockResolvedValue({ status: 'error' })
+
+      expect(findByTitle(await SystemBackupsPage(), 'Restoring a tenant')).toBeDefined()
+    })
   })
 })
