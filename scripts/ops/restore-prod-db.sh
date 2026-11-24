@@ -194,38 +194,73 @@ done
 rm -f "${WORKDIR}/data.sql.bak"
 
 # Collision #6, found by the first N25 preview run (2026-11-24): prod's auth
-# schema had gained auth.mfa_recovery_code_sets, which the local stack of the
-# pinned CLI (2.116.0) does not have, and data.sql's COPY into it killed the
+# schema had gained tables (auth.mfa_recovery_code_sets, auth.scim_users, ...)
+# and columns (auth.one_time_tokens.expires_at) that the local stack of the
+# pinned CLI (2.116.0) does not have, and data.sql's COPY into them killed the
 # restore. Supabase upgrades its own platform services in the cloud on its own
-# schedule, so prod's auth/storage tables will keep drifting ahead of whatever
-# a target runs. Rather than chasing each new table by name (the vector-table
-# fix above), data for an auth/storage table the TARGET does not have is left
-# out, and said so with its row count. public is never filtered: schema.sql
-# creates every public table, so a missing one there is a real error.
+# schedule, so prod's auth/storage schemas will keep drifting ahead of whatever
+# a target runs. Rather than chasing each table by name (the vector-table fix
+# above), auth/storage data is fitted to the TARGET: a table it lacks is left
+# out, a column it lacks is cut from every row, and both are reported with how
+# much data was dropped. public is never touched: schema.sql creates every
+# public table, so a mismatch there is a real error.
 #
-# Losing rows this way is acceptable for the targets this script restores to
-# (inspection and rehearsal), and the app uses phone OTP only, not MFA. If a
-# skipped table had rows and they matter, upgrade the target's CLI instead.
-echo "==> Leaving out data for auth/storage tables the target does not have..."
-psql --no-psqlrc -At --dbname "${TARGET_DB_URL}" -c \
-  "SELECT format('\"%s\".\"%s\"', schemaname, tablename) FROM pg_tables WHERE schemaname IN ('auth', 'storage')" \
-  >"${WORKDIR}/target-platform-tables"
-awk -v known="${WORKDIR}/target-platform-tables" -v skipped="${WORKDIR}/skipped-tables" '
-  BEGIN { while ((getline t < known) > 0) have[t] = 1 }
-  skipping {
-    if ($0 == "\\.") { printf "%s %d\n", name, rows >> skipped; skipping = 0 } else rows++
+# Acceptable for the targets this script restores to (inspection and
+# rehearsal); the app uses phone OTP only, not MFA or SCIM. If something
+# reported as dropped matters, upgrade the target's CLI instead.
+echo "==> Fitting auth/storage data to the target's platform schema..."
+psql --no-psqlrc -At -F' ' --dbname "${TARGET_DB_URL}" -c \
+  "SELECT format('\"%s\".\"%s\"', table_schema, table_name), column_name
+   FROM information_schema.columns WHERE table_schema IN ('auth', 'storage')" \
+  >"${WORKDIR}/target-platform-columns"
+# COPY text format escapes tabs inside values as \t, so a literal tab always
+# separates fields and cutting a column is cutting a field.
+awk -v known="${WORKDIR}/target-platform-columns" -v report="${WORKDIR}/fitted" '
+  BEGIN {
+    FS = "\t"; OFS = "\t"
+    while ((getline line < known) > 0) { split(line, p, " "); table[p[1]] = 1; col[p[1] SUBSEP p[2]] = 1 }
+  }
+  mode == "skip" {
+    if ($0 == "\\.") { printf "skipped table %s: %d row(s)\n", name, rows >> report; mode = "" } else rows++
     next
   }
-  /^COPY "(auth|storage)"\."[^"]+" / && !($2 in have) { skipping = 1; name = $2; rows = 0; next }
+  mode == "cut" {
+    if ($0 == "\\.") {
+      printf "cut %s from %s: %d non-null value(s) dropped\n", dropped, name, lost >> report
+      mode = ""; print; next
+    }
+    out = ""
+    for (i = 1; i <= n; i++) {
+      if (keep[i]) out = out (out == "" ? "" : "\t") $i
+      else if ($i != "\\N") lost++
+    }
+    print out
+    next
+  }
+  /^COPY "(auth|storage)"\."[^"]+" / {
+    split($0, w, " "); name = w[2]
+    if (!(name in table)) { mode = "skip"; rows = 0; next }
+    cols = $0; sub(/^[^(]*\(/, "", cols); sub(/\) FROM stdin;$/, "", cols)
+    n = split(cols, c, ", ")
+    kept = ""; dropped = ""
+    for (i = 1; i <= n; i++) {
+      bare = c[i]; gsub(/"/, "", bare)
+      keep[i] = ((name SUBSEP bare) in col)
+      if (keep[i]) kept = kept (kept == "" ? "" : ", ") c[i]
+      else dropped = dropped (dropped == "" ? "" : ",") bare
+    }
+    if (dropped == "") { print; next }
+    printf "COPY %s (%s) FROM stdin;\n", name, kept
+    mode = "cut"; lost = 0
+    next
+  }
   { print }
-' "${WORKDIR}/data.sql" >"${WORKDIR}/data.filtered.sql"
-mv "${WORKDIR}/data.filtered.sql" "${WORKDIR}/data.sql"
-if [[ -s "${WORKDIR}/skipped-tables" ]]; then
-  while read -r TABLE ROWS; do
-    echo "    skipped ${TABLE}: ${ROWS} row(s) — the target has no such table" >&2
-  done <"${WORKDIR}/skipped-tables"
+' "${WORKDIR}/data.sql" >"${WORKDIR}/data.fitted.sql"
+mv "${WORKDIR}/data.fitted.sql" "${WORKDIR}/data.sql"
+if [[ -s "${WORKDIR}/fitted" ]]; then
+  sed 's/^/    /' "${WORKDIR}/fitted" >&2
 else
-  echo "    none"
+  echo "    nothing to fit"
 fi
 
 echo ""
