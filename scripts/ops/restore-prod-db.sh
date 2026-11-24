@@ -15,8 +15,16 @@
 # against the wrong target under pressure.
 #
 # REQUIRES:
-#   - 1Password CLI (`op`), signed in
+#   - 1Password CLI (`op`), signed in — unless BLOB_CONN_STR is set (below)
 #   - psql (part of a full Postgres install)
+#
+# NON-INTERACTIVE USE (N25: .github/workflows/restore-tenant-diff.yml)
+# A CI runner has neither 1Password nor a terminal to type into, so two
+# environment variables stand in for them:
+#   BLOB_CONN_STR=<connection string>  used instead of reading it from 1Password
+#   RESTORE_CONFIRM=restore            answers the "Type 'restore'" prompt
+# Neither weakens the prod guard below: that one still has no override. The
+# workflow only ever restores into the throwaway local stack on its own runner.
 #
 # USAGE:
 #   scripts/ops/restore-prod-db.sh <blob-name> <target-db-url> [--include-roles]
@@ -134,8 +142,8 @@ if [[ "${TARGET_DB_URL}" == *"rauvaxuypujbeintnnoe"* ]]; then
   exit 1
 fi
 
-if ! command -v op >/dev/null 2>&1; then
-  echo "ERROR: 1Password CLI (op) not found." >&2
+if [[ -z "${BLOB_CONN_STR:-}" ]] && ! command -v op >/dev/null 2>&1; then
+  echo "ERROR: 1Password CLI (op) not found, and BLOB_CONN_STR is not set." >&2
   exit 1
 fi
 
@@ -147,10 +155,12 @@ fi
 # stderr is NOT merged into this capture (no 2>&1) — see the matching note
 # in snapshot-prod-db.sh for why: a stray op warning must not silently end
 # up concatenated into the connection string.
-BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" --account extrapreneurab.1password.com)" || {
-  echo "ERROR: could not read the Azure Blob connection string from 1Password." >&2
-  exit 1
-}
+if [[ -z "${BLOB_CONN_STR:-}" ]]; then
+  BLOB_CONN_STR="$(op read "op://Viadal Event Manager/Azure Blob sportsevtmgrprodsnaps/password" --account extrapreneurab.1password.com)" || {
+    echo "ERROR: could not read the Azure Blob connection string from 1Password." >&2
+    exit 1
+  }
+fi
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
@@ -197,7 +207,12 @@ echo "this is an additional, separate confirmation because dropping a schema"
 echo "is destructive in its own right, independent of which target it's run"
 echo "against."
 echo ""
-read -r -p "Type 'restore' to confirm: " CONFIRMATION
+if [[ -n "${RESTORE_CONFIRM:-}" ]]; then
+  CONFIRMATION="${RESTORE_CONFIRM}"
+  echo "Confirmation taken from RESTORE_CONFIRM."
+else
+  read -r -p "Type 'restore' to confirm: " CONFIRMATION
+fi
 if [[ "${CONFIRMATION}" != "restore" ]]; then
   echo "Aborted."
   exit 1

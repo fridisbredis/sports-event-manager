@@ -374,9 +374,26 @@ Building this properly is card N25 (split from N9). Its first step is done:
 **System admin → Backups** (`/admin/backups`, SYS-04) lists the weekly slots
 through the same list-only token as the freshness alert (§4c) and shows, for
 each of the last four ISO weeks, which slot holds it — or that the week has no
-backup at all. Use it to pick the slot for step 1 above. It cannot restore
-anything; steps 2 (staging restore + per-table diff) and 3 (the write) are not
-built yet.
+backup at all. Use it to pick the slot for step 1 above.
+
+**Step 2 is done too: a read-only preview.** Run the workflow _Tenant restore
+preview (read-only)_ (`.github/workflows/restore-tenant-diff.yml`) from the
+Actions tab with a slot and the tenant's id. It restores the slot into a
+throwaway local stack on the runner and compares the tenant's rows with live
+prod, table by table: how many rows restoring would add, remove and change,
+which columns change, which users the backup refers to that no longer exist,
+and schema drift since the backup. Prod is only read, inside `READ ONLY`
+transactions. The report (run summary + a 7-day artifact) has counts and ids,
+never values. Tables marked _log/queue_ (`audit_events`, `auth_events`,
+`sms_queue`, `sms_usage`, `sms_cap_warnings`) need their own decision before
+anything is restored — an old `sms_queue` row put back as pending is sent
+again.
+
+The same diff can be run by hand: `scripts/ops/diff-tenant.sh <restored-db-url>
+<live-db-url> <tenant-id> <out-dir>`, after restoring a slot locally with
+`restore-prod-db.sh`.
+
+Step 3 (actually writing a tenant back) is not built.
 
 ## 7. Known gaps
 
