@@ -67,9 +67,11 @@ function PreviewBody({
   t: Awaited<ReturnType<typeof getServerTranslation>>
   language: string
 }) {
-  const changed = report.tables.filter(differs)
+  // keep-live tables are never restored (supabase/tenant-restore-tables.txt),
+  // so their differences are shown apart: they are what stays, not what changes.
+  const changed = report.tables.filter((d) => differs(d) && !d.keep_live)
+  const kept = report.tables.filter((d) => differs(d) && d.keep_live)
   const unchanged = report.tables.filter((d) => !differs(d))
-  const logTablesChanged = changed.filter((d) => d.log_or_queue)
   const drift = report.tables.filter(
     (d) => d.columns_only_in_live.length > 0 || d.columns_only_in_backup.length > 0
   )
@@ -93,50 +95,28 @@ function PreviewBody({
               ? t('backups.preview.noChanges')
               : t('backups.preview.changedTitle', { count: changed.length })}
           </h3>
-          {changed.length > 0 && (
-            <ul className="mt-4 divide-y divide-edge-soft">
-              {changed.map((d) => (
-                <li key={d.table} className="py-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p className="font-mono text-sm font-medium text-ink">
-                      {d.table}
-                      {d.log_or_queue && (
-                        <span className="ml-2 rounded-full bg-status-neutral-bg px-2 py-0.5 font-sans text-xs font-semibold text-status-neutral-text">
-                          {t('backups.preview.logOrQueue')}
-                        </span>
-                      )}
-                    </p>
-                    {d.missing_in_live ? (
-                      <p className="text-sm text-destructive">
-                        {t('backups.preview.goneFromLive')}
-                      </p>
-                    ) : (
-                      <p className="flex gap-3 font-mono text-sm">
-                        <Count n={d.would_add} sign="+" label={t('backups.preview.add')} />
-                        <Count n={d.would_remove} sign="−" label={t('backups.preview.remove')} />
-                        <Count n={d.would_change} sign="~" label={t('backups.preview.change')} />
-                      </p>
-                    )}
-                  </div>
-                  {Object.keys(d.changed_columns).length > 0 && (
-                    <p className="mt-1 text-xs text-ink-label">
-                      {t('backups.preview.columns')}{' '}
-                      {Object.entries(d.changed_columns)
-                        .map(([col, n]) => `${col} (${n})`)
-                        .join(', ')}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          {changed.length > 0 && <DiffList tables={changed} t={t} />}
           <p className="mt-3 text-xs leading-relaxed text-ink-faint">
             {t('backups.preview.legend')}
           </p>
         </AppCard>
 
-        {logTablesChanged.length > 0 && (
-          <Notice tone="warning">{t('backups.preview.logOrQueueNote')}</Notice>
+        {report.tables_unclassified.length > 0 && (
+          <Notice tone="error">
+            {t('backups.preview.unclassified', { list: report.tables_unclassified.join(', ') })}
+          </Notice>
+        )}
+
+        {kept.length > 0 && (
+          <AppCard>
+            <h3 className="font-display text-base font-bold tracking-tight text-ink">
+              {t('backups.preview.keptTitle', { count: kept.length })}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-label">
+              {t('backups.preview.keptNote')}
+            </p>
+            <DiffList tables={kept} t={t} muted />
+          </AppCard>
         )}
 
         {report.missing_users.length > 0 && (
@@ -195,6 +175,48 @@ function PreviewBody({
         </p>
       </div>
     </>
+  )
+}
+
+function DiffList({
+  tables,
+  t,
+  muted = false,
+}: {
+  tables: TableDiff[]
+  t: Awaited<ReturnType<typeof getServerTranslation>>
+  /** Kept-live tables: shown for information, so they do not read as changes. */
+  muted?: boolean
+}) {
+  return (
+    <ul className="mt-4 divide-y divide-edge-soft">
+      {tables.map((d) => (
+        <li key={d.table} className="py-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className={`font-mono text-sm font-medium ${muted ? 'text-ink-label' : 'text-ink'}`}>
+              {d.table}
+            </p>
+            {d.missing_in_live ? (
+              <p className="text-sm text-destructive">{t('backups.preview.goneFromLive')}</p>
+            ) : (
+              <p className={`flex gap-3 font-mono text-sm ${muted ? 'opacity-60' : ''}`}>
+                <Count n={d.would_add} sign="+" label={t('backups.preview.add')} />
+                <Count n={d.would_remove} sign="−" label={t('backups.preview.remove')} />
+                <Count n={d.would_change} sign="~" label={t('backups.preview.change')} />
+              </p>
+            )}
+          </div>
+          {Object.keys(d.changed_columns).length > 0 && (
+            <p className="mt-1 text-xs text-ink-label">
+              {t('backups.preview.columns')}{' '}
+              {Object.entries(d.changed_columns)
+                .map(([col, n]) => `${col} (${n})`)
+                .join(', ')}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }
 

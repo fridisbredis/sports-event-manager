@@ -120,6 +120,12 @@ jobs:
       - name: Start local Supabase stack
         run: supabase start
 
+      # N25 decision 4: every tenant table is classified restore / keep-live
+      # in supabase/tenant-restore-tables.txt. Here because this job has a
+      # database that has run every migration; the check reads its catalog.
+      - name: Every tenant table is classified for restore
+        run: scripts/check-tenant-table-classification.sh
+
       - name: Write .env.test.local from local Supabase status
         run: |
           supabase status -o env \

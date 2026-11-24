@@ -68,12 +68,15 @@ mkdir -p "$OUT"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-# Tables whose rows are a log or a queue rather than the tenant's data. They
-# are diffed like the rest, but restoring them is a different question: put an
-# already-sent SMS back into sms_queue as pending and the worker sends it
-# again; roll back audit_events and the audit trail loses what happened since.
-# Flagged in the report so step 3 decides them deliberately.
-LOG_OR_QUEUE="audit_events auth_events sms_queue sms_usage sms_cap_warnings"
+# What the restore does with each table: supabase/tenant-restore-tables.txt
+# (N25, decided 2026-11-24). keep-live tables are never restored: they record
+# things that already happened (an SMS sent, a login, an audit entry). The
+# preview still diffs them, but reports them as kept rather than as changes.
+# A table missing from the file is reported as unclassified; CI should have
+# caught it (scripts/check-tenant-table-classification.sh).
+CLASSIFICATION="$(dirname "$0")/../../supabase/tenant-restore-tables.txt"
+KEEP_LIVE=" $(sed 's/#.*//' "$CLASSIFICATION" | awk '$2 == "keep-live" { print $1 }' | paste -sd' ' -) "
+CLASSIFIED=" $(sed 's/#.*//' "$CLASSIFICATION" | awk 'NF { print $1 }' | paste -sd' ' -) "
 
 # client_min_messages: DROP SCHEMA ... CASCADE otherwise prints a NOTICE per table.
 restored() { PGOPTIONS='-c client_min_messages=warning' psql "$RESTORED" -X -q -v ON_ERROR_STOP=1 "$@"; }
@@ -89,47 +92,14 @@ echo "==> Finding the tenant's tables in the restored backup..."
 
 # table|filter, one per line. The filter selects the tenant's rows of that
 # table in whichever database it is run against.
-SCOPE_SQL="
-  WITH base AS (
-    SELECT c.relname
-    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
-  ),
-  tenant_tables AS (
-    SELECT b.relname FROM base b
-    JOIN information_schema.columns col
-      ON col.table_schema = 'public' AND col.table_name = b.relname AND col.column_name = 'tenant_id'
-  ),
-  one_hop AS (
-    -- Single-column foreign keys from a table without tenant_id to one with it.
-    SELECT DISTINCT ON (child.relname)
-      child.relname,
-      format('%I IN (SELECT %I FROM public.%I WHERE tenant_id = %L)',
-             ca.attname, pa.attname, parent.relname, '$TENANT') AS filter
-    FROM pg_constraint con
-    JOIN pg_class child ON child.oid = con.conrelid
-    JOIN pg_class parent ON parent.oid = con.confrelid
-    JOIN pg_namespace cn ON cn.oid = child.relnamespace AND cn.nspname = 'public'
-    JOIN pg_attribute ca ON ca.attrelid = con.conrelid AND ca.attnum = con.conkey[1]
-    JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = con.confkey[1]
-    WHERE con.contype = 'f' AND cardinality(con.conkey) = 1
-      AND parent.relname IN (SELECT relname FROM tenant_tables)
-      AND child.relname NOT IN (SELECT relname FROM tenant_tables)
-      AND child.relname <> 'tenants'
-    ORDER BY child.relname, con.conname
-  )
-  SELECT 'tenants', format('id = %L', '$TENANT')
-  UNION ALL
-  SELECT relname, format('tenant_id = %L', '$TENANT') FROM tenant_tables
-  UNION ALL
-  SELECT relname, filter FROM one_hop
-  ORDER BY 1"
-restored -At -F'|' -c "$SCOPE_SQL" >"$WORK/scope"
+SCOPE_SQL_FILE="$(dirname "$0")/tenant-scope.sql"
+restored -At -F'|' -v tenant="$TENANT" -f "$SCOPE_SQL_FILE" >"$WORK/scope"
 
 restored -At -c "
   SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')" | sort >"$WORK/all_tables"
 cut -d'|' -f1 "$WORK/scope" | sort >"$WORK/scope_tables"
+UNCLASSIFIED="$(while read -r T; do [[ "$CLASSIFIED" == *" $T "* ]] || echo "$T"; done <"$WORK/scope_tables" | paste -sd' ' -)"
 OUT_OF_SCOPE="$(comm -23 "$WORK/all_tables" "$WORK/scope_tables" | paste -sd' ' -)"
 
 if [[ "$(restored -At -c "SELECT count(*) FROM public.tenants WHERE id = '$TENANT'")" != "1" ]]; then
@@ -141,7 +111,7 @@ LIVE_TENANT="$(live -At -c "SELECT count(*) FROM public.tenants WHERE id = '$TEN
 # The tenant's tables as live sees them, found by the same query: any that did
 # not exist in the backup were created by a migration since, and nothing in
 # the backup can restore them.
-live -At -F'|' -c "$SCOPE_SQL" | sed '/^$/d' | cut -d'|' -f1 | sort >"$WORK/live_scope_tables"
+live -At -F'|' -v tenant="$TENANT" -f "$SCOPE_SQL_FILE" | sed '/^$/d' | cut -d'|' -f1 | sort >"$WORK/live_scope_tables"
 NEW_IN_LIVE="$(comm -23 "$WORK/live_scope_tables" "$WORK/scope_tables" | paste -sd' ' -)"
 
 echo "==> Copying the tenant's live rows (read-only) into scratch schema n25_live..."
@@ -188,8 +158,8 @@ while IFS='|' read -r TABLE FILTER; do
 
   JOIN_ON="$(echo "$PK" | tr ',' '\n' | awk '{printf "%sb.%s = l.%s", (NR>1?" AND ":""), $0, $0}')"
   PK_TEXT="$(echo "$PK" | tr ',' '\n' | awk '{printf "%s%s::text", (NR>1?" || \x27,\x27 || ":""), $0}')"
-  IS_LOG="false"
-  [[ " $LOG_OR_QUEUE " == *" $TABLE "* ]] && IS_LOG="true"
+  KEEP="false"
+  [[ "$KEEP_LIVE" == *" $TABLE "* ]] && KEEP="true"
 
   restored -At -c "
     WITH b AS (SELECT $COMMON FROM public.\"$TABLE\" WHERE $FILTER),
@@ -200,7 +170,7 @@ while IFS='|' read -r TABLE FILTER; do
          changed AS (SELECT * FROM pairs WHERE bj IS DISTINCT FROM lj)
     SELECT json_build_object(
       'table', '$TABLE',
-      'log_or_queue', $IS_LOG,
+      'keep_live', $KEEP,
       'backup_rows', (SELECT count(*) FROM b),
       'live_rows', (SELECT count(*) FROM l),
       'would_add', (SELECT count(*) FROM added),
@@ -276,6 +246,7 @@ echo "==> Writing the report..."
   echo "\"generated_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
   echo "\"slot\": \"${DIFF_SLOT:-}\","
   echo "\"tables_new_in_live\": \"$NEW_IN_LIVE\","
+  echo "\"tables_unclassified\": \"$UNCLASSIFIED\","
   echo "\"tables_out_of_scope\": \"$OUT_OF_SCOPE\","
   echo "\"inbound_foreign_keys\": \"$INBOUND\","
   echo "\"tables\": [$(paste -sd, "$WORK/tables.json")],"
@@ -301,7 +272,7 @@ SELECT concat_ws(E'\n',
   '|---|--:|--:|--:|--:|--:|---|',
   (SELECT string_agg(format('| %s%s | %s | %s | %s | %s | %s | %s |',
       x ->> 'table',
-      CASE WHEN (x ->> 'log_or_queue')::boolean THEN ' ⚠︎ log/queue' ELSE '' END,
+      CASE WHEN (x ->> 'keep_live')::boolean THEN ' (kept live)' ELSE '' END,
       coalesce(x ->> 'backup_rows', '?'), coalesce(x ->> 'live_rows', '–'),
       coalesce(x ->> 'would_add', '–'), coalesce(x ->> 'would_remove', '–'), coalesce(x ->> 'would_change', '–'),
       CASE
@@ -315,7 +286,7 @@ SELECT concat_ws(E'\n',
                      THEN ' · dropped from live: ' || (x ->> 'columns_only_in_backup') ELSE '' END
       END), E'\n' ORDER BY x ->> 'table') FROM t),
   '',
-  '⚠︎ log/queue: restoring these is a separate decision for step 3 (an old sms_queue row put back as pending would be sent again; rolling back audit_events loses the audit trail since the backup).',
+  '(kept live): never restored, so these differences stay as they are (supabase/tenant-restore-tables.txt).',
   '',
   CASE WHEN jsonb_array_length(j -> 'missing_users') = 0
        THEN '**Users:** every user the backup refers to still exists in live.'
@@ -324,6 +295,8 @@ SELECT concat_ws(E'\n',
              FROM jsonb_array_elements(j -> 'missing_users') AS m)
   END,
   '',
+  CASE WHEN coalesce(j ->> 'tables_unclassified', '') = '' THEN NULL
+       ELSE '**Not classified for restore** (add to supabase/tenant-restore-tables.txt): ' || (j ->> 'tables_unclassified') END,
   CASE WHEN coalesce(j ->> 'tables_new_in_live', '') = '' THEN NULL
        ELSE '**Tables created since the backup** (nothing to restore them from): ' || (j ->> 'tables_new_in_live') END,
   CASE WHEN coalesce(j ->> 'inbound_foreign_keys', '') = '' THEN NULL

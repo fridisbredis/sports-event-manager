@@ -385,10 +385,17 @@ with live prod, table by table: how many rows restoring would add, remove and
 change, which columns change, which users the backup refers to that no longer
 exist, and schema drift since the backup. Prod is only read, inside `READ ONLY`
 transactions. When it finishes, _Open_ appears next to the tenant on the
-Backups page. Tables marked _log/queue_ (`audit_events`, `auth_events`,
-`sms_queue`, `sms_usage`, `sms_cap_warnings`) need their own decision before
-anything is restored — an old `sms_queue` row put back as pending is sent
-again.
+Backups page.
+
+**What a restore does with each table** is decided in
+`supabase/tenant-restore-tables.txt`: `restore` (the tenant's rows become the
+backup's) or `keep-live` (never restored). Decided 2026-11-24: tables that
+record things that already happened (`audit_events`, `auth_events`,
+`checklist_item_events`, `sms_queue`, `sms_usage`, `sms_cap_warnings`, and the
+per-user `admin_guide_dismissals`) keep their live rows — an old `sms_queue`
+row put back as pending would be sent again. The preview shows them in their
+own "kept as in live" card. CI fails when a migration adds a tenant table
+that is not in the file (`scripts/check-tenant-table-classification.sh`).
 
 **The report never goes to GitHub.** The repository is public, and so are its
 Actions logs, summaries and artifacts. The run stores the report (counts, ids

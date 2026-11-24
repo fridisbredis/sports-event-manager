@@ -28,7 +28,7 @@ function report(overrides: Record<string, unknown> = {}) {
     tables: [
       {
         table: 'announcements',
-        log_or_queue: false,
+        keep_live: false,
         backup_rows: 1,
         live_rows: 2,
         would_add: 0,
@@ -130,6 +130,26 @@ describe('readRestorePreview', () => {
       columns_only_in_backup: [],
     })
     expect(result.report.inbound_foreign_keys).toEqual([])
+    expect(result.report.tables_unclassified).toEqual([])
+  })
+
+  it('reads keep_live, and log_or_queue from reports written before the classification file', async () => {
+    const tables = [
+      { table: 'sms_queue', log_or_queue: true, backup_rows: 0 },
+      { table: 'auth_events', keep_live: true, backup_rows: 0 },
+      { table: 'events', backup_rows: 1 },
+    ]
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(report({ tables }))))
+
+    const result = await readRestorePreview(TENANT)
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.report.tables.map((t) => [t.table, t.keep_live])).toEqual([
+      ['sms_queue', true],
+      ['auth_events', true],
+      ['events', false],
+    ])
   })
 
   it('never builds a URL from something that is not a uuid', async () => {

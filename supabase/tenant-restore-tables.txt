@@ -1,0 +1,46 @@
+# What a single-tenant restore (N25) does with each of the tenant's tables.
+#
+#   restore    the tenant's rows become exactly what the backup had
+#   keep-live  never restored: the live rows stay as they are
+#
+# EVERY tenant table must be listed. "Tenant table" = what
+# scripts/ops/tenant-scope.sql returns: tenants, every public table with
+# tenant_id, and tables reaching one through a single foreign key. CI fails
+# when a migration adds one that is not here
+# (scripts/check-tenant-table-classification.sh), so the next table is
+# classified on purpose instead of restored by default.
+#
+# The rule (decided 2026-11-24, N25 decision memo, option B): tables that
+# record what already happened outside the database (an SMS sent, money
+# spent, a login, an audit entry) keep their live rows. Rolling them back does
+# not undo those things, it only makes the app forget them, and for sms_queue
+# it sends SMS again. Everything the tenant edits is restored.
+#
+# Read by scripts/ops/diff-tenant.sh (the restore preview) and, later, by the
+# restore itself.
+
+admin_guide_dismissals         keep-live   # a user's "hide the guide" choice, not tenant content
+announcements                  restore     # decided: restored; sms_queue rows of newer ones cascade away
+assignments                    restore
+audit_events                   keep-live   # write-once audit trail (SEC-07)
+auth_events                    keep-live   # sign-in/OTP security log (SEC-07)
+checklist_item_checks          restore
+checklist_item_events          keep-live   # write-once audit trail of check-offs
+event_distances                restore
+event_info_sections            restore
+event_stages                   restore
+events                         restore
+official_events                restore
+official_unavailability        restore
+officials                      restore
+participant_claim_conflicts    restore
+participant_stages             restore
+participants                   restore
+sms_cap_warnings               keep-live   # restoring re-sends this month's cap warning
+sms_queue                      keep-live   # restoring re-sends SMS already delivered
+sms_usage                      keep-live   # billing record; restoring undercounts the monthly cap
+tenants                        restore
+user_roles                     restore
+workstation_operating_windows  restore
+workstation_todos              restore
+workstations                   restore
