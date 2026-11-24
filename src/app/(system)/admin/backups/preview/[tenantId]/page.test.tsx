@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import RestorePreviewPage from './page'
 import { requireSystemAdmin } from '@/lib/auth/tenant'
 import { readRestorePreview, RestorePreviewReport } from '@/lib/backup/restore-previews'
@@ -109,26 +109,44 @@ describe('RestorePreviewPage', () => {
     expect(notFound).toHaveBeenCalled()
   })
 
-  it('lists only the tables that would change, with their counts and columns', async () => {
+  it('lists the tables a restore would change, with their counts and columns', async () => {
     render(await RestorePreviewPage({ params }))
 
     expect(screen.getByRole('heading', { name: 'Restore preview: Micke testar' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '4 tables would change' })).toBeTruthy()
-    const items = screen.getAllByRole('listitem').map((li) => li.textContent)
-    expect(items).toHaveLength(4)
+    const changedCard = screen.getByRole('heading', {
+      name: '3 tables would change',
+    }).parentElement!
+    const items = within(changedCard)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent)
+    expect(items).toHaveLength(3)
     expect(items[0]).toContain('announcements')
     expect(items[0]).toContain('−1')
     expect(items.find((i) => i?.startsWith('officials'))).toContain('name (1)')
+    expect(items.some((i) => i?.startsWith('sms_queue'))).toBe(false)
     expect(screen.getByText('1 table unchanged')).toBeTruthy()
   })
 
-  it('warns about log/queue tables and tables created since the backup', async () => {
+  it('shows keep-live tables apart, as kept rather than changed', async () => {
     render(await RestorePreviewPage({ params }))
 
-    expect(
-      screen.getByText(/an old sms_queue row put back as pending would be sent again/)
-    ).toBeTruthy()
+    // sms_queue is marked the pre-2026-11-24 way (log_or_queue), as in the
+    // report already stored in prod.
+    const keptCard = screen.getByRole('heading', { name: '1 table kept as in live' }).parentElement!
+    expect(within(keptCard).getByText('sms_queue')).toBeTruthy()
+    expect(within(keptCard).getByText(/never restored/)).toBeTruthy()
+  })
+
+  it('warns about tables created since the backup and unclassified ones', async () => {
+    vi.mocked(readRestorePreview).mockResolvedValue({
+      status: 'ok',
+      report: { ...report, tables_unclassified: ['new_event_log'] },
+    })
+
+    render(await RestorePreviewPage({ params }))
+
     expect(screen.getByText(/Tables created since the backup.*admin_guide_dismissals/)).toBeTruthy()
+    expect(screen.getByText(/Not classified for restore: new_event_log/)).toBeTruthy()
   })
 
   it('says so when the tenant was deleted after the backup', async () => {

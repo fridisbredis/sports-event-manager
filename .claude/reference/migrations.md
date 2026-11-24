@@ -321,6 +321,12 @@ touched.
    CHECK constraints
 3. Remove any temporary `any` casts that were placed pending types
 4. Run the migration on **both dev and prod** Supabase projects
+5. **A new tenant table** (has `tenant_id`, or a foreign key to one) must be
+   added to `supabase/tenant-restore-tables.txt` as `restore` or `keep-live`
+   (N25: what a single-tenant restore does with it). The integration job
+   fails until it is. `keep-live` = a log or queue of things that already
+   happened (SMS sent, logins, audit entries); everything people edit is
+   `restore`.
 
 **`--local` vs dev types will never be byte-identical.** The local Docker
 stack's PostgREST version isn't pinned to dev's, and dev's own version has

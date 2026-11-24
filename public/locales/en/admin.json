@@ -986,14 +986,12 @@
       "noChanges": "No differences: restoring would change nothing",
       "changedTitle_one": "{{count}} table would change",
       "changedTitle_other": "{{count}} tables would change",
-      "logOrQueue": "log/queue",
       "goneFromLive": "Table no longer exists in live",
       "add": "rows the restore would add",
       "remove": "rows the restore would remove",
       "change": "rows the restore would change",
       "columns": "Changed columns:",
       "legend": "+ rows the backup has and live does not (would be added back) · − rows live has and the backup does not (would be removed) · ~ rows in both that differ (would be reverted).",
-      "logOrQueueNote": "Tables marked log/queue need their own decision before anything is restored: an old sms_queue row put back as pending would be sent again, and rolling back audit_events would erase what has happened since the backup.",
       "missingUsers": "Users deleted since the backup — restored rows would point at them: {{list}}.",
       "newTables": "Tables created since the backup — nothing to restore them from: {{list}}.",
       "drift": "Columns added (+) or dropped (−) in live since the backup: {{list}}.",
@@ -1001,7 +999,11 @@
       "unchangedTitle_one": "{{count}} table unchanged",
       "unchangedTitle_other": "{{count}} tables unchanged",
       "outOfScope": "Not this tenant's data, so not compared: {{list}}.",
-      "nothingWritten": "Nothing has been written. The preview holds counts, ids and column names, never values."
+      "nothingWritten": "Nothing has been written. The preview holds counts, ids and column names, never values.",
+      "keptTitle_one": "{{count}} table kept as in live",
+      "keptTitle_other": "{{count}} tables kept as in live",
+      "keptNote": "These tables record things that already happened — SMS sent, logins, audit entries — and are never restored. Their differences below stay as they are. Decided 2026-11-24.",
+      "unclassified": "Not classified for restore: {{list}}. A restore cannot decide what to do with these tables; add them to supabase/tenant-restore-tables.txt."
     }
   }
 }

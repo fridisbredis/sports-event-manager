@@ -22,20 +22,28 @@ const csvWords = z
   .default('')
   .transform((s) => s.split(/[\s,]+/).filter(Boolean))
 
-const TableDiff = z.object({
-  table: z.string(),
-  log_or_queue: z.boolean().default(false),
-  missing_in_live: z.boolean().optional(),
-  no_primary_key: z.boolean().optional(),
-  backup_rows: z.number(),
-  live_rows: z.number().optional(),
-  would_add: z.number().optional(),
-  would_remove: z.number().optional(),
-  would_change: z.number().optional(),
-  changed_columns: z.record(z.string(), z.number()).default({}),
-  columns_only_in_backup: csvWords,
-  columns_only_in_live: csvWords,
-})
+const TableDiff = z
+  .object({
+    table: z.string(),
+    // Never restored, by supabase/tenant-restore-tables.txt. Reports written
+    // before that file existed (2026-11-24) call it log_or_queue.
+    keep_live: z.boolean().optional(),
+    log_or_queue: z.boolean().optional(),
+    missing_in_live: z.boolean().optional(),
+    no_primary_key: z.boolean().optional(),
+    backup_rows: z.number(),
+    live_rows: z.number().optional(),
+    would_add: z.number().optional(),
+    would_remove: z.number().optional(),
+    would_change: z.number().optional(),
+    changed_columns: z.record(z.string(), z.number()).default({}),
+    columns_only_in_backup: csvWords,
+    columns_only_in_live: csvWords,
+  })
+  .transform(({ log_or_queue, keep_live, ...rest }) => ({
+    ...rest,
+    keep_live: keep_live ?? log_or_queue ?? false,
+  }))
 
 export const RestorePreviewReport = z.object({
   tenant_id: z.string().uuid(),
@@ -43,6 +51,7 @@ export const RestorePreviewReport = z.object({
   generated_at: z.string(),
   slot: z.string().default(''),
   tables_new_in_live: csvWords,
+  tables_unclassified: csvWords,
   tables_out_of_scope: csvWords,
   inbound_foreign_keys: z
     .string()
