@@ -185,18 +185,14 @@ describe('DashboardPage', () => {
     expect(card!.props.confirmed).toBe(11)
   })
 
-  it('passes live setup progress and the help-guide request to the onboarding guide', async () => {
+  it('passes live setup progress and the saved hide choice to the onboarding guide', async () => {
     mockDashboardRpc({ data: dashboardPayload(), error: null })
 
-    const result = await DashboardPage({
-      params: PARAMS,
-      searchParams: Promise.resolve({ guide: '1' }),
-    })
+    const result = await DashboardPage({ params: PARAMS })
 
     expect(fetchAdminGuideCounts).toHaveBeenCalledWith(expect.anything(), TENANT_ID, EVENT.id)
     expect(fetchAdminGuideDismissed).toHaveBeenCalledWith(expect.anything(), 'user-1', EVENT.id)
     expect(findByType(result, AdminOnboardingGuide)?.props).toMatchObject({
-      forceOpen: true,
       initiallyDismissed: true,
       eventConfigComplete: true,
       workAreaCount: 2,

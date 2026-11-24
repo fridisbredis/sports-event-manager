@@ -4,12 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import svAdmin from '@/../public/locales/sv/admin.json'
 import { AdminOnboardingGuide } from './admin-onboarding-guide'
 
-const { replace } = vi.hoisted(() => ({ replace: vi.fn() }))
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace }),
-}))
-
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -46,7 +40,6 @@ vi.mock('@/lib/i18n/client', () => ({
 const PROPS = {
   tenantSlug: 'viadal',
   eventId: 'event-1',
-  forceOpen: false,
   initiallyDismissed: false,
   eventConfigComplete: true,
   workAreaCount: 1,
@@ -119,26 +112,13 @@ describe('AdminOnboardingGuide', () => {
     expect(screen.getByRole('button', { name: HIDE })).toBeInTheDocument()
   })
 
-  it('reopens a hidden guide from the help link and deletes the saved choice', async () => {
-    render(<AdminOnboardingGuide {...PROPS} initiallyDismissed forceOpen />)
+  it('points the publish step at the dashboard publish section by full path', () => {
+    render(<AdminOnboardingGuide {...PROPS} />)
 
-    expect(screen.getByRole('button', { name: HIDE })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith(
-        '/viadal/admin/events/event-1/dashboard#onboarding-glossary',
-        { scroll: false }
-      )
+    expect(screen.getByRole('link', { name: 'Publicera eventet' })).toHaveAttribute(
+      'href',
+      '/viadal/admin/events/event-1/dashboard#publish-status'
     )
-    expect(callsTo('DELETE')).toHaveLength(1)
-    // The row is gone before the URL is cleaned, so the re-render reads it as shown.
-    expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(replace.mock.invocationCallOrder[0])
-  })
-
-  it('does not call the API when the help link opens a guide that was never hidden', async () => {
-    render(<AdminOnboardingGuide {...PROPS} forceOpen />)
-
-    await waitFor(() => expect(replace).toHaveBeenCalled())
-    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('carries over a choice made in localStorage before it moved onto the user', async () => {

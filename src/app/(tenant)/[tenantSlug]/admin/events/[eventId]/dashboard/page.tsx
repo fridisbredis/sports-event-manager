@@ -1,10 +1,9 @@
 import { redirect, notFound } from 'next/navigation'
-import { unstable_cache } from 'next/cache'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
-import { adminDashboardCacheTag } from '@/lib/cache/tags'
+import { getAdminDashboardCached } from '@/lib/events/admin-dashboard-cached'
 import { DashboardHeader } from './_components/dashboard-header'
 import { PublishSection } from './_components/publish-section'
 import { AdminOnboardingGuide } from './_components/admin-onboarding-guide'
@@ -28,34 +27,10 @@ import { fetchAdminGuideDismissed } from '@/lib/onboarding/admin-guide-dismissal
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
-  searchParams?: Promise<{ guide?: string | string[] }>
 }
 
-interface AdminDashboardCached {
-  event: {
-    id: string
-    name: string | null
-    event_type: string | null
-    start_date: string | null
-    end_date: string | null
-    status: string
-    scheduling_granularity_min: number
-    logo_url: string | null
-  } | null
-  officials_invited: number
-  officials_confirmed: number
-  race_stage_count: number
-  over_capacity: number
-  double_booked: number
-  time_off_clash: number
-  earliest_day: string | null
-  earliest_stage_id: string | null
-}
-
-export default async function DashboardPage({ params, searchParams }: Props) {
+export default async function DashboardPage({ params }: Props) {
   const { tenantSlug, eventId } = await params
-  const { guide: guideParam } = (await searchParams) ?? {}
-  const forceOpenGuide = guideParam === '1'
   const language = await getUserLanguage()
   const t = await getServerTranslation(language, 'admin')
 
@@ -70,32 +45,8 @@ export default async function DashboardPage({ params, searchParams }: Props) {
 
   if (!tenant) notFound()
 
-  // PERF-06 / F-PERF-04 Phase 3 (ADR-0003): the event read, both officials
-  // head-counts, the race-stage count, and the scheduling-warning counts
-  // (previously five separate round trips, one of them a Postgres RPC) all
-  // moved behind get_admin_dashboard_cached (migration 0054). Must be the
-  // service-role client — unstable_cache can't reach cookies(), and this is
-  // only safe because the RPC is SECURITY DEFINER owned by cache_rpc_reader
-  // (NOBYPASSRLS), so service_role's own BYPASSRLS never applies inside it.
-  const getAdminDashboardCached = unstable_cache(
-    async (tenantId: string, eventId: string) => {
-      const service = createSupabaseServiceClient()
-      const { data, error } = await service.rpc('get_admin_dashboard_cached', {
-        p_tenant_id: tenantId,
-        p_event_id: eventId,
-      })
-      if (error) throw error
-      return data as unknown as AdminDashboardCached
-    },
-    ['admin-dashboard'], // cache namespace, data-shape only — tenant scoping
-    // comes entirely from the tenantId closure argument reaching both the
-    // RPC call above and the tags array below
-    {
-      tags: [adminDashboardCacheTag(tenant.id)],
-      revalidate: 60,
-    }
-  )
-
+  // PERF-06 / F-PERF-04 Phase 3: one cached RPC — see
+  // getAdminDashboardCached for why it runs on the service-role client.
   const {
     event,
     officials_invited: officialsInvited,
@@ -194,7 +145,6 @@ export default async function DashboardPage({ params, searchParams }: Props) {
       <AdminOnboardingGuide
         tenantSlug={tenantSlug}
         eventId={eventId}
-        forceOpen={forceOpenGuide}
         initiallyDismissed={guideDismissed}
         eventConfigComplete={hasName && hasRaceStage}
         workAreaCount={guideCounts.workAreaCount}

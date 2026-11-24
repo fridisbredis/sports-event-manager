@@ -11,6 +11,7 @@ export type AdminEventSegment =
   | 'participants'
   | 'scheduling'
   | 'communication'
+  | 'help'
 
 export function adminEventPath(tenantSlug: string, eventId: string, subpath = ''): string {
   const base = `/${tenantSlug}/admin/events/${eventId}`

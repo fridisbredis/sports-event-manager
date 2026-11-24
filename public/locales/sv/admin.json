@@ -68,7 +68,7 @@
       "glossaryLabel": "Vad är vad?",
       "dismiss": "Jag kan det här – dölj guiden",
       "dismissFailed": "Det gick inte att dölja guiden. Försök igen.",
-      "dismissNote": "Guiden visas igen när du skapar ett nytt event eller via Hjälp och guide.",
+      "dismissNote": "Guiden döljs bara på den här dashboarden. Hjälp och guide visar den alltid, och därifrån kan du ta tillbaka den hit.",
       "edit": "Redigera",
       "addWorkArea": "Lägg till arbetsområde",
       "inviteOfficials": "Bjud in funktionärer",
@@ -932,5 +932,11 @@
     "save": "Spara",
     "saving": "Sparar…",
     "saved": "Sparat"
+  },
+  "help": {
+    "hiddenOnDashboard": "Du har dolt guiden på dashboarden.",
+    "showOnDashboard": "Visa guiden på dashboarden igen",
+    "showOnDashboardFailed": "Det gick inte att visa guiden på dashboarden. Försök igen.",
+    "shownOnDashboard": "Guiden visas på dashboarden igen."
   }
 }
