@@ -193,6 +193,41 @@ for VECTOR_TABLE in buckets_vectors vector_indexes; do
 done
 rm -f "${WORKDIR}/data.sql.bak"
 
+# Collision #6, found by the first N25 preview run (2026-11-24): prod's auth
+# schema had gained auth.mfa_recovery_code_sets, which the local stack of the
+# pinned CLI (2.116.0) does not have, and data.sql's COPY into it killed the
+# restore. Supabase upgrades its own platform services in the cloud on its own
+# schedule, so prod's auth/storage tables will keep drifting ahead of whatever
+# a target runs. Rather than chasing each new table by name (the vector-table
+# fix above), data for an auth/storage table the TARGET does not have is left
+# out, and said so with its row count. public is never filtered: schema.sql
+# creates every public table, so a missing one there is a real error.
+#
+# Losing rows this way is acceptable for the targets this script restores to
+# (inspection and rehearsal), and the app uses phone OTP only, not MFA. If a
+# skipped table had rows and they matter, upgrade the target's CLI instead.
+echo "==> Leaving out data for auth/storage tables the target does not have..."
+psql --no-psqlrc -At --dbname "${TARGET_DB_URL}" -c \
+  "SELECT format('\"%s\".\"%s\"', schemaname, tablename) FROM pg_tables WHERE schemaname IN ('auth', 'storage')" \
+  >"${WORKDIR}/target-platform-tables"
+awk -v known="${WORKDIR}/target-platform-tables" -v skipped="${WORKDIR}/skipped-tables" '
+  BEGIN { while ((getline t < known) > 0) have[t] = 1 }
+  skipping {
+    if ($0 == "\\.") { printf "%s %d\n", name, rows >> skipped; skipping = 0 } else rows++
+    next
+  }
+  /^COPY "(auth|storage)"\."[^"]+" / && !($2 in have) { skipping = 1; name = $2; rows = 0; next }
+  { print }
+' "${WORKDIR}/data.sql" >"${WORKDIR}/data.filtered.sql"
+mv "${WORKDIR}/data.filtered.sql" "${WORKDIR}/data.sql"
+if [[ -s "${WORKDIR}/skipped-tables" ]]; then
+  while read -r TABLE ROWS; do
+    echo "    skipped ${TABLE}: ${ROWS} row(s) — the target has no such table" >&2
+  done <"${WORKDIR}/skipped-tables"
+else
+  echo "    none"
+fi
+
 echo ""
 echo "About to restore onto:"
 echo "  ${TARGET_DB_URL}"
