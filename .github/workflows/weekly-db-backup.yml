@@ -13,9 +13,10 @@ name: 'Weekly Prod DB Backup (rotating, 4 weeks)'
 # four blobs, always, and the oldest is replaced by the newest. Nothing has
 # to delete anything.
 #
-# The slot is the ISO week number mod 4, so it advances automatically and
-# needs no state anywhere. Week 42 writes slot 2, week 43 writes slot 3, week
-# 46 overwrites slot 2 again.
+# The slot is a running count of weeks mod 4 (scripts/ops/backup-slot.sh), so
+# it advances automatically and needs no state anywhere: each week writes the
+# next slot, and the fifth week overwrites the first. Until B23 it was the ISO
+# week number mod 4, which put week 53 and the next week 1 in the same slot.
 #
 # WHAT THIS IS NOT
 # Not a replacement for scripts/ops/snapshot-prod-db.sh, which is the manual
@@ -67,21 +68,12 @@ jobs:
 
       - name: Compute this week's rotation slot
         id: slot
+        # A running week count mod 4, not the ISO week mod 4: in a 53-week
+        # year the old formula put week 53 and the next week 1 in the same
+        # slot (B23). The reasoning and the alignment with the old formula
+        # are in the script; scripts/__tests__/backup-slot.test.ts pins them.
         run: |
-          # ISO week mod 4. `date -u +%V` is the ISO-8601 week number, which
-          # is stable across year boundaries in a way %U and %W are not —
-          # those restart at 00 mid-week and would make two consecutive runs
-          # land on the same slot at new year.
-          #
-          # 10# forces base-10: week numbers are zero-padded ("05"), and bash
-          # reads a leading-zero literal as octal, so week 08 and 09 would be
-          # a syntax error. This has bitten enough shell scripts to be worth
-          # the three characters.
-          WEEK=$(date -u +%V)
-          SLOT=$(( 10#$WEEK % 4 ))
-          echo "slot=${SLOT}" >> "$GITHUB_OUTPUT"
-          echo "week=${WEEK}" >> "$GITHUB_OUTPUT"
-          echo "ISO week ${WEEK} -> slot ${SLOT}"
+          scripts/ops/backup-slot.sh | tee -a "$GITHUB_OUTPUT"
 
       - name: Dump prod database
         env:
