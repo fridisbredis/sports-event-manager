@@ -159,8 +159,14 @@ test.describe('admin navigation on a phone', () => {
       'Officials',
       'Scheduling',
       'Communication',
-      'Official view',
     ]) {
+      await expect(drawer.getByRole('link', { name: label })).toBeVisible()
+    }
+    // N67: the support items sit behind one collapsed row, Account on top.
+    const support = drawer.getByRole('button', { name: 'Account and help' })
+    await expect(support).toHaveAttribute('aria-expanded', 'false')
+    await support.click()
+    for (const label of ['Account', 'Help and guide', 'Official view']) {
       await expect(drawer.getByRole('link', { name: label })).toBeVisible()
     }
     await expect(drawer.getByRole('button', { name: 'Log out' })).toBeVisible()

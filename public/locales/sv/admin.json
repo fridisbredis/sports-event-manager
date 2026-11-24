@@ -17,7 +17,8 @@
     "settings": "Inställningar",
     "helpGuide": "Hjälp och guide",
     "systemAdminView": "Systemadmin",
-    "otherOrganisations": "Andra organisationer"
+    "otherOrganisations": "Andra organisationer",
+    "supportMenu": "Konto och hjälp"
   },
   "dashboard": {
     "eventName": "Namnlöst evenemang",

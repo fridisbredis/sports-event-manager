@@ -17,7 +17,8 @@
     "settings": "Settings",
     "helpGuide": "Help and guide",
     "systemAdminView": "System admin",
-    "otherOrganisations": "Other organisations"
+    "otherOrganisations": "Other organisations",
+    "supportMenu": "Account and help"
   },
   "dashboard": {
     "eventName": "Untitled event",
