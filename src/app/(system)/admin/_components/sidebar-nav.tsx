@@ -3,7 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
-import { Activity, Building2, FileText, LayoutPanelLeft, LogOut, Menu, UserCog } from 'lucide-react'
+import {
+  Activity,
+  Building2,
+  DatabaseBackup,
+  FileText,
+  LayoutPanelLeft,
+  LogOut,
+  Menu,
+  UserCog,
+} from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
 import type { OwnTenantLink } from '@/lib/navigation/own-tenant-links'
 
@@ -11,6 +20,8 @@ interface Labels {
   tenants: string
   systemAdmins: string
   systemStatus: string
+  /** N25 (SYS-04): the weekly prod backup slots. */
+  backups: string
   logOut: string
   privacyPolicy: string
   privacyPolicyNewTab: string
@@ -48,9 +59,12 @@ export function SidebarNav({ labels, ownTenants }: Props) {
   // SYS-03: its own tab too, for the same reason — "Tenants" would otherwise
   // claim /admin/health as well.
   const systemStatusActive = pathname.startsWith('/admin/health')
+  // SYS-04 (N25): same again.
+  const backupsActive = pathname.startsWith('/admin/backups')
   const isActive =
     !systemAdminsActive &&
     !systemStatusActive &&
+    !backupsActive &&
     (pathname === '/admin' || pathname.startsWith('/admin/'))
 
   // One definition, rendered twice: in the desktop rail and inside the
@@ -98,6 +112,19 @@ export function SidebarNav({ labels, ownTenants }: Props) {
           <Activity className="size-[18px] shrink-0" strokeWidth={1.5} />
           <span className="truncate" title={labels.systemStatus}>
             {labels.systemStatus}
+          </span>
+        </Link>
+        <Link
+          href="/admin/backups"
+          aria-current={backupsActive ? 'page' : undefined}
+          onClick={onNavigate}
+          className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${
+            backupsActive ? ACTIVE_ITEM : IDLE_ITEM
+          }`}
+        >
+          <DatabaseBackup className="size-[18px] shrink-0" strokeWidth={1.5} />
+          <span className="truncate" title={labels.backups}>
+            {labels.backups}
           </span>
         </Link>
         {/* B19: the tenants where this person holds a role of their own. A

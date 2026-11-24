@@ -366,7 +366,13 @@ If a single tenant needs recovering before this is built:
 3. Write them back as a reviewed, deliberate migration — with a snapshot taken
    first (§4 step 2).
 
-Building this properly is the open half of card N9.
+Building this properly is card N25 (split from N9). Its first step is done:
+**System admin → Backups** (`/admin/backups`, SYS-04) lists the weekly slots
+through the same list-only token as the freshness alert (§4c) and shows, for
+each of the last four ISO weeks, which slot holds it — or that the week has no
+backup at all. Use it to pick the slot for step 1 above. It cannot restore
+anything; steps 2 (staging restore + per-table diff) and 3 (the write) are not
+built yet.
 
 ## 7. Known gaps
 

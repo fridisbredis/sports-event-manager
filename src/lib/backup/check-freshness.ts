@@ -1,6 +1,7 @@
 import { logger } from '@/lib/logger'
 
-import { assessSlots, parseBlobList, STALE_AFTER_DAYS } from './weekly-slots'
+import { listWeeklySlots } from './list-slots'
+import { assessSlots, STALE_AFTER_DAYS } from './weekly-slots'
 
 // N46: alerts when the weekly prod backup has stopped landing.
 //
@@ -37,8 +38,8 @@ export type BackupFreshness =
   | { status: 'unconfigured' }
 
 export async function checkBackupFreshness(now: Date = new Date()): Promise<BackupFreshness> {
-  const base = process.env.BACKUP_SLOTS_LIST_URL
-  if (!base) {
+  const listing = await listWeeklySlots(OP)
+  if (listing.status === 'unconfigured') {
     // Only prod has backups. Unset anywhere else is the expected state; unset
     // in prod would make this whole check silently absent, which is the very
     // failure it exists to catch.
@@ -53,31 +54,9 @@ export async function checkBackupFreshness(now: Date = new Date()): Promise<Back
     }
     return { status: 'unconfigured' }
   }
+  if (listing.status === 'error') return { status: 'error' }
 
-  let xml: string
-  try {
-    const url = new URL(base)
-    url.searchParams.set('restype', 'container')
-    url.searchParams.set('comp', 'list')
-    url.searchParams.set('prefix', 'weekly-slot')
-    url.searchParams.set('include', 'metadata')
-
-    const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) })
-    if (!response.ok) {
-      // Never log the URL: it carries the SAS signature.
-      logger.error('Backup freshness check: listing the backup slots failed', undefined, {
-        op: OP,
-        status: response.status,
-      })
-      return { status: 'error' }
-    }
-    xml = await response.text()
-  } catch (err) {
-    logger.error('Backup freshness check: listing the backup slots failed', err, { op: OP })
-    return { status: 'error' }
-  }
-
-  const result = assessSlots(parseBlobList(xml), now)
+  const result = assessSlots(listing.slots, now)
   const context = {
     op: OP,
     newest: result.newest?.name ?? null,

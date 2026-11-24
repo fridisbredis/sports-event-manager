@@ -689,6 +689,7 @@
     "tenants": "Kunder",
     "privacyPolicy": "Integritetspolicy",
     "systemStatus": "Systemstatus",
+    "backups": "Säkerhetskopior",
     "createTenant": "Skapa kund",
     "noTenantsYet": "Inga kunder än",
     "noTenantsHint": "Skapa en kund för att komma igång.",
@@ -939,5 +940,32 @@
     "showOnDashboard": "Visa guiden på dashboarden igen",
     "showOnDashboardFailed": "Det gick inte att visa guiden på dashboarden. Försök igen.",
     "shownOnDashboard": "Guiden visas på dashboarden igen."
+  },
+  "backups": {
+    "title": "Säkerhetskopior",
+    "subtitle": "Veckobackuperna av produktionsdatabasen. Varje söndagskörning ersätter den äldsta av fyra platser, så upp till fyra veckor bakåt kan återställas härifrån — utöver Supabase egna dagliga backuper.",
+    "weeksTitle": "Senaste fyra veckorna",
+    "newestAge": "Nyaste backup",
+    "days": "{{count}} dagar gammal",
+    "none": "Ingen",
+    "week": "Vecka {{week}}, {{year}}",
+    "weekMissing": "Saknas",
+    "missingNote_one": "{{count}} av de senaste fyra veckorna saknar backup. Den veckan går inte att återställa. Kontrollera körhistoriken för backup-workflowen.",
+    "missingNote_other": "{{count}} av de senaste fyra veckorna saknar backup. De veckorna går inte att återställa. Kontrollera körhistoriken för backup-workflowen.",
+    "completeNote": "Alla de senaste fyra veckorna har en backup, inklusive uppladdade filer (logotyper, profilbilder).",
+    "olderTitle": "Äldre än fyra veckor",
+    "olderNote": "Ligger kvar på en plats som nyare körningar inte har ersatt än. Den går att återställa, men är utanför rotationen — veckorna efter den saknas.",
+    "restoreTitle": "Återställa en tenant",
+    "restoreNote": "Det går ännu inte att återställa en enskild tenant från den här sidan. Tills dess gäller den manuella vägen i runbooken (avsnitt 6): återställ till en separat databas, plocka ut tenanten där och skriv tillbaka den som en granskad migration.",
+    "runbook": "Runbook för backup och återställning",
+    "workflowRuns": "Körningar av backup-workflowen",
+    "unconfigured": "Den här miljön har ingen backuplistning konfigurerad. Bara produktion har veckobackuper.",
+    "listFailed": "Backuperna kunde inte listas. Åtkomsttoken kan ha gått ut — se avsnitt 4c i runbooken.",
+    "status": {
+      "complete": "Komplett",
+      "missing": "Veckor saknas",
+      "unavailable": "Ej tillgänglig"
+    },
+    "timesUtc": "Tiderna är i UTC."
   }
 }

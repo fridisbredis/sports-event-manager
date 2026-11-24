@@ -23,6 +23,16 @@ test.describe('SYS-01 tenant management', () => {
     await expect(page).toHaveURL(/\/admin\/health$/)
   })
 
+  // N25 (SYS-04). Only the frame is asserted: what the card says depends on
+  // whether BACKUP_SLOTS_LIST_URL is set, and it is not, outside prod.
+  test('links to backups', async ({ systemAdminPage: page }) => {
+    await page.goto('/admin')
+    await page.getByRole('link', { name: 'Backups' }).click()
+    await expect(page).toHaveURL(/\/admin\/backups$/)
+    await expect(page.getByRole('heading', { name: 'Backups', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Last four weeks' })).toBeVisible()
+  })
+
   test('create-tenant modal previews the slug and can be cancelled', async ({
     systemAdminPage: page,
   }) => {

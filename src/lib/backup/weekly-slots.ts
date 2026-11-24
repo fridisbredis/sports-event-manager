@@ -107,3 +107,82 @@ export function assessSlots(slots: WeeklySlot[], now: Date): SlotAssessment {
 function round1(n: number): number {
   return Math.round(n * 10) / 10
 }
+
+// N25: which of the last four weeks a restore can actually go back to.
+//
+// assessSlots answers "is the newest backup recent, and are there holes?".
+// Choosing a slot to restore needs the question turned around: for each of
+// the four weeks the rotation is supposed to cover, is there a slot holding
+// THAT week, and if not, say so. The 2026-11-16 drill found only two of four
+// slots and nothing on screen said which weeks were gone.
+//
+// Weeks are derived from capturedAt, the way the workflow itself derives
+// them (`date -u +%V` at run time), not from the isoweek tag alone: a week
+// number repeats every year, and a slot that outlived its rotation (a job that
+// stopped for a month) would otherwise be mistaken for this year's week.
+
+export interface IsoWeek {
+  year: number
+  week: number
+}
+
+export interface CoveredWeek extends IsoWeek {
+  /** The slot holding this week's backup, or null: no backup of this week exists. */
+  slot: WeeklySlot | null
+}
+
+export interface WeekCoverage {
+  /** The four weeks the rotation should cover, newest first. */
+  weeks: CoveredWeek[]
+  /** Slots holding a week older than those four — restorable, but past the rotation. */
+  older: WeeklySlot[]
+}
+
+/** ISO-8601 week of a UTC instant — the same number `date -u +%V` gives. */
+export function isoWeekOf(date: Date): IsoWeek {
+  const day = (date.getUTCDay() + 6) % 7 // Monday = 0
+  const midnight = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  // The ISO year is the year of the week's Thursday.
+  const thursday = new Date(midnight + (3 - day) * DAY_MS)
+  const year = thursday.getUTCFullYear()
+  const week = Math.floor((thursday.getTime() - Date.UTC(year, 0, 1)) / DAY_MS / 7) + 1
+  return { year, week }
+}
+
+/**
+ * How long after Sunday 00:00 UTC that week's run counts as due. The job is
+ * scheduled 03:17 but GitHub has started it as late as 11:08; Monday noon
+ * leaves room for that without calling a merely late run missing.
+ */
+const RUN_DUE_AFTER_MS = 1.5 * DAY_MS
+
+export function weekCoverage(slots: WeeklySlot[], now: Date): WeekCoverage {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  let dueSunday = today - now.getUTCDay() * DAY_MS
+  if (now.getTime() < dueSunday + RUN_DUE_AFTER_MS) dueSunday -= 7 * DAY_MS
+
+  // A manual run (workflow_dispatch) can land a week the schedule has not
+  // reached yet; the window then starts from that week instead.
+  const newest = Math.max(dueSunday, ...slots.map((s) => s.capturedAt.getTime()))
+
+  const key = (w: IsoWeek) => `${w.year}-${w.week}`
+  const byWeek = new Map<string, WeeklySlot>()
+  for (const s of slots) {
+    const k = key(isoWeekOf(s.capturedAt))
+    const held = byWeek.get(k)
+    if (!held || s.capturedAt > held.capturedAt) byWeek.set(k, s)
+  }
+
+  const weeks: CoveredWeek[] = []
+  for (let i = 0; i < 4; i++) {
+    const w = isoWeekOf(new Date(newest - i * 7 * DAY_MS))
+    weeks.push({ ...w, slot: byWeek.get(key(w)) ?? null })
+  }
+
+  const covered = new Set(weeks.map((w) => w.slot).filter((s): s is WeeklySlot => s !== null))
+  const older = slots
+    .filter((s) => !covered.has(s))
+    .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())
+
+  return { weeks, older }
+}

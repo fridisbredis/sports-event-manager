@@ -82,19 +82,22 @@ export function StatusCard({ title, status, statusLabels, facts, links, note }: 
 
       {note && <p className="mt-3 text-xs leading-relaxed text-ink-faint">{note}</p>}
 
-      <div className="mt-4 flex flex-wrap gap-4 border-t border-edge-soft pt-3">
-        {links.map((link) => (
-          <a
-            key={link.href}
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-ink underline decoration-edge-field underline-offset-4 transition-colors hover:decoration-ink"
-          >
-            {link.label} ↗
-          </a>
-        ))}
-      </div>
+      {/* Skipped when empty: the border would otherwise draw a rule under nothing. */}
+      {links.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-4 border-t border-edge-soft pt-3">
+          {links.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-ink underline decoration-edge-field underline-offset-4 transition-colors hover:decoration-ink"
+            >
+              {link.label} ↗
+            </a>
+          ))}
+        </div>
+      )}
     </AppCard>
   )
 }

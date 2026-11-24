@@ -689,6 +689,7 @@
     "tenants": "Tenants",
     "privacyPolicy": "Privacy policy",
     "systemStatus": "System status",
+    "backups": "Backups",
     "createTenant": "Create tenant",
     "noTenantsYet": "No tenants yet",
     "noTenantsHint": "Create a tenant to get started.",
@@ -939,5 +940,32 @@
     "showOnDashboard": "Show the guide on the dashboard again",
     "showOnDashboardFailed": "Couldn't show the guide on the dashboard. Try again.",
     "shownOnDashboard": "The guide is back on the dashboard."
+  },
+  "backups": {
+    "title": "Backups",
+    "subtitle": "The weekly backups of the production database. Each Sunday's run replaces the oldest of four slots, so up to four weeks can be restored from here — in addition to Supabase's own daily backups.",
+    "weeksTitle": "Last four weeks",
+    "newestAge": "Newest backup",
+    "days": "{{count}} days old",
+    "none": "None",
+    "week": "Week {{week}}, {{year}}",
+    "weekMissing": "Missing",
+    "missingNote_one": "{{count}} of the last four weeks has no backup. That week cannot be restored. Check the run history of the backup workflow.",
+    "missingNote_other": "{{count}} of the last four weeks have no backup. Those weeks cannot be restored. Check the run history of the backup workflow.",
+    "completeNote": "Every one of the last four weeks has a backup, including the uploaded files (logos, avatars).",
+    "olderTitle": "Older than four weeks",
+    "olderNote": "Left in a slot that newer runs have not replaced yet. It can be restored, but it is past the rotation — the weeks after it are missing.",
+    "restoreTitle": "Restoring a tenant",
+    "restoreNote": "Restoring a single tenant cannot be done from this page yet. Until it can, follow the supervised manual path in the runbook (section 6): restore into a separate database, extract the tenant there, and write it back as a reviewed migration.",
+    "runbook": "Backup and restore runbook",
+    "workflowRuns": "Backup workflow runs",
+    "unconfigured": "This environment has no backup listing configured. Only production has weekly backups.",
+    "listFailed": "The backups could not be listed. The access token may have expired — see section 4c of the runbook.",
+    "status": {
+      "complete": "Complete",
+      "missing": "Weeks missing",
+      "unavailable": "Unavailable"
+    },
+    "timesUtc": "Times are in UTC."
   }
 }

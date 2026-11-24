@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 
-import { assessSlots, parseBlobList, STALE_AFTER_DAYS, type WeeklySlot } from './weekly-slots'
+import {
+  assessSlots,
+  isoWeekOf,
+  parseBlobList,
+  STALE_AFTER_DAYS,
+  weekCoverage,
+  type WeeklySlot,
+} from './weekly-slots'
 
 function blob(name: string, opts: { capturedat?: string; isoweek?: string; modified?: string }) {
   const meta = [
@@ -121,5 +128,138 @@ describe('assessSlots', () => {
     expect(result.gaps).toEqual([
       { after: 'weekly-slot-0.tar.gz', before: 'weekly-slot-3.tar.gz', days: 15.1 },
     ])
+  })
+})
+
+describe('isoWeekOf', () => {
+  it.each([
+    ['2026-11-22T11:37:00Z', 2026, 47], // Sunday: last day of its ISO week
+    ['2026-11-16T13:38:00Z', 2026, 47], // Monday: first day of the same week
+    ['2026-01-01T12:00:00Z', 2026, 1], // a Thursday, so week 1 of its own year
+    ['2027-01-03T10:00:00Z', 2026, 53], // 2026 has 53 ISO weeks
+    ['2027-01-10T10:00:00Z', 2027, 1],
+    ['2024-12-30T10:00:00Z', 2025, 1], // a Monday in December belonging to next ISO year
+  ])('%s is ISO %i-W%i', (iso, year, week) => {
+    expect(isoWeekOf(new Date(iso))).toEqual({ year, week })
+  })
+})
+
+describe('weekCoverage', () => {
+  const weeksOf = (c: ReturnType<typeof weekCoverage>) =>
+    c.weeks.map((w) => [w.week, w.slot?.name ?? null])
+
+  it('names the missing weeks in the state the 2026-11 drill found (slots for weeks 44 and 47 only)', () => {
+    const slots = [
+      slot('weekly-slot-0.tar.gz', '2026-11-01T10:37:35Z', 44),
+      slot('weekly-slot-3.tar.gz', '2026-11-22T11:38:40Z', 47),
+    ]
+
+    const coverage = weekCoverage(slots, new Date('2026-11-24T12:00:00Z'))
+
+    expect(weeksOf(coverage)).toEqual([
+      [47, 'weekly-slot-3.tar.gz'],
+      [46, null],
+      [45, null],
+      [44, 'weekly-slot-0.tar.gz'],
+    ])
+    expect(coverage.older).toEqual([])
+  })
+
+  it('covers all four weeks after a healthy rotation', () => {
+    const slots = [
+      slot('weekly-slot-0.tar.gz', '2026-11-29T10:30:00Z', 48),
+      slot('weekly-slot-1.tar.gz', '2026-12-06T10:30:00Z', 49),
+      slot('weekly-slot-2.tar.gz', '2026-12-13T10:30:00Z', 50),
+      slot('weekly-slot-3.tar.gz', '2026-11-22T11:38:40Z', 47),
+    ]
+
+    const coverage = weekCoverage(slots, new Date('2026-12-15T09:00:00Z'))
+
+    expect(weeksOf(coverage)).toEqual([
+      [50, 'weekly-slot-2.tar.gz'],
+      [49, 'weekly-slot-1.tar.gz'],
+      [48, 'weekly-slot-0.tar.gz'],
+      [47, 'weekly-slot-3.tar.gz'],
+    ])
+  })
+
+  it("does not call this Sunday's run missing before it has had time to land", () => {
+    const slots = [slot('weekly-slot-3.tar.gz', '2026-11-22T11:38:40Z', 47)]
+
+    // Sunday 2026-11-29, 08:00 UTC: week 48's run is scheduled but GitHub often starts it late.
+    const coverage = weekCoverage(slots, new Date('2026-11-29T08:00:00Z'))
+
+    expect(coverage.weeks[0].week).toBe(47)
+  })
+
+  it('calls the run missing once Monday noon has passed without it', () => {
+    const slots = [slot('weekly-slot-3.tar.gz', '2026-11-22T11:38:40Z', 47)]
+
+    const coverage = weekCoverage(slots, new Date('2026-11-30T13:00:00Z'))
+
+    expect(weeksOf(coverage)[0]).toEqual([48, null])
+  })
+
+  it('starts the window at a manual run that is ahead of the schedule', () => {
+    // workflow_dispatch on Monday 2026-11-16 writes ISO week 47 before week 47's Sunday.
+    const slots = [slot('weekly-slot-3.tar.gz', '2026-11-16T13:38:24Z', 47)]
+
+    const coverage = weekCoverage(slots, new Date('2026-11-17T09:00:00Z'))
+
+    expect(weeksOf(coverage)[0]).toEqual([47, 'weekly-slot-3.tar.gz'])
+  })
+
+  it('lists a slot left over from before the window as older, not as a covered week', () => {
+    const slots = [
+      slot('weekly-slot-3.tar.gz', '2026-11-22T11:38:40Z', 47),
+      slot('weekly-slot-1.tar.gz', '2026-10-11T10:00:00Z', 41),
+    ]
+
+    const coverage = weekCoverage(slots, new Date('2026-11-24T12:00:00Z'))
+
+    expect(coverage.weeks.map((w) => w.slot?.name ?? null)).toEqual([
+      'weekly-slot-3.tar.gz',
+      null,
+      null,
+      null,
+    ])
+    expect(coverage.older.map((s) => s.name)).toEqual(['weekly-slot-1.tar.gz'])
+  })
+
+  it("does not mistake last year's week for this year's", () => {
+    // Same week number, a year apart: the isoweek tag alone would match it.
+    const slots = [slot('weekly-slot-3.tar.gz', '2025-11-23T10:00:00Z', 47)]
+
+    const coverage = weekCoverage(slots, new Date('2026-11-24T12:00:00Z'))
+
+    expect(coverage.weeks[0]).toMatchObject({ year: 2026, week: 47, slot: null })
+    expect(coverage.older.map((s) => s.name)).toEqual(['weekly-slot-3.tar.gz'])
+  })
+
+  it('shows week 53 as gone once week 1 has overwritten its slot (both are slot 1)', () => {
+    // 53 % 4 === 1 % 4: the rotation has no room for a 53-week year.
+    const slots = [
+      slot('weekly-slot-0.tar.gz', '2026-12-27T10:00:00Z', 52),
+      slot('weekly-slot-1.tar.gz', '2027-01-10T10:00:00Z', 1),
+      slot('weekly-slot-2.tar.gz', '2026-12-13T10:00:00Z', 50),
+      slot('weekly-slot-3.tar.gz', '2026-12-20T10:00:00Z', 51),
+    ]
+
+    const coverage = weekCoverage(slots, new Date('2027-01-12T09:00:00Z'))
+
+    expect(weeksOf(coverage)).toEqual([
+      [1, 'weekly-slot-1.tar.gz'],
+      [53, null],
+      [52, 'weekly-slot-0.tar.gz'],
+      [51, 'weekly-slot-3.tar.gz'],
+    ])
+    expect(coverage.older.map((s) => s.name)).toEqual(['weekly-slot-2.tar.gz'])
+  })
+
+  it('reports four missing weeks for an empty container', () => {
+    const coverage = weekCoverage([], new Date('2026-11-24T12:00:00Z'))
+
+    expect(coverage.weeks.map((w) => w.slot)).toEqual([null, null, null, null])
+    expect(coverage.weeks.map((w) => w.week)).toEqual([47, 46, 45, 44])
   })
 })
