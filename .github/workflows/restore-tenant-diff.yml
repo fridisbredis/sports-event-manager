@@ -1,0 +1,121 @@
+name: 'Tenant restore preview (read-only)'
+
+# N25 step 2. Shows what restoring ONE tenant from a weekly backup slot would
+# change in live prod, table by table — and writes nothing to prod.
+#
+#   1. Starts a throwaway local Supabase stack on this runner.
+#   2. Restores the chosen weekly slot into it (scripts/ops/restore-prod-db.sh,
+#      whose prod guard refuses any prod target).
+#   3. Compares the tenant's rows there with live prod
+#      (scripts/ops/diff-tenant.sh). Prod is only read, inside READ ONLY
+#      transactions, through PROD_DB_URL — the same credential the weekly
+#      backup job already dumps the whole database with.
+#   4. Puts the report in the run summary and a 7-day artifact.
+#
+# The restored copy holds real prod data, phone numbers included. It lives only
+# on this runner's disk and is gone when the job ends. The report holds counts
+# and ids, never values (see diff-tenant.sh).
+#
+# Restoring for real is step 3 of N25 and is not built. See
+# docs/ops/backup-and-restore.md §6.
+
+on:
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: 'Weekly slot to restore from (see System admin → Backups for which week each holds)'
+        required: true
+        type: choice
+        options: ['0', '1', '2', '3']
+      tenant_id:
+        description: 'Tenant id (uuid)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-tenant-diff
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    name: Restore slot ${{ inputs.slot }} locally and diff the tenant against prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check inputs
+        env:
+          TENANT_ID: ${{ inputs.tenant_id }}
+        run: |
+          # Interpolated into SQL by diff-tenant.sh, which checks it too.
+          if ! [[ "$TENANT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            echo "::error::tenant_id must be a lowercase uuid"
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          # Same pin as quality.yml and weekly-db-backup.yml.
+          version: 2.116.0
+
+      - name: Read the slot's week from its metadata
+        id: meta
+        env:
+          BLOB_CONN_STR: ${{ secrets.PROD_BLOB_CONNECTION_STRING }}
+          SLOT: ${{ inputs.slot }}
+        run: |
+          META=$(az storage blob metadata show \
+            --connection-string "$BLOB_CONN_STR" \
+            --container-name db-snapshots \
+            --name "weekly-slot-${SLOT}.tar.gz" \
+            --query "[isoweek, capturedat]" --output tsv | paste -sd' ' -)
+          read -r WEEK CAPTURED <<<"$META"
+          echo "label=${SLOT} (ISO week ${WEEK:-?}, captured ${CAPTURED:-?})" >> "$GITHUB_OUTPUT"
+          echo "Slot ${SLOT}: ISO week ${WEEK:-?}, captured ${CAPTURED:-?}"
+
+      - name: Start a throwaway local Supabase stack
+        env:
+          # config.toml reads the Twilio token through env(); its value is
+          # irrelevant here (see quality.yml).
+          SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: dummy
+        run: supabase start
+
+      - name: Restore the slot into the local stack
+        env:
+          BLOB_CONN_STR: ${{ secrets.PROD_BLOB_CONNECTION_STRING }}
+          RESTORE_CONFIRM: restore
+          SLOT: ${{ inputs.slot }}
+        run: |
+          scripts/ops/restore-prod-db.sh "weekly-slot-${SLOT}.tar.gz" \
+            "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          # The script copies the archive's Storage files into the workspace
+          # for a human to upload by hand. Nobody does that here.
+          rm -rf restored-storage-*
+
+      - name: Diff the tenant against live prod (read-only)
+        env:
+          LIVE_DB_URL: ${{ secrets.PROD_DB_URL }}
+          TENANT_ID: ${{ inputs.tenant_id }}
+          DIFF_SLOT: ${{ steps.meta.outputs.label }}
+        run: |
+          [ -n "$LIVE_DB_URL" ] || { echo "::error::PROD_DB_URL secret is not set"; exit 1; }
+          scripts/ops/diff-tenant.sh \
+            "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            "$LIVE_DB_URL" "$TENANT_ID" report
+          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tenant-restore-preview-${{ inputs.tenant_id }}
+          path: report/
+          # Ids and counts only, but ids of a tenant's people all the same:
+          # kept long enough to act on, not indefinitely.
+          retention-days: 7
+          if-no-files-found: error
