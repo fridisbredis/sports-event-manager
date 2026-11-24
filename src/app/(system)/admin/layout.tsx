@@ -29,6 +29,7 @@ export default async function SystemAdminLayout({ children }: Props) {
     tenants: t('systemAdmin.tenants'),
     systemAdmins: t('systemAdmin.systemAdmins'),
     systemStatus: t('systemAdmin.systemStatus'),
+    backups: t('systemAdmin.backups'),
     privacyPolicy: t('systemAdmin.privacyPolicy'),
     privacyPolicyNewTab: tCommon('privacyPage.opensInNewTab'),
     logOut: t('systemAdmin.logOut'),
