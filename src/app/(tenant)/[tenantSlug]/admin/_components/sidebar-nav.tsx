@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname } from 'next/navigation'
 import { Drawer, DrawerContent, useDisclosure } from '@heroui/react'
@@ -23,6 +23,7 @@ import {
   CircleHelp,
   ShieldCheck,
   Building2,
+  ChevronDown,
   type LucideIcon,
 } from 'lucide-react'
 import { PremiumBadge } from '@/components/ui/premium-badge'
@@ -86,6 +87,30 @@ export function SidebarNav({
   }
 
   const eventBase = `admin/events/${eventId}`
+
+  // N67: the support items (Account, Help and guide, Official view, System
+  // admin, Log out) fold into one row. Used now and then, so they start
+  // collapsed on every page load — no storage, decided with Peter. Only
+  // Account and Help live inside this admin area, so only they can be the
+  // current page; the other three leave it.
+  const supportGroupId = useId()
+  const isUnder = (segment: string) => {
+    const href = `/${tenantSlug}/${segment}`
+    return pathname === href || pathname.startsWith(href + '/')
+  }
+  const supportActive =
+    (showAccount && isUnder('admin/account')) || (!!eventId && isUnder(`${eventBase}/help`))
+  // Opens itself when the page is one of its items, so the highlighted link
+  // is never hidden. Adjusted during render rather than in an effect (React's
+  // "storing information from previous renders" pattern): the sidebar lives
+  // in the layout and survives client navigation, so arriving at Account from
+  // a link elsewhere must open it too, without a collapsed first paint.
+  const [supportOpen, setSupportOpen] = useState(supportActive)
+  const [prevSupportActive, setPrevSupportActive] = useState(supportActive)
+  if (supportActive !== prevSupportActive) {
+    setPrevSupportActive(supportActive)
+    if (supportActive) setSupportOpen(true)
+  }
   const navItems: {
     segment: string
     label: string
@@ -261,47 +286,78 @@ export function SidebarNav({
         )}
       </nav>
       <div className="border-t border-gray-100 py-2">
-        {/* B22: its own page, not the dashboard with ?guide=1 — so it shows
-            only the guide and always opens, also from the dashboard. */}
-        {eventId && navLink(`${eventBase}/help`, t('navigation.helpGuide'), CircleHelp, opts)}
-        {/* The official surface for this same tenant. Shown to every admin,
-            not gated on showAccount: access there comes from the admin role
-            (see resolveOfficialSurfaceAccess), while an officials row only
-            decides whether their own schedule has anything in it. */}
-        {navLink('home', t('navigation.officialView'), Smartphone, opts)}
-        {showAccount && navLink('admin/account', t('navigation.account'), UserCircle, opts)}
-        {/* Not navLink: that builds /<tenantSlug>/…, and the system admin
-            pages live at /admin, outside any tenant. */}
-        {showSystemAdmin && (
-          <Link
-            href="/admin"
-            title={opts.isCollapsed ? t('navigation.systemAdminView') : undefined}
-            onClick={opts.onNavigate}
-            className={`flex items-center gap-3 px-6 py-2.5 text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
-              opts.isCollapsed ? 'justify-center px-0' : ''
-            }`}
-          >
-            <ShieldCheck className="size-[18px] shrink-0" strokeWidth={1.5} />
-            {!opts.isCollapsed && (
-              <span className="truncate" title={t('navigation.systemAdminView')}>
-                {t('navigation.systemAdminView')}
-              </span>
-            )}
-          </Link>
-        )}
-        <LogoutButton
-          title={opts.isCollapsed ? t('navigation.logOut') : undefined}
-          className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
+        {/* N67: the toggle. In the icon-only rail it is the person icon alone,
+            and expands the group in place like the full-width row does. */}
+        <button
+          type="button"
+          onClick={() => setSupportOpen((open) => !open)}
+          aria-expanded={supportOpen}
+          // The rail and the drawer each render this group, so the id carries
+          // which one — two elements must not share it.
+          aria-controls={`${supportGroupId}-${opts.onNavigate ? 'drawer' : 'rail'}`}
+          aria-label={opts.isCollapsed ? t('navigation.supportMenu') : undefined}
+          title={opts.isCollapsed ? t('navigation.supportMenu') : undefined}
+          className={`flex w-full items-center gap-3 px-6 py-2.5 text-left text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
             opts.isCollapsed ? 'justify-center px-0' : ''
           }`}
         >
-          <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
+          <UserCircle className="size-[18px] shrink-0" strokeWidth={1.5} />
           {!opts.isCollapsed && (
-            <span className="truncate" title={t('navigation.logOut')}>
-              {t('navigation.logOut')}
-            </span>
+            <>
+              <span className="truncate">{t('navigation.supportMenu')}</span>
+              <ChevronDown
+                aria-hidden
+                className={`ml-auto size-4 shrink-0 transition-transform duration-150 ${
+                  supportOpen ? 'rotate-180' : ''
+                }`}
+                strokeWidth={1.75}
+              />
+            </>
           )}
-        </LogoutButton>
+        </button>
+        <div id={`${supportGroupId}-${opts.onNavigate ? 'drawer' : 'rail'}`} hidden={!supportOpen}>
+          {showAccount && navLink('admin/account', t('navigation.account'), UserCircle, opts)}
+          {/* B22: its own page, not the dashboard with ?guide=1 — so it shows
+              only the guide and always opens, also from the dashboard. */}
+          {eventId && navLink(`${eventBase}/help`, t('navigation.helpGuide'), CircleHelp, opts)}
+          {/* The official surface for this same tenant. Shown to every admin,
+              not gated on showAccount: access there comes from the admin role
+              (see resolveOfficialSurfaceAccess), while an officials row only
+              decides whether their own schedule has anything in it. */}
+          {navLink('home', t('navigation.officialView'), Smartphone, opts)}
+          {/* Not navLink: that builds /<tenantSlug>/…, and the system admin
+              pages live at /admin, outside any tenant. */}
+          {showSystemAdmin && (
+            <Link
+              href="/admin"
+              title={opts.isCollapsed ? t('navigation.systemAdminView') : undefined}
+              onClick={opts.onNavigate}
+              className={`flex items-center gap-3 px-6 py-2.5 text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
+                opts.isCollapsed ? 'justify-center px-0' : ''
+              }`}
+            >
+              <ShieldCheck className="size-[18px] shrink-0" strokeWidth={1.5} />
+              {!opts.isCollapsed && (
+                <span className="truncate" title={t('navigation.systemAdminView')}>
+                  {t('navigation.systemAdminView')}
+                </span>
+              )}
+            </Link>
+          )}
+          <LogoutButton
+            title={opts.isCollapsed ? t('navigation.logOut') : undefined}
+            className={`flex w-full items-center gap-3 text-left px-6 py-2.5 text-[15px] text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
+              opts.isCollapsed ? 'justify-center px-0' : ''
+            }`}
+          >
+            <LogOut className="size-[18px] shrink-0" strokeWidth={1.5} />
+            {!opts.isCollapsed && (
+              <span className="truncate" title={t('navigation.logOut')}>
+                {t('navigation.logOut')}
+              </span>
+            )}
+          </LogoutButton>
+        </div>
       </div>
     </div>
   )
