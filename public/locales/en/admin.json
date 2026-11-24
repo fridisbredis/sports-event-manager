@@ -68,7 +68,7 @@
       "glossaryLabel": "What is what?",
       "dismiss": "I know this – hide the guide",
       "dismissFailed": "Couldn't hide the guide. Try again.",
-      "dismissNote": "The guide will appear again when you create another event, or from Help and guide.",
+      "dismissNote": "The guide is hidden on this dashboard only. Help and guide always shows it, and you can bring it back here from there.",
       "edit": "Edit",
       "addWorkArea": "Add work area",
       "inviteOfficials": "Invite officials",
@@ -932,5 +932,11 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved"
+  },
+  "help": {
+    "hiddenOnDashboard": "You have hidden this guide on the dashboard.",
+    "showOnDashboard": "Show the guide on the dashboard again",
+    "showOnDashboardFailed": "Couldn't show the guide on the dashboard. Try again.",
+    "shownOnDashboard": "The guide is back on the dashboard."
   }
 }

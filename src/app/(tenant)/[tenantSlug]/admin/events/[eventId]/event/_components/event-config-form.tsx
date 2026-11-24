@@ -24,6 +24,7 @@ import { LogoUploadField } from './logo-upload-field'
 import { DatesAndGranularitySection } from './dates-and-granularity-section'
 import { InfoSectionsEditor } from './info-sections-editor'
 import type { InfoSection } from '@/lib/events/info-sections'
+import { adminEventPath } from '@/lib/events/paths'
 import { derivedDateRange } from '../_utils'
 
 interface Props {
@@ -492,7 +493,7 @@ export default function EventConfigForm({
             {/* Stages */}
             <StageList
               stages={stages}
-              guideHref={`/${tenantSlug}/admin/events/${eventId}/dashboard?guide=1#onboarding-glossary`}
+              guideHref={adminEventPath(tenantSlug, eventId, 'help#onboarding-glossary')}
               onChange={(updated) => {
                 setStages(updated)
                 setSaveSuccess(false)
