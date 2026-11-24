@@ -5,7 +5,7 @@
 // newest backup, and are weeks missing?".
 //
 // The slots are written by .github/workflows/weekly-db-backup.yml as
-// weekly-slot-{0..3}.tar.gz, one per ISO week mod 4, each carrying metadata
+// weekly-slot-{0..3}.tar.gz, one per week in rotation, each carrying metadata
 // `isoweek` and `capturedat`. See docs/ops/backup-and-restore.md §4b.
 
 const DAY_MS = 24 * 60 * 60 * 1000

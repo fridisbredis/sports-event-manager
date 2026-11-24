@@ -193,8 +193,12 @@ weekly-slot-2.tar.gz
 weekly-slot-3.tar.gz
 ```
 
-The slot is the ISO week number mod 4, so week 42 writes slot 2, week 43 slot
-3, and week 46 overwrites slot 2 again. **Once the job has run four times
+Each week writes the next slot, and the fifth overwrites the first: the slot is
+a running count of weeks mod 4 (`scripts/ops/backup-slot.sh`). Through ISO year
+2026 that equals the ISO week number mod 4 (week 47 → slot 3, week 48 → slot
+0). It stops being equal at 2027-W01 on purpose (B23): under the old "ISO week
+mod 4" rule, week 53 and the next week 1 shared slot 1, so a 53-week year lost
+a backup after one week. **Once the job has run four times
 there are four, and the oldest is overwritten by the newest** — the retention
 policy lives in the names, so nothing has to delete anything.
 
