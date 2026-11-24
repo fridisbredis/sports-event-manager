@@ -38,6 +38,10 @@
 
 set -euo pipefail
 
+# comm needs both inputs in one sort order; every list it compares goes through
+# sort under this locale rather than trusting Postgres's collation order.
+export LC_ALL=C
+
 RESTORED="${1:-}"
 LIVE="${2:-}"
 TENANT="${3:-}"
@@ -85,7 +89,7 @@ echo "==> Finding the tenant's tables in the restored backup..."
 
 # table|filter, one per line. The filter selects the tenant's rows of that
 # table in whichever database it is run against.
-restored -At -F'|' -c "
+SCOPE_SQL="
   WITH base AS (
     SELECT c.relname
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -119,12 +123,13 @@ restored -At -F'|' -c "
   SELECT relname, format('tenant_id = %L', '$TENANT') FROM tenant_tables
   UNION ALL
   SELECT relname, filter FROM one_hop
-  ORDER BY 1" >"$WORK/scope"
+  ORDER BY 1"
+restored -At -F'|' -c "$SCOPE_SQL" >"$WORK/scope"
 
 restored -At -c "
   SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') ORDER BY 1" >"$WORK/all_tables"
-cut -d'|' -f1 "$WORK/scope" >"$WORK/scope_tables"
+  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')" | sort >"$WORK/all_tables"
+cut -d'|' -f1 "$WORK/scope" | sort >"$WORK/scope_tables"
 OUT_OF_SCOPE="$(comm -23 "$WORK/all_tables" "$WORK/scope_tables" | paste -sd' ' -)"
 
 if [[ "$(restored -At -c "SELECT count(*) FROM public.tenants WHERE id = '$TENANT'")" != "1" ]]; then
@@ -133,13 +138,11 @@ if [[ "$(restored -At -c "SELECT count(*) FROM public.tenants WHERE id = '$TENAN
 fi
 LIVE_TENANT="$(live -At -c "SELECT count(*) FROM public.tenants WHERE id = '$TENANT'" | tail -n1)"
 
-# Tables that hold tenant_id in live but did not exist in the backup: created
-# by a migration since. Nothing in the backup can restore them.
-live -At -c "
-  SELECT table_name FROM information_schema.columns
-  WHERE table_schema = 'public' AND column_name = 'tenant_id' ORDER BY 1" |
-  sed '/^$/d' >"$WORK/live_tenant_tables"
-NEW_IN_LIVE="$(comm -23 "$WORK/live_tenant_tables" <(sort "$WORK/scope_tables") | paste -sd' ' -)"
+# The tenant's tables as live sees them, found by the same query: any that did
+# not exist in the backup were created by a migration since, and nothing in
+# the backup can restore them.
+live -At -F'|' -c "$SCOPE_SQL" | sed '/^$/d' | cut -d'|' -f1 | sort >"$WORK/live_scope_tables"
+NEW_IN_LIVE="$(comm -23 "$WORK/live_scope_tables" "$WORK/scope_tables" | paste -sd' ' -)"
 
 echo "==> Copying the tenant's live rows (read-only) into scratch schema n25_live..."
 restored -c 'DROP SCHEMA IF EXISTS n25_live CASCADE' -c 'CREATE SCHEMA n25_live'
@@ -157,8 +160,8 @@ while IFS='|' read -r TABLE FILTER; do
   COLS_SQL="SELECT column_name FROM information_schema.columns
             WHERE table_schema = 'public' AND table_name = '$TABLE'
               AND is_generated = 'NEVER' ORDER BY column_name"
-  restored -At -c "$COLS_SQL" >"$WORK/cols_backup"
-  live -At -c "$COLS_SQL" | sed '/^$/d' >"$WORK/cols_live"
+  restored -At -c "$COLS_SQL" | sort >"$WORK/cols_backup"
+  live -At -c "$COLS_SQL" | sed '/^$/d' | sort >"$WORK/cols_live"
   COMMON="$(comm -12 "$WORK/cols_backup" "$WORK/cols_live" | sed 's/.*/"&"/' | paste -sd, -)"
   ONLY_BACKUP="$(comm -23 "$WORK/cols_backup" "$WORK/cols_live" | paste -sd' ' -)"
   ONLY_LIVE="$(comm -13 "$WORK/cols_backup" "$WORK/cols_live" | paste -sd' ' -)"
