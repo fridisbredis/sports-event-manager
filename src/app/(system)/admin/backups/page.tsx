@@ -4,15 +4,25 @@ import { listWeeklySlots } from '@/lib/backup/list-slots'
 import { assessSlots, isoWeekOf, weekCoverage, type WeeklySlot } from '@/lib/backup/weekly-slots'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
+import { listRestorePreviews } from '@/lib/backup/restore-previews'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { StatusCard } from '../health/_components/status-card'
+import { relativeTime } from '../health/_lib/relative-time'
+import { RestorePreviewsCard, type PreviewRow } from './_components/restore-previews-card'
 
 // N25 step 1 (SYS-04): which weekly prod backups exist to restore from.
 //
 // Read-only. It lists the four-week rotation through the list-only SAS token
 // (it can see names and dates, never the dumps), and says plainly which weeks
 // have no backup at all — the 2026-11-16 drill found two of four slots and
-// nothing showed it. Restoring a tenant from here is steps 2 and 3 of N25;
-// until they exist the note points at the manual path.
+// nothing showed it.
+//
+// N25 step 2 adds the restore previews: one row per tenant with its newest
+// preview (run in GitHub, stored privately; see restore-previews.ts). Writing
+// a tenant back is step 3 and is not built; the note points at the manual path.
+
+const PREVIEW_WORKFLOW =
+  'https://github.com/fridisbredis/sports-event-manager/actions/workflows/restore-tenant-diff.yml'
 
 const OP = 'GET /admin/backups'
 
@@ -23,7 +33,35 @@ export default async function SystemBackupsPage() {
   const language = await getUserLanguage()
   const t = await getServerTranslation(language, 'admin')
   const now = new Date()
-  const listing = await listWeeklySlots(OP)
+  const supabase = await createSupabaseServerClient()
+  const [listing, previews, tenantsResult] = await Promise.all([
+    listWeeklySlots(OP),
+    listRestorePreviews(),
+    // Three tenants in prod today; the ceiling only guards against surprises.
+    supabase.from('tenants').select('id, name').order('name').range(0, 199),
+  ])
+  if (tenantsResult.error) throw tenantsResult.error
+
+  const previewByTenant = new Map(
+    previews.status === 'ok' ? previews.previews.map((p) => [p.tenantId, p]) : []
+  )
+  const previewRows: PreviewRow[] = (tenantsResult.data ?? []).map((tenant) => {
+    const preview = previewByTenant.get(tenant.id)
+    const when = preview?.generatedAt
+      ? relativeTime(preview.generatedAt.toISOString(), language, now)
+      : null
+    return {
+      tenantId: tenant.id,
+      name: tenant.name,
+      previewed: preview
+        ? t('backups.previews.previewed', {
+            when: when ?? '?',
+            slot: preview.slot ?? '?',
+            week: preview.isoWeek ?? '?',
+          })
+        : null,
+    }
+  })
 
   const statusLabels = {
     ok: t('backups.status.complete'),
@@ -69,6 +107,38 @@ export default async function SystemBackupsPage() {
             links={[]}
           />
         )}
+
+        <RestorePreviewsCard
+          title={t('backups.previews.title')}
+          intro={t('backups.previews.intro')}
+          runLabel={t('backups.previews.run')}
+          runHref={PREVIEW_WORKFLOW}
+          noPreview={t('backups.previews.none')}
+          openLabel={t('backups.previews.open')}
+          unavailable={
+            previews.status === 'unconfigured'
+              ? t('backups.previews.unconfigured')
+              : previews.status === 'error'
+                ? t('backups.previews.listFailed')
+                : undefined
+          }
+          rows={previewRows}
+        />
+
+        <StatusCard
+          title={t('backups.restoreTitle')}
+          note={t('backups.restoreNote')}
+          links={[
+            {
+              label: t('backups.runbook'),
+              href: 'https://github.com/fridisbredis/sports-event-manager/blob/main/docs/ops/backup-and-restore.md',
+            },
+            {
+              label: t('backups.workflowRuns'),
+              href: 'https://github.com/fridisbredis/sports-event-manager/actions/workflows/weekly-db-backup.yml',
+            },
+          ]}
+        />
       </div>
     </div>
   )
@@ -133,21 +203,6 @@ function coverageCards({
           links={[]}
         />
       )}
-
-      <StatusCard
-        title={t('backups.restoreTitle')}
-        note={t('backups.restoreNote')}
-        links={[
-          {
-            label: t('backups.runbook'),
-            href: 'https://github.com/fridisbredis/sports-event-manager/blob/main/docs/ops/backup-and-restore.md',
-          },
-          {
-            label: t('backups.workflowRuns'),
-            href: 'https://github.com/fridisbredis/sports-event-manager/actions/workflows/weekly-db-backup.yml',
-          },
-        ]}
-      />
     </>
   )
 }

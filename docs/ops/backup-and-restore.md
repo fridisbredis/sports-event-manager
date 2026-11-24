@@ -376,18 +376,50 @@ through the same list-only token as the freshness alert (§4c) and shows, for
 each of the last four ISO weeks, which slot holds it — or that the week has no
 backup at all. Use it to pick the slot for step 1 above.
 
-**Step 2 is done too: a read-only preview.** Run the workflow _Tenant restore
-preview (read-only)_ (`.github/workflows/restore-tenant-diff.yml`) from the
-Actions tab with a slot and the tenant's id. It restores the slot into a
-throwaway local stack on the runner and compares the tenant's rows with live
-prod, table by table: how many rows restoring would add, remove and change,
-which columns change, which users the backup refers to that no longer exist,
-and schema drift since the backup. Prod is only read, inside `READ ONLY`
-transactions. The report (run summary + a 7-day artifact) has counts and ids,
-never values. Tables marked _log/queue_ (`audit_events`, `auth_events`,
+**Step 2 is done too: a read-only preview.** On the Backups page, copy the
+tenant's id from _Restore previews_ and follow _Run a preview in GitHub_
+(workflow _Tenant restore preview (read-only)_,
+`.github/workflows/restore-tenant-diff.yml`) with a slot. The run restores the
+slot into a throwaway local stack on the runner and compares the tenant's rows
+with live prod, table by table: how many rows restoring would add, remove and
+change, which columns change, which users the backup refers to that no longer
+exist, and schema drift since the backup. Prod is only read, inside `READ ONLY`
+transactions. When it finishes, _Open_ appears next to the tenant on the
+Backups page. Tables marked _log/queue_ (`audit_events`, `auth_events`,
 `sms_queue`, `sms_usage`, `sms_cap_warnings`) need their own decision before
 anything is restored — an old `sms_queue` row put back as pending is sent
 again.
+
+**The report never goes to GitHub.** The repository is public, and so are its
+Actions logs, summaries and artifacts. The run stores the report (counts, ids
+and column names, never values) as `preview-<tenant-id>.json` in the private
+`restore-previews` container of the snapshot storage account, replacing that
+tenant's previous one; it masks the tenant id in the log and does not print
+the restore's output.
+
+**The credential** the app reads previews with is
+`PROD_RESTORE_PREVIEW_READ_URL`: the `restore-previews` container URL with a
+SAS token carrying read + list on that container only. Creating or renewing
+it (same connection string as §4c):
+
+```
+SAS="$(az storage container generate-sas --connection-string "$BLOB_CONN_STR" \
+  --name restore-previews --permissions rl --https-only \
+  --expiry "$(date -u -v+1y +%Y-%m-%dT%H:%MZ)" -o tsv)"
+URL="https://sportsevtmgrprodsnaps.blob.core.windows.net/restore-previews?${SAS}"
+
+# Verify: listing works, and the token cannot reach the dumps.
+curl -s "${URL}&restype=container&comp=list" | grep -c EnumerationResults            # expect 1
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://sportsevtmgrprodsnaps.blob.core.windows.net/db-snapshots/weekly-slot-0.tar.gz?${SAS}"   # expect 403
+
+gh secret set PROD_RESTORE_PREVIEW_READ_URL --body "$URL"
+```
+
+Then redeploy prod. The first preview run creates the container if it does
+not exist yet; create it by hand
+(`az storage container create --name restore-previews --public-access off`)
+if you make the token first.
 
 The same diff can be run by hand: `scripts/ops/diff-tenant.sh <restored-db-url>
 <live-db-url> <tenant-id> <out-dir>`, after restoring a slot locally with

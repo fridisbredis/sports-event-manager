@@ -956,7 +956,7 @@
     "olderTitle": "Older than four weeks",
     "olderNote": "Left in a slot that newer runs have not replaced yet. It can be restored, but it is past the rotation — the weeks after it are missing.",
     "restoreTitle": "Restoring a tenant",
-    "restoreNote": "Restoring a single tenant cannot be done from this page yet. Until it can, follow the supervised manual path in the runbook (section 6): restore into a separate database, extract the tenant there, and write it back as a reviewed migration.",
+    "restoreNote": "Writing a tenant back cannot be done from this page yet. Until it can, follow the supervised manual path in the runbook (section 6): restore into a separate database, extract the tenant there, and write it back as a reviewed migration.",
     "runbook": "Backup and restore runbook",
     "workflowRuns": "Backup workflow runs",
     "unconfigured": "This environment has no backup listing configured. Only production has weekly backups.",
@@ -966,6 +966,42 @@
       "missing": "Weeks missing",
       "unavailable": "Unavailable"
     },
-    "timesUtc": "Times are in UTC."
+    "timesUtc": "Times are in UTC.",
+    "previews": {
+      "title": "Restore previews",
+      "intro": "Before anything is restored, preview what it would change. Run a preview in GitHub with a slot and the tenant's id (below); the result appears here. Previews read prod but never write to it.",
+      "run": "Run a preview in GitHub",
+      "none": "No preview yet",
+      "previewed": "Previewed {{when}} · slot {{slot}}, week {{week}}",
+      "open": "Open",
+      "unconfigured": "This environment has no preview storage configured. Only production has previews.",
+      "listFailed": "The previews could not be listed. The access token may have expired — see section 6 of the runbook."
+    },
+    "preview": {
+      "back": "Backups",
+      "title": "Restore preview: {{name}}",
+      "subtitle": "What restoring this tenant from slot {{slot}} would do to live prod. Previewed {{when}}.",
+      "readFailed": "The preview could not be read. Run it again from GitHub, or check the access token (runbook section 6).",
+      "tenantGone": "This tenant no longer exists in live prod: it was deleted after the backup was taken.",
+      "noChanges": "No differences: restoring would change nothing",
+      "changedTitle_one": "{{count}} table would change",
+      "changedTitle_other": "{{count}} tables would change",
+      "logOrQueue": "log/queue",
+      "goneFromLive": "Table no longer exists in live",
+      "add": "rows the restore would add",
+      "remove": "rows the restore would remove",
+      "change": "rows the restore would change",
+      "columns": "Changed columns:",
+      "legend": "+ rows the backup has and live does not (would be added back) · − rows live has and the backup does not (would be removed) · ~ rows in both that differ (would be reverted).",
+      "logOrQueueNote": "Tables marked log/queue need their own decision before anything is restored: an old sms_queue row put back as pending would be sent again, and rolling back audit_events would erase what has happened since the backup.",
+      "missingUsers": "Users deleted since the backup — restored rows would point at them: {{list}}.",
+      "newTables": "Tables created since the backup — nothing to restore them from: {{list}}.",
+      "drift": "Columns added (+) or dropped (−) in live since the backup: {{list}}.",
+      "inbound": "Foreign keys into this tenant's tables from outside them: {{list}}.",
+      "unchangedTitle_one": "{{count}} table unchanged",
+      "unchangedTitle_other": "{{count}} tables unchanged",
+      "outOfScope": "Not this tenant's data, so not compared: {{list}}.",
+      "nothingWritten": "Nothing has been written. The preview holds counts, ids and column names, never values."
+    }
   }
 }

@@ -956,7 +956,7 @@
     "olderTitle": "Äldre än fyra veckor",
     "olderNote": "Ligger kvar på en plats som nyare körningar inte har ersatt än. Den går att återställa, men är utanför rotationen — veckorna efter den saknas.",
     "restoreTitle": "Återställa en tenant",
-    "restoreNote": "Det går ännu inte att återställa en enskild tenant från den här sidan. Tills dess gäller den manuella vägen i runbooken (avsnitt 6): återställ till en separat databas, plocka ut tenanten där och skriv tillbaka den som en granskad migration.",
+    "restoreNote": "Det går ännu inte att skriva tillbaka en tenant från den här sidan. Tills dess gäller den manuella vägen i runbooken (avsnitt 6): återställ till en separat databas, plocka ut tenanten där och skriv tillbaka den som en granskad migration.",
     "runbook": "Runbook för backup och återställning",
     "workflowRuns": "Körningar av backup-workflowen",
     "unconfigured": "Den här miljön har ingen backuplistning konfigurerad. Bara produktion har veckobackuper.",
@@ -966,6 +966,42 @@
       "missing": "Veckor saknas",
       "unavailable": "Ej tillgänglig"
     },
-    "timesUtc": "Tiderna är i UTC."
+    "timesUtc": "Tiderna är i UTC.",
+    "previews": {
+      "title": "Förhandsvisa återställning",
+      "intro": "Innan något återställs: förhandsvisa vad det skulle ändra. Kör en förhandsvisning i GitHub med en plats och tenantens id (nedan), så visas resultatet här. Förhandsvisningen läser prod men skriver aldrig dit.",
+      "run": "Kör en förhandsvisning i GitHub",
+      "none": "Ingen förhandsvisning än",
+      "previewed": "Förhandsvisad {{when}} · plats {{slot}}, vecka {{week}}",
+      "open": "Öppna",
+      "unconfigured": "Den här miljön har ingen lagring för förhandsvisningar. Bara produktion har dem.",
+      "listFailed": "Förhandsvisningarna kunde inte listas. Åtkomsttoken kan ha gått ut — se avsnitt 6 i runbooken."
+    },
+    "preview": {
+      "back": "Säkerhetskopior",
+      "title": "Förhandsvisning: {{name}}",
+      "subtitle": "Vad en återställning av den här tenanten från plats {{slot}} skulle göra med live-prod. Förhandsvisad {{when}}.",
+      "readFailed": "Förhandsvisningen kunde inte läsas. Kör den igen från GitHub, eller kontrollera åtkomsttoken (runbookens avsnitt 6).",
+      "tenantGone": "Tenanten finns inte längre i live-prod: den togs bort efter att backupen togs.",
+      "noChanges": "Inga skillnader: en återställning skulle inte ändra något",
+      "changedTitle_one": "{{count}} tabell skulle ändras",
+      "changedTitle_other": "{{count}} tabeller skulle ändras",
+      "logOrQueue": "logg/kö",
+      "goneFromLive": "Tabellen finns inte längre i live",
+      "add": "rader som återställningen skulle lägga till",
+      "remove": "rader som återställningen skulle ta bort",
+      "change": "rader som återställningen skulle ändra",
+      "columns": "Ändrade kolumner:",
+      "legend": "+ rader som backupen har men inte live (skulle läggas tillbaka) · − rader som live har men inte backupen (skulle tas bort) · ~ rader som finns i båda men skiljer sig (skulle återställas).",
+      "logOrQueueNote": "Tabeller märkta logg/kö kräver ett eget beslut innan något återställs: en gammal sms_queue-rad som läggs tillbaka som ej skickad skickas igen, och att rulla tillbaka audit_events raderar det som hänt sedan backupen.",
+      "missingUsers": "Användare som tagits bort sedan backupen — återställda rader skulle peka på dem: {{list}}.",
+      "newTables": "Tabeller som skapats sedan backupen — det finns inget att återställa dem från: {{list}}.",
+      "drift": "Kolumner som lagts till (+) eller tagits bort (−) i live sedan backupen: {{list}}.",
+      "inbound": "Främmande nycklar in i tenantens tabeller utifrån: {{list}}.",
+      "unchangedTitle_one": "{{count}} tabell oförändrad",
+      "unchangedTitle_other": "{{count}} tabeller oförändrade",
+      "outOfScope": "Inte tenantens data, så inte jämfört: {{list}}.",
+      "nothingWritten": "Ingenting har skrivits. Förhandsvisningen innehåller antal, id:n och kolumnnamn, aldrig värden."
+    }
   }
 }

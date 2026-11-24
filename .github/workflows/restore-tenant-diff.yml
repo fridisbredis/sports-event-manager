@@ -10,7 +10,14 @@ name: 'Tenant restore preview (read-only)'
 #      (scripts/ops/diff-tenant.sh). Prod is only read, inside READ ONLY
 #      transactions, through PROD_DB_URL — the same credential the weekly
 #      backup job already dumps the whole database with.
-#   4. Puts the report in the run summary and a 7-day artifact.
+#   4. Stores the report in the private `restore-previews` container of the
+#      prod snapshot storage account, as preview-<tenant-id>.json. The
+#      system admin reads it on System admin -> Backups.
+#
+# THIS REPO IS PUBLIC, and so are its Actions runs: logs, summaries and
+# artifacts. So nothing about the result goes to GitHub — no summary beyond
+# "done", no artifact — the tenant id is masked in the logs, and the restore's
+# own output (row counts of every prod table) is not printed.
 #
 # The restored copy holds real prod data, phone numbers included. It lives only
 # on this runner's disk and is gone when the job ends. The report holds counts
@@ -46,9 +53,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check inputs
-        env:
-          TENANT_ID: ${{ inputs.tenant_id }}
         run: |
+          # Read from the event file, not through env: or an expression: GitHub
+          # prints a step's env and script into the (public) log before the
+          # step runs, which would show the id before the mask below exists.
+          # Every later step's env is masked.
+          TENANT_ID=$(jq -r '.inputs.tenant_id' "$GITHUB_EVENT_PATH")
+          echo "::add-mask::${TENANT_ID}"
           # Interpolated into SQL by diff-tenant.sh, which checks it too.
           if ! [[ "$TENANT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
             echo "::error::tenant_id must be a lowercase uuid"
@@ -77,6 +88,7 @@ jobs:
             --query "[isoweek, capturedat]" --output tsv | paste -sd' ' -)
           read -r WEEK CAPTURED <<<"$META"
           echo "label=${SLOT} (ISO week ${WEEK:-?}, captured ${CAPTURED:-?})" >> "$GITHUB_OUTPUT"
+          echo "week=${WEEK}" >> "$GITHUB_OUTPUT"
           echo "Slot ${SLOT}: ISO week ${WEEK:-?}, captured ${CAPTURED:-?}"
 
       - name: Start a throwaway local Supabase stack
@@ -92,8 +104,10 @@ jobs:
           RESTORE_CONFIRM: restore
           SLOT: ${{ inputs.slot }}
         run: |
+          # stdout carries psql's "COPY <n>" for every prod table; not for a
+          # public log. Errors and the auth/storage fitting report are stderr.
           scripts/ops/restore-prod-db.sh "weekly-slot-${SLOT}.tar.gz" \
-            "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+            "postgresql://postgres:postgres@127.0.0.1:54322/postgres" >/dev/null
           # The script copies the archive's Storage files into the workspace
           # for a human to upload by hand. Nobody does that here.
           rm -rf restored-storage-*
@@ -107,15 +121,33 @@ jobs:
           [ -n "$LIVE_DB_URL" ] || { echo "::error::PROD_DB_URL secret is not set"; exit 1; }
           scripts/ops/diff-tenant.sh \
             "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-            "$LIVE_DB_URL" "$TENANT_ID" report
-          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+            "$LIVE_DB_URL" "$TENANT_ID" report >/dev/null
 
-      - name: Keep the report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tenant-restore-preview-${{ inputs.tenant_id }}
-          path: report/
-          # Ids and counts only, but ids of a tenant's people all the same:
-          # kept long enough to act on, not indefinitely.
-          retention-days: 7
-          if-no-files-found: error
+      - name: Store the report where the Backups page reads it
+        env:
+          BLOB_CONN_STR: ${{ secrets.PROD_BLOB_CONNECTION_STRING }}
+          TENANT_ID: ${{ inputs.tenant_id }}
+          SLOT: ${{ inputs.slot }}
+          WEEK: ${{ steps.meta.outputs.week }}
+        run: |
+          # Private container (created on the first run; a no-op after), one
+          # blob per tenant, replaced by the next run: the newest preview is the
+          # one that matters, and keeping old ones would only keep ids around.
+          az storage container create --connection-string "$BLOB_CONN_STR" \
+            --name restore-previews --public-access off --only-show-errors >/dev/null
+          az storage blob upload --connection-string "$BLOB_CONN_STR" \
+            --container-name restore-previews \
+            --name "preview-${TENANT_ID}.json" \
+            --file report/report.json \
+            --content-type application/json \
+            --overwrite --only-show-errors >/dev/null
+          az storage blob metadata update --connection-string "$BLOB_CONN_STR" \
+            --container-name restore-previews \
+            --name "preview-${TENANT_ID}.json" \
+            --metadata "slot=${SLOT}" "isoweek=${WEEK}" "generatedat=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --only-show-errors >/dev/null
+          rm -rf report
+
+      - name: Summary
+        run: |
+          echo "Preview stored. Open it in the app: System admin → Backups." >> "$GITHUB_STEP_SUMMARY"
