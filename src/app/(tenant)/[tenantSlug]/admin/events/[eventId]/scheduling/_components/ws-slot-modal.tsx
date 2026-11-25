@@ -78,7 +78,15 @@ export function WsSlotModal({
                         key={a.official_id}
                         className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 mb-2"
                       >
-                        <span className="text-sm text-gray-900">{off?.name ?? '—'}</span>
+                        {/* B28: not in the roster = removed before removal
+                            also deleted assignments. Say so, not '—'. */}
+                        {off ? (
+                          <span className="text-sm text-gray-900">{off.name}</span>
+                        ) : (
+                          <span className="text-sm italic text-ink-muted">
+                            {t('scheduling.removedOfficial')}
+                          </span>
+                        )}
                         <Button
                           color="danger"
                           variant="light"

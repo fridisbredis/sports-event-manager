@@ -40,7 +40,8 @@ export function CellActionPopup({
           cellActionCell.labelBy,
           assignment,
           officials,
-          workstations
+          workstations,
+          t('scheduling.removedOfficial')
         )
         return (
           <div key={assignment.id ?? i} className="border-t border-gray-100 py-1 first:border-t-0">

@@ -132,10 +132,12 @@ export function resolveCellActionLabel(
   labelBy: 'workArea' | 'official',
   assignment: LocalAssignment,
   officials: OfficialData[],
-  workstations: WorkstationData[]
+  workstations: WorkstationData[],
+  /** B28: shown for an official no longer in the roster (removed). */
+  unknownOfficial = '—'
 ): string {
   if (labelBy === 'official') {
-    return officials.find((o) => o.id === assignment.official_id)?.name ?? '—'
+    return officials.find((o) => o.id === assignment.official_id)?.name ?? unknownOfficial
   }
   return workstations.find((w) => w.id === assignment.workstation_id)?.name ?? '—'
 }

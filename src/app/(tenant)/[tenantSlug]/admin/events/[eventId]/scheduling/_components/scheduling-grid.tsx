@@ -235,10 +235,10 @@ export function SchedulingGrid({
     return [...unavailableConflicts]
       .sort((a, b) => Date.parse(a.timeslot_start) - Date.parse(b.timeslot_start))
       .map((a) => ({
-        officialName: nameById.get(a.official_id) ?? '—',
+        officialName: nameById.get(a.official_id) ?? t('scheduling.removedOfficial'),
         time: formatSlotLabel(new Date(a.timeslot_start), language),
       }))
-  }, [unavailableConflicts, officials, language])
+  }, [unavailableConflicts, officials, language, t])
 
   const overCapacityCount = useMemo(
     () => uniqueIdsFromCellKeys(overCapacityCells),
@@ -269,9 +269,10 @@ export function SchedulingGrid({
         activeAssignments,
         stageWorkstations,
         officials,
-        language
+        language,
+        t('scheduling.removedOfficial')
       ),
-    [overCapacityCells, activeAssignments, stageWorkstations, officials, language]
+    [overCapacityCells, activeAssignments, stageWorkstations, officials, language, t]
   )
 
   const handleWsExpandedSlotClick = useCallback(

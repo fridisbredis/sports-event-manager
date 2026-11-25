@@ -558,6 +558,7 @@
     "conflictPickToRemove": "Assigned to multiple work areas — pick one to remove",
     "overflowPickToRemove": "Over capacity — pick who to remove",
     "slotModalTitle": "Position {{index}} — {{ws}}, {{time}}",
+    "removedOfficial": "Removed official",
     "slotModalAssigned": "Assigned",
     "slotModalAvailable": "Available at {{time}}",
     "slotModalAdd": "Add",
