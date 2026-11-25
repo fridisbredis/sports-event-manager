@@ -150,23 +150,26 @@ night's backup exists, open the link and look.
      the row describing it is gone. The file is orphaned: present, paid for,
      unreachable from the app.
 
-   Two public buckets, both small (verified on prod 2026-10-19):
+   Three public buckets, all small (verified on prod 2026-11-25):
 
-   | Bucket    | Objects | What breaks if a file is missing            |
-   | --------- | ------- | ------------------------------------------- |
-   | `logos`   | 5       | Event logo on INFO-01 renders broken        |
-   | `avatars` | 2       | Official's avatar on HOME-01 renders broken |
+   | Bucket              | Objects | What breaks if a file is missing                         |
+   | ------------------- | ------- | -------------------------------------------------------- |
+   | `logos`             | 6       | Event logo on INFO-01 renders broken                     |
+   | `avatars`           | 3       | Official's or participant's avatar renders broken        |
+   | `event-info-images` | 0       | Image in an event info section on INFO-01 renders broken |
 
    The weekly slots (§4b) carry these files from ISO week 44 onward, so if a
    slot is new enough you already have them. A **dashboard** restore is a
    different matter: it reaches back further than any slot, and Supabase's own
-   backups never include files. So before one, **download both buckets** and
+   backups never include files. So before one, **download every bucket** and
    re-upload whatever the restore orphans:
 
    ```
    supabase storage cp -r ss:///logos ./storage-backup/logos \
      --project-ref rauvaxuypujbeintnnoe --experimental
    supabase storage cp -r ss:///avatars ./storage-backup/avatars \
+     --project-ref rauvaxuypujbeintnnoe --experimental
+   supabase storage cp -r ss:///event-info-images ./storage-backup/event-info-images \
      --project-ref rauvaxuypujbeintnnoe --experimental
    ```
 
@@ -175,7 +178,7 @@ night's backup exists, open the link and look.
    environment's buckets — and during an incident the output would look
    perfectly plausible.
 
-   Neither bucket holds anything irreplaceable — a logo can be re-uploaded by
+   No bucket holds anything irreplaceable — a logo can be re-uploaded by
    the tenant admin, an avatar by the official — so this is a cosmetic
    cleanup, not a data-loss event. It is listed here because discovering it
    mid-incident looks like the restore failed when it did not.
@@ -234,9 +237,14 @@ az storage blob list --connection-string "$BLOB_CONN_STR" \
 ```
 
 **These slots also carry the Storage files**, from ISO week 44 onward: the job
-downloads both buckets through the Storage API and puts them in the same
+downloads every bucket through the Storage API and puts them in the same
 archive as the SQL, so one slot is one complete recovery point rather than a
-database that no longer matches its images. Slots captured earlier — week 43's
+database that no longer matches its images. The bucket list is asked from the
+Storage API on every run (B27, 2026-11-25); until then it was hard-coded to
+`logos` and `avatars`, so slots taken before B27 lack `event-info-images`
+(which held no files then). Each bucket gets a folder in the slot even when
+empty, and the log prints a file count per bucket, never paths: the Actions
+logs are public and every path starts with a tenant id. Slots captured earlier — week 43's
 slot 3 is the only one — contain the three SQL files and nothing else.
 
 **Restoring one** is the same script as §5:
@@ -452,7 +460,7 @@ Step 3 (actually writing a tenant back) is not built.
   only from ISO week 44 onward. A Supabase scheduled backup (§4) contains the
   `storage.objects` metadata rows, never the files; restoring from the
   dashboard therefore leaves dangling references whatever else is true. The
-  weekly slot job now downloads both buckets into the same archive as the SQL
+  weekly slot job now downloads every bucket into the same archive as the SQL
   (§4b), so a slot from week 44 on is a complete recovery point. **Slot 3 from
   week 43 is not** — it predates the change. Within Supabase's 7-day window
   the files are simply not covered by any automatic backup, which is the
