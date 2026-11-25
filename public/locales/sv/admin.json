@@ -558,6 +558,7 @@
     "conflictPickToRemove": "Inplanerad på flera arbetsområden — välj en att ta bort",
     "overflowPickToRemove": "Över kapacitet — välj vem som ska tas bort",
     "slotModalTitle": "Plats {{index}} — {{ws}}, {{time}}",
+    "removedOfficial": "Borttagen funktionär",
     "slotModalAssigned": "Inplanerade",
     "slotModalAvailable": "Tillgängliga kl. {{time}}",
     "slotModalAdd": "Lägg till",

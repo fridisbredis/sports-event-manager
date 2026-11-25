@@ -124,6 +124,29 @@ describe('computeOverCapacityDetails', () => {
   })
 })
 
+describe('computeOverCapacityDetails — official not in the roster (B28)', () => {
+  it('names an official missing from the roster with the given label', () => {
+    const workstations = [{ id: 'ws-1', name: 'Start line', capacity_ceiling: 1 }]
+    const officials = [{ id: 'o2', name: 'Mikael Saras' }]
+    const assignments = [
+      { official_id: 'gone', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+      { official_id: 'o2', workstation_id: 'ws-1', timeslot_start: '2026-08-06T12:00:00.000Z' },
+    ]
+    const cells = computeOverCapacityCells(assignments, workstations)
+
+    const details = computeOverCapacityDetails(
+      cells,
+      assignments,
+      workstations,
+      officials,
+      'en',
+      'Removed official'
+    )
+
+    expect(details[0].officialNames.sort()).toEqual(['Mikael Saras', 'Removed official'])
+  })
+})
+
 describe('computeOverCapacityDetails — locale', () => {
   it("formats the over-capacity time in the reader's locale", () => {
     const workstations = [{ id: 'ws-1', name: 'Start line', capacity_ceiling: 1 }]

@@ -215,6 +215,20 @@ describe('resolveCellActionLabel', () => {
     expect(resolveCellActionLabel('official', assignment, officials, workstations)).toBe('—')
     expect(resolveCellActionLabel('workArea', assignment, officials, workstations)).toBe('—')
   })
+
+  // B28: an official missing from the roster is one removed before removal
+  // also deleted their assignments; the popup names that instead of '—'.
+  it('uses the given label for an official who is no longer in the roster', () => {
+    const assignment = makeAssignment({ official_id: 'removed', workstation_id: 'unknown' })
+
+    expect(
+      resolveCellActionLabel('official', assignment, officials, workstations, 'Removed official')
+    ).toBe('Removed official')
+    // The label is for officials only: an unknown work area still reads '—'.
+    expect(
+      resolveCellActionLabel('workArea', assignment, officials, workstations, 'Removed official')
+    ).toBe('—')
+  })
 })
 
 describe('buildPickerCandidates', () => {

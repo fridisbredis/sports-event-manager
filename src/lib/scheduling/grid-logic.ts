@@ -239,7 +239,9 @@ export function computeOverCapacityDetails(
   activeAssignments: AssignmentLike[],
   stageWorkstations: (WorkstationLike & WorkstationCapacity)[],
   officials: OfficialLike[],
-  language?: string
+  language?: string,
+  /** B28: shown for an official no longer in the roster (removed). */
+  unknownOfficial = '—'
 ): OverCapacityDetail[] {
   const details: OverCapacityDetail[] = []
   for (const key of overCapacityCells) {
@@ -250,7 +252,7 @@ export function computeOverCapacityDetails(
       (a) => a.workstation_id === wsId && a.timeslot_start === timeslotStart
     )
     const officialNames = cellAssignments.map(
-      (a) => officials.find((o) => o.id === a.official_id)?.name ?? '—'
+      (a) => officials.find((o) => o.id === a.official_id)?.name ?? unknownOfficial
     )
     details.push({
       workAreaName: ws.name,

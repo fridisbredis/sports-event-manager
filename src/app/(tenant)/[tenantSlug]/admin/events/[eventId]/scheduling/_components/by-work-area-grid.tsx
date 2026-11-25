@@ -322,8 +322,15 @@ export function ByWorkAreaGrid({
                             ws.workstation_operating_windows
                           )
                           const assignment = slotIndexMap.get(`${ws.id}:${slotStart}:${slotIdx}`)
+                          // B28: an assignment whose official is not in the
+                          // loaded roster (confirmed members of this event) is
+                          // a leftover of someone removed before removal also
+                          // deleted their assignments. Named as such, not '—'.
+                          const knownName = assignment
+                            ? officialNameMap.get(assignment.official_id)
+                            : undefined
                           const officialName = assignment
-                            ? (officialNameMap.get(assignment.official_id) ?? '—')
+                            ? (knownName ?? t('scheduling.removedOfficial'))
                             : undefined
                           const inDragRange =
                             (!!wsDrag &&
@@ -371,7 +378,11 @@ export function ByWorkAreaGrid({
                                   }}
                                   className={`w-full h-10 truncate rounded-md border bg-white px-2 text-center text-xs transition-colors hover:brightness-95 ${inDragRange ? 'ring-2 ring-tenant-primary' : ''}`}
                                 >
-                                  {shortName(officialName)}
+                                  {knownName ? (
+                                    shortName(officialName)
+                                  ) : (
+                                    <span className="italic">{officialName}</span>
+                                  )}
                                 </button>
                               ) : (
                                 <button
