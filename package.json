@@ -18,6 +18,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:types": "supabase gen types typescript --project-id lhflutwvwvzawzbcuwup --schema public > src/types/database.ts && prettier --write src/types/database.ts",
+    "db:types:prod": "supabase gen types typescript --project-id rauvaxuypujbeintnnoe --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "seed:dev:local": "node scripts/seed-dev-local.mjs",
     "seed:perf": "tsx scripts/seed-perf.ts",
