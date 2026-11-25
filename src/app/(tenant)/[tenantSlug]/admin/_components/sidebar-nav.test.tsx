@@ -68,6 +68,15 @@ describe('SidebarNav support group (N67)', () => {
     expect(screen.queryByRole('button', { name: 'navigation.logOut' })).toBeNull()
   })
 
+  // Full width, the toggle is a section header: label and chevron, no icon.
+  // With Account's person icon it read as a menu row and was mistaken for it.
+  it('renders the toggle as a header without a row icon', () => {
+    renderNav('/seed-klubben/admin/events/e1/dashboard')
+    const icons = toggle().querySelectorAll('svg')
+    expect(icons).toHaveLength(1)
+    expect(icons[0]).toHaveAttribute('aria-hidden')
+  })
+
   it('expands with Account on top, and collapses again', () => {
     renderNav('/seed-klubben/admin/events/e1/dashboard')
     fireEvent.click(toggle())
