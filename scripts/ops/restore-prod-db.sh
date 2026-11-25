@@ -386,10 +386,15 @@ if [ -d "${WORKDIR}/storage" ]; then
   echo "  which renders as broken images rather than missing ones."
   echo ""
   echo "  To upload them to a target you choose, deliberately:"
-  echo "    supabase storage cp -r ${STORAGE_OUT}/logos ss:///logos \\"
-  echo "      --project-ref <ref> --experimental"
-  echo "    supabase storage cp -r ${STORAGE_OUT}/avatars ss:///avatars \\"
-  echo "      --project-ref <ref> --experimental"
+  # One command per bucket in the archive (B27: slots from then on hold
+  # every bucket the project has, not a fixed logos/avatars pair). An
+  # empty bucket folder is skipped: there is nothing to upload.
+  for BUCKET_DIR in "${STORAGE_OUT}"/*/; do
+    BUCKET=$(basename "${BUCKET_DIR}")
+    [ -n "$(find "${BUCKET_DIR}" -type f -print -quit)" ] || continue
+    echo "    supabase storage cp -r ${STORAGE_OUT}/${BUCKET} ss:///${BUCKET} \\"
+    echo "      --project-ref <ref> --experimental"
+  done
   echo ""
   echo "  <ref> is never implied: the repo's CLI is linked to dev, so an"
   echo "  omitted --project-ref writes to the wrong environment and succeeds."

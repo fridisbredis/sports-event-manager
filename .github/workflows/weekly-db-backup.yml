@@ -167,7 +167,7 @@ jobs:
           #
           # Listed through the Storage API with the service role rather than
           # read from storage.objects or fetched from the public CDN URLs.
-          # Both buckets happen to be public today, but a backup that stops
+          # Every bucket happens to be public today, but a backup that stops
           # working the day someone makes a bucket private is not a backup;
           # and the API is the only source that sees a file whose metadata
           # row is missing, which is exactly the inconsistency worth
@@ -177,13 +177,41 @@ jobs:
 
           mkdir -p dump/storage
 
+          # B27: every bucket the project has, asked from the Storage API, not
+          # a hard-coded list. The list used to be `logos avatars`, and
+          # event-info-images (2026-11-09) was silently left out of every slot.
+          # A bucket created later is now picked up without anyone remembering
+          # to add it here.
+          BUCKETS=$(curl -sS "${SUPABASE_URL}/storage/v1/bucket" \
+            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          if not isinstance(d,list):
+              sys.stderr.write('Storage API error: %s\n' % json.dumps(d))
+              sys.exit(1)
+          for b in d:
+              print(b['id'])
+          ") || {
+            echo "::error::listing the Storage buckets failed"
+            exit 1
+          }
+          # Zero buckets is an API or credential problem, not a real state:
+          # the app cannot run without its buckets.
+          [ -n "$BUCKETS" ] || { echo "::error::the Storage API returned no buckets"; exit 1; }
+
           TOTAL=0
-          for BUCKET in logos avatars; do
+          for BUCKET in $BUCKETS; do
+            # One folder per bucket even when it is empty, so the slot itself
+            # shows which buckets existed when it was taken.
+            mkdir -p "dump/storage/${BUCKET}"
+            BUCKET_COUNT=0
+
             # The list endpoint is POST with a JSON body, and it is NOT
             # recursive: it returns one directory level, with folders as
-            # entries whose `id` is null. Both buckets store objects as
-            # <tenant_id>/<entity_id>/<filename>, so the listing is walked
-            # three levels deep rather than assumed flat.
+            # entries whose `id` is null. Objects sit up to four levels deep
+            # (event-info-images: <tenant_id>/<event_id>/<section_id>/<file>;
+            # participant avatars: <tenant_id>/participants/<id>/<file>), so
+            # the listing is walked rather than assumed flat.
             walk() {
               local prefix="$1" depth="$2"
               [ "$depth" -gt 4 ] && return 0
@@ -213,12 +241,12 @@ jobs:
           for e in d:
               print(('F' if e.get('id') else 'D') + '\t' + e['name'])
           ") || {
-                echo "::error::listing ${BUCKET}/${prefix} failed"
+                echo "::error::listing ${BUCKET} failed"
                 exit 1
               }
 
               # Fed by here-string rather than a pipe, so the loop body runs
-              # in this shell and TOTAL survives it.
+              # in this shell and the counters survive it.
               while IFS=$'\t' read -r KIND NAME; do
                 [ -z "$NAME" ] && continue
                 local path="${prefix:+${prefix}/}${NAME}"
@@ -230,25 +258,29 @@ jobs:
                     "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}" \
                     -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
                     -o "dump/storage/${BUCKET}/${path}" || {
-                      echo "::error::failed to download ${BUCKET}/${path}"
+                      echo "::error::failed to download a file from ${BUCKET}"
                       exit 1
                     }
-                  TOTAL=$((TOTAL + 1))
+                  BUCKET_COUNT=$((BUCKET_COUNT + 1))
                 fi
               done <<< "$entries"
             }
 
             walk "" 1
+            TOTAL=$((TOTAL + BUCKET_COUNT))
+            # Counts only, never paths. This repo and its Actions logs are
+            # public, and every path starts with a tenant id (B27; the restore
+            # preview masks tenant ids for the same reason).
+            echo "  ${BUCKET}: ${BUCKET_COUNT} file(s)"
           done
           echo "Downloaded ${TOTAL} Storage object(s)"
-          find dump/storage -type f | sed 's/^/  /'
 
           # Zero files is reported, not failed. Empty buckets are a legitimate
           # state (a fresh tenant has uploaded nothing), and failing the whole
           # backup over it would lose the database dump too — the far more
           # valuable half.
           if [ "$TOTAL" -eq 0 ]; then
-            echo "::warning::no Storage objects found; both buckets appear empty"
+            echo "::warning::no Storage objects found; every bucket appears empty"
           fi
 
       - name: Compress
