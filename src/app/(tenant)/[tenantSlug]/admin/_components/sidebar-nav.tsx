@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Building2,
   ChevronDown,
+  Ellipsis,
   type LucideIcon,
 } from 'lucide-react'
 import { PremiumBadge } from '@/components/ui/premium-badge'
@@ -286,8 +287,12 @@ export function SidebarNav({
         )}
       </nav>
       <div className="border-t border-gray-100 py-2">
-        {/* N67: the toggle. In the icon-only rail it is the person icon alone,
-            and expands the group in place like the full-width row does. */}
+        {/* N67: the toggle. Full width, it is a section header (label and
+            chevron, no icon) like "Other organisations": with the person icon
+            it read as a menu row and was mistaken for Account, which carries
+            the same icon. The icon-only rail has no room for a label, so
+            there it is an ellipsis — anything but UserCircle — and expands
+            the group in place like the full-width header does. */}
         <button
           type="button"
           onClick={() => setSupportOpen((open) => !open)}
@@ -297,14 +302,17 @@ export function SidebarNav({
           aria-controls={`${supportGroupId}-${opts.onNavigate ? 'drawer' : 'rail'}`}
           aria-label={opts.isCollapsed ? t('navigation.supportMenu') : undefined}
           title={opts.isCollapsed ? t('navigation.supportMenu') : undefined}
-          className={`flex w-full items-center gap-3 px-6 py-2.5 text-left text-[15px] text-ink-soft transition-colors hover:bg-gray-50 hover:text-ink ${
-            opts.isCollapsed ? 'justify-center px-0' : ''
+          className={`flex w-full items-center gap-3 px-6 text-left transition-colors ${
+            opts.isCollapsed
+              ? 'justify-center px-0 py-2.5 text-ink-soft hover:bg-gray-50 hover:text-ink'
+              : 'pb-1 pt-3 text-ink-faint hover:text-ink'
           }`}
         >
-          <UserCircle className="size-[18px] shrink-0" strokeWidth={1.5} />
-          {!opts.isCollapsed && (
+          {opts.isCollapsed ? (
+            <Ellipsis className="size-[18px] shrink-0" strokeWidth={1.5} />
+          ) : (
             <>
-              <span className="truncate">{t('navigation.supportMenu')}</span>
+              <span className="section-label truncate">{t('navigation.supportMenu')}</span>
               <ChevronDown
                 aria-hidden
                 className={`ml-auto size-4 shrink-0 transition-transform duration-150 ${
