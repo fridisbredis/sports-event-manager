@@ -33,6 +33,19 @@ jobs:
           # rate-limit failures from resolving "latest" on every run.
           version: 2.116.0
 
+      # B26: a run that waits for approval keeps the commit it was started on.
+      # If main moves on meanwhile, this deploys an OLDER commit than main.
+      # Sometimes that is the point (a rollback), so this only warns, before
+      # anything touches prod, instead of letting it surface later as a
+      # confusing types diff.
+      - name: Warn if this commit is no longer the tip of main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          tip=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "::warning title=Deploying an older commit than main::This run deploys ${GITHUB_SHA::7}, but main is now at ${tip::7}. Re-run Deploy to prod on main if you meant to ship the latest."
+          fi
+
       - name: Preview pending DB migrations (prod)
         run: |
           bash scripts/supabase-link-retry.sh rauvaxuypujbeintnnoe
@@ -148,8 +161,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Regenerate DB types
-        run: npm run db:types
+      # B26: from PROD, the schema the step above just migrated. db:types reads
+      # dev, which can be ahead of the commit being deployed (a run approved
+      # after a later migration reached dev), and then the gate failed on a
+      # table prod did not even have.
+      - name: Regenerate DB types (prod)
+        run: npm run db:types:prod
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

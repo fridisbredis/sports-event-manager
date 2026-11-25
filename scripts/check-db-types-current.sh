@@ -3,6 +3,14 @@
 # Fails if src/types/database.ts does not match what `npm run db:types` produces
 # — ignoring the one field that is not part of the schema.
 #
+# WHICH DATABASE. The caller regenerates the types first, from the database it
+# just migrated: deploy-dev.yml runs `db:types` (dev), deploy-prod.yml runs
+# `db:types:prod` (prod). This script only compares the file on disk with HEAD.
+# Until B26 (2026-11-25) prod also generated from dev, so a prod deploy of a
+# commit older than dev's schema failed here on tables prod did not have.
+# deploy-dev.yml still has that shape for a workflow_dispatch of a branch cut
+# before dev's latest migration: rebase the branch, or expect this to fail.
+#
 # WHY THIS EXISTS
 #
 # The deploy workflows regenerate the types and fail if the result differs from

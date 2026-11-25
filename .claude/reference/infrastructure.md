@@ -223,6 +223,8 @@ Keep a copy of each in 1Password ("Viadal Event Manager", Work account). Losing 
 - `.github/workflows/deploy-dev.yml` — auto-deploys on push to `main`
 - `.github/workflows/deploy-prod.yml` — manual trigger (`workflow_dispatch`) or git tag `v*`. Uses `environment: production` with required reviewer (Frida) for approval gate.
 
+**Types gate:** both deploy workflows apply migrations, regenerate `src/types/database.ts` and fail if it differs from the committed file (`scripts/check-db-types-current.sh`). Dev regenerates from dev (`npm run db:types`), prod from prod (`npm run db:types:prod`), so each compares against the database it just migrated (B26). A prod run that waited for approval while `main` moved on deploys the commit it was started on; it now warns ("Deploying an older commit than main") before touching prod, and passes the gate as long as that commit matches prod's schema.
+
 **Image tagging:** Always tag with `${{ github.sha }}`, not `latest`. Azure Container Apps doesn't detect updates if the tag doesn't change.
 
 **Docker layer cache:** Separate scopes for dev and prod (`scope=dev`, `scope=prod`) so they don't interfere.
