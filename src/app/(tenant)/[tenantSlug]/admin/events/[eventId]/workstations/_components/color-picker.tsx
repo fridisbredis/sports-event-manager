@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useId, useRef, useState } from 'react'
 import { Tooltip } from '@heroui/react'
+import { ChevronDown } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 
@@ -27,6 +29,62 @@ interface Props {
 
 export function ColorPicker({ value, takenBy, onChange }: Props) {
   const { t } = useTranslation('admin')
+  const paletteId = useId()
+
+  const selectedIndex = WORK_AREA_COLORS.findIndex((c) => c.name === value)
+  const selected = selectedIndex >= 0 ? WORK_AREA_COLORS[selectedIndex] : undefined
+
+  // N70: the colour is chosen once, so the 30-swatch palette stays folded
+  // behind the current choice and a "Change" button. With nothing chosen yet
+  // there is nothing to fold behind, so it starts open — an extra "Choose
+  // colour" click would only delay the one decision the admin came to make.
+  // A name retired from the palette counts as nothing chosen: there is no
+  // swatch to show for it.
+  const [isOpen, setIsOpen] = useState(selected === undefined)
+
+  const changeButtonRef = useRef<HTMLButtonElement>(null)
+  const paletteRef = useRef<HTMLDivElement>(null)
+  // Where focus should land once the open/closed render has committed. A
+  // flag rather than focusing inline because the target does not exist (or
+  // is still `hidden`) until after that render.
+  const pendingFocus = useRef<'palette' | 'button' | null>(null)
+
+  useEffect(() => {
+    const target = pendingFocus.current
+    pendingFocus.current = null
+    if (target === 'button') {
+      changeButtonRef.current?.focus()
+    } else if (target === 'palette') {
+      // The selected swatch if there is one — that is where the admin's
+      // attention already is — otherwise the first.
+      const swatchButtons = paletteRef.current?.querySelectorAll<HTMLButtonElement>('button')
+      const pressed = paletteRef.current?.querySelector<HTMLButtonElement>(
+        'button[aria-pressed="true"]'
+      )
+      ;(pressed ?? swatchButtons?.[0])?.focus()
+    }
+  }, [isOpen])
+
+  function open() {
+    pendingFocus.current = 'palette'
+    setIsOpen(true)
+  }
+
+  function choose(color: string) {
+    onChange(color)
+    pendingFocus.current = 'button'
+    setIsOpen(false)
+  }
+
+  // Escape folds the palette back without changing anything — but only when
+  // there is a choice to fold back to.
+  function onPaletteKeyDown(event: React.KeyboardEvent) {
+    if (event.key === 'Escape' && selected) {
+      event.preventDefault()
+      pendingFocus.current = 'button'
+      setIsOpen(false)
+    }
+  }
 
   // Several areas can hold one colour, so this collects names rather than
   // overwriting — the tooltip names all of them.
@@ -40,14 +98,60 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
   return (
     <section>
       <h2 className="section-label mb-1">{t('workstations.colorLabel')}</h2>
-      <p className="mb-4 text-[13px] text-ink-muted">{t('workstations.colorHint')}</p>
+      <p className="mb-4 text-[13px] text-gray-400">{t('workstations.colorHint')}</p>
+
+      {/* The folded state: the current choice as a bare swatch, no ring — the
+          heavy "selected" ring only means something next to its siblings, and
+          alone it read as a heavy outline. The palette's own names never
+          render (see work-area-colors.ts), so the swatch is labelled by its
+          position, as it is inside the palette. */}
+      {selected && !isOpen && (
+        <div className="flex items-center gap-4">
+          <span
+            role="img"
+            aria-label={`${t('workstations.colorSelected')}: ${t('workstations.colorSwatchLabel', {
+              index: selectedIndex + 1,
+              total: WORK_AREA_COLORS.length,
+            })}`}
+            className="size-[22px] shrink-0 rounded-full"
+            style={{ backgroundColor: selected.bg }}
+          />
+          <button
+            ref={changeButtonRef}
+            type="button"
+            onClick={open}
+            aria-expanded={isOpen}
+            aria-controls={paletteId}
+            // Same height as the swatch with `leading-none`, so the label is
+            // centred on the swatch rather than on the font's line box — which
+            // sat it a pixel or two off. Underline on the label only, so it
+            // does not run under the caret.
+            className="group inline-flex h-[22px] items-center gap-1 text-[13px] font-medium leading-none text-tenant-primary focus:outline-none"
+          >
+            <span className="underline-offset-4 group-hover:underline group-focus-visible:underline">
+              {t('workstations.colorChange')}
+            </span>
+            <ChevronDown aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
+          </button>
+        </div>
+      )}
 
       {/* Ten per row at every width: the palette reads as three hue runs, and
           reflowing it into uneven rows would lose that structure.
           Fixed-size swatches in a `w-fit` grid rather than `w-full` in a
           10-column one — the latter grows each swatch with the card, which on
           a wide screen turned them into ~50px slabs. */}
-      <div className="grid w-fit grid-cols-10 gap-2.5">
+      {/* Kept mounted while folded (just `hidden`) so the Change button's
+          aria-controls always points at a real element. */}
+      <div
+        ref={paletteRef}
+        id={paletteId}
+        hidden={!isOpen}
+        onKeyDown={onPaletteKeyDown}
+        // `hidden` alone loses to the `grid` display utility (same
+        // specificity, later in the stylesheet), so the class switches too.
+        className={`${isOpen ? 'grid' : 'hidden'} w-fit grid-cols-10 gap-2.5`}
+      >
         {WORK_AREA_COLORS.map((color, index) => {
           const isSelected = value === color.name
           // A colour the selected area itself holds is not "taken" from its
@@ -59,7 +163,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
           const swatch = (
             <button
               type="button"
-              onClick={() => onChange(color.name)}
+              onClick={() => choose(color.name)}
               aria-pressed={isSelected}
               aria-label={
                 isTaken
@@ -125,7 +229,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
         })}
       </div>
 
-      {takenBy.length > 0 && (
+      {isOpen && takenBy.length > 0 && (
         <p className="mt-3 text-[13px] text-gray-400">{t('workstations.colorTakenHint')}</p>
       )}
     </section>

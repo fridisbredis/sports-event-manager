@@ -265,6 +265,7 @@
     "colorTakenHint": "A line through a color means it's already used by another work area (hover to see which).",
     "colorTakenBy": "Already used by {{name}}",
     "colorSwatchLabel": "Color {{index}} of {{total}}",
+    "colorChange": "Change",
     "colorSelected": "Selected",
     "operatingWindowsLabel": "Operating windows",
     "matchStageHours": "Match stage hours",
