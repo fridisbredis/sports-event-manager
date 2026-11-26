@@ -63,6 +63,7 @@ export default async function ParticipantAccountPage({ params }: Props) {
       </div>
       <ParticipantAccountForm
         tenantId={tenant.id}
+        tenantSlug={tenantSlug}
         name={records[0].name ?? ''}
         phone={records.find((r) => r.phone)?.phone ?? user.phone ?? ''}
         smsOptOut={smsOptOut}

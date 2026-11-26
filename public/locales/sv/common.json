@@ -66,7 +66,8 @@
     "infoSectionTitleTooLong": "Rubriken får vara högst 80 tecken.",
     "infoSectionBodyTooLong": "Texten får vara högst 4 000 tecken.",
     "infoSectionLinkInvalid": "Ange en webbadress som börjar med http:// eller https://.",
-    "infoSectionNeedsContent": "Lägg till text, en bild eller en länk."
+    "infoSectionNeedsContent": "Lägg till text, en bild eller en länk.",
+    "participantEntryGone": "Evenemanget finns inte längre på ditt konto. Ladda om sidan."
   },
   "notFoundPage": {
     "eyebrow": "Inget resultat",

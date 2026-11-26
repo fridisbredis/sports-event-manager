@@ -1523,6 +1523,10 @@ export type Database = {
       }
       is_own_official_row: { Args: { p_official_id: string }; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
+      leave_own_participant_entry: {
+        Args: { p_participant_id: string }
+        Returns: Json
+      }
       list_gdpr_avatar_cleanup: {
         Args: never
         Returns: {

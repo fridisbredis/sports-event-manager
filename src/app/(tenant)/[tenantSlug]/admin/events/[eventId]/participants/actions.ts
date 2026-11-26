@@ -16,7 +16,7 @@ import { hasFeature } from '@/lib/tiers/features'
 import type { Json } from '@/types/database'
 import { adminEventRoutePattern } from '@/lib/events/paths'
 import { resolveRequestEventId } from '@/lib/events/request-event'
-import { avatarStoragePath } from '@/lib/participants/participant-avatar'
+import { removeParticipantAvatar } from '@/lib/participants/participant-avatar'
 
 const tenantIdSchema = z.string().uuid()
 const stageIdSchema = z.string().uuid()
@@ -521,6 +521,10 @@ export async function unlinkParticipant(input: {
   // `user_id is not null` in the filter: unlinking a row nobody has claimed
   // (or that someone else unlinked a moment ago) is "not found", not a
   // silent success that also wipes a phone number an admin typed in.
+  //
+  // N74: leave_own_participant_entry (migration 20261126144947) clears the
+  // same four columns when the participant leaves on their own. Keep the two
+  // lists identical.
   const { data, error } = await supabase
     .from('participants')
     .update({ user_id: null, phone: null, privacy_accepted_at: null, avatar_url: null })
@@ -549,7 +553,8 @@ export async function unlinkParticipant(input: {
     return { error: await tError('actionErrors.participantNotFound') }
   }
 
-  await removePreviousClaimantPhoto(
+  await removeParticipantAvatar(
+    createSupabaseServiceClient(),
     before?.avatar_url ?? null,
     { tenantId, participantId: participantId.data },
     'unlinkParticipant'
@@ -559,30 +564,6 @@ export async function unlinkParticipant(input: {
   revalidatePath(adminEventRoutePattern('dashboard'), 'page')
 
   return {}
-}
-
-/**
- * The previous claimant's photo file, once the record is no longer theirs
- * (unlink, switch). Best-effort: the change has committed, and a stray object
- * in storage is not worth failing it. Only ever a path under this
- * participant's own prefix, whatever the URL says.
- */
-async function removePreviousClaimantPhoto(
-  avatarUrl: string | null,
-  ctx: { tenantId: string; participantId: string },
-  op: string
-) {
-  const avatarPath = avatarUrl ? avatarStoragePath(avatarUrl) : null
-  if (!avatarPath?.startsWith(`${ctx.tenantId}/participants/${ctx.participantId}/`)) return
-
-  const { error } = await createSupabaseServiceClient().storage.from('avatars').remove([avatarPath])
-  if (error) {
-    logger.warn(`${op}: could not remove the previous photo`, {
-      tenantId: ctx.tenantId,
-      participantId: ctx.participantId,
-      message: error.message,
-    })
-  }
 }
 
 /**
@@ -709,7 +690,8 @@ export async function switchToNewClaimant(input: {
     previous_avatar_url?: string | null
   }
   if (result.participant_id) {
-    await removePreviousClaimantPhoto(
+    await removeParticipantAvatar(
+      createSupabaseServiceClient(),
       result.previous_avatar_url ?? null,
       { tenantId, participantId: result.participant_id },
       'switchToNewClaimant'
