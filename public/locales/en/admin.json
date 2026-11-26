@@ -305,6 +305,7 @@
     "checklistHint": "Officials tick these off during their shift. Everyone on the shift sees who did it.",
     "addChecklistItem": "+ Add check-off item",
     "checklistPlaceholder": "e.g. Collect timing chips",
+    "notesLabel": "Information",
     "notesHeading": "Notes",
     "notesHint": "Shown to officials for reference only — nothing to tick off.",
     "addNote": "+ Add note",

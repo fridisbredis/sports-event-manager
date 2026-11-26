@@ -11,6 +11,7 @@ vi.mock('@/lib/i18n/client', () => ({
         'workstations.checklistHint': 'Officials tick these off.',
         'workstations.addChecklistItem': '+ Add check-off item',
         'workstations.checklistPlaceholder': 'e.g. Collect timing chips',
+        'workstations.notesLabel': 'Information',
         'workstations.notesHeading': 'Notes',
         'workstations.notesHint': 'Reference only.',
         'workstations.addNote': '+ Add note',
@@ -71,11 +72,13 @@ describe('TodosEditor layout', () => {
     expect(sections[0].contains(sections[1])).toBe(false)
   })
 
-  it('labels the pair above the first list only', () => {
+  it('gives each list its own group label', () => {
     render(<TodosEditor todos={MIXED} onChange={vi.fn()} />)
 
     expect(screen.getAllByText('Checklists / to-dos')).toHaveLength(1)
     expect(listFor('Check-off items')).toHaveTextContent('Checklists / to-dos')
+    expect(screen.getAllByText('Information')).toHaveLength(1)
+    expect(listFor('Notes')).toHaveTextContent('Information')
   })
 })
 
