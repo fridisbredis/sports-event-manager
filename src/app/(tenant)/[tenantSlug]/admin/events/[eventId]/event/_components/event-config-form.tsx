@@ -17,7 +17,7 @@ import { useTranslation } from '@/lib/i18n/client'
 import { useLanguage } from '@/components/i18n-provider'
 import { resizeImage } from '@/lib/image/resize-image'
 import { toastError } from '@/lib/toast'
-import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import { saveInTransition, useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import StageList from './stage-list'
 import { LogoUploadField } from './logo-upload-field'
@@ -70,7 +70,9 @@ export default function EventConfigForm({
 }: Props) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
-  const { markDirty, markClean, dialogProps } = useUnsavedChanges()
+  const { markDirty, markClean, dialogProps } = useUnsavedChanges({
+    onSave: () => (prepareSave() ? saveInTransition(startSave, save) : Promise.resolve(false)),
+  })
 
   const [name, setName] = useState(initialName)
   const [eventType, setEventType] = useState(initialEventType)
@@ -246,29 +248,41 @@ export default function EventConfigForm({
     }
   }
 
-  function handleSave() {
+  // Validates and resets the form's save state; false means there is nothing
+  // to send yet (the name error is showing).
+  function prepareSave(): boolean {
     if (!name.trim()) {
       setErrors({ name: t('eventConfig.eventNameEmpty') })
-      return
+      return false
     }
     setSaveSuccess(false)
     markDirty()
     setErrors({})
+    return true
+  }
+
+  async function save(): Promise<boolean> {
+    // The logo first: it is the only part of this form that writes to
+    // Storage, and a failure there must stop the save rather than report
+    // success over a logo that never landed.
+    const logo = await commitPendingLogo()
+    if (!logo.ok) return false
+
+    const result = await saveEvent(buildInput(logo.logoUrl))
+    if (result.error) {
+      toastError(result.error)
+      return false
+    }
+
+    setSaveSuccess(true)
+    markClean()
+    return true
+  }
+
+  function handleSave() {
+    if (!prepareSave()) return
     startSave(async () => {
-      // The logo first: it is the only part of this form that writes to
-      // Storage, and a failure there must stop the save rather than report
-      // success over a logo that never landed.
-      const logo = await commitPendingLogo()
-      if (!logo.ok) return
-
-      const result = await saveEvent(buildInput(logo.logoUrl))
-      if (result.error) {
-        toastError(result.error)
-        return
-      }
-
-      setSaveSuccess(true)
-      markClean()
+      await save()
     })
   }
 
