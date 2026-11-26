@@ -51,3 +51,9 @@ export function participantPath(tenantSlug: string, segment: ParticipantSegment 
 export function participantEventInfoPath(tenantSlug: string, eventId: string): string {
   return `/${tenantSlug}/participant/events/${eventId}/info`
 }
+
+// B29: the event info picker, and the prefix the Event info tab is lit under
+// (the picker and every event's info page sit beneath it).
+export function participantEventsPath(tenantSlug: string): string {
+  return `/${tenantSlug}/participant/events`
+}

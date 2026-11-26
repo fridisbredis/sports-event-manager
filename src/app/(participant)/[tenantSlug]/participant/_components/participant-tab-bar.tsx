@@ -3,16 +3,29 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useOptimistic, useTransition } from 'react'
-import { Bell, House, Info, User } from 'lucide-react'
+import { Bell, House, Info, User, type LucideIcon } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
-import { participantEventInfoPath, participantPath } from '@/lib/events/paths'
+import {
+  participantEventInfoPath,
+  participantEventsPath,
+  participantPath,
+} from '@/lib/events/paths'
 
 interface Props {
   tenantSlug: string
   // The event the Event info tab opens: the caller's only event. null when
-  // they are entered in several, which sends the tab to PAR-01, where each
-  // event block links to its own info.
+  // they are entered in several, which sends the tab to the event info
+  // picker, where they choose one (B29).
   soleEventId: string | null
+}
+
+interface Tab {
+  id: string
+  href: string
+  label: string
+  Icon: LucideIcon
+  // Path prefix the tab is lit under, when that differs from its href.
+  match?: string
 }
 
 // N43: the participant counterpart of the official BottomTabBar, with the
@@ -26,11 +39,16 @@ export function ParticipantTabBar({ tenantSlug, soleEventId }: Props) {
   const [shownPath, setShownPath] = useOptimistic(pathname)
 
   const home = participantPath(tenantSlug)
-  const tabs = [
+  const tabs: Tab[] = [
     { id: 'home', href: home, label: t('participant.nav.home'), Icon: House },
     {
       id: 'event-info',
-      href: soleEventId ? participantEventInfoPath(tenantSlug, soleEventId) : home,
+      href: soleEventId
+        ? participantEventInfoPath(tenantSlug, soleEventId)
+        : participantEventsPath(tenantSlug),
+      // Lit on the picker and on every event's info page, however it was
+      // reached — from PAR-01's per-event link too, not only from this tab.
+      match: participantEventsPath(tenantSlug),
       label: t('participant.nav.eventInfo'),
       Icon: Info,
     },
@@ -49,21 +67,22 @@ export function ParticipantTabBar({ tenantSlug, soleEventId }: Props) {
   ]
 
   // Home is a prefix of every other participant path, so it matches exactly;
-  // the others also match their sub-paths.
-  const isOn = (path: string, id: string, href: string) =>
-    id === 'home' ? path === href : path === href || path.startsWith(href + '/')
+  // the others also match their sub-paths. A tab with its own `match` prefix
+  // (Event info) is lit anywhere under it rather than only under its href.
+  const isOn = (path: string, id: string, href: string, match?: string) => {
+    if (id === 'home') return path === href
+    const base = match ?? href
+    return path === base || path.startsWith(base + '/')
+  }
 
   return (
     // h-16 for the same reason as the official bar: the layout's pb-16 and the
     // account screen's Save bar both assume it.
     <nav className="fixed bottom-0 inset-x-0 z-40 h-16 border-t border-edge bg-white">
       <div className="flex h-full">
-        {tabs.map(({ id, href, label, Icon }) => {
-          // With several events the Event info tab leads home; it is not lit
-          // there, since home is not event info.
-          const leadsHome = id !== 'home' && href === home
-          const active = !leadsHome && isOn(shownPath, id, href)
-          const committed = !leadsHome && isOn(pathname, id, href)
+        {tabs.map(({ id, href, label, Icon, match }) => {
+          const active = isOn(shownPath, id, href, match)
+          const committed = isOn(pathname, id, href, match)
           return (
             <Link
               key={id}
