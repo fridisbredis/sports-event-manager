@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { Tooltip } from '@heroui/react'
+import { ChevronDown } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/client'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 
@@ -97,13 +98,13 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
   return (
     <section>
       <h2 className="section-label mb-1">{t('workstations.colorLabel')}</h2>
-      <p className="mb-4 text-[13px] text-ink-muted">{t('workstations.colorHint')}</p>
+      <p className="mb-4 text-[13px] text-gray-400">{t('workstations.colorHint')}</p>
 
-      {/* The folded state: the current choice drawn exactly as the selected
-          swatch in the palette (same size, same heavy ring), so opening and
-          closing reads as the one swatch expanding into its siblings. The
-          palette's own names never render (see work-area-colors.ts), so the
-          swatch is labelled by its position, as it is inside the palette. */}
+      {/* The folded state: the current choice as a bare swatch, no ring — the
+          heavy "selected" ring only means something next to its siblings, and
+          alone it read as a heavy outline. The palette's own names never
+          render (see work-area-colors.ts), so the swatch is labelled by its
+          position, as it is inside the palette. */}
       {selected && !isOpen && (
         <div className="flex items-center gap-4">
           <span
@@ -112,7 +113,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
               index: selectedIndex + 1,
               total: WORK_AREA_COLORS.length,
             })}`}
-            className="size-[22px] rounded-full ring-[3px] ring-ink"
+            className="size-[22px] shrink-0 rounded-full"
             style={{ backgroundColor: selected.bg }}
           />
           <button
@@ -121,9 +122,16 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
             onClick={open}
             aria-expanded={isOpen}
             aria-controls={paletteId}
-            className="text-[13px] font-medium text-ink underline-offset-4 hover:underline focus:outline-none focus-visible:underline"
+            // Same height as the swatch with `leading-none`, so the label is
+            // centred on the swatch rather than on the font's line box — which
+            // sat it a pixel or two off. Underline on the label only, so it
+            // does not run under the caret.
+            className="group inline-flex h-[22px] items-center gap-1 text-[13px] font-medium leading-none text-tenant-primary focus:outline-none"
           >
-            {t('workstations.colorChange')}
+            <span className="underline-offset-4 group-hover:underline group-focus-visible:underline">
+              {t('workstations.colorChange')}
+            </span>
+            <ChevronDown aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
           </button>
         </div>
       )}
