@@ -15,6 +15,7 @@ import {
 } from '@/components/navigation/surface-switch-bar'
 import { officialShiftsPath } from '@/lib/events/official-event'
 import { effectivePalette, TenantThemeStyle } from '@/lib/theme/tenant-theme-style'
+import { participantEventIds } from '@/lib/participants/participant-event-ids'
 import { ParticipantTabBar } from './_components/participant-tab-bar'
 
 interface Props {
@@ -65,7 +66,10 @@ export default async function ParticipantLayout({ children, params }: Props) {
 
   if (!tenant) notFound()
 
-  const soleEventId = tenant.entries.length === 1 ? tenant.entries[0].eventId : null
+  // Counted per event, not per entry (B29): two records in one event still
+  // have exactly one event's info to open.
+  const eventIds = participantEventIds(tenant.entries)
+  const soleEventId = eventIds.length === 1 ? eventIds[0] : null
 
   return (
     <>
