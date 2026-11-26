@@ -102,7 +102,10 @@ export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 export type SmsQueueStatus = 'pending' | 'sending' | 'sent' | 'failed'
 // Match migration 0037's CHECK constraints (SEC-07).
-export type AuditActorRole = 'system_admin' | 'tenant_admin'
+// 'participant' (N74, migration 20261126144947) is written only by the
+// leave_own_participant_entry RPC: the INSERT policy still admits admins only,
+// so logAuditEvent() cannot write a participant row from app code.
+export type AuditActorRole = 'system_admin' | 'tenant_admin' | 'participant'
 export type AuditAction =
   | 'role_revoked'
   | 'tenant_created'
@@ -124,7 +127,10 @@ export type AuditAction =
   // N13 (migration 20261027143113): a system admin set or cleared a tenant's
   // alphanumeric SMS sender name.
   | 'tenant_sms_sender_changed'
-export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement'
+  // N74 (migration 20261126144947): a participant cleared their own record
+  // from the Account page, as opposed to an admin unlinking it.
+  | 'participant_left_event'
+export type AuditTargetType = 'user_role' | 'tenant' | 'official' | 'announcement' | 'participant'
 // Match migration 0038's CHECK constraint (SEC-07-rest). Separate from
 // AuditAction/audit_events — see docs/adr/0001 category 5.
 export type AuthEventType =

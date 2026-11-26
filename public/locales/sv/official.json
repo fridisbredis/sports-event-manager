@@ -198,7 +198,15 @@
       "myRaceEmptyHint": "Ditt startnummer och din klass syns här när arrangörerna har lagt in dem.",
       "myShiftsHeading": "Dina pass",
       "myShifts": "Mina pass",
-      "myShiftsSub": "Du är funktionär här också"
+      "myShiftsSub": "Du är funktionär här också",
+      "leaveHeading": "Lämna ett evenemang",
+      "leaveHint": "Tar bort evenemanget från appen. Din anmälan i Race Results ligger kvar.",
+      "leave": "Lämna",
+      "leaveAria": "Lämna {{event}}",
+      "leaveConfirmTitle": "Lämna {{event}}?",
+      "leaveConfirmBody": "Evenemanget försvinner från appen, och ditt telefonnummer och din bild tas bort från anmälan. Du avanmäls inte från loppet: anmälan i Race Results ligger kvar, och du kan registrera dig för evenemanget i appen igen senare.",
+      "leaveConfirm": "Lämna evenemanget",
+      "leaveCancel": "Avbryt"
     }
   },
   "tournaments": {

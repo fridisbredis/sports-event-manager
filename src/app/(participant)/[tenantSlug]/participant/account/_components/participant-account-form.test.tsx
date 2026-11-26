@@ -9,6 +9,9 @@ const { fakeT } = vi.hoisted(() => ({ fakeT: (key: string) => key }))
 vi.mock('@/lib/i18n/client', () => ({ useTranslation: () => ({ t: fakeT }) }))
 vi.mock('@/lib/toast', () => ({ toastError: vi.fn() }))
 vi.mock('@/components/language-switcher', () => ({ LanguageSwitcher: () => null }))
+// N74: the leave section has its own test; here it only must not pull in the
+// server action or HeroUI's Modal.
+vi.mock('./leave-event-section', () => ({ LeaveEventSection: () => null }))
 vi.mock('@/components/ui/app-card', () => ({
   AppCard: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }))
@@ -42,6 +45,7 @@ vi.mock('@heroui/react', () => ({
 
 const baseProps = {
   tenantId: 't1',
+  tenantSlug: 'viadal',
   name: 'Lisa Nord',
   phone: '+46700000000',
   smsOptOut: false,

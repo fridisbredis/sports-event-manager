@@ -25,6 +25,7 @@ import { toastError } from '@/lib/toast'
 import { formatPhoneForDisplay } from '@/lib/phone'
 import type { IceContact } from '@/lib/ice-contact'
 import type { Locale } from '@/lib/i18n/config'
+import { LeaveEventSection } from './leave-event-section'
 
 export interface MyRaceEntry {
   eventId: string
@@ -37,6 +38,7 @@ export interface MyRaceEntry {
 
 interface Props {
   tenantId: string
+  tenantSlug: string
   name: string
   phone: string
   smsOptOut: boolean
@@ -58,6 +60,7 @@ interface Props {
 // account name of their own to edit, and no photo here (CLAIM-02 takes it).
 export function ParticipantAccountForm({
   tenantId,
+  tenantSlug,
   name,
   phone,
   smsOptOut: initialSmsOptOut,
@@ -291,7 +294,7 @@ export function ParticipantAccountForm({
         href="/privacy"
         target="_blank"
         rel="noopener noreferrer"
-        className={`mb-6 flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:bg-surface`}
+        className={`mb-8 flex items-center gap-4 ${CARD_SURFACE} px-4 py-4 transition-colors hover:bg-surface`}
       >
         <FileText
           aria-hidden="true"
@@ -308,6 +311,11 @@ export function ParticipantAccountForm({
           className="size-5 shrink-0 text-ink-label"
         />
       </a>
+
+      <LeaveEventSection
+        tenantSlug={tenantSlug}
+        events={myRace.map((e) => ({ eventId: e.eventId, eventName: e.eventName }))}
+      />
 
       <LogoutButton className="flex w-full items-center justify-center gap-2 rounded-control border-1 border-edge bg-white px-4 py-3 text-[15px] font-semibold text-ink-soft transition-colors hover:border-edge-field hover:text-ink">
         <LogOut className="size-4 shrink-0" strokeWidth={2} />

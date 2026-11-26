@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Database } from '@/types/database'
 import { logQueryError } from '@/lib/db/query-error'
+import { logger } from '@/lib/logger'
 
 // N40 (L8): the participant's photo, participants.avatar_url
 // (migration 20261110130000). Same bucket and limits as an official's avatar
@@ -31,6 +32,32 @@ export function avatarStoragePath(url: string): string | null {
   const idx = url.indexOf(marker)
   if (idx === -1) return null
   return decodeURIComponent(url.slice(idx + marker.length))
+}
+
+/**
+ * The photo file of a record that is no longer its holder's: an admin unlink
+ * or switch (N41/N42), or the participant leaving the event themselves (N74).
+ * Best-effort: the change has committed, and a stray object in storage is not
+ * worth failing it. Only ever a path under this participant's own prefix,
+ * whatever the URL says.
+ */
+export async function removeParticipantAvatar(
+  service: SupabaseClient<Database>,
+  avatarUrl: string | null,
+  ctx: { tenantId: string; participantId: string },
+  op: string
+): Promise<void> {
+  const avatarPath = avatarUrl ? avatarStoragePath(avatarUrl) : null
+  if (!avatarPath?.startsWith(`${ctx.tenantId}/participants/${ctx.participantId}/`)) return
+
+  const { error } = await service.storage.from(BUCKET).remove([avatarPath])
+  if (error) {
+    logger.warn(`${op}: could not remove the previous photo`, {
+      tenantId: ctx.tenantId,
+      participantId: ctx.participantId,
+      message: error.message,
+    })
+  }
 }
 
 interface Target {

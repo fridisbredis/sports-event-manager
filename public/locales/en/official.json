@@ -198,7 +198,15 @@
       "myRaceEmptyHint": "Your bib and class show up here once the organisers have added them.",
       "myShiftsHeading": "Your shifts",
       "myShifts": "My shifts",
-      "myShiftsSub": "You are an official here too"
+      "myShiftsSub": "You are an official here too",
+      "leaveHeading": "Leave an event",
+      "leaveHint": "Removes the event from the app. Your entry in Race Results stays as it is.",
+      "leave": "Leave",
+      "leaveAria": "Leave {{event}}",
+      "leaveConfirmTitle": "Leave {{event}}?",
+      "leaveConfirmBody": "The event disappears from the app, and your phone number and photo are removed from the entry. This does not withdraw you from the race: your entry in Race Results stays, and you can register for the event in the app again later.",
+      "leaveConfirm": "Leave event",
+      "leaveCancel": "Cancel"
     }
   },
   "tournaments": {
