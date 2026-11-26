@@ -13,13 +13,20 @@ vi.mock('@/lib/i18n/client', () => ({
           "A line through a color means it's already used by another work area (hover to see which).",
         'workstations.colorTakenBy': `Already used by ${vars?.name}`,
         'workstations.colorSwatchLabel': `Color ${vars?.index} of ${vars?.total}`,
+        'workstations.colorSelected': 'Selected',
+        'workstations.colorChange': 'Change',
       })[key] ?? key,
   }),
 }))
 
-/** Every swatch, in palette order. */
+/** Every swatch, in palette order. Only reachable while the palette is open. */
 function swatches() {
   return screen.getAllByRole('button')
+}
+
+/** Unfold the palette behind an already chosen colour. */
+function openPalette() {
+  fireEvent.click(screen.getByRole('button', { name: 'Change' }))
 }
 
 describe('ColorPicker', () => {
@@ -31,6 +38,7 @@ describe('ColorPicker', () => {
 
   it('marks the selected colour as pressed, and only that one', () => {
     render(<ColorPicker value="jade" takenBy={[]} onChange={vi.fn()} />)
+    openPalette()
 
     const pressed = swatches().filter((b) => b.getAttribute('aria-pressed') === 'true')
     expect(pressed).toHaveLength(1)
@@ -92,6 +100,7 @@ describe('ColorPicker', () => {
         onChange={vi.fn()}
       />
     )
+    openPalette()
 
     expect(screen.queryByLabelText(/Already used by/)).not.toBeInTheDocument()
   })
@@ -140,5 +149,102 @@ describe('ColorPicker', () => {
 
     expect(screen.queryByLabelText(/Already used by/)).not.toBeInTheDocument()
     expect(swatches()).toHaveLength(WORK_AREA_COLORS.length)
+  })
+
+  describe('folding (N70)', () => {
+    it('shows only the chosen colour and a Change button when one is chosen', () => {
+      render(<ColorPicker value="jade" takenBy={[]} onChange={vi.fn()} />)
+
+      const jadeIndex = WORK_AREA_COLORS.findIndex((c) => c.name === 'jade')
+      expect(
+        screen.getByRole('img', { name: `Selected: Color ${jadeIndex + 1} of 30` })
+      ).toBeInTheDocument()
+      // The Change button is the only reachable button — the swatches are folded away.
+      expect(screen.getAllByRole('button')).toHaveLength(1)
+      const change = screen.getByRole('button', { name: 'Change' })
+      expect(change).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('points the Change button at the palette it opens', () => {
+      const { container } = render(<ColorPicker value="jade" takenBy={[]} onChange={vi.fn()} />)
+
+      const controls = screen.getByRole('button', { name: 'Change' }).getAttribute('aria-controls')
+      expect(controls).toBeTruthy()
+      expect(container.querySelector(`[id="${controls}"]`)).not.toBeNull()
+    })
+
+    it('starts open when nothing is chosen yet', () => {
+      render(<ColorPicker value={null} takenBy={[]} onChange={vi.fn()} />)
+
+      expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+      expect(swatches()).toHaveLength(WORK_AREA_COLORS.length)
+    })
+
+    it('starts open when the stored colour has left the palette', () => {
+      // There is no swatch to fold behind, so folding would hide the only way
+      // to pick a valid one.
+      render(<ColorPicker value="teal2" takenBy={[]} onChange={vi.fn()} />)
+
+      expect(swatches()).toHaveLength(WORK_AREA_COLORS.length)
+    })
+
+    it('opens on Change and moves focus to the chosen swatch', () => {
+      render(<ColorPicker value="jade" takenBy={[]} onChange={vi.fn()} />)
+
+      openPalette()
+
+      expect(swatches()).toHaveLength(WORK_AREA_COLORS.length)
+      const jadeIndex = WORK_AREA_COLORS.findIndex((c) => c.name === 'jade')
+      expect(swatches()[jadeIndex]).toHaveFocus()
+    })
+
+    it('folds again on a choice and returns focus to Change', () => {
+      const onChange = vi.fn()
+      const { rerender } = render(<ColorPicker value="jade" takenBy={[]} onChange={onChange} />)
+
+      openPalette()
+      fireEvent.click(swatches()[4])
+      // The parent owns the value; play its part.
+      rerender(<ColorPicker value={WORK_AREA_COLORS[4].name} takenBy={[]} onChange={onChange} />)
+
+      expect(onChange).toHaveBeenCalledWith(WORK_AREA_COLORS[4].name)
+      const change = screen.getByRole('button', { name: 'Change' })
+      expect(change).toHaveFocus()
+      expect(screen.getByRole('img', { name: 'Selected: Color 5 of 30' })).toBeInTheDocument()
+    })
+
+    it('folds on Escape without changing the colour', () => {
+      const onChange = vi.fn()
+      render(<ColorPicker value="jade" takenBy={[]} onChange={onChange} />)
+
+      openPalette()
+      fireEvent.keyDown(swatches()[0], { key: 'Escape' })
+
+      expect(onChange).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
+    })
+
+    it('does not fold on Escape when there is nothing to fold back to', () => {
+      render(<ColorPicker value={null} takenBy={[]} onChange={vi.fn()} />)
+
+      fireEvent.keyDown(swatches()[0], { key: 'Escape' })
+
+      expect(swatches()).toHaveLength(WORK_AREA_COLORS.length)
+    })
+
+    it('keeps the taken-marker hint with the palette, not the folded view', () => {
+      render(
+        <ColorPicker
+          value="jade"
+          takenBy={[{ color: 'rose', name: 'Finish line' }]}
+          onChange={vi.fn()}
+        />
+      )
+      expect(screen.queryByText(/A line through a color/)).not.toBeInTheDocument()
+
+      openPalette()
+
+      expect(screen.getByText(/A line through a color/)).toBeInTheDocument()
+    })
   })
 })
