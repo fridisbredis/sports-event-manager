@@ -162,14 +162,17 @@ export default function StageList({ stages, onChange, guideHref }: Props) {
         </div>
 
         {showStageHelp && (
-          <div id="stage-help" className="border-b border-edge-soft bg-ink px-4 py-4 text-white">
+          <div
+            id="stage-help"
+            className="border-b border-edge-soft bg-tenant-primary-tint px-4 py-4 text-ink"
+          >
             <h3 className="font-semibold">{t('eventConfig.stageHelpTitle')}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-gray-200">
+            <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
               {t('eventConfig.stageHelpBody')}
             </p>
             <Link
               href={guideHref}
-              className="mt-2 inline-flex text-sm font-medium text-cyan-200 underline underline-offset-2 hover:text-white"
+              className="mt-2 inline-flex text-sm font-medium text-tenant-primary underline underline-offset-2 hover:text-tenant-primary-hover"
             >
               {t('eventConfig.stageHelpMore')}
             </Link>
