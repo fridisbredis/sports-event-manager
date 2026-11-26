@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
@@ -27,18 +27,18 @@ interface Props {
 export function LeaveEventSection({ tenantSlug, events }: Props) {
   const { t } = useTranslation('official')
   const [leaving, setLeaving] = useState<LeavableEvent | null>(null)
-  // ConfirmDialog has no pending state of its own; a second tap on its button
-  // while the first is still on its way must not send a second request.
-  const inFlight = useRef(false)
+  // Spinner on the confirm button, and no second tap or dismissal while the
+  // request is on its way.
+  const [pending, setPending] = useState(false)
 
   if (events.length === 0) return null
 
   async function handleConfirm() {
-    if (!leaving || inFlight.current) return
-    inFlight.current = true
+    if (!leaving || pending) return
+    setPending(true)
     // On success the action redirects, so this resolves only with an error.
     const result = await leaveParticipantEvent({ tenantSlug, eventId: leaving.eventId })
-    inFlight.current = false
+    setPending(false)
     setLeaving(null)
     if (result?.error) toastError(result.error)
   }
@@ -75,6 +75,7 @@ export function LeaveEventSection({ tenantSlug, events }: Props) {
         body={t('participant.account.leaveConfirmBody')}
         confirmLabel={t('participant.account.leaveConfirm')}
         cancelLabel={t('participant.account.leaveCancel')}
+        isPending={pending}
         destructive
       />
     </>
