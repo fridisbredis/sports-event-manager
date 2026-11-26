@@ -181,8 +181,14 @@ test.describe('EVT-02 event configuration', () => {
       dialog.getByText('You have unsaved changes. If you leave, your changes will be lost.')
     ).toBeVisible()
 
+    // This form can save from the dialog, so it offers Save instead of Stay
+    // (N76); closing the dialog is how the user stays.
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Stay' })).toHaveCount(0)
+
     // Staying keeps both the page and the edit.
-    await dialog.getByRole('button', { name: 'Stay' }).click()
+    await page.keyboard.press('Escape')
+    await expect(dialog).not.toBeVisible()
     await expect(page).toHaveURL(new RegExp(`/${SEED_TENANT_SLUG}/admin/${EVENT_SEGMENT}/event$`))
     await expect(name).toHaveValue(`${original} unsaved`)
 

@@ -6,7 +6,7 @@ import { LinkButton } from '@/components/ui/link-button'
 import { Input, Textarea } from '@/components/ui/form-fields'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
-import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import { saveInTransition, useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import ConfirmDialog from '@/components/confirm-dialog'
 import { updateWorkstation, deleteWorkstation } from '../../actions'
@@ -69,7 +69,13 @@ export default function WorkstationEditForm({
     markClean,
     guardedNavigate,
     dialogProps,
-  } = useUnsavedChanges()
+  } = useUnsavedChanges({
+    onSave: () => {
+      if (!validate()) return Promise.resolve(false)
+      setSaveSuccess(false)
+      return saveInTransition(startSave, save)
+    },
+  })
 
   const stageId = initialStageId ?? '__all__'
   const selectedStage = stages.find((s) => s.id === stageId) ?? null
@@ -215,37 +221,41 @@ export default function WorkstationEditForm({
     return Object.keys(newErrors).length === 0
   }
 
+  async function save(): Promise<boolean> {
+    const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
+
+    const result = await updateWorkstation({
+      tenantSlug,
+      tenantId,
+      workstationId,
+      stageId: stageId === '__all__' ? null : stageId,
+      name,
+      description,
+      capacity,
+      color,
+      recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
+      windows: finalWindows,
+      todos: todos
+        .map((item) => ({ ...item, text: item.text.trim() }))
+        .filter((item) => item.text)
+        .map((item) => ({ instruction_text: item.text, item_type: item.itemType })),
+      schedulingGranularityMin,
+    })
+
+    if (result.error) {
+      toastError(result.error)
+      return false
+    }
+    setSaveSuccess(true)
+    markClean()
+    return true
+  }
+
   function handleSave() {
     if (!validate()) return
     setSaveSuccess(false)
-
     startSave(async () => {
-      const finalWindows = expandWindows(windows, stageDays, allocableRange?.start ?? null)
-
-      const result = await updateWorkstation({
-        tenantSlug,
-        tenantId,
-        workstationId,
-        stageId: stageId === '__all__' ? null : stageId,
-        name,
-        description,
-        capacity,
-        color,
-        recurring: isMultiDay && windows.some((w) => w.limitToDay === null),
-        windows: finalWindows,
-        todos: todos
-          .map((item) => ({ ...item, text: item.text.trim() }))
-          .filter((item) => item.text)
-          .map((item) => ({ instruction_text: item.text, item_type: item.itemType })),
-        schedulingGranularityMin,
-      })
-
-      if (result.error) {
-        toastError(result.error)
-      } else {
-        setSaveSuccess(true)
-        markClean()
-      }
+      await save()
     })
   }
 

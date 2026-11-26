@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useUnsavedChanges } from './use-unsaved-changes'
+import { saveInTransition, useUnsavedChanges } from './use-unsaved-changes'
 import { useRouter } from 'next/navigation'
 
 vi.mock('next/navigation', () => ({
@@ -208,5 +208,142 @@ describe('useUnsavedChanges', () => {
     expect(result.current.dialogProps.open).toBe(false)
 
     document.body.removeChild(anchor)
+  })
+
+  describe('onSave', () => {
+    it('offers no save in the dialog when the form passes no onSave', () => {
+      mockRouter()
+      const { result } = renderHook(() => useUnsavedChanges())
+
+      expect(result.current.dialogProps.onSave).toBeUndefined()
+    })
+
+    it('continues the pending navigation once the save succeeds', async () => {
+      const { push } = mockRouter()
+      const onSave = vi.fn().mockResolvedValue(true)
+      const onDiscard = vi.fn()
+      const { result } = renderHook(() => useUnsavedChanges({ onSave, onDiscard }))
+
+      act(() => result.current.markDirty())
+      act(() => result.current.guardedNavigate('/next'))
+      await act(async () => result.current.dialogProps.onSave!())
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+      expect(onDiscard).not.toHaveBeenCalled()
+      expect(push).toHaveBeenCalledWith('/next')
+      expect(result.current.isDirty).toBe(false)
+      expect(result.current.dialogProps.open).toBe(false)
+      expect(result.current.dialogProps.isSaving).toBe(false)
+    })
+
+    it('continues a back-navigation once the save succeeds', async () => {
+      mockRouter()
+      const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+      const { result } = renderHook(() =>
+        useUnsavedChanges({ onSave: vi.fn().mockResolvedValue(true) })
+      )
+
+      act(() => result.current.markDirty())
+      act(() => {
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      })
+      await act(async () => result.current.dialogProps.onSave!())
+
+      expect(backSpy).toHaveBeenCalledTimes(1)
+      backSpy.mockRestore()
+    })
+
+    it('reports isSaving while the save runs', async () => {
+      mockRouter()
+      let finish: (saved: boolean) => void = () => {}
+      const onSave = vi.fn(() => new Promise<boolean>((resolve) => (finish = resolve)))
+      const { result } = renderHook(() => useUnsavedChanges({ onSave }))
+
+      act(() => result.current.markDirty())
+      act(() => result.current.guardedNavigate('/next'))
+      let pending: Promise<void> | undefined
+      act(() => {
+        pending = result.current.dialogProps.onSave!() as unknown as Promise<void>
+      })
+      expect(result.current.dialogProps.isSaving).toBe(true)
+
+      await act(async () => {
+        finish(true)
+        await pending
+      })
+      expect(result.current.dialogProps.isSaving).toBe(false)
+    })
+
+    it('stays on the page, still dirty, when the save fails', async () => {
+      const { push } = mockRouter()
+      const { result } = renderHook(() =>
+        useUnsavedChanges({ onSave: vi.fn().mockResolvedValue(false) })
+      )
+
+      act(() => result.current.markDirty())
+      act(() => result.current.guardedNavigate('/next'))
+      await act(async () => result.current.dialogProps.onSave!())
+
+      expect(push).not.toHaveBeenCalled()
+      expect(result.current.isDirty).toBe(true)
+      expect(result.current.dialogProps.open).toBe(false)
+    })
+
+    it('treats a thrown save as failed instead of navigating away', async () => {
+      const { push } = mockRouter()
+      const { result } = renderHook(() =>
+        useUnsavedChanges({ onSave: vi.fn().mockRejectedValue(new Error('boom')) })
+      )
+
+      act(() => result.current.markDirty())
+      act(() => result.current.guardedNavigate('/next'))
+      await act(async () => result.current.dialogProps.onSave!())
+
+      expect(push).not.toHaveBeenCalled()
+      expect(result.current.dialogProps.open).toBe(false)
+      expect(result.current.dialogProps.isSaving).toBe(false)
+    })
+
+    it('does not carry a failed save’s navigation over to a later leave', async () => {
+      const { push } = mockRouter()
+      const { result } = renderHook(() =>
+        useUnsavedChanges({ onSave: vi.fn().mockResolvedValue(false) })
+      )
+
+      act(() => result.current.markDirty())
+      act(() => result.current.guardedNavigate('/first'))
+      await act(async () => result.current.dialogProps.onSave!())
+      act(() => result.current.guardedNavigate('/second'))
+      act(() => result.current.dialogProps.onLeave())
+
+      expect(push).toHaveBeenCalledTimes(1)
+      expect(push).toHaveBeenCalledWith('/second')
+    })
+  })
+})
+
+describe('saveInTransition', () => {
+  const runNow = ((cb: () => unknown) => {
+    void cb()
+  }) as never
+
+  it('resolves with what the save returned', async () => {
+    await expect(saveInTransition(runNow, async () => true)).resolves.toBe(true)
+    await expect(saveInTransition(runNow, async () => false)).resolves.toBe(false)
+  })
+
+  it('resolves false when the save throws, so the dialog does not wait forever', async () => {
+    let rethrown: unknown
+    const capture = ((cb: () => Promise<unknown>) => {
+      cb().catch((e) => (rethrown = e))
+    }) as never
+
+    await expect(
+      saveInTransition(capture, async () => {
+        throw new Error('boom')
+      })
+    ).resolves.toBe(false)
+    await Promise.resolve()
+    expect(rethrown).toBeInstanceOf(Error)
   })
 })
