@@ -51,7 +51,10 @@
 --             the actor_role/target_type CHECKs from 0037. If non-zero,
 --             leave the wider CHECKs in place rather than deleting audit rows
 --             to make a rollback possible.
---   Data:     <prod snapshot pending — taken before merge>
+--   Data:     prod snapshot 20261126144947_pre-migration_2026-11-26T15-04-06Z.tar.gz
+--             (Azure Blob sportsevtmgrprodsnaps, container db-snapshots),
+--             taken by hand before the push; restore with
+--             scripts/ops/restore-prod-db.sh <that filename>.
 --             On apply, no row is written. At call time the function clears
 --             four columns on one participants row (the same clear an admin
 --             unlink does); a bad body could clear someone else's record.
