@@ -306,6 +306,7 @@
     "checklistHint": "Funktionärer bockar av dessa under sitt pass. Alla på passet ser vem som gjorde det.",
     "addChecklistItem": "+ Lägg till avbockningspunkt",
     "checklistPlaceholder": "t.ex. Samla in tidtagningschip",
+    "notesLabel": "Information",
     "notesHeading": "Anteckningar",
     "notesHint": "Visas för funktionärer som information — inget att bocka av.",
     "addNote": "+ Lägg till anteckning",

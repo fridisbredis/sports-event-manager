@@ -24,7 +24,7 @@ interface ListProps {
   addLabel: string
   placeholder: string
   removeLabel: string
-  /** Small grey label above the heading. Only the first list carries one. */
+  /** Small grey label above the heading, naming the card like its peers. */
   groupLabel?: string
   rows: { draft: TodoDraft; index: number }[]
   /** Renders the leading glyph for this list — a checkbox outline or a dot. */
@@ -58,8 +58,8 @@ function TodoList({
 }: ListProps) {
   return (
     <AppCard as="section">
-      {/* The group label sits above the first list only, naming the pair the
-          way the other column headings name their panels. `section-label`
+      {/* The group label names each card the way the other column headings
+          name their panels. `section-label`
           matches Capacity beside it, so each list reads as a peer panel in
           this column rather than a sub-heading of a combined one. */}
       {groupLabel ? <h2 className="section-label mb-2">{groupLabel}</h2> : null}
@@ -225,6 +225,7 @@ export function TodosEditor({ todos, onChange }: Props) {
         focusIndex={focusIndex}
       />
       <TodoList
+        groupLabel={t('workstations.notesLabel')}
         heading={t('workstations.notesHeading')}
         hint={t('workstations.notesHint')}
         addLabel={t('workstations.addNote')}
