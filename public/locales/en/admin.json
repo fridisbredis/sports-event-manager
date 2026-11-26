@@ -734,6 +734,7 @@
     "featureParticipants": "Participants and Race Results import",
     "featurePublish": "Publish the participant side",
     "featureSmsSenderId": "Own SMS sender name",
+    "featureTournaments": "Tournaments between officials",
     "smsSenderTitle": "SMS sender",
     "smsSenderLabel": "Sender name",
     "smsSenderSave": "Save",
