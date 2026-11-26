@@ -5,7 +5,7 @@ import { AppCard } from '@/components/ui/app-card'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n/client'
 import { toastError } from '@/lib/toast'
-import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
+import { saveInTransition, useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes'
 import UnsavedChangesDialog from '@/components/unsaved-changes-dialog'
 import type { TenantPaletteKey } from '@/lib/theme/tenant-colors'
 import { tenantThemeVars } from '@/lib/theme/tenant-theme-style'
@@ -43,6 +43,7 @@ export function ColorThemeForm({
   // would otherwise follow the admin to the next page and read as saved.
   const { markDirty, markClean, dialogProps } = useUnsavedChanges({
     onDiscard: () => paintTheme(savedPalette),
+    onSave: () => saveInTransition(startSave, save),
   })
 
   // What is being previewed, and what the database holds. Save compares the
@@ -77,26 +78,31 @@ export function ColorThemeForm({
     else markDirty()
   }
 
+  async function save(): Promise<boolean> {
+    const result = await updateTenantColorPalette(
+      tenantSlug,
+      tenantId,
+      colorPalette as TenantPaletteKey
+    )
+    if (result.error) {
+      // Put the preview back to what is actually stored so the page does
+      // not claim a colour the database never took.
+      setColorPalette(savedPalette)
+      paintTheme(savedPalette)
+      setPaletteError(t('settings.colorThemeError'))
+      toastError(t('settings.colorThemeError'))
+      markClean()
+      return false
+    }
+    setSavedPalette(colorPalette)
+    setSaveSuccess(true)
+    markClean()
+    return true
+  }
+
   function handleSave() {
     startSave(async () => {
-      const result = await updateTenantColorPalette(
-        tenantSlug,
-        tenantId,
-        colorPalette as TenantPaletteKey
-      )
-      if (result.error) {
-        // Put the preview back to what is actually stored so the page does
-        // not claim a colour the database never took.
-        setColorPalette(savedPalette)
-        paintTheme(savedPalette)
-        setPaletteError(t('settings.colorThemeError'))
-        toastError(t('settings.colorThemeError'))
-        markClean()
-        return
-      }
-      setSavedPalette(colorPalette)
-      setSaveSuccess(true)
-      markClean()
+      await save()
     })
   }
 
