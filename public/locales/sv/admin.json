@@ -265,6 +265,7 @@
     "colorTakenHint": "En färg med streck över används redan av ett annat arbetsområde (peka för att se vilket).",
     "colorTakenBy": "Används redan av {{name}}",
     "colorSwatchLabel": "Färg {{index}} av {{total}}",
+    "colorChange": "Ändra",
     "colorSelected": "Vald",
     "operatingWindowsLabel": "Öppettider",
     "matchStageHours": "Följ etappens tider",
