@@ -188,7 +188,7 @@
     "stageTimeRange": "Start / end time",
     "stageEndTimeError": "End time must be after start time.",
     "stageVenuePlaceholder": "Optional",
-    "stageResultsUrlLabel": "Results link",
+    "stageResultsUrlLabel": "Link to Race Results",
     "stageResultsUrlPlaceholder": "Optional",
     "stageResultsUrlHint": "Shown to officials on the event info screen.",
     "stageResultsUrlError": "Enter a valid web address, starting with http:// or https://.",

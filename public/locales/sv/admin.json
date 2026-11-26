@@ -188,7 +188,7 @@
     "stageTimeRange": "Start- / sluttid",
     "stageEndTimeError": "Sluttiden måste vara efter starttiden.",
     "stageVenuePlaceholder": "Valfritt",
-    "stageResultsUrlLabel": "Länk till resultat",
+    "stageResultsUrlLabel": "Länk till Race Results",
     "stageResultsUrlPlaceholder": "Valfritt",
     "stageResultsUrlHint": "Visas för funktionärer på sidan med evenemangsinfo.",
     "stageResultsUrlError": "Ange en giltig webbadress som börjar med http:// eller https://.",
