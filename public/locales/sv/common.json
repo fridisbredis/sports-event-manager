@@ -140,5 +140,58 @@
     "groupLabel": "Kontakt vid nödfall (ICE)",
     "visibilityNote": "Bara arrangörerna kan se detta.",
     "invalidPhone": "Ange ett giltigt telefonnummer, t.ex. 070 123 45 67 eller +46 70 123 45 67."
+  },
+  "feedback": {
+    "title": "Feedback",
+    "intro": "Ställ en fråga, rapportera ett fel eller föreslå en förbättring. Feedbacken går till dem som bygger appen, inte till arrangören.",
+    "type": {
+      "question": "Fråga",
+      "bug": "Felrapport",
+      "feature": "Önskemål"
+    },
+    "typeHint": {
+      "question": "Något du undrar över",
+      "bug": "Något som inte fungerar",
+      "feature": "Något du skulle vilja ha"
+    },
+    "status": {
+      "new": "Ny",
+      "in_progress": "Pågår",
+      "done": "Klar",
+      "declined": "Avböjd"
+    },
+    "form": {
+      "typeLabel": "Vad gäller det?",
+      "typeRequired": "Välj vad din feedback gäller.",
+      "titleLabel": "Rubrik",
+      "titlePlaceholder": "En kort sammanfattning",
+      "titleRequired": "Ge din feedback en rubrik.",
+      "bodyLabel": "Meddelande",
+      "bodyPlaceholder": {
+        "default": "Berätta mer",
+        "question": "Vad vill du veta?",
+        "bug": "Vad gjorde du, vad hände och vad hade du väntat dig?",
+        "feature": "Vad vill du ha, och vad skulle det hjälpa dig med?"
+      },
+      "bodyRequired": "Skriv ett meddelande.",
+      "imageLabel": "Bild",
+      "optional": "(valfritt)",
+      "imageChoose": "Bifoga en bild",
+      "imageRemove": "Ta bort bilden",
+      "imagePreviewAlt": "Den bifogade bilden",
+      "imageHint": "En skärmdump hjälper ofta. PNG, JPG eller WebP, högst 5 MB.",
+      "imageWrongType": "Bilden måste vara en PNG-, JPG- eller WebP-fil.",
+      "imageTooLarge": "Bilden är större än 5 MB.",
+      "submit": "Skicka feedback",
+      "sent": "Tack! Din feedback är skickad.",
+      "errorRate": "Du har skickat mycket feedback på kort tid. Vänta några minuter.",
+      "errorGeneric": "Din feedback kunde inte skickas. Försök igen."
+    },
+    "mine": {
+      "title": "Din feedback",
+      "empty": "Du har inte skickat någon feedback än.",
+      "loadFailed": "Din feedback kunde inte laddas. Ladda om sidan.",
+      "imageAttached": "Bild bifogad"
+    }
   }
 }

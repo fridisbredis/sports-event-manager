@@ -140,5 +140,58 @@
     "groupLabel": "Emergency (ICE) contact",
     "visibilityNote": "Only the organisers can see this.",
     "invalidPhone": "Enter a valid phone number, e.g. 070 123 45 67 or +46 70 123 45 67."
+  },
+  "feedback": {
+    "title": "Feedback",
+    "intro": "Ask a question, report a bug or suggest an improvement. Feedback goes to the people who build the app, not to your organisers.",
+    "type": {
+      "question": "Question",
+      "bug": "Bug report",
+      "feature": "Feature request"
+    },
+    "typeHint": {
+      "question": "Something you are wondering about",
+      "bug": "Something that does not work",
+      "feature": "Something you would like to see"
+    },
+    "status": {
+      "new": "New",
+      "in_progress": "In progress",
+      "done": "Done",
+      "declined": "Declined"
+    },
+    "form": {
+      "typeLabel": "What is it about?",
+      "typeRequired": "Choose what your feedback is about.",
+      "titleLabel": "Title",
+      "titlePlaceholder": "A short summary",
+      "titleRequired": "Give your feedback a title.",
+      "bodyLabel": "Message",
+      "bodyPlaceholder": {
+        "default": "Tell us more",
+        "question": "What would you like to know?",
+        "bug": "What did you do, what happened, and what did you expect?",
+        "feature": "What would you like, and what would it help you with?"
+      },
+      "bodyRequired": "Write a message.",
+      "imageLabel": "Image",
+      "optional": "(optional)",
+      "imageChoose": "Attach an image",
+      "imageRemove": "Remove image",
+      "imagePreviewAlt": "The attached image",
+      "imageHint": "A screenshot often helps. PNG, JPG or WebP, up to 5 MB.",
+      "imageWrongType": "The image must be a PNG, JPG or WebP file.",
+      "imageTooLarge": "The image is larger than 5 MB.",
+      "submit": "Send feedback",
+      "sent": "Thank you! Your feedback has been sent.",
+      "errorRate": "You have sent a lot of feedback in a short time. Please wait a few minutes.",
+      "errorGeneric": "Your feedback could not be sent. Please try again."
+    },
+    "mine": {
+      "title": "Your feedback",
+      "empty": "You have not sent any feedback yet.",
+      "loadFailed": "Your feedback could not be loaded. Please reload the page.",
+      "imageAttached": "Image attached"
+    }
   }
 }
