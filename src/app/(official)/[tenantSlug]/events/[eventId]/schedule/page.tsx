@@ -4,6 +4,7 @@ import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { getServerTranslation } from '@/lib/i18n/server'
 import { getUserLanguage } from '@/lib/i18n/user-language'
 import { ScheduleView, type AssignmentRow, type CheckMap } from './_components/schedule-view'
+import type { MyTask } from './_components/my-tasks'
 import { checkReadCeiling } from '@/lib/db/bounded-read'
 import { logger } from '@/lib/logger'
 import type { PostgrestError } from '@supabase/supabase-js'
@@ -430,6 +431,47 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     }
   }
 
+  // N72: the tasks this official is assigned to. `mine` is an inner join on
+  // their own assignee row that only filters; the second, plain embed lists
+  // everyone on the task (RLS: assignee_read_task_assignees), so the card can
+  // say who they share it with. Fatal on error, like the check read above:
+  // rendering no tasks would tell an official they have nothing to do.
+  const myTasks: MyTask[] = []
+  if (officialId) {
+    const { data: taskRows, error: tasksError } = await supabase
+      .from('tasks')
+      .select(
+        'id, name, description, color, starts_at, deadline, done, done_at, done_by, done_by_name, event_stages!tasks_stage_tenant_fkey(name), mine:task_assignees!inner(official_id), task_assignees(official_id, officials!task_assignees_official_tenant_fkey(name))'
+      )
+      .eq('tenant_id', tenant.id)
+      .eq('event_id', eventId)
+      .eq('mine.official_id', officialId)
+      .order('deadline', { ascending: true })
+
+    if (tasksError) throw tasksError
+
+    for (const row of taskRows ?? []) {
+      myTasks.push({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        color: row.color,
+        stageName: row.event_stages?.name ?? '',
+        starts_at: row.starts_at,
+        deadline: row.deadline,
+        doneCheck:
+          row.done && row.done_at
+            ? { checked_by: row.done_by, checked_at: row.done_at, actorName: row.done_by_name }
+            : null,
+        coAssignees: (row.task_assignees ?? [])
+          .filter((a) => a.official_id !== officialId)
+          .map((a) => a.officials?.name ?? '')
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b)),
+      })
+    }
+  }
+
   const eventDates = eventDatesPromise ? await eventDatesPromise : null
 
   const strings = {
@@ -487,6 +529,14 @@ export default async function SchedulePage({ params, searchParams }: Props) {
       shiftPeers={shiftPeers}
       allTimeOff={allTimeOff}
       eventDates={eventDates}
+      myTasks={myTasks}
+      myTasksStrings={{
+        title: t('myTasks.title'),
+        overdue: t('myTasks.overdue'),
+        withYou: t('myTasks.withYou'),
+        markDone: t('myTasks.markDone'),
+        doneBy: t('myTasks.doneBy'),
+      }}
     />
   )
 }

@@ -63,6 +63,13 @@
     "timeOffClash": "Du har angett att du är ledig den här tiden",
     "timeOffClashAdmin": "Arrangörerna har satt dig som ledig den här tiden"
   },
+  "myTasks": {
+    "title": "Mina uppgifter",
+    "overdue": "Försenad",
+    "withYou": "Med dig på uppgiften: {{names}}",
+    "markDone": "Uppgiften är klar",
+    "doneBy": "Klarmarkerad av {{name}} kl. {{time}}"
+  },
   "announcements": {
     "title": "Meddelanden",
     "noAnnouncements": "Inga meddelanden än",

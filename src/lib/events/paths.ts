@@ -7,6 +7,7 @@ export type AdminEventSegment =
   | 'dashboard'
   | 'event'
   | 'workstations'
+  | 'tasks'
   | 'officials'
   | 'participants'
   | 'scheduling'

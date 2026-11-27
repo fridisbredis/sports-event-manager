@@ -63,9 +63,25 @@ interface Props {
   check: ChecklistCheck | null
   color: WorkAreaColor
   tenantSlug: string
-  workstationId: string
-  timeslotStart: string
-  timeslotEnd: string
+  /**
+   * The shift the check belongs to — required for a work area checklist,
+   * whose ticks are scoped per shift. Left out by an N72 task checklist,
+   * which passes `onToggle` instead.
+   */
+  workstationId?: string
+  timeslotStart?: string
+  timeslotEnd?: string
+  /**
+   * N72: writes the tick somewhere other than the per-shift checklist (a
+   * task's item). The row's behaviour — optimistic tick, confirm before
+   * clearing a colleague's tick — is the same either way.
+   */
+  onToggle?: (checked: boolean) => Promise<{ error?: string }>
+  /**
+   * Strike the text through once ticked. Off for a statement rather than a
+   * to-do — N72's "The task is done" row would read as withdrawn.
+   */
+  strikeWhenChecked?: boolean
   /** The viewer, to tell "you checked this" from "a colleague did". */
   currentUserId: string | null
   /**
@@ -108,6 +124,8 @@ export function ChecklistItemRow({
   workstationId,
   timeslotStart,
   timeslotEnd,
+  onToggle,
+  strikeWhenChecked = true,
   currentUserId,
   labelWithTime = false,
   strings,
@@ -148,14 +166,16 @@ export function ChecklistItemRow({
     setError(null)
     startTransition(async () => {
       setOptimisticChecked(nextChecked)
-      const result = await toggleChecklistItem({
-        tenantSlug,
-        todoId: todo.id,
-        workstationId,
-        timeslotStart,
-        timeslotEnd,
-        checked: nextChecked,
-      })
+      const result = onToggle
+        ? await onToggle(nextChecked)
+        : await toggleChecklistItem({
+            tenantSlug,
+            todoId: todo.id,
+            workstationId: workstationId ?? '',
+            timeslotStart: timeslotStart ?? '',
+            timeslotEnd: timeslotEnd ?? '',
+            checked: nextChecked,
+          })
       // On success the row re-renders from the server's own state after
       // revalidatePath, inside this same transition, so the optimistic value
       // hands over to the real one without a flicker back.
@@ -186,7 +206,7 @@ export function ChecklistItemRow({
         aria-busy={isPending || undefined}
         onChange={(e) => handleChange(e.target.checked)}
         aria-label={
-          labelWithTime
+          labelWithTime && timeslotStart && timeslotEnd
             ? `${strings.toggleLabel}: ${todo.instruction_text}, ${formatTimeOfDay(
                 timeslotStart,
                 language
@@ -197,7 +217,7 @@ export function ChecklistItemRow({
       />
       <span className="min-w-0 flex-1">
         <span
-          className={`block text-sm ${isChecked ? 'text-gray-400 line-through' : 'text-gray-700'}`}
+          className={`block text-sm ${isChecked && strikeWhenChecked ? 'text-gray-400 line-through' : 'text-gray-700'}`}
         >
           {todo.instruction_text}
         </span>

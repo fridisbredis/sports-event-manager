@@ -68,7 +68,8 @@
     "infoSectionBodyTooLong": "Keep the text to 4,000 characters or fewer.",
     "infoSectionLinkInvalid": "Enter a web address starting with http:// or https://.",
     "infoSectionNeedsContent": "Add text, an image or a link.",
-    "participantEntryGone": "That event is no longer on your account. Refresh the page."
+    "participantEntryGone": "That event is no longer on your account. Refresh the page.",
+    "taskStartAfterDeadline": "The start must be before the deadline."
   },
   "notFoundPage": {
     "eyebrow": "No result",

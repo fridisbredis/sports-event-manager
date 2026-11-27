@@ -1,0 +1,58 @@
+import { redirect, notFound } from 'next/navigation'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
+import TasksList from './_components/tasks-list'
+import { fetchAssignableOfficials, fetchTaskListItems } from './_load-list'
+
+interface Props {
+  params: Promise<{ tenantSlug: string; eventId: string }>
+}
+
+// N72: the admin's Tasks page. Read uncached through the admin's own session
+// (RLS: tenant_admin_manage_*), for the same reason the work areas page reads
+// uncached — an admin must see their own save on the very next render.
+export default async function TasksPage({ params }: Props) {
+  const { tenantSlug, eventId } = await params
+
+  const user = await getCurrentUser()
+  if (!user) redirect('/login')
+
+  const tenant = await getAdminTenant(tenantSlug)
+  if (!tenant) notFound()
+
+  const supabase = await createSupabaseServerClient()
+
+  const { data: event } = await supabase
+    .from('events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('tenant_id', tenant.id)
+    .maybeSingle()
+
+  if (!event) notFound()
+
+  const [{ data: stages, error: stagesError }, items, officials] = await Promise.all([
+    supabase
+      .from('event_stages')
+      .select('id, name, stage_type, start_time, end_time')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true }),
+    fetchTaskListItems(supabase, tenant.id, event.id),
+    fetchAssignableOfficials(supabase, tenant.id, event.id),
+  ])
+
+  if (stagesError) throw stagesError
+
+  return (
+    <div className="px-4 py-6 md:px-8 md:py-8">
+      <TasksList
+        tenantId={tenant.id}
+        eventId={event.id}
+        stages={stages ?? []}
+        tasks={items}
+        officials={officials}
+      />
+    </div>
+  )
+}

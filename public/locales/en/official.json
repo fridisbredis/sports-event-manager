@@ -63,6 +63,13 @@
     "timeOffClash": "You said you were away at this time",
     "timeOffClashAdmin": "The organisers marked you away at this time"
   },
+  "myTasks": {
+    "title": "My tasks",
+    "overdue": "Overdue",
+    "withYou": "With you on this task: {{names}}",
+    "markDone": "The task is done",
+    "doneBy": "Marked done by {{name}} at {{time}}"
+  },
   "announcements": {
     "title": "Announcements",
     "noAnnouncements": "No announcements yet",

@@ -13,6 +13,9 @@ import { getUserLanguage } from '@/lib/i18n/user-language'
 import { EmptyStateCard } from '@/components/ui/empty-state'
 import { Monitor } from 'lucide-react'
 import type { UnavailabilityPeriod } from '@/lib/scheduling/unavailability'
+import { StageTasksBlock } from './_components/stage-tasks-block'
+import { fetchAssignableOfficials, fetchTaskListItems } from '../tasks/_load-list'
+import { isOverdue } from '@/lib/tasks/time'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -166,12 +169,24 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
         ? today
         : selectedStageDays[0]
 
-  const [assignments, unavailability] = selectedDay
-    ? await Promise.all([
-        fetchAssignmentsForDay(supabase, tenant.id, event.id, selectedDay),
-        fetchUnavailabilityForDay(supabase, tenant.id, selectedDay),
-      ])
-    : [[], []]
+  // N72: the selected stage's tasks, for the block below the grid. Read with
+  // the day's assignments rather than after them; the stage is what scopes it.
+  const [[assignments, unavailability], stageTasks, taskOfficials] = await Promise.all([
+    selectedDay
+      ? Promise.all([
+          fetchAssignmentsForDay(supabase, tenant.id, event.id, selectedDay),
+          fetchUnavailabilityForDay(supabase, tenant.id, selectedDay),
+        ])
+      : Promise.resolve([[], []] as [
+          Awaited<ReturnType<typeof fetchAssignmentsForDay>>,
+          UnavailabilityPeriod[],
+        ]),
+    selectedStage
+      ? fetchTaskListItems(supabase, tenant.id, event.id, selectedStage.id)
+      : Promise.resolve([]),
+    // For the task dialog's assignee picker.
+    fetchAssignableOfficials(supabase, tenant.id, event.id),
+  ])
 
   // N18: the phone-shaped read-only view, rendered alongside the grid and
   // swapped by a CSS breakpoint rather than by sniffing the device — one
@@ -226,6 +241,16 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
             description={t('scheduling.mobileUpgradeBody')}
           />
         )}
+        {selectedStage && (
+          <StageTasksBlock
+            tenantId={tenant.id}
+            eventId={event.id}
+            stageId={selectedStage.id}
+            stageName={selectedStage.name}
+            tasks={stageTasks}
+            readOnly
+          />
+        )}
       </div>
 
       <div className="hidden px-8 py-8 md:block">
@@ -241,7 +266,22 @@ export default async function SchedulingPage({ params, searchParams }: Props) {
           unavailability={unavailability}
           initialSelectedDay={selectedDay ?? ''}
           initialSelectedStageId={selectedStage?.id ?? ''}
+          taskCount={stageTasks.length}
+          overdueTaskCount={stageTasks.filter((task) => isOverdue(task)).length}
         />
+        {/* Keyed by stage so its ticks start from the server's state when the
+            grid switches stage, instead of carrying the last stage's over. */}
+        {selectedStage && (
+          <StageTasksBlock
+            key={selectedStage.id}
+            tenantId={tenant.id}
+            eventId={event.id}
+            stageId={selectedStage.id}
+            stageName={selectedStage.name}
+            tasks={stageTasks}
+            officials={taskOfficials}
+          />
+        )}
       </div>
     </>
   )
