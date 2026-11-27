@@ -100,6 +100,27 @@ describe('featuresForTier', () => {
   })
 })
 
+// The system admin tenant view builds the label key from the feature name
+// (tenant-detail.tsx: `systemAdmin.feature${Capitalised}`), so the string
+// never appears in the code and a missing key renders as raw text. This is
+// how 'tournaments' (ADR-0005) shipped without a label.
+describe('feature labels', () => {
+  const labelKey = (feature: string) =>
+    `feature${feature.charAt(0).toUpperCase()}${feature.slice(1)}`
+
+  for (const locale of ['en', 'sv']) {
+    it(`has a systemAdmin label for every tier feature in ${locale}`, () => {
+      const admin = JSON.parse(
+        readFileSync(join(process.cwd(), `public/locales/${locale}/admin.json`), 'utf8')
+      ) as { systemAdmin: Record<string, unknown> }
+      const missing = Object.keys(TIER_FEATURES)
+        .map(labelKey)
+        .filter((key) => typeof admin.systemAdmin[key] !== 'string')
+      expect(missing).toEqual([])
+    })
+  }
+})
+
 describe('monthlySmsCap', () => {
   it('returns the cap for each tier', () => {
     expect(monthlySmsCap('standard')).toBe(100)
