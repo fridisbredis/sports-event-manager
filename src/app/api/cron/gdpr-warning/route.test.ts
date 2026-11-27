@@ -4,6 +4,7 @@ import { POST } from './route'
 import { createSupabaseServiceClient } from '@/lib/supabase/server'
 import twilio from 'twilio'
 import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
+import { removeExpiredFeedback } from '@/lib/gdpr/feedback-cleanup'
 import { checkBackupFreshness } from '@/lib/backup/check-freshness'
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -21,6 +22,10 @@ vi.mock('@/lib/sms/usage', () => ({
 
 vi.mock('@/lib/gdpr/avatar-cleanup', () => ({
   removeExpiredAvatars: vi.fn(),
+}))
+
+vi.mock('@/lib/gdpr/feedback-cleanup', () => ({
+  removeExpiredFeedback: vi.fn(),
 }))
 
 vi.mock('@/lib/backup/check-freshness', () => ({
@@ -82,6 +87,7 @@ beforeEach(() => {
   messagesCreate.mockResolvedValue({})
   vi.mocked(twilio).mockReturnValue({ messages: { create: messagesCreate } } as never)
   vi.mocked(removeExpiredAvatars).mockResolvedValue({ cleared: 0, failed: 0, listFailed: false })
+  vi.mocked(removeExpiredFeedback).mockResolvedValue({ deleted: 0, failed: 0, listFailed: false })
   vi.mocked(checkBackupFreshness).mockResolvedValue({ status: 'unconfigured' })
 })
 
@@ -170,8 +176,45 @@ describe('POST /api/cron/gdpr-warning — B18 avatar cleanup', () => {
       failed: 0,
       unmarked: 0,
       avatars: { cleared: 2, failed: 1, listFailed: false },
+      feedback: { deleted: 0, failed: 0, listFailed: false },
       backup: { status: 'unconfigured' },
     })
+  })
+})
+
+// N80: the same tick deletes expired feedback (rows and images).
+describe('POST /api/cron/gdpr-warning — N80 feedback cleanup', () => {
+  it('does not touch feedback when the cron secret is wrong', async () => {
+    const request = new NextRequest('http://localhost/api/cron/gdpr-warning', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer wrong' },
+    })
+
+    await POST(request)
+
+    expect(removeExpiredFeedback).not.toHaveBeenCalled()
+  })
+
+  it('still deletes feedback when SMS is not configured', async () => {
+    delete process.env.TWILIO_PHONE_NUMBER
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({ officials: [], tenants: { data: [] } }) as never
+    )
+
+    await POST(makeRequest())
+
+    expect(removeExpiredFeedback).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the result alongside the warnings', async () => {
+    vi.mocked(removeExpiredFeedback).mockResolvedValue({ deleted: 3, failed: 1, listFailed: false })
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceWith({ officials: [], tenants: { data: [] } }) as never
+    )
+
+    const response = await POST(makeRequest())
+
+    expect((await response.json()).feedback).toEqual({ deleted: 3, failed: 1, listFailed: false })
   })
 })
 

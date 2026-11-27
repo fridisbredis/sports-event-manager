@@ -7,6 +7,7 @@ import { logQueryError } from '@/lib/db/query-error'
 import { recordSmsUsage } from '@/lib/sms/usage'
 import { resolveSmsSender } from '@/lib/sms/sender'
 import { removeExpiredAvatars } from '@/lib/gdpr/avatar-cleanup'
+import { removeExpiredFeedback } from '@/lib/gdpr/feedback-cleanup'
 import { checkBackupFreshness } from '@/lib/backup/check-freshness'
 
 // SEC-09: triggered daily by the gdpr-warning-sms-trigger pg_cron job (migration
@@ -20,6 +21,10 @@ import { checkBackupFreshness } from '@/lib/backup/check-freshness'
 // SMS configuration check, so a Twilio problem cannot keep a photo past the
 // retention limit. Its failures are logged and retried on the next tick; they
 // never stop the warnings.
+//
+// N80: likewise, the same tick deletes the feedback (rows and images) of
+// everyone inactive for 24+ months (src/lib/gdpr/feedback-cleanup.ts). Same
+// placement and failure handling as the photos, for the same reason.
 //
 // N46: the same tick also checks that the weekly prod backup is still landing
 // (src/lib/backup/check-freshness.ts). It has nothing to do with GDPR — it is
@@ -35,6 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   const avatars = await removeExpiredAvatars(createSupabaseServiceClient())
+  const feedback = await removeExpiredFeedback(createSupabaseServiceClient())
   const backup = await checkBackupFreshness()
 
   const fromNumber = process.env.TWILIO_PHONE_NUMBER
@@ -222,5 +228,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, sent, failed, unmarked, avatars, backup })
+  return NextResponse.json({ ok: true, sent, failed, unmarked, avatars, feedback, backup })
 }
