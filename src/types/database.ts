@@ -1790,7 +1790,7 @@ export type Database = {
         Returns: {
           feedback_id: string
           feedback_tenant_id: string
-          image_path: string | null
+          image_path: string
         }[]
       }
       mark_official_event_seen: {
