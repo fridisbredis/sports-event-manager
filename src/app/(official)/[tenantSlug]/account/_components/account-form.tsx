@@ -15,6 +15,7 @@ import { Switch } from '@heroui/react'
 import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { LogoutButton } from '@/components/logout-button'
+import { FeedbackLinkCard } from '@/components/feedback/feedback-link-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { useTranslation } from '@/lib/i18n/client'
 import { useAutosave } from '@/lib/hooks/use-autosave'
@@ -54,6 +55,11 @@ interface AccountFormProps {
   vapidPublicKey?: string | null
   /** N37: the user's own ICE contact, or null when none is stored. */
   iceContact?: IceContact | null
+  /**
+   * N71: the Feedback page. Only the official account page passes it; an
+   * admin has Feedback in the sidebar.
+   */
+  feedbackHref?: string | null
 }
 
 export default function AccountForm({
@@ -71,6 +77,7 @@ export default function AccountForm({
   otherOrganisations = [],
   vapidPublicKey = null,
   iceContact = null,
+  feedbackHref = null,
 }: AccountFormProps) {
   const { t } = useTranslation(i18nNamespace)
   // The section heading is shared with every other language control in the
@@ -475,6 +482,8 @@ export default function AccountForm({
 
             A plain <a> with target="_blank", matching the invite forms: the
             page is a document to read, not a step in this screen's flow. */}
+        {feedbackHref && <FeedbackLinkCard href={feedbackHref} />}
+
         <p className={`section-label ${isDesktop ? 'mb-3.5' : 'mb-2.5'}`}>
           {t('account.privacyHeading')}
         </p>

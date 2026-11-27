@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/form-fields'
 import { AppCard } from '@/components/ui/app-card'
 import { CARD_SURFACE } from '@/components/ui/card-styles'
 import { LogoutButton } from '@/components/logout-button'
+import { FeedbackLinkCard } from '@/components/feedback/feedback-link-card'
 import { IceContactFields } from '@/components/ice-contact-fields'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/lib/i18n/client'
@@ -288,6 +289,8 @@ export function ParticipantAccountForm({
           </Link>
         </>
       ) : null}
+
+      <FeedbackLinkCard href={`/${tenantSlug}/participant/feedback`} />
 
       <p className="section-label mb-2.5">{t('account.privacyHeading')}</p>
       <a

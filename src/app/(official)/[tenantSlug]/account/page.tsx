@@ -93,6 +93,7 @@ export default async function OfficialAccountPage({ params }: Props) {
         // env var on the Container App needs neither.
         vapidPublicKey={process.env.VAPID_PUBLIC_KEY ?? null}
         iceContact={iceContact}
+        feedbackHref={`/${tenantSlug}/feedback`}
       />
     </div>
   )

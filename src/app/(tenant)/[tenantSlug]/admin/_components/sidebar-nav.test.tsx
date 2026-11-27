@@ -84,6 +84,7 @@ describe('SidebarNav support group (N67)', () => {
     expect(groupRows()).toEqual([
       'navigation.account',
       'navigation.helpGuide',
+      'navigation.feedback',
       'navigation.officialView',
       'navigation.systemAdminView',
       'navigation.logOut',
@@ -101,6 +102,7 @@ describe('SidebarNav support group (N67)', () => {
     fireEvent.click(toggle())
     expect(groupRows()).toEqual([
       'navigation.helpGuide',
+      'navigation.feedback',
       'navigation.officialView',
       'navigation.logOut',
     ])
@@ -109,10 +111,23 @@ describe('SidebarNav support group (N67)', () => {
   it.each([
     ['Account', '/seed-klubben/admin/account', 'navigation.account'],
     ['Help and guide', '/seed-klubben/admin/events/e1/help', 'navigation.helpGuide'],
+    ['Feedback', '/seed-klubben/admin/feedback', 'navigation.feedback'],
   ])('opens expanded on %s with the item highlighted', (_, pathname, label) => {
     renderNav(pathname)
     expect(toggle()).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
+  })
+
+  // N71: Feedback is tenant-level, so the link carries the event and the page
+  // the admin was on; a bug report then says where it happened.
+  it('links to Feedback with the current page and event in the query', () => {
+    renderNav('/seed-klubben/admin/events/e1/scheduling')
+    fireEvent.click(toggle())
+    const href = screen.getByRole('link', { name: 'navigation.feedback' }).getAttribute('href')!
+    const url = new URL(href, 'http://localhost')
+    expect(url.pathname).toBe('/seed-klubben/admin/feedback')
+    expect(url.searchParams.get('from')).toBe('/seed-klubben/admin/events/e1/scheduling')
+    expect(url.searchParams.get('event')).toBe('e1')
   })
 
   it('opens when client navigation lands on a support page', () => {

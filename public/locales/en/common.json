@@ -144,6 +144,10 @@
   "feedback": {
     "title": "Feedback",
     "intro": "Ask a question, report a bug or suggest an improvement. Feedback goes to the people who build the app, not to your organisers.",
+    "link": {
+      "title": "Send feedback",
+      "sub": "A question, a bug or an idea — and the status of what you have sent"
+    },
     "type": {
       "question": "Question",
       "bug": "Bug report",

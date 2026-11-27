@@ -144,6 +144,10 @@
   "feedback": {
     "title": "Feedback",
     "intro": "Ställ en fråga, rapportera ett fel eller föreslå en förbättring. Feedbacken går till dem som bygger appen, inte till arrangören.",
+    "link": {
+      "title": "Skicka feedback",
+      "sub": "En fråga, ett fel eller en idé — och status på det du har skickat"
+    },
     "type": {
       "question": "Fråga",
       "bug": "Felrapport",

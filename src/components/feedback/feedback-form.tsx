@@ -157,10 +157,14 @@ export function FeedbackForm({ tenantId, eventId, surface, fromPath }: Props) {
             return (
               <label
                 key={value}
-                className={`flex cursor-pointer items-start gap-3 rounded-control border bg-white p-4 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-tenant-primary ${
+                // The background is set per state only: a shared bg-white
+                // would compete with the tint at equal specificity and win.
+                // The selected card also gets a 1px ring, so its edge reads
+                // as 2px — a clear "this one", not just a recoloured border.
+                className={`flex cursor-pointer items-start gap-3 rounded-control border p-4 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-tenant-primary ${
                   checked
-                    ? 'border-tenant-primary bg-tenant-primary-tint'
-                    : 'border-edge-field hover:border-ink-faint'
+                    ? 'border-tenant-primary bg-tenant-primary-tint ring-1 ring-tenant-primary'
+                    : 'border-edge-field bg-white hover:border-ink-faint'
                 }`}
               >
                 <input
@@ -197,17 +201,22 @@ export function FeedbackForm({ tenantId, eventId, surface, fromPath }: Props) {
         )}
       </fieldset>
 
-      <Input
-        label={t('feedback.form.titleLabel')}
-        labelPlacement="outside"
-        placeholder={t('feedback.form.titlePlaceholder')}
-        value={title}
-        onValueChange={setTitle}
-        maxLength={FEEDBACK_TITLE_MAX}
-        isRequired
-        isInvalid={showErrors && titleMissing}
-        errorMessage={t('feedback.form.titleRequired')}
-      />
+      {/* Wrapped, like the account form's fields: an outside label sits above
+          the input inside the field's own box, so space-y alone leaves the
+          label pressed against the type cards. */}
+      <div className="pt-4">
+        <Input
+          label={t('feedback.form.titleLabel')}
+          labelPlacement="outside"
+          placeholder={t('feedback.form.titlePlaceholder')}
+          value={title}
+          onValueChange={setTitle}
+          maxLength={FEEDBACK_TITLE_MAX}
+          isRequired
+          isInvalid={showErrors && titleMissing}
+          errorMessage={t('feedback.form.titleRequired')}
+        />
+      </div>
 
       <Textarea
         label={t('feedback.form.bodyLabel')}

@@ -4,6 +4,7 @@ import { Paperclip } from 'lucide-react'
 
 import { AppCard } from '@/components/ui/app-card'
 import { useTranslation } from '@/lib/i18n/client'
+import { EVENT_TIME_ZONE } from '@/lib/i18n/date-locale'
 import type { OwnFeedback } from '@/lib/feedback/queries'
 import { FEEDBACK_TYPE_ICON, FeedbackStatusChip } from './feedback-meta'
 
@@ -27,7 +28,12 @@ export function MyFeedbackList({ rows, failed = false }: Props) {
     return <p className="text-sm text-ink-label">{t('feedback.mine.empty')}</p>
   }
 
-  const dateFormat = new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' })
+  // created_at is a real instant, so it is shown in the event time zone, not
+  // the host's — the prod container runs in UTC (B10).
+  const dateFormat = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeZone: EVENT_TIME_ZONE,
+  })
 
   return (
     <ul className="space-y-3">
