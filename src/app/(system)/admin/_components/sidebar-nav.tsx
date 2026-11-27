@@ -11,6 +11,7 @@ import {
   LayoutPanelLeft,
   LogOut,
   Menu,
+  MessageSquareText,
   UserCog,
 } from 'lucide-react'
 import { LogoutButton } from '@/components/logout-button'
@@ -22,6 +23,8 @@ interface Labels {
   systemStatus: string
   /** N25 (SYS-04): the weekly prod backup slots. */
   backups: string
+  /** N71: every tenant's feedback, by type. */
+  feedback: string
   logOut: string
   privacyPolicy: string
   privacyPolicyNewTab: string
@@ -61,10 +64,13 @@ export function SidebarNav({ labels, ownTenants }: Props) {
   const systemStatusActive = pathname.startsWith('/admin/health')
   // SYS-04 (N25): same again.
   const backupsActive = pathname.startsWith('/admin/backups')
+  // N71: same again.
+  const feedbackActive = pathname.startsWith('/admin/feedback')
   const isActive =
     !systemAdminsActive &&
     !systemStatusActive &&
     !backupsActive &&
+    !feedbackActive &&
     (pathname === '/admin' || pathname.startsWith('/admin/'))
 
   // One definition, rendered twice: in the desktop rail and inside the
@@ -125,6 +131,19 @@ export function SidebarNav({ labels, ownTenants }: Props) {
           <DatabaseBackup className="size-[18px] shrink-0" strokeWidth={1.5} />
           <span className="truncate" title={labels.backups}>
             {labels.backups}
+          </span>
+        </Link>
+        <Link
+          href="/admin/feedback"
+          aria-current={feedbackActive ? 'page' : undefined}
+          onClick={onNavigate}
+          className={`flex items-center gap-3 px-6 py-2.5 text-[15px] transition-colors ${
+            feedbackActive ? ACTIVE_ITEM : IDLE_ITEM
+          }`}
+        >
+          <MessageSquareText className="size-[18px] shrink-0" strokeWidth={1.5} />
+          <span className="truncate" title={labels.feedback}>
+            {labels.feedback}
           </span>
         </Link>
         {/* B19: the tenants where this person holds a role of their own. A

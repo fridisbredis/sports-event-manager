@@ -5,6 +5,9 @@ import { test, expect } from './fixtures/auth'
 import { SEED_TENANT_SLUG } from './fixtures/users'
 import type { Database } from '../../src/types/database'
 
+// The seed tenant's display name, as the triage card shows it.
+const SEED_TENANT_NAME = 'Seed Klubben'
+
 // N71: Feedback, sent by a tenant admin (from the sidebar, with an image — so
 // the upload goes through the real Storage API and its bucket policies) and by
 // an official (from the account page). Each sees what they sent, with status
@@ -47,7 +50,9 @@ test.afterAll(async () => {
 })
 
 async function fillAndSend(page: Page, type: string, title: string, withImage: boolean) {
-  await page.getByText(type, { exact: true }).click()
+  // Scoped to the type picker: the same words also label rows in "Your
+  // feedback" once this user has sent something.
+  await page.locator('fieldset').getByText(type, { exact: true }).click()
   await page.getByLabel('Title').fill(title)
   await page.getByLabel('Message').fill('Written by the e2e suite.')
   if (withImage) {
@@ -60,6 +65,13 @@ async function fillAndSend(page: Page, type: string, title: string, withImage: b
   await expect(page.getByText('Your feedback has been sent.')).toBeVisible()
 }
 
+// Serial: the system admin's test triages the rows the first two send, and
+// the last checks the sender sees the status the system admin set.
+test.describe.configure({ mode: 'serial' })
+
+const ADMIN_BUG = `${RUN} admin bug`
+const OFFICIAL_QUESTION = `${RUN} official question`
+
 test('a tenant admin sends a bug report with an image from the sidebar', async ({
   tenantAdminPage: page,
 }) => {
@@ -70,7 +82,7 @@ test('a tenant admin sends a bug report with an image from the sidebar', async (
   await expect(page).toHaveURL(/\/admin\/feedback\?from=/)
   await expect(page.getByRole('heading', { name: 'Feedback', level: 1 })).toBeVisible()
 
-  const title = `${RUN} admin bug`
+  const title = ADMIN_BUG
   await fillAndSend(page, 'Bug report', title, true)
 
   const row = page.getByRole('listitem').filter({ hasText: title })
@@ -88,10 +100,57 @@ test('an official sends a question from the account page', async ({
 
   await expect(page).toHaveURL(new RegExp(`${base}/feedback$`))
 
-  const title = `${RUN} official question`
+  const title = OFFICIAL_QUESTION
   await fillAndSend(page, 'Question', title, false)
 
   const row = page.getByRole('listitem').filter({ hasText: title })
   await expect(row).toBeVisible()
   await expect(row.getByText('New')).toBeVisible()
+})
+
+test('a system admin sees both, sorted by type, and moves the bug to In progress', async ({
+  systemAdminPage: page,
+}) => {
+  await page.goto('/admin')
+  await page.getByRole('link', { name: 'Feedback' }).first().click()
+  await expect(page).toHaveURL(/\/admin\/feedback$/)
+
+  const bugs = page.getByRole('region', { name: 'Bug reports' })
+  const questions = page.getByRole('region', { name: 'Questions' })
+
+  const bug = bugs.getByRole('listitem').filter({ hasText: ADMIN_BUG })
+  await expect(bug).toBeVisible()
+  await expect(bug.getByText(SEED_TENANT_NAME, { exact: true })).toBeVisible()
+  await expect(bug.getByText(/· Admin$/)).toBeVisible()
+  // The image comes through a signed URL from the private bucket.
+  await expect(bug.getByAltText('Image attached to the feedback')).toBeVisible()
+  await expect
+    .poll(() =>
+      bug
+        .getByAltText('Image attached to the feedback')
+        .evaluate((img: HTMLImageElement) => img.naturalWidth)
+    )
+    .toBeGreaterThan(0)
+
+  const question = questions.getByRole('listitem').filter({ hasText: OFFICIAL_QUESTION })
+  await expect(question).toBeVisible()
+  await expect(question.getByText(/· Official$/)).toBeVisible()
+
+  await bug.getByLabel('Status').selectOption('in_progress')
+  await expect(bug.getByText('In progress', { exact: true }).first()).toBeVisible()
+  // Persisted, not just shown: a fresh load still says In progress.
+  await page.reload()
+  await expect(
+    page
+      .getByRole('region', { name: 'Bug reports' })
+      .getByRole('listitem')
+      .filter({ hasText: ADMIN_BUG })
+      .getByLabel('Status')
+  ).toHaveValue('in_progress')
+})
+
+test('the sender sees the status the system admin set', async ({ tenantAdminPage: page }) => {
+  await page.goto(`${base}/admin/feedback`)
+  const row = page.getByRole('listitem').filter({ hasText: ADMIN_BUG })
+  await expect(row.getByText('In progress')).toBeVisible()
 })

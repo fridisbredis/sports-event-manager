@@ -17,6 +17,7 @@
     "tenantNameTaken": "Det finns redan en kund med det namnet",
     "createTenantFailed": "Kunden kunde inte skapas",
     "updateTenantFailed": "Kunden kunde inte uppdateras",
+    "updateFeedbackStatusFailed": "Statusen kunde inte ändras",
     "updateTierFailed": "Nivån kunde inte uppdateras",
     "invalidSmsSenderId": "Avsändarnamnet får ha högst 11 tecken: bokstäver A–Z, siffror och mellanslag, minst en bokstav.",
     "updateSmsSenderFailed": "SMS-avsändaren kunde inte uppdateras",
@@ -196,6 +197,36 @@
       "empty": "Du har inte skickat någon feedback än.",
       "loadFailed": "Din feedback kunde inte laddas. Ladda om sidan.",
       "imageAttached": "Bild bifogad"
+    },
+    "triage": {
+      "columns": {
+        "question": "Frågor",
+        "bug": "Felrapporter",
+        "feature": "Önskemål"
+      },
+      "intro": "Feedback från alla organisationer. Ändra status medan du arbetar dig igenom den — avsändaren ser den på sin feedbacksida.",
+      "showOpen": "Öppna",
+      "showAll": "Alla",
+      "filterLabel": "Visa",
+      "empty": "Inget här.",
+      "loadFailed": "Feedbacken kunde inte laddas. Ladda om sidan.",
+      "truncated": "Visar de {{count}} senaste. Äldre feedback visas inte.",
+      "statusLabel": "Status",
+      "unknownSender": "Namn saknas",
+      "noTenant": "Okänd organisation",
+      "from": "Från",
+      "page": "Sida",
+      "event": "Event",
+      "imageAlt": "Bild bifogad med feedbacken",
+      "openImage": "Öppna bilden i full storlek",
+      "imageUnavailable": "Bilden kunde inte laddas.",
+      "statusChanged": "Status ändrad",
+      "role": {
+        "system_admin": "Systemadmin",
+        "tenant_admin": "Admin",
+        "official": "Funktionär",
+        "participant": "Deltagare"
+      }
     }
   }
 }

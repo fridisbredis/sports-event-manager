@@ -694,6 +694,7 @@
     "privacyPolicy": "Privacy policy",
     "systemStatus": "System status",
     "backups": "Backups",
+    "feedback": "Feedback",
     "createTenant": "Create tenant",
     "noTenantsYet": "No tenants yet",
     "noTenantsHint": "Create a tenant to get started.",

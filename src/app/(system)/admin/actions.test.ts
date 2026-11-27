@@ -7,6 +7,7 @@ import {
   grantSystemAdmin,
   revokeSystemAdmin,
   updateOwnSystemAdminName,
+  updateFeedbackStatus,
 } from './actions'
 import { grantSystemAdminRole, revokeSystemAdminRole } from '@/lib/auth/system-admins'
 import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
@@ -565,6 +566,69 @@ describe('updateOwnSystemAdminName (N28)', () => {
     expect((await updateOwnSystemAdminName('Peter Thörn')).error).toBe(
       'Could not save your name. Try again.'
     )
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateFeedbackStatus (N71)', () => {
+  const FEEDBACK_ID = '7f3c1a52-2b8e-4d4a-9c61-0e5b8f2a9d10'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('refuses a caller who is not a system admin, without calling the RPC', async () => {
+    const rpc = vi.fn()
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      rpc,
+    } as never)
+    vi.mocked(createSupabaseServiceClient).mockResolvedValue({
+      from: vi.fn(() => chain({ data: null })),
+    } as never)
+
+    const result = await updateFeedbackStatus(FEEDBACK_ID, 'done')
+
+    expect(result.error).toBeDefined()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown status before the RPC', async () => {
+    const rpc = vi.fn()
+    mockAuthedSystemAdmin(vi.fn(), rpc)
+
+    const result = await updateFeedbackStatus(FEEDBACK_ID, 'archived' as never)
+
+    expect(result.error).toBeDefined()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('calls the RPC and revalidates the triage page', async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: FEEDBACK_ID, status: 'in_progress' },
+      error: null,
+    })
+    mockAuthedSystemAdmin(vi.fn(), rpc)
+
+    const result = await updateFeedbackStatus(FEEDBACK_ID, 'in_progress')
+
+    expect(result).toEqual({})
+    expect(rpc).toHaveBeenCalledWith('update_feedback_status', {
+      p_feedback_id: FEEDBACK_ID,
+      p_status: 'in_progress',
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/feedback')
+  })
+
+  // The return-shape contract: a reply without the status asked for is a
+  // failure, not a silent success.
+  it('reports a failure when the RPC answers without the new status', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null })
+    mockAuthedSystemAdmin(vi.fn(), rpc)
+
+    const result = await updateFeedbackStatus(FEEDBACK_ID, 'done')
+
+    expect(result.error).toBeDefined()
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

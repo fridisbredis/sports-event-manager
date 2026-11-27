@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { ImagePlus, X } from 'lucide-react'
 
@@ -50,23 +50,30 @@ export function FeedbackForm({ tenantId, eventId, surface, fromPath }: Props) {
   const [type, setType] = useState<FeedbackType | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
-  // The file and its preview URL travel together, so they can never disagree.
+  // The file and its preview travel together, so they can never disagree.
+  // The preview is a data: URL, not an object URL: an object URL has to be
+  // revoked, and revoking it in an effect cleanup broke the preview whenever
+  // the effect re-ran without the file changing (Fast Refresh in dev did
+  // exactly that). A data: URL needs no cleanup, and at ≤5 MB costs nothing
+  // that matters.
   const [picked, setPicked] = useState<{ file: File; url: string } | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const [showErrors, setShowErrors] = useState(false)
   const [sending, setSending] = useState(false)
 
-  // Release each preview URL once it is replaced, removed or the form
-  // unmounts. Cleanup only — the URL is created where the file is picked.
-  useEffect(() => {
-    if (!picked) return
-    return () => URL.revokeObjectURL(picked.url)
-  }, [picked])
-
   const image = picked?.file ?? null
   const preview = picked?.url ?? null
   function setImage(file: File | null) {
-    setPicked(file ? { file, url: URL.createObjectURL(file) } : null)
+    if (!file) {
+      setPicked(null)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setPicked({ file, url: reader.result })
+    }
+    reader.onerror = () => setImageError(t('feedback.form.imageWrongType'))
+    reader.readAsDataURL(file)
   }
 
   const titleMissing = title.trim() === ''

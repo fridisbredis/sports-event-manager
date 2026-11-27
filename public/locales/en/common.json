@@ -17,6 +17,7 @@
     "tenantNameTaken": "A tenant with that name already exists",
     "createTenantFailed": "Failed to create tenant",
     "updateTenantFailed": "Failed to update tenant",
+    "updateFeedbackStatusFailed": "Could not change the status",
     "updateTierFailed": "Failed to update tier",
     "invalidSmsSenderId": "The sender name must be up to 11 characters: letters A–Z, digits and spaces, with at least one letter.",
     "updateSmsSenderFailed": "Failed to update the SMS sender",
@@ -196,6 +197,36 @@
       "empty": "You have not sent any feedback yet.",
       "loadFailed": "Your feedback could not be loaded. Please reload the page.",
       "imageAttached": "Image attached"
+    },
+    "triage": {
+      "columns": {
+        "question": "Questions",
+        "bug": "Bug reports",
+        "feature": "Feature requests"
+      },
+      "intro": "Feedback from every organisation. Change the status as you work through it — the sender sees it on their feedback page.",
+      "showOpen": "Open",
+      "showAll": "All",
+      "filterLabel": "Show",
+      "empty": "Nothing here.",
+      "loadFailed": "The feedback could not be loaded. Please reload the page.",
+      "truncated": "Showing the {{count}} newest. Older feedback is not listed.",
+      "statusLabel": "Status",
+      "unknownSender": "No name on file",
+      "noTenant": "Unknown organisation",
+      "from": "From",
+      "page": "Page",
+      "event": "Event",
+      "imageAlt": "Image attached to the feedback",
+      "openImage": "Open the image in full size",
+      "imageUnavailable": "The image could not be loaded.",
+      "statusChanged": "Status changed",
+      "role": {
+        "system_admin": "System admin",
+        "tenant_admin": "Admin",
+        "official": "Official",
+        "participant": "Participant"
+      }
     }
   }
 }

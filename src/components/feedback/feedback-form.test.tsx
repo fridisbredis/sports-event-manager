@@ -26,9 +26,6 @@ const fetchMock = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   vi.stubGlobal('fetch', fetchMock)
-  // jsdom has no object URLs.
-  URL.createObjectURL = vi.fn(() => 'blob:preview')
-  URL.revokeObjectURL = vi.fn()
 })
 
 afterEach(() => {
@@ -122,12 +119,17 @@ describe('FeedbackForm', () => {
     const png = new File([new Uint8Array(10)], 'shot.png', { type: 'image/png' })
 
     fireEvent.change(fileInput(), { target: { files: [png] } })
-    expect(screen.getByAltText('feedback.form.imagePreviewAlt')).toBeInTheDocument()
+    // Read as a data: URL, so the preview appears asynchronously.
+    expect(await screen.findByAltText('feedback.form.imagePreviewAlt')).toHaveAttribute(
+      'src',
+      expect.stringMatching(/^data:image\/png;base64,/)
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'feedback.form.imageRemove' }))
     expect(screen.queryByAltText('feedback.form.imagePreviewAlt')).not.toBeInTheDocument()
 
     fireEvent.change(fileInput(), { target: { files: [png] } })
+    await screen.findByAltText('feedback.form.imagePreviewAlt')
     fillValid()
     submit()
 

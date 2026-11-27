@@ -694,6 +694,7 @@
     "privacyPolicy": "Integritetspolicy",
     "systemStatus": "Systemstatus",
     "backups": "Säkerhetskopior",
+    "feedback": "Feedback",
     "createTenant": "Skapa kund",
     "noTenantsYet": "Inga kunder än",
     "noTenantsHint": "Skapa en kund för att komma igång.",
