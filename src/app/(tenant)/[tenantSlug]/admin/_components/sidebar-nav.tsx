@@ -12,6 +12,7 @@ import {
   Flag,
   Users,
   ClipboardList,
+  ListTodo,
   CalendarClock,
   MessageSquare,
   MessageSquareText,
@@ -138,6 +139,7 @@ export function SidebarNav({
         },
         { segment: `${eventBase}/event`, label: t('navigation.eventConfig'), icon: Trophy },
         { segment: `${eventBase}/workstations`, label: t('navigation.workstations'), icon: Flag },
+        { segment: `${eventBase}/tasks`, label: t('navigation.tasks'), icon: ListTodo },
         { segment: `${eventBase}/officials`, label: t('navigation.officials'), icon: Users },
         // Listed on every tier and marked Premium, so a Standard admin can see
         // what Premium adds. On Standard it is locked: greyed out, not a link.

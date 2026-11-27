@@ -1,5 +1,6 @@
 import { Time } from '@internationalized/date'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
+import { dateLocaleFor } from '@/lib/i18n/date-locale'
 
 export interface Stage {
   id: string
@@ -7,6 +8,37 @@ export interface Stage {
   stage_type: string
   start_time: string | null
   end_time: string | null
+}
+
+/**
+ * A stage's date line in a panel title: "tis 1 dec · 08:00–17:00" on one day,
+ * "mån 30 nov – tis 1 dec" across days. Wall-clock UTC. Shared by the work
+ * areas and tasks lists (N72).
+ */
+export function formatStageDate(stage: Stage, language?: string): string {
+  if (!stage.start_time) return ''
+  const locale = dateLocaleFor(language)
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }
+  const time = (iso: string) =>
+    new Date(iso).toLocaleTimeString(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    })
+  const day = (iso: string) => new Date(iso).toISOString().slice(0, 10)
+
+  const start = new Date(stage.start_time).toLocaleDateString(locale, opts)
+  if (!stage.end_time) return start
+  if (day(stage.start_time) === day(stage.end_time)) {
+    return `${start} · ${time(stage.start_time)}–${time(stage.end_time)}`
+  }
+  const end = new Date(stage.end_time).toLocaleDateString(locale, opts)
+  return `${start} – ${end}`
 }
 
 export interface TimeWindow {

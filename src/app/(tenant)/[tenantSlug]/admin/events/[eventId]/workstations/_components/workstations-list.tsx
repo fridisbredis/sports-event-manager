@@ -28,6 +28,7 @@ import {
 import { dateLocaleFor } from '@/lib/i18n/date-locale'
 import { useLanguage } from '@/components/i18n-provider'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
+import { formatStageDate } from '../_utils'
 
 // Every rendered id is in the map by construction; this only satisfies the
 // type at the lookup site.
@@ -113,27 +114,6 @@ function formatWindowsSummary(windows: OperatingWindow[], language?: string): st
   }
 
   return `${formatWindow(windows[0], language)} +${windows.length - 1}`
-}
-
-function formatStageDate(stage: Stage, language?: string): string {
-  if (!stage.start_time) return ''
-  const opts: Intl.DateTimeFormatOptions = {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  }
-  const start = new Date(stage.start_time).toLocaleDateString(dateLocaleFor(language), opts)
-  if (!stage.end_time) return start
-  const startDay = utcDateStr(stage.start_time)
-  const endDay = utcDateStr(stage.end_time)
-  if (startDay === endDay) {
-    const startTime = utcTimeStr(stage.start_time, language)
-    const endTime = utcTimeStr(stage.end_time, language)
-    return `${start} · ${startTime}–${endTime}`
-  }
-  const end = new Date(stage.end_time).toLocaleDateString(dateLocaleFor(language), opts)
-  return `${start} – ${end}`
 }
 
 function StageTitle({ stage, count }: { stage: Stage; count: number }) {
