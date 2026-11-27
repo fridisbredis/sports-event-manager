@@ -355,6 +355,13 @@ describe('tasks (N72)', () => {
         .select('action, actor_name')
         .eq('task_id', taskId)
       expect(events).toEqual([{ action: 'done', actor_name: 'Test Official' }])
+
+      const { data: row } = await admin()
+        .from('tasks')
+        .select('done_by_name')
+        .eq('id', taskId)
+        .single()
+      expect(row!.done_by_name).toBe('Test Official')
     })
 
     it('lets an admin untick, clearing done_at', async () => {
@@ -367,6 +374,12 @@ describe('tasks (N72)', () => {
       })
       expect(error).toBeNull()
       expect(data).toMatchObject({ id: taskId, done: false, done_at: null })
+      const { data: cleared } = await admin()
+        .from('tasks')
+        .select('done_by, done_by_name')
+        .eq('id', taskId)
+        .single()
+      expect(cleared).toEqual({ done_by: null, done_by_name: null })
 
       const { data: events } = await admin()
         .from('task_events')
@@ -429,6 +442,12 @@ describe('tasks (N72)', () => {
       expect(error).toBeNull()
       expect(Object.keys(tick as object).sort()).toEqual(['checked', 'checked_at', 'id'])
       expect(tick).toMatchObject({ id: count.id, checked: true })
+      const { data: tickedRow } = await assigneeClient
+        .from('task_todos')
+        .select('checked_by_name')
+        .eq('id', count.id)
+        .single()
+      expect(tickedRow!.checked_by_name).toBe('Test Official')
 
       // Reorder, rename the ticked one, drop "Bring tape", add a new one.
       const { error: saveError } = await adminClient.rpc(

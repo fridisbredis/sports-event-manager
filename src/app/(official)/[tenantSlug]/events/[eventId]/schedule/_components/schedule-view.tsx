@@ -28,6 +28,7 @@ import {
 } from '@/lib/scheduling/unavailability'
 import { workAreaColorMap, WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './checklist-item-row'
+import { MyTasks, type MyTask, type MyTasksStrings } from './my-tasks'
 import { AvailabilityManager } from '../../availability/_components/availability-manager'
 import { dateLocaleFor } from '@/lib/i18n/date-locale'
 import { useLanguage } from '@/components/i18n-provider'
@@ -111,6 +112,9 @@ interface Props {
   allTimeOff: UnavailabilityPeriod[]
   /** Event bounds for the panel's date picker. Null leaves it unbounded. */
   eventDates: { min: string; max: string } | null
+  /** N72: the tasks this official is assigned to, in the event. */
+  myTasks?: MyTask[]
+  myTasksStrings?: MyTasksStrings
 }
 
 function formatTime(ts: string, language?: string): string {
@@ -864,6 +868,8 @@ export function ScheduleView({
   shiftPeers,
   allTimeOff,
   eventDates,
+  myTasks = [],
+  myTasksStrings,
 }: Props) {
   const [view, setView] = useState<View>('time')
   const [timeOffOpen, setTimeOffOpen] = useState(false)
@@ -1083,6 +1089,19 @@ export function ScheduleView({
           strings={strings}
         />
       )}
+      {/* N72: their tasks, in a block of their own below the shifts — a task
+          is not a shift, so it never enters the day's timeline. Outside the
+          day branches above, so it shows on every day and also when the
+          official has no shifts at all. */}
+      {myTasksStrings ? (
+        <MyTasks
+          tasks={myTasks}
+          tenantSlug={tenantSlug}
+          currentUserId={currentUserId}
+          strings={myTasksStrings}
+          checklistStrings={checklistStrings}
+        />
+      ) : null}
       {/* Time off expands in place rather than linking away. It belongs to the
           same question this screen answers — when am I working, and when have
           I said I cannot — so sending someone to a separate page meant losing

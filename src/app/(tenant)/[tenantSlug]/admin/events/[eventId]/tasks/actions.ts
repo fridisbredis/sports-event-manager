@@ -12,7 +12,7 @@ import { adminEventRoutePattern } from '@/lib/events/paths'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 import type { Json } from '@/types/database'
 import type { ChecklistItemType } from '@/types/app'
-import { wallClockToIso } from './_utils'
+import { wallClockToIso } from '@/lib/tasks/time'
 
 // N72. Every write goes through an RPC (migration 20261127105240): save_task
 // writes the task, its checklist and its assignees in one transaction, and

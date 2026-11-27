@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import TaskForm from '../_components/task-form'
 import { loadTaskFormData } from '../_load-form-data'
-import { isoToWallClock } from '../_utils'
+import { isoToWallClock } from '@/lib/tasks/time'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string; taskId: string }>

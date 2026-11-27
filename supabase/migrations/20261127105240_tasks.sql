@@ -109,6 +109,12 @@ create table if not exists public.tasks (
   deadline    timestamptz not null,
   done        boolean not null default false,
   done_at     timestamptz,
+  -- Who ticked it, for "done by Anna 14:02" on the official's screen. The
+  -- name is denormalised at tick time like task_events.actor_name, so it
+  -- survives the account being deleted and needs no join to officials (which
+  -- an official can only read for colleagues). Cleared on untick.
+  done_by      uuid references auth.users (id) on delete set null,
+  done_by_name text,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   constraint tasks_color_check check (
@@ -178,6 +184,10 @@ create table if not exists public.task_todos (
   item_type        text not null default 'info' check (item_type in ('info', 'checkbox')),
   checked          boolean not null default false,
   checked_at       timestamptz,
+  -- Same as tasks.done_by / done_by_name: the latest tick's author, cleared
+  -- on untick. The full history is in task_events.
+  checked_by       uuid references auth.users (id) on delete set null,
+  checked_by_name  text,
   created_at       timestamptz not null default now(),
   constraint task_todos_task_event_fkey
     foreign key (task_id, event_id) references public.tasks (id, event_id)
@@ -483,6 +493,14 @@ begin
       checked_at       = case
                            when coalesce(t.value ->> 'item_type', 'info') = 'checkbox'
                            then tt.checked_at
+                         end,
+      checked_by       = case
+                           when coalesce(t.value ->> 'item_type', 'info') = 'checkbox'
+                           then tt.checked_by
+                         end,
+      checked_by_name  = case
+                           when coalesce(t.value ->> 'item_type', 'info') = 'checkbox'
+                           then tt.checked_by_name
                          end
   from jsonb_array_elements(v_todos) with ordinality as t(value, ordinality)
   where tt.task_id = v_task_id
@@ -533,6 +551,7 @@ declare
   v_done      boolean;
   v_done_at   timestamptz;
   v_changed   boolean := false;
+  v_actor     text;
 begin
   if auth.uid() is null or p_done is null then
     raise exception 'not authorized' using errcode = '42501';
@@ -559,10 +578,20 @@ begin
     raise exception 'not authorized' using errcode = '42501';
   end if;
 
+  select o.name into v_actor
+  from public.officials o
+  where o.user_id = auth.uid() and o.tenant_id = v_tenant_id
+  -- A re-invited official holds a 'removed' and a 'confirmed' row for the
+  -- same user (migration 0020); take the live one (Sentry VIADAL-EVENT-PROD-6).
+  order by (o.invite_status = 'confirmed') desc
+  limit 1;
+
   update public.tasks
-  set done       = p_done,
-      done_at    = case when p_done then now() end,
-      updated_at = now()
+  set done         = p_done,
+      done_at      = case when p_done then now() end,
+      done_by      = case when p_done then auth.uid() end,
+      done_by_name = case when p_done then v_actor end,
+      updated_at   = now()
   where id = p_task_id
     and done is distinct from p_done
   returning done, done_at into v_done, v_done_at;
@@ -572,10 +601,7 @@ begin
   if v_changed then
     insert into public.task_events (task_id, event_id, tenant_id, actor_user_id, actor_name, action)
     values (
-      p_task_id, v_event_id, v_tenant_id, auth.uid(),
-      (select o.name from public.officials o
-       where o.user_id = auth.uid() and o.tenant_id = v_tenant_id
-       limit 1),
+      p_task_id, v_event_id, v_tenant_id, auth.uid(), v_actor,
       case when p_done then 'done' else 'undone' end
     );
   else
@@ -615,6 +641,7 @@ declare
   v_item_type  text;
   v_checked    boolean;
   v_checked_at timestamptz;
+  v_actor      text;
 begin
   if auth.uid() is null or p_checked is null then
     raise exception 'not authorized' using errcode = '42501';
@@ -646,9 +673,19 @@ begin
     raise exception 'checklist item is not a checkbox' using errcode = '22023';
   end if;
 
+  select o.name into v_actor
+  from public.officials o
+  where o.user_id = auth.uid() and o.tenant_id = v_tenant_id
+  -- A re-invited official holds a 'removed' and a 'confirmed' row for the
+  -- same user (migration 0020); take the live one (Sentry VIADAL-EVENT-PROD-6).
+  order by (o.invite_status = 'confirmed') desc
+  limit 1;
+
   update public.task_todos
-  set checked    = p_checked,
-      checked_at = case when p_checked then now() end
+  set checked         = p_checked,
+      checked_at      = case when p_checked then now() end,
+      checked_by      = case when p_checked then auth.uid() end,
+      checked_by_name = case when p_checked then v_actor end
   where id = p_todo_id
     and checked is distinct from p_checked
   returning checked, checked_at into v_checked, v_checked_at;
@@ -658,10 +695,7 @@ begin
       task_id, todo_id, event_id, tenant_id, actor_user_id, actor_name, action
     )
     values (
-      v_task_id, p_todo_id, v_event_id, v_tenant_id, auth.uid(),
-      (select o.name from public.officials o
-       where o.user_id = auth.uid() and o.tenant_id = v_tenant_id
-       limit 1),
+      v_task_id, p_todo_id, v_event_id, v_tenant_id, auth.uid(), v_actor,
       case when p_checked then 'checked' else 'unchecked' end
     );
   else

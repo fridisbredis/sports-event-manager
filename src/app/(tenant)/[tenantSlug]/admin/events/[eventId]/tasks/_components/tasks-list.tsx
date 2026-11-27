@@ -28,7 +28,7 @@ import {
   type WorkAreaColor,
 } from '@/lib/theme/work-area-colors'
 import { formatStageDate, type Stage } from '../../workstations/_utils'
-import { formatTaskWhen, isOverdue } from '../_utils'
+import { formatTaskWhen, isOverdue } from '@/lib/tasks/time'
 import { DoneToggle } from './done-toggle'
 import type { TaskListItem } from '../_load-list'
 

@@ -10,7 +10,7 @@ import { useLanguage } from '@/components/i18n-provider'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
 import { WORK_AREA_COLORS, workAreaColorMap, workAreaDotColor } from '@/lib/theme/work-area-colors'
 import { DoneToggle } from '../../tasks/_components/done-toggle'
-import { formatTaskWhen, isOverdue } from '../../tasks/_utils'
+import { formatTaskWhen, isOverdue } from '@/lib/tasks/time'
 import type { TaskListItem } from '../../tasks/_load-list'
 
 interface Props {

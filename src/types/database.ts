@@ -1278,6 +1278,8 @@ export type Database = {
         Row: {
           checked: boolean
           checked_at: string | null
+          checked_by: string | null
+          checked_by_name: string | null
           created_at: string
           event_id: string
           id: string
@@ -1290,6 +1292,8 @@ export type Database = {
         Insert: {
           checked?: boolean
           checked_at?: string | null
+          checked_by?: string | null
+          checked_by_name?: string | null
           created_at?: string
           event_id: string
           id?: string
@@ -1302,6 +1306,8 @@ export type Database = {
         Update: {
           checked?: boolean
           checked_at?: string | null
+          checked_by?: string | null
+          checked_by_name?: string | null
           created_at?: string
           event_id?: string
           id?: string
@@ -1329,6 +1335,8 @@ export type Database = {
           description: string | null
           done: boolean
           done_at: string | null
+          done_by: string | null
+          done_by_name: string | null
           event_id: string
           id: string
           name: string
@@ -1344,6 +1352,8 @@ export type Database = {
           description?: string | null
           done?: boolean
           done_at?: string | null
+          done_by?: string | null
+          done_by_name?: string | null
           event_id: string
           id?: string
           name: string
@@ -1359,6 +1369,8 @@ export type Database = {
           description?: string | null
           done?: boolean
           done_at?: string | null
+          done_by?: string | null
+          done_by_name?: string | null
           event_id?: string
           id?: string
           name?: string

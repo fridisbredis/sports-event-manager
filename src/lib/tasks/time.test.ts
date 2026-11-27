@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTaskWhen, isOverdue, isoToWallClock, wallClockToIso } from './_utils'
+import { formatTaskWhen, isOverdue, isoToWallClock, wallClockToIso } from './time'
 
 describe('wall-clock conversion', () => {
   it('stores the typed time as UTC and reads it back unchanged', () => {
