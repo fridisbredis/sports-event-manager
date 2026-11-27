@@ -40,6 +40,10 @@ participants                   restore
 sms_cap_warnings               keep-live   # restoring re-sends this month's cap warning
 sms_queue                      keep-live   # restoring re-sends SMS already delivered
 sms_usage                      keep-live   # billing record; restoring undercounts the monthly cap
+task_assignees                 restore
+task_events                    keep-live   # write-once audit trail of task ticks (N72)
+task_todos                     restore
+tasks                          restore
 tenants                        restore
 user_roles                     restore
 workstation_operating_windows  restore

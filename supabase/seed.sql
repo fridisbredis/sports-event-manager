@@ -132,7 +132,8 @@ to authenticated, service_role;
 -- Tables that grant in their own migrations.
 -- ----------------------------------------------------------------------------
 -- checklist_item_checks, checklist_item_events, official_unavailability and
--- official_events (N23, 20261028104200) each grant `authenticated` in the migration that creates them, which is why
+-- official_events (N23, 20261028104200), tasks, task_assignees, task_todos and task_events
+-- (N72, 20261127105240) each grant `authenticated` in the migration that creates them, which is why
 -- they are absent from the lists above. Those grants omit service_role,
 -- because hosted Supabase supplies it automatically — but a local
 -- `supabase db reset` does not, so anything going through the service client
@@ -145,10 +146,14 @@ to authenticated, service_role;
 grant select, insert, update, delete on table
   public.checklist_item_checks,
   public.official_unavailability,
-  public.official_events
+  public.official_events,
+  public.tasks,
+  public.task_assignees,
+  public.task_todos
 to service_role;
 
 grant select, insert on table public.checklist_item_events to service_role;
+grant select, insert on table public.task_events to service_role;
 
 
 -- ----------------------------------------------------------------------------

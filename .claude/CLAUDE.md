@@ -139,6 +139,7 @@ One concept, one word, in both locales. New user-facing strings must use these:
 | One capacity position inside a slot (`slot_index`)                         | position   | plats       |
 | One person in one position for one slot — the `assignments` row            | assignment | inplanering |
 | One person's continuous run of assignments in one work area (`foldShifts`) | shift      | pass        |
+| A to-do tied to a stage, not a scheduled shift (`tasks`, N72)              | task       | uppgift     |
 
 - Official surfaces never say assignment/inplanering or uppdrag: an official has shifts.
 - Admin surfaces say assignment when they mean rows being created, removed or counted, and shift only where they show a person's folded runs (by-person view, official detail, mobile coverage).

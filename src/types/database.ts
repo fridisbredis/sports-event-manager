@@ -1170,6 +1170,220 @@ export type Database = {
           },
         ]
       }
+      task_assignees: {
+        Row: {
+          created_at: string
+          event_id: string
+          official_id: string
+          task_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          official_id: string
+          task_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          official_id?: string
+          task_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_assignees_official_event_fkey'
+            columns: ['official_id', 'event_id']
+            isOneToOne: false
+            referencedRelation: 'official_events'
+            referencedColumns: ['official_id', 'event_id']
+          },
+          {
+            foreignKeyName: 'task_assignees_official_tenant_fkey'
+            columns: ['official_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'officials'
+            referencedColumns: ['id', 'tenant_id']
+          },
+          {
+            foreignKeyName: 'task_assignees_task_event_fkey'
+            columns: ['task_id', 'event_id']
+            isOneToOne: false
+            referencedRelation: 'tasks'
+            referencedColumns: ['id', 'event_id']
+          },
+        ]
+      }
+      task_events: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string
+          event_id: string
+          id: string
+          task_id: string
+          tenant_id: string
+          todo_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          task_id: string
+          tenant_id: string
+          todo_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          task_id?: string
+          tenant_id?: string
+          todo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_events_task_id_fkey'
+            columns: ['task_id']
+            isOneToOne: false
+            referencedRelation: 'tasks'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_events_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_events_todo_id_fkey'
+            columns: ['todo_id']
+            isOneToOne: false
+            referencedRelation: 'task_todos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      task_todos: {
+        Row: {
+          checked: boolean
+          checked_at: string | null
+          created_at: string
+          event_id: string
+          id: string
+          instruction_text: string
+          item_type: string
+          position: number
+          task_id: string
+          tenant_id: string
+        }
+        Insert: {
+          checked?: boolean
+          checked_at?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          instruction_text: string
+          item_type?: string
+          position: number
+          task_id: string
+          tenant_id: string
+        }
+        Update: {
+          checked?: boolean
+          checked_at?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          instruction_text?: string
+          item_type?: string
+          position?: number
+          task_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_todos_task_event_fkey'
+            columns: ['task_id', 'event_id']
+            isOneToOne: false
+            referencedRelation: 'tasks'
+            referencedColumns: ['id', 'event_id']
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          color: string | null
+          created_at: string
+          deadline: string
+          description: string | null
+          done: boolean
+          done_at: string | null
+          event_id: string
+          id: string
+          name: string
+          stage_id: string
+          starts_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          deadline: string
+          description?: string | null
+          done?: boolean
+          done_at?: string | null
+          event_id: string
+          id?: string
+          name: string
+          stage_id: string
+          starts_at?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          deadline?: string
+          description?: string | null
+          done?: boolean
+          done_at?: string | null
+          event_id?: string
+          id?: string
+          name?: string
+          stage_id?: string
+          starts_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tasks_event_tenant_fkey'
+            columns: ['event_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id', 'tenant_id']
+          },
+          {
+            foreignKeyName: 'tasks_stage_tenant_fkey'
+            columns: ['stage_id', 'tenant_id']
+            isOneToOne: false
+            referencedRelation: 'event_stages'
+            referencedColumns: ['id', 'tenant_id']
+          },
+        ]
+      }
       tenants: {
         Row: {
           color_palette: string
@@ -1608,6 +1822,7 @@ export type Database = {
       }
       is_own_official_row: { Args: { p_official_id: string }; Returns: boolean }
       is_system_admin: { Args: never; Returns: boolean }
+      is_task_assignee: { Args: { p_task_id: string }; Returns: boolean }
       leave_own_participant_entry: {
         Args: { p_participant_id: string }
         Returns: Json
@@ -1682,6 +1897,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      save_task: {
+        Args: {
+          p_assignee_ids: string[]
+          p_color: string
+          p_deadline: string
+          p_description: string
+          p_event_id: string
+          p_name: string
+          p_stage_id: string
+          p_starts_at: string
+          p_task_id: string
+          p_tenant_id: string
+          p_todos: Json
+        }
+        Returns: Json
+      }
       scheduling_warning_counts: {
         Args: { p_event_id: string; p_tenant_id: string }
         Returns: {
@@ -1696,6 +1927,14 @@ export type Database = {
       set_own_participant_sms_opt_out: {
         Args: { p_opt_out: boolean; p_tenant_id: string }
         Returns: number
+      }
+      set_task_done: {
+        Args: { p_done: boolean; p_task_id: string }
+        Returns: Json
+      }
+      set_task_todo_checked: {
+        Args: { p_checked: boolean; p_todo_id: string }
+        Returns: Json
       }
       shares_event_with_caller: {
         Args: { p_official_id: string }

@@ -40,6 +40,19 @@ export type ChecklistItemEventAction = 'checked' | 'unchecked'
 export type ChecklistItemEvent = Omit<DbTables['checklist_item_events']['Row'], 'action'> & {
   action: ChecklistItemEventAction
 }
+// N72: to-dos per stage. Written through save_task / set_task_done.
+export type Task = DbTables['tasks']['Row']
+export type TaskAssignee = DbTables['task_assignees']['Row']
+// Same item types as workstation_todos; one shared list per task, so the
+// tick (checked) lives on the row instead of in a per-shift table.
+export type TaskTodo = Omit<DbTables['task_todos']['Row'], 'item_type'> & {
+  item_type: ChecklistItemType
+}
+// Match migration 20261127105240's CHECK constraint.
+export type TaskEventAction = 'done' | 'undone' | 'checked' | 'unchecked'
+export type TaskEvent = Omit<DbTables['task_events']['Row'], 'action'> & {
+  action: TaskEventAction
+}
 export type Official = DbTables['officials']['Row']
 // Client-safe projection: excludes invite_token and invite_token_expires_at,
 // which are single-use bearer credentials that must never reach the browser (F-SEC-06).
