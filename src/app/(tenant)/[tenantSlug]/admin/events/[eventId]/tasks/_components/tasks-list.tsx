@@ -1,12 +1,11 @@
 'use client'
 
 import { Flag } from 'lucide-react'
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Accordion,
   AccordionItem,
-  Checkbox,
   Chip,
   Table,
   TableHeader,
@@ -22,7 +21,6 @@ import { LinkButton } from '@/components/ui/link-button'
 import { useTranslation } from '@/lib/i18n/client'
 import { useLanguage } from '@/components/i18n-provider'
 import { useAdminEventPath } from '@/lib/hooks/use-admin-event-path'
-import { toastError } from '@/lib/toast'
 import {
   WORK_AREA_COLORS,
   workAreaColorMap,
@@ -31,7 +29,8 @@ import {
 } from '@/lib/theme/work-area-colors'
 import { formatStageDate, type Stage } from '../../workstations/_utils'
 import { formatTaskWhen, isOverdue } from '../_utils'
-import { setTaskDone } from '../actions'
+import { DoneToggle } from './done-toggle'
+import type { TaskListItem } from '../_load-list'
 
 // N72. Laid out like the work areas list (one panel per stage, the same
 // table look) so the two pages read as siblings. A separate component rather
@@ -39,19 +38,6 @@ import { setTaskDone } from '../actions'
 // later cleanup, once both pages exist and their common shape is proven.
 
 const FALLBACK_COLOR: WorkAreaColor = WORK_AREA_COLORS[0]
-
-export interface TaskListItem {
-  id: string
-  name: string
-  color: string | null
-  stage_id: string
-  starts_at: string | null
-  deadline: string
-  done: boolean
-  assigneeNames: string[]
-  checklistDone: number
-  checklistTotal: number
-}
 
 interface Props {
   tenantId: string
@@ -88,42 +74,6 @@ function StageTitle({ stage, count }: { stage: Stage; count: number }) {
       <span className="ml-auto font-sans text-[13px] text-ink-muted">
         {t('tasks.taskCount', { count })}
       </span>
-    </div>
-  )
-}
-
-/**
- * The done tick in a row. Optimistic: it flips at once and goes back with a
- * toast if the save fails. Its clicks stop at the cell, so ticking a task
- * does not also open it.
- */
-function DoneToggle({ tenantId, task }: { tenantId: string; task: TaskListItem }) {
-  const { t } = useTranslation('admin')
-  const router = useRouter()
-  const [done, setDone] = useState(task.done)
-  const [isPending, startTransition] = useTransition()
-
-  function toggle(next: boolean) {
-    setDone(next)
-    startTransition(async () => {
-      const result = await setTaskDone({ tenantId, taskId: task.id, done: next })
-      if (result.error) {
-        setDone(!next)
-        toastError(result.error)
-        return
-      }
-      router.refresh()
-    })
-  }
-
-  return (
-    <div onClick={(e) => e.stopPropagation()} className="inline-flex">
-      <Checkbox
-        isSelected={done}
-        isDisabled={isPending}
-        onValueChange={toggle}
-        aria-label={t('tasks.markDone', { name: task.name })}
-      />
     </div>
   )
 }

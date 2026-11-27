@@ -1,7 +1,8 @@
 import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
-import TasksList, { type TaskListItem } from './_components/tasks-list'
+import TasksList from './_components/tasks-list'
+import { fetchTaskListItems } from './_load-list'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -30,45 +31,17 @@ export default async function TasksPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: stages, error: stagesError }, { data: tasks, error: tasksError }] =
-    await Promise.all([
-      supabase
-        .from('event_stages')
-        .select('id, name, stage_type, start_time, end_time')
-        .eq('event_id', event.id)
-        .eq('tenant_id', tenant.id)
-        .order('position', { ascending: true }),
-      supabase
-        .from('tasks')
-        .select(
-          'id, name, color, stage_id, starts_at, deadline, done, task_assignees(official_id, officials!task_assignees_official_tenant_fkey(name)), task_todos(item_type, checked)'
-        )
-        .eq('event_id', event.id)
-        .eq('tenant_id', tenant.id)
-        .order('deadline', { ascending: true }),
-    ])
+  const [{ data: stages, error: stagesError }, items] = await Promise.all([
+    supabase
+      .from('event_stages')
+      .select('id, name, stage_type, start_time, end_time')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true }),
+    fetchTaskListItems(supabase, tenant.id, event.id),
+  ])
 
   if (stagesError) throw stagesError
-  if (tasksError) throw tasksError
-
-  const items: TaskListItem[] = (tasks ?? []).map((task) => {
-    const checkboxes = (task.task_todos ?? []).filter((todo) => todo.item_type === 'checkbox')
-    return {
-      id: task.id,
-      name: task.name,
-      color: task.color,
-      stage_id: task.stage_id,
-      starts_at: task.starts_at,
-      deadline: task.deadline,
-      done: task.done,
-      assigneeNames: (task.task_assignees ?? [])
-        .map((a) => a.officials?.name ?? '')
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b)),
-      checklistDone: checkboxes.filter((todo) => todo.checked).length,
-      checklistTotal: checkboxes.length,
-    }
-  })
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">

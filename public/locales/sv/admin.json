@@ -358,7 +358,11 @@
     "startAfterDeadline": "Starten måste ligga före deadline.",
     "genericSaveError": "Kunde inte spara uppgiften. Försök igen.",
     "genericDeleteError": "Kunde inte ta bort uppgiften. Försök igen.",
-    "colorHint": "Används för att skilja uppgiften från andra i listorna."
+    "colorHint": "Används för att skilja uppgiften från andra i listorna.",
+    "blockTitle": "Uppgifter · {{stage}}",
+    "manageTasks": "Hantera uppgifter",
+    "noTasksOnStage": "Inga uppgifter på den här etappen.",
+    "checklistShort": "Checklista {{done}} av {{total}}"
   },
   "officials": {
     "title": "Funktionärslista",

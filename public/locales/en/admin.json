@@ -358,7 +358,11 @@
     "startAfterDeadline": "The start must be before the deadline.",
     "genericSaveError": "Could not save the task. Please try again.",
     "genericDeleteError": "Could not delete the task. Please try again.",
-    "colorHint": "Used to tell this task apart in the lists."
+    "colorHint": "Used to tell this task apart in the lists.",
+    "blockTitle": "Tasks · {{stage}}",
+    "manageTasks": "Manage tasks",
+    "noTasksOnStage": "No tasks on this stage.",
+    "checklistShort": "Checklist {{done}} of {{total}}"
   },
   "officials": {
     "title": "Officials Roster",
