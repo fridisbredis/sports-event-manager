@@ -9,7 +9,7 @@ import {
   cleanupTenant,
 } from './helpers'
 
-// N72 (migration 20261127105240). Tasks are written only through save_task
+// N72 (migration 20261127152421). Tasks are written only through save_task
 // and set_task_done, and officials read only the tasks they are assigned to.
 // All of that lives in Postgres (RLS, grants, SECURITY DEFINER checks, FKs),
 // so only a real database can prove it.

@@ -12,7 +12,7 @@ import { adminEventRoutePattern } from '@/lib/events/paths'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
 import { wallClockToIso } from '@/lib/tasks/time'
 
-// N72. Every write goes through an RPC (migration 20261127105240): save_task
+// N72. Every write goes through an RPC (migration 20261127152421): save_task
 // writes the task, its done flag and its assignees in one transaction, and
 // set_task_done (the list's tick) writes the flag together with its audit row. Delete is a plain
 // DELETE under tenant_admin_manage_tasks, like deleting a work area.

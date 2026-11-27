@@ -178,7 +178,7 @@ export async function toggleChecklistItem(
 // N72: an assigned official's own tasks
 // ---------------------------------------------------------------------------
 // The tick goes through the SECURITY DEFINER set_task_done (migration
-// 20261127105240), which checks the caller is a confirmed assignee of the
+// 20261127152421), which checks the caller is a confirmed assignee of the
 // task, writes the flag and the task_events trail row in one transaction, and
 // records who ticked it. This
 // action only fails fast on a caller who cannot see the tenant's official

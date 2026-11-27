@@ -133,7 +133,7 @@ to authenticated, service_role;
 -- ----------------------------------------------------------------------------
 -- checklist_item_checks, checklist_item_events, official_unavailability and
 -- official_events (N23, 20261028104200), tasks, task_assignees and task_events
--- (N72, 20261127105240) each grant `authenticated` in the migration that creates them, which is why
+-- (N72, 20261127152421) each grant `authenticated` in the migration that creates them, which is why
 -- they are absent from the lists above. Those grants omit service_role,
 -- because hosted Supabase supplies it automatically — but a local
 -- `supabase db reset` does not, so anything going through the service client

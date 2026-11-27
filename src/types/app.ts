@@ -43,7 +43,7 @@ export type ChecklistItemEvent = Omit<DbTables['checklist_item_events']['Row'], 
 // N72: to-dos per stage. Written through save_task / set_task_done.
 export type Task = DbTables['tasks']['Row']
 export type TaskAssignee = DbTables['task_assignees']['Row']
-// Match migration 20261127105240's CHECK constraint.
+// Match migration 20261127152421's CHECK constraint.
 export type TaskEventAction = 'done' | 'undone'
 export type TaskEvent = Omit<DbTables['task_events']['Row'], 'action'> & {
   action: TaskEventAction
