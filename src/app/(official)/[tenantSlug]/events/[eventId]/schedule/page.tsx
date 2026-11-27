@@ -441,7 +441,7 @@ export default async function SchedulePage({ params, searchParams }: Props) {
     const { data: taskRows, error: tasksError } = await supabase
       .from('tasks')
       .select(
-        'id, name, description, color, starts_at, deadline, done, done_at, done_by, done_by_name, event_stages!tasks_stage_tenant_fkey(name), mine:task_assignees!inner(official_id), task_assignees(official_id, officials!task_assignees_official_tenant_fkey(name)), task_todos(id, instruction_text, position, item_type, checked, checked_at, checked_by, checked_by_name)'
+        'id, name, description, color, starts_at, deadline, done, done_at, done_by, done_by_name, event_stages!tasks_stage_tenant_fkey(name), mine:task_assignees!inner(official_id), task_assignees(official_id, officials!task_assignees_official_tenant_fkey(name))'
       )
       .eq('tenant_id', tenant.id)
       .eq('event_id', eventId)
@@ -468,22 +468,6 @@ export default async function SchedulePage({ params, searchParams }: Props) {
           .map((a) => a.officials?.name ?? '')
           .filter(Boolean)
           .sort((a, b) => a.localeCompare(b)),
-        todos: [...(row.task_todos ?? [])]
-          .sort((a, b) => a.position - b.position)
-          .map((todo) => ({
-            id: todo.id,
-            instruction_text: todo.instruction_text,
-            position: todo.position,
-            item_type: todo.item_type,
-            check:
-              todo.checked && todo.checked_at
-                ? {
-                    checked_by: todo.checked_by,
-                    checked_at: todo.checked_at,
-                    actorName: todo.checked_by_name,
-                  }
-                : null,
-          })),
       })
     }
   }
@@ -552,8 +536,6 @@ export default async function SchedulePage({ params, searchParams }: Props) {
         withYou: t('myTasks.withYou'),
         markDone: t('myTasks.markDone'),
         doneBy: t('myTasks.doneBy'),
-        todoLabel: t('mySchedule.todoLabel'),
-        infoLabel: t('mySchedule.infoLabel'),
       }}
     />
   )

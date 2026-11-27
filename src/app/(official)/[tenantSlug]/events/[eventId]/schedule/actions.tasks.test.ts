@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { toggleMyTaskDone, toggleMyTaskTodo } from './actions'
+import { toggleMyTaskDone } from './actions'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getOfficialTenant } from '@/lib/auth/tenant'
 import { revalidatePath } from 'next/cache'
@@ -66,15 +66,5 @@ describe('toggleMyTaskDone', () => {
       error: 'actionErrors.notAuthorized',
     })
     expect(rpc).not.toHaveBeenCalled()
-  })
-})
-
-describe('toggleMyTaskTodo', () => {
-  it('calls set_task_todo_checked', async () => {
-    await toggleMyTaskTodo({ tenantSlug: 'viadal', id: TASK_ID, checked: false })
-    expect(rpc).toHaveBeenCalledWith('set_task_todo_checked', {
-      p_todo_id: TASK_ID,
-      p_checked: false,
-    })
   })
 })

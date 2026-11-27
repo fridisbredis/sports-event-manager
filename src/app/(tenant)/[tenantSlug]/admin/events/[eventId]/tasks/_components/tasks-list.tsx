@@ -1,7 +1,7 @@
 'use client'
 
 import { Flag } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Accordion,
@@ -30,7 +30,8 @@ import {
 import { formatStageDate, type Stage } from '../../workstations/_utils'
 import { formatTaskWhen, isOverdue } from '@/lib/tasks/time'
 import { DoneToggle } from './done-toggle'
-import type { TaskListItem } from '../_load-list'
+import { TaskDialog } from './task-dialog'
+import type { AssignableOfficial, TaskListItem } from '../_load-list'
 
 // N72. Laid out like the work areas list (one panel per stage, the same
 // table look) so the two pages read as siblings. A separate component rather
@@ -41,9 +42,14 @@ const FALLBACK_COLOR: WorkAreaColor = WORK_AREA_COLORS[0]
 
 interface Props {
   tenantId: string
+  eventId: string
   stages: Stage[]
   tasks: TaskListItem[]
+  officials: AssignableOfficial[]
 }
+
+/** What the dialog is open on: a task to edit, or a stage to add one to. */
+type DialogTarget = { stage: Stage; task: TaskListItem | null }
 
 function StageTitle({ stage, count }: { stage: Stage; count: number }) {
   const { t } = useTranslation('admin')
@@ -83,15 +89,15 @@ function StageContent({
   stage,
   tasks,
   colors,
+  onOpen,
 }: {
   tenantId: string
   stage: Stage
   tasks: TaskListItem[]
   colors: Map<string, WorkAreaColor>
+  onOpen: (target: DialogTarget) => void
 }) {
-  const router = useRouter()
   const { t } = useTranslation('admin')
-  const eventPath = useAdminEventPath()
   const language = useLanguage()
 
   return (
@@ -109,9 +115,8 @@ function StageContent({
             <TableColumn>{t('tasks.nameLabel')}</TableColumn>
             <TableColumn>{t('tasks.colWhen')}</TableColumn>
             {/* Admin screens are web-first; on a phone the table keeps name,
-                deadline and the tick, and the detail page has the rest. */}
+                deadline and the tick, and the dialog has the rest. */}
             <TableColumn className="hidden md:table-cell">{t('tasks.colAssignees')}</TableColumn>
-            <TableColumn className="hidden md:table-cell">{t('tasks.colChecklist')}</TableColumn>
             <TableColumn align="end">{t('tasks.colDone')}</TableColumn>
           </TableHeader>
           <TableBody>
@@ -121,7 +126,7 @@ function StageContent({
                 <TableRow
                   key={task.id}
                   className="cursor-pointer"
-                  onClick={() => router.push(eventPath(`tasks/${task.id}`))}
+                  onClick={() => onOpen({ stage, task })}
                 >
                   <TableCell className="text-[15px] font-medium text-ink">
                     <span className="flex items-center gap-2.5">
@@ -154,14 +159,6 @@ function StageContent({
                   <TableCell className="hidden text-[15px] text-ink-soft md:table-cell">
                     {task.assigneeNames.length > 0 ? task.assigneeNames.join(', ') : '—'}
                   </TableCell>
-                  <TableCell className="hidden text-[15px] text-ink-soft md:table-cell">
-                    {task.checklistTotal > 0
-                      ? t('tasks.checklistProgress', {
-                          done: task.checklistDone,
-                          total: task.checklistTotal,
-                        })
-                      : '—'}
-                  </TableCell>
                   <TableCell className="text-right">
                     <DoneToggle tenantId={tenantId} task={task} />
                   </TableCell>
@@ -172,7 +169,7 @@ function StageContent({
         </Table>
       )}
       <div className="mt-2 flex justify-end border-t border-edge pt-3">
-        <LinkButton onPress={() => router.push(eventPath(`tasks/new?stageId=${stage.id}`))}>
+        <LinkButton onPress={() => onOpen({ stage, task: null })}>
           + {t('tasks.addTask')}
         </LinkButton>
       </div>
@@ -180,10 +177,11 @@ function StageContent({
   )
 }
 
-export default function TasksList({ tenantId, stages, tasks }: Props) {
+export default function TasksList({ tenantId, eventId, stages, tasks, officials }: Props) {
   const router = useRouter()
   const { t } = useTranslation('admin')
   const eventPath = useAdminEventPath()
+  const [dialog, setDialog] = useState<DialogTarget | null>(null)
 
   const colors = useMemo(
     () => workAreaColorMap(tasks.map((task) => ({ id: task.id, color: task.color }))),
@@ -229,11 +227,31 @@ export default function TasksList({ tenantId, stages, tasks }: Props) {
               textValue={stage.name}
               title={<StageTitle stage={stage} count={stageTasks.length} />}
             >
-              <StageContent tenantId={tenantId} stage={stage} tasks={stageTasks} colors={colors} />
+              <StageContent
+                tenantId={tenantId}
+                stage={stage}
+                tasks={stageTasks}
+                colors={colors}
+                onOpen={setDialog}
+              />
             </AccordionItem>
           )
         })}
       </Accordion>
+      {dialog && (
+        <TaskDialog
+          // Keyed so a second open starts from that task, not the last one's state.
+          key={dialog.task?.id ?? `new-${dialog.stage.id}`}
+          tenantId={tenantId}
+          eventId={eventId}
+          stageId={dialog.stage.id}
+          stageName={dialog.stage.name}
+          officials={officials}
+          stageTasks={tasks.filter((task) => task.stage_id === dialog.stage.id)}
+          task={dialog.task}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   )
 }

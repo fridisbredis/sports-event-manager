@@ -1226,7 +1226,6 @@ export type Database = {
           id: string
           task_id: string
           tenant_id: string
-          todo_id: string | null
         }
         Insert: {
           action: string
@@ -1237,7 +1236,6 @@ export type Database = {
           id?: string
           task_id: string
           tenant_id: string
-          todo_id?: string | null
         }
         Update: {
           action?: string
@@ -1248,7 +1246,6 @@ export type Database = {
           id?: string
           task_id?: string
           tenant_id?: string
-          todo_id?: string | null
         }
         Relationships: [
           {
@@ -1264,66 +1261,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'tenants'
             referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'task_events_todo_id_fkey'
-            columns: ['todo_id']
-            isOneToOne: false
-            referencedRelation: 'task_todos'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      task_todos: {
-        Row: {
-          checked: boolean
-          checked_at: string | null
-          checked_by: string | null
-          checked_by_name: string | null
-          created_at: string
-          event_id: string
-          id: string
-          instruction_text: string
-          item_type: string
-          position: number
-          task_id: string
-          tenant_id: string
-        }
-        Insert: {
-          checked?: boolean
-          checked_at?: string | null
-          checked_by?: string | null
-          checked_by_name?: string | null
-          created_at?: string
-          event_id: string
-          id?: string
-          instruction_text: string
-          item_type?: string
-          position: number
-          task_id: string
-          tenant_id: string
-        }
-        Update: {
-          checked?: boolean
-          checked_at?: string | null
-          checked_by?: string | null
-          checked_by_name?: string | null
-          created_at?: string
-          event_id?: string
-          id?: string
-          instruction_text?: string
-          item_type?: string
-          position?: number
-          task_id?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'task_todos_task_event_fkey'
-            columns: ['task_id', 'event_id']
-            isOneToOne: false
-            referencedRelation: 'tasks'
-            referencedColumns: ['id', 'event_id']
           },
         ]
       }
@@ -1915,13 +1852,13 @@ export type Database = {
           p_color: string
           p_deadline: string
           p_description: string
+          p_done: boolean
           p_event_id: string
           p_name: string
           p_stage_id: string
           p_starts_at: string
           p_task_id: string
           p_tenant_id: string
-          p_todos: Json
         }
         Returns: Json
       }
@@ -1942,10 +1879,6 @@ export type Database = {
       }
       set_task_done: {
         Args: { p_done: boolean; p_task_id: string }
-        Returns: Json
-      }
-      set_task_todo_checked: {
-        Args: { p_checked: boolean; p_todo_id: string }
         Returns: Json
       }
       shares_event_with_caller: {

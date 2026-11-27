@@ -9,12 +9,6 @@ import { AppCard } from '@/components/ui/app-card'
 
 /** One row in the editor. `text` is the instruction, `itemType` its kind. */
 export interface TodoDraft {
-  /**
-   * The saved item's id. Only the Tasks form sets it: a task's tick lives on
-   * the item row, so save_task must know which row an edited line is. Work
-   * areas replace their whole list on save and leave it unset.
-   */
-  id?: string
   text: string
   itemType: ChecklistItemType
 }
@@ -22,8 +16,6 @@ export interface TodoDraft {
 interface Props {
   todos: TodoDraft[]
   onChange: (next: TodoDraft[]) => void
-  /** Replaces the check-off hint, whose default talks about shifts. */
-  checklistHint?: string
 }
 
 interface ListProps {
@@ -144,7 +136,7 @@ function TodoList({
  * row carries its index into that array, so editing one list never disturbs
  * the other's ordering.
  */
-export function TodosEditor({ todos, onChange, checklistHint }: Props) {
+export function TodosEditor({ todos, onChange }: Props) {
   const { t } = useTranslation('admin')
   // Which absolute index to focus once it renders. A ref, not state: it must
   // survive the re-render the add causes without triggering another.
@@ -215,7 +207,7 @@ export function TodosEditor({ todos, onChange, checklistHint }: Props) {
       <TodoList
         groupLabel={t('workstations.todosLabel')}
         heading={t('workstations.checklistHeading')}
-        hint={checklistHint ?? t('workstations.checklistHint')}
+        hint={t('workstations.checklistHint')}
         addLabel={t('workstations.addChecklistItem')}
         placeholder={t('workstations.checklistPlaceholder')}
         removeLabel={t('workstations.removeTodo')}

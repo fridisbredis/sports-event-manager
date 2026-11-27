@@ -22,7 +22,7 @@ export function SchedulingViewToggle({
     <div
       role="tablist"
       aria-label={t('scheduling.viewToggleLabel')}
-      className="no-print mb-5 inline-flex gap-1 rounded-control bg-status-neutral-bg p-1"
+      className="no-print inline-flex gap-1 rounded-control bg-status-neutral-bg p-1"
     >
       {options.map(([key, label]) => {
         const isActive = view === key

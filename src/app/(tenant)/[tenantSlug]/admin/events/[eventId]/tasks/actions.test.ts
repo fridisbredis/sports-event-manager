@@ -53,7 +53,7 @@ const BASE = {
   color: 'sky',
   startsAt: null,
   deadline: '2026-12-01T10:00',
-  todos: [],
+  done: false,
   assigneeIds: [],
 }
 
@@ -70,7 +70,7 @@ beforeEach(() => {
 })
 
 describe('saveTask', () => {
-  it('sends trimmed fields, UTC times and the checklist to save_task', async () => {
+  it('sends trimmed fields, UTC times and the done flag to save_task', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { id: TASK_ID }, error: null })
     mockClient({ rpc })
 
@@ -78,11 +78,7 @@ describe('saveTask', () => {
       ...BASE,
       startsAt: '2026-12-01T08:00',
       assigneeIds: ['a', 'a', 'b'],
-      todos: [
-        { id: 'todo-1', instruction_text: ' Count bibs ', item_type: 'checkbox' },
-        { instruction_text: '   ', item_type: 'info' },
-        { instruction_text: 'New one', item_type: 'info' },
-      ],
+      done: true,
     })
 
     expect(result).toEqual({ id: TASK_ID })
@@ -96,10 +92,7 @@ describe('saveTask', () => {
       p_color: 'sky',
       p_starts_at: '2026-12-01T08:00:00.000Z',
       p_deadline: '2026-12-01T10:00:00.000Z',
-      p_todos: [
-        { id: 'todo-1', instruction_text: 'Count bibs', item_type: 'checkbox' },
-        { instruction_text: 'New one', item_type: 'info' },
-      ],
+      p_done: true,
       p_assignee_ids: ['a', 'b'],
     })
     expect(revalidatePath).toHaveBeenCalledWith(

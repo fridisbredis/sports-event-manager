@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MyTasks, type MyTask } from './my-tasks'
-import { toggleMyTaskDone, toggleMyTaskTodo } from '../actions'
+import { toggleMyTaskDone } from '../actions'
 
 vi.mock('../actions', () => ({
   toggleChecklistItem: vi.fn(() => Promise.resolve({})),
   toggleMyTaskDone: vi.fn(() => Promise.resolve({})),
-  toggleMyTaskTodo: vi.fn(() => Promise.resolve({})),
 }))
 
 const STRINGS = {
@@ -15,8 +14,6 @@ const STRINGS = {
   withYou: 'With you on this task: {{names}}',
   markDone: 'The task is done',
   doneBy: 'Marked done by {{name}} at {{time}}',
-  todoLabel: 'To do',
-  infoLabel: 'Good to know',
 }
 
 const CHECKLIST_STRINGS = {
@@ -42,22 +39,6 @@ const TASK: MyTask = {
   deadline: '2099-12-01T10:00:00.000Z',
   doneCheck: null,
   coAssignees: ['Bob'],
-  todos: [
-    {
-      id: 'todo-1',
-      instruction_text: 'Anchor the legs',
-      position: 0,
-      item_type: 'checkbox',
-      check: { checked_by: 'u-bob', checked_at: '2099-12-01T08:00:00.000Z', actorName: 'Bob' },
-    },
-    {
-      id: 'todo-2',
-      instruction_text: 'Key is with Erik',
-      position: 1,
-      item_type: 'info',
-      check: null,
-    },
-  ],
 }
 
 function renderTasks(tasks: MyTask[]) {
@@ -82,14 +63,13 @@ describe('MyTasks', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows the task, its stage, co-assignees and who ticked an item', () => {
+  it('shows the task, its stage, notes and co-assignees', () => {
     renderTasks([TASK])
     expect(screen.getByRole('heading', { name: 'My tasks' })).toBeInTheDocument()
     expect(screen.getByText('Set up finish arch')).toBeInTheDocument()
     expect(screen.getByText(/^Day 1 · /)).toBeInTheDocument()
     expect(screen.getByText('With you on this task: Bob')).toBeInTheDocument()
-    expect(screen.getByText(/Checked by Bob at/)).toBeInTheDocument()
-    expect(screen.getByText('Key is with Erik')).toBeInTheDocument()
+    expect(screen.getByText('Arch is in the shed')).toBeInTheDocument()
     expect(screen.queryByText('Overdue')).not.toBeInTheDocument()
   })
 
@@ -110,17 +90,28 @@ describe('MyTasks', () => {
     )
   })
 
-  it('asks before clearing a colleague’s tick on a checklist item', async () => {
-    renderTasks([TASK])
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Check off: Anchor the legs' }))
+  it('shows who ticked it, and asks before clearing a colleague’s tick', async () => {
+    renderTasks([
+      {
+        ...TASK,
+        doneCheck: {
+          checked_by: 'u-bob',
+          checked_at: '2099-12-01T08:00:00.000Z',
+          actorName: 'Bob',
+        },
+      },
+    ])
+    expect(screen.getByText(/Marked done by Bob at/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Check off: The task is done' }))
     expect(await screen.findByText('Bob checked this off. Uncheck it anyway?')).toBeInTheDocument()
-    expect(toggleMyTaskTodo).not.toHaveBeenCalled()
+    expect(toggleMyTaskDone).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Yes, uncheck' }))
     await waitFor(() =>
-      expect(toggleMyTaskTodo).toHaveBeenCalledWith({
+      expect(toggleMyTaskDone).toHaveBeenCalledWith({
         tenantSlug: 'viadal',
-        id: 'todo-1',
+        id: 'task-1',
         checked: false,
       })
     )

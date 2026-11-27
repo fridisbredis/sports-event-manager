@@ -64,7 +64,7 @@ describe('tasks (N72)', () => {
       p_color: null,
       p_starts_at: null,
       p_deadline: DEADLINE,
-      p_todos: [],
+      p_done: null,
       p_assignee_ids: [] as string[],
       ...overrides,
     } as unknown as Database['public']['Functions']['save_task']['Args']
@@ -409,132 +409,55 @@ describe('tasks (N72)', () => {
     })
   })
 
-  describe('checklist', () => {
-    async function todosOf(taskId: string) {
+  describe('save_task done flag', () => {
+    async function eventsOf(taskId: string) {
       const { data } = await admin()
-        .from('task_todos')
-        .select('id, instruction_text, position, item_type, checked')
+        .from('task_events')
+        .select('action, actor_user_id')
         .eq('task_id', taskId)
-        .order('position')
-      return data ?? []
+        .order('created_at')
+      return (data ?? []).map((e) => e.action)
     }
 
-    it('keeps ticks when the task is edited, and drops items left out', async () => {
-      const { data } = await adminClient.rpc(
-        'save_task',
-        saveArgs({
-          p_assignee_ids: [assigneeOfficialId],
-          p_todos: [
-            { instruction_text: 'Count bibs', item_type: 'checkbox' },
-            { instruction_text: 'Bring tape', item_type: 'checkbox' },
-            { instruction_text: 'Boxes are in the shed' },
-          ],
-        })
-      )
-      const taskId = (data as { id: string }).id
-      const [count, tape, info] = await todosOf(taskId)
-      expect(info.item_type).toBe('info')
-
-      const { data: tick, error } = await assigneeClient.rpc('set_task_todo_checked', {
-        p_todo_id: count.id,
-        p_checked: true,
-      })
+    it('creates a task already done, and logs it', async () => {
+      const { data, error } = await adminClient.rpc('save_task', saveArgs({ p_done: true }))
       expect(error).toBeNull()
-      expect(Object.keys(tick as object).sort()).toEqual(['checked', 'checked_at', 'id'])
-      expect(tick).toMatchObject({ id: count.id, checked: true })
-      const { data: tickedRow } = await assigneeClient
-        .from('task_todos')
-        .select('checked_by_name')
-        .eq('id', count.id)
+      const taskId = (data as { id: string }).id
+
+      const { data: task } = await admin()
+        .from('tasks')
+        .select('done, done_at, done_by')
+        .eq('id', taskId)
         .single()
-      expect(tickedRow!.checked_by_name).toBe('Test Official')
-
-      // Reorder, rename the ticked one, drop "Bring tape", add a new one.
-      const { error: saveError } = await adminClient.rpc(
-        'save_task',
-        saveArgs({
-          p_task_id: taskId,
-          p_assignee_ids: [assigneeOfficialId],
-          p_todos: [
-            { id: info.id, instruction_text: 'Boxes are in the shed' },
-            { id: count.id, instruction_text: 'Count all bibs', item_type: 'checkbox' },
-            { instruction_text: 'Label boxes', item_type: 'checkbox' },
-          ],
-        })
-      )
-      expect(saveError).toBeNull()
-
-      const after = await todosOf(taskId)
-      expect(after.map((t) => [t.instruction_text, t.position, t.checked])).toEqual([
-        ['Boxes are in the shed', 0, false],
-        ['Count all bibs', 1, true],
-        ['Label boxes', 2, false],
-      ])
-      expect(after.find((t) => t.id === tape.id)).toBeUndefined()
-
-      const { data: events } = await admin()
-        .from('task_events')
-        .select('action, todo_id')
-        .eq('task_id', taskId)
-      expect(events).toEqual([{ action: 'checked', todo_id: count.id }])
+      expect(task!.done).toBe(true)
+      expect(task!.done_at).not.toBeNull()
+      expect(task!.done_by).not.toBeNull()
+      expect(await eventsOf(taskId)).toEqual(['done'])
     })
 
-    it('lets an assignee read the checklist, but not an outsider', async () => {
-      const { data } = await adminClient.rpc(
-        'save_task',
-        saveArgs({
-          p_assignee_ids: [assigneeOfficialId],
-          p_todos: [{ instruction_text: 'Check radios', item_type: 'checkbox' }],
-        })
-      )
-      const taskId = (data as { id: string }).id
+    it('logs only a real change, and leaves the flag alone on null', async () => {
+      const taskId = await createTask()
 
-      const { data: mine } = await assigneeClient
-        .from('task_todos')
-        .select('id')
-        .eq('task_id', taskId)
-      expect(mine).toHaveLength(1)
+      // Same value: no trail row.
+      await adminClient.rpc('save_task', saveArgs({ p_task_id: taskId, p_done: false }))
+      expect(await eventsOf(taskId)).toEqual([])
 
-      const { data: theirs } = await outsiderClient
-        .from('task_todos')
-        .select('id')
-        .eq('task_id', taskId)
-      expect(theirs).toEqual([])
+      await adminClient.rpc('save_task', saveArgs({ p_task_id: taskId, p_done: true }))
+      // Null: an edit that does not touch the flag.
+      await adminClient.rpc('save_task', saveArgs({ p_task_id: taskId, p_done: null }))
+      await adminClient.rpc('save_task', saveArgs({ p_task_id: taskId, p_done: false }))
 
-      const [todo] = await todosOf(taskId)
-      const { error } = await outsiderClient.rpc('set_task_todo_checked', {
-        p_todo_id: todo.id,
-        p_checked: true,
-      })
-      expect(error?.code).toBe('42501')
+      const { data: task } = await admin()
+        .from('tasks')
+        .select('done, done_at, done_by, done_by_name')
+        .eq('id', taskId)
+        .single()
+      expect(task).toEqual({ done: false, done_at: null, done_by: null, done_by_name: null })
+      expect(await eventsOf(taskId)).toEqual(['done', 'undone'])
     })
+  })
 
-    it('refuses ticking an info item, and an item id from another task', async () => {
-      const { data } = await adminClient.rpc(
-        'save_task',
-        saveArgs({ p_todos: [{ instruction_text: 'Just info' }] })
-      )
-      const taskId = (data as { id: string }).id
-      const [info] = await todosOf(taskId)
-
-      const { error: tickError } = await adminClient.rpc('set_task_todo_checked', {
-        p_todo_id: info.id,
-        p_checked: true,
-      })
-      expect(tickError?.code).toBe('22023')
-
-      const otherTaskId = await createTask()
-      const { error: moveError } = await adminClient.rpc(
-        'save_task',
-        saveArgs({
-          p_task_id: otherTaskId,
-          p_todos: [{ id: info.id, instruction_text: 'Stolen' }],
-        })
-      )
-      expect(moveError?.code).toBe('22023')
-      expect((await todosOf(taskId))[0].instruction_text).toBe('Just info')
-    })
-
+  describe('colour', () => {
     it('stores the colour and refuses one outside the palette', async () => {
       const { data } = await adminClient.rpc('save_task', saveArgs({ p_color: 'sky' }))
       const { data: task } = await admin()
@@ -593,20 +516,6 @@ describe('tasks (N72)', () => {
 
         const { error: deleteError } = await adminClient.from('tasks').delete().eq('id', taskId)
         expect(deleteError?.code).toBe('P0004')
-
-        // The checklist is the event's setup too: no ticking either.
-        const { data: todo } = await admin()
-          .from('task_todos')
-          .insert({
-            task_id: taskId,
-            event_id: eventId,
-            tenant_id: tenantId,
-            instruction_text: 'x',
-            position: 0,
-            item_type: 'checkbox',
-          })
-          .select('id')
-        expect(todo).toBeNull()
       } finally {
         await admin().from('events').update({ status: 'draft' }).eq('id', eventId)
       }

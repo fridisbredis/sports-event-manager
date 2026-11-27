@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock, Layers } from 'lucide-react'
+import { ChevronDown, Clock, Layers } from 'lucide-react'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getAllocableDays } from '@/lib/scheduling/allocable-range'
@@ -36,6 +36,8 @@ import {
   type UnavailabilityPeriod,
 } from '@/lib/scheduling/unavailability'
 import { SchedulingViewToggle } from './scheduling-view-toggle'
+import { LinkButton } from '@/components/ui/link-button'
+import { STAGE_TASKS_ANCHOR } from './stage-tasks-block'
 import { ByPersonGrid } from './by-person-grid'
 import { ByWorkAreaGrid } from './by-work-area-grid'
 import { useSchedulingGridInteraction } from './use-scheduling-grid-interaction'
@@ -68,7 +70,14 @@ interface Props {
   unavailability: UnavailabilityPeriod[]
   initialSelectedDay: string
   initialSelectedStageId: string
+  /** N72: the selected stage's tasks, shown in a block below the grid. */
+  taskCount?: number
+  overdueTaskCount?: number
 }
+
+// A per-viewer convenience: remembered in this browser only, and the grid
+// shows when storage is unavailable.
+const GRID_OPEN_KEY = 'sched-grid-open'
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -83,6 +92,8 @@ export function SchedulingGrid({
   unavailability,
   initialSelectedDay,
   initialSelectedStageId,
+  taskCount = 0,
+  overdueTaskCount = 0,
 }: Props) {
   const { t } = useTranslation('admin')
   const language = useLanguage()
@@ -93,6 +104,31 @@ export function SchedulingGrid({
   // here, so a "review this warning" link actually lands on the flagged stage.
   const [selectedStageId, setSelectedStageId] = useState<string>(initialSelectedStageId)
   const [view, setView] = useState<SchedulingView>('by-person')
+  // N72: with many work areas and officials the grid runs far down the page
+  // and the tasks block below it goes unseen. Folding the grid away brings
+  // the tasks up; the "tasks below" link says they are there either way.
+  const [gridOpen, setGridOpen] = useState(true)
+
+  useEffect(() => {
+    try {
+      // After mount, like the sidebar's collapse state: localStorage is not
+      // there during SSR, and reading it earlier would break hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem(GRID_OPEN_KEY) === 'false') setGridOpen(false)
+    } catch {
+      // Storage blocked: the grid stays open.
+    }
+  }, [])
+
+  function toggleGridOpen() {
+    const next = !gridOpen
+    setGridOpen(next)
+    try {
+      window.localStorage.setItem(GRID_OPEN_KEY, String(next))
+    } catch {
+      // Storage blocked: the choice lasts for this page only.
+    }
+  }
   const [selectedDay, setSelectedDay] = useState<string>(initialSelectedDay)
 
   // The assignments the server sent are scoped to `initialSelectedDay` — when the
@@ -599,61 +635,93 @@ export function SchedulingGrid({
         unavailableDetails={unavailableDetails}
       />
 
-      <SchedulingViewToggle view={view} onChange={setView} />
-
-      {/* Grid */}
-      {officials.length === 0 && stageWorkstations.length === 0 ? (
-        <SetupEmptyState />
-      ) : slots.length === 0 ? (
-        <EmptyStateCard
-          Icon={Clock}
-          title={t('scheduling.noTimeRangeTitle')}
-          description={t('scheduling.noTimeRangeHint')}
-        />
-      ) : view === 'by-person' ? (
-        <ByPersonGrid
-          slots={slots}
-          granularityMin={granularityMin}
-          officials={officials}
-          stageWorkstations={stageWorkstations}
-          activeAssignments={activeAssignments}
-          doubleBookedOfficials={doubleBookedOfficials}
-          unavailableSlots={unavailableSlots}
-          periodsByCell={periodsByCell}
-          personDrag={personDrag}
-          pendingPaint={
-            personDragPicker
-              ? {
-                  officialId: personDragPicker.officialId,
-                  cellStarts: new Set(personDragPicker.cellStarts),
-                }
-              : null
+      <div className="no-print mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+        {gridOpen && <SchedulingViewToggle view={view} onChange={setView} />}
+        <LinkButton
+          onPress={toggleGridOpen}
+          aria-expanded={gridOpen}
+          aria-controls="scheduling-grid-body"
+          startContent={
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 transition-transform ${gridOpen ? '' : '-rotate-90'}`}
+            />
           }
-          onPersonDragStart={handlePersonDragStart}
-          onPersonDragEnter={handlePersonDragEnter}
-          onTimeOffClick={handleTimeOffClick}
-          onCellClick={handleCellClick}
-          pendingCells={pendingCells}
-        />
-      ) : (
-        <ByWorkAreaGrid
-          slots={slots}
-          granularityMin={granularityMin}
-          officials={officials}
-          stageWorkstations={stageWorkstations}
-          activeAssignments={activeAssignments}
-          overCapacityCells={overCapacityCells}
-          expandedWorkAreas={expandedWorkAreas}
-          pendingCells={pendingCells}
-          onToggleExpand={toggleExpandedWorkArea}
-          onWsExpandedSlotClick={handleWsExpandedSlotClick}
-          onOverflowClick={handleOverflowClick}
-          wsDrag={wsDrag}
-          onWsDragStart={handleWsDragStart}
-          onWsDragEnter={handleWsDragEnter}
-          dragOfficialPicker={dragOfficialPicker}
-        />
-      )}
+        >
+          {gridOpen ? t('scheduling.hideGrid') : t('scheduling.showGrid')}
+        </LinkButton>
+        {taskCount > 0 && (
+          <a
+            href={`#${STAGE_TASKS_ANCHOR}`}
+            className="ml-auto inline-flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-ink hover:underline"
+          >
+            {t('scheduling.tasksBelow', { count: taskCount })}
+            {overdueTaskCount > 0 && (
+              <span className="rounded-full bg-status-pending-bg px-2 py-0.5 text-xs font-medium text-status-pending-text">
+                {t('tasks.overdueCount', { count: overdueTaskCount })}
+              </span>
+            )}
+            <span aria-hidden="true">↓</span>
+          </a>
+        )}
+      </div>
+
+      {/* Grid. Folded with a class rather than unmounted, so it keeps its
+          state and still prints. */}
+      <div id="scheduling-grid-body" className={gridOpen ? undefined : 'hidden print:block'}>
+        {officials.length === 0 && stageWorkstations.length === 0 ? (
+          <SetupEmptyState />
+        ) : slots.length === 0 ? (
+          <EmptyStateCard
+            Icon={Clock}
+            title={t('scheduling.noTimeRangeTitle')}
+            description={t('scheduling.noTimeRangeHint')}
+          />
+        ) : view === 'by-person' ? (
+          <ByPersonGrid
+            slots={slots}
+            granularityMin={granularityMin}
+            officials={officials}
+            stageWorkstations={stageWorkstations}
+            activeAssignments={activeAssignments}
+            doubleBookedOfficials={doubleBookedOfficials}
+            unavailableSlots={unavailableSlots}
+            periodsByCell={periodsByCell}
+            personDrag={personDrag}
+            pendingPaint={
+              personDragPicker
+                ? {
+                    officialId: personDragPicker.officialId,
+                    cellStarts: new Set(personDragPicker.cellStarts),
+                  }
+                : null
+            }
+            onPersonDragStart={handlePersonDragStart}
+            onPersonDragEnter={handlePersonDragEnter}
+            onTimeOffClick={handleTimeOffClick}
+            onCellClick={handleCellClick}
+            pendingCells={pendingCells}
+          />
+        ) : (
+          <ByWorkAreaGrid
+            slots={slots}
+            granularityMin={granularityMin}
+            officials={officials}
+            stageWorkstations={stageWorkstations}
+            activeAssignments={activeAssignments}
+            overCapacityCells={overCapacityCells}
+            expandedWorkAreas={expandedWorkAreas}
+            pendingCells={pendingCells}
+            onToggleExpand={toggleExpandedWorkArea}
+            onWsExpandedSlotClick={handleWsExpandedSlotClick}
+            onOverflowClick={handleOverflowClick}
+            wsDrag={wsDrag}
+            onWsDragStart={handleWsDragStart}
+            onWsDragEnter={handleWsDragEnter}
+            dragOfficialPicker={dragOfficialPicker}
+          />
+        )}
+      </div>
 
       {/* Action popup — status change / remove for an existing assignment */}
       {cellActionCell && (
@@ -756,7 +824,7 @@ export function SchedulingGrid({
         />
       )}
 
-      <SchedulingWarningLegend />
+      {gridOpen && <SchedulingWarningLegend />}
     </div>
   )
 }

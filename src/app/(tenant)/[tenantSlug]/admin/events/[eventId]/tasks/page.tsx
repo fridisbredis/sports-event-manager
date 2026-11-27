@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getCurrentUser, getAdminTenant } from '@/lib/auth/tenant'
 import TasksList from './_components/tasks-list'
-import { fetchTaskListItems } from './_load-list'
+import { fetchAssignableOfficials, fetchTaskListItems } from './_load-list'
 
 interface Props {
   params: Promise<{ tenantSlug: string; eventId: string }>
@@ -31,7 +31,7 @@ export default async function TasksPage({ params }: Props) {
 
   if (!event) notFound()
 
-  const [{ data: stages, error: stagesError }, items] = await Promise.all([
+  const [{ data: stages, error: stagesError }, items, officials] = await Promise.all([
     supabase
       .from('event_stages')
       .select('id, name, stage_type, start_time, end_time')
@@ -39,13 +39,20 @@ export default async function TasksPage({ params }: Props) {
       .eq('tenant_id', tenant.id)
       .order('position', { ascending: true }),
     fetchTaskListItems(supabase, tenant.id, event.id),
+    fetchAssignableOfficials(supabase, tenant.id, event.id),
   ])
 
   if (stagesError) throw stagesError
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">
-      <TasksList tenantId={tenant.id} stages={stages ?? []} tasks={items} />
+      <TasksList
+        tenantId={tenant.id}
+        eventId={event.id}
+        stages={stages ?? []}
+        tasks={items}
+        officials={officials}
+      />
     </div>
   )
 }

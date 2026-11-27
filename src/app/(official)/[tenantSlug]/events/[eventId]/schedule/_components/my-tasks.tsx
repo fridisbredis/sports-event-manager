@@ -9,16 +9,8 @@ import {
   type WorkAreaColor,
 } from '@/lib/theme/work-area-colors'
 import { formatTaskWhen, isOverdue } from '@/lib/tasks/time'
-import {
-  ChecklistItemRow,
-  type ChecklistCheck,
-  type ChecklistStrings,
-  type ChecklistTodo,
-} from './checklist-item-row'
-import { toggleMyTaskDone, toggleMyTaskTodo } from '../actions'
-
-/** One checklist item on a task, with its current tick (null = unticked). */
-export type MyTaskTodo = ChecklistTodo & { check: ChecklistCheck | null }
+import { ChecklistItemRow, type ChecklistCheck, type ChecklistStrings } from './checklist-item-row'
+import { toggleMyTaskDone } from '../actions'
 
 export interface MyTask {
   id: string
@@ -28,11 +20,10 @@ export interface MyTask {
   stageName: string
   starts_at: string | null
   deadline: string
-  /** The task's own done tick, in the same shape as a checklist item's. */
+  /** The task's done tick, in the same shape as a shift checklist item's. */
   doneCheck: ChecklistCheck | null
   /** The other officials on the task, by name. */
   coAssignees: string[]
-  todos: MyTaskTodo[]
 }
 
 export interface MyTasksStrings {
@@ -43,8 +34,6 @@ export interface MyTasksStrings {
   markDone: string
   /** Carries `{{name}}` and `{{time}}`, like checklistStrings.checkedBy. */
   doneBy: string
-  todoLabel: string
-  infoLabel: string
 }
 
 interface Props {
@@ -61,9 +50,9 @@ interface Props {
  * deadline, not worked on a day, and an undone one from yesterday still
  * needs doing.
  *
- * The done tick and the checklist both render through ChecklistItemRow, so
- * they behave exactly like a shift's checklist: optimistic tick, "done by
- * Anna 14:02", and a confirm before clearing a colleague's tick.
+ * A task is one checkbox. Its tick renders through ChecklistItemRow, so it
+ * behaves exactly like an item on a shift's checklist: optimistic tick,
+ * "done by Anna 14:02", and a confirm before clearing a colleague's tick.
  */
 export function MyTasks({ tasks, tenantSlug, currentUserId, strings, checklistStrings }: Props) {
   const language = useLanguage()
@@ -82,8 +71,6 @@ export function MyTasks({ tasks, tenantSlug, currentUserId, strings, checklistSt
           const color: WorkAreaColor = colors.get(task.id) ?? WORK_AREA_COLORS[0]
           const done = task.doneCheck !== null
           const overdue = isOverdue({ done, deadline: task.deadline })
-          const checkable = task.todos.filter((todo) => todo.item_type === 'checkbox')
-          const info = task.todos.filter((todo) => todo.item_type !== 'checkbox')
 
           return (
             <AppCard
@@ -116,54 +103,6 @@ export function MyTasks({ tasks, tenantSlug, currentUserId, strings, checklistSt
                 </p>
               ) : null}
 
-              {task.todos.length > 0 ? (
-                <div className="mt-3 border-t border-gray-100 pt-3">
-                  {checkable.length > 0 ? (
-                    <>
-                      <p className="section-label mb-2">{strings.todoLabel}</p>
-                      <ul className="flex flex-col gap-2">
-                        {checkable.map((todo) => (
-                          <ChecklistItemRow
-                            key={todo.id}
-                            todo={todo}
-                            check={todo.check}
-                            color={color}
-                            tenantSlug={tenantSlug}
-                            onToggle={(checked) =>
-                              toggleMyTaskTodo({ tenantSlug, id: todo.id, checked })
-                            }
-                            currentUserId={currentUserId}
-                            strings={checklistStrings}
-                          />
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                  {info.length > 0 ? (
-                    <>
-                      <p className={`section-label mb-2 ${checkable.length > 0 ? 'mt-4' : ''}`}>
-                        {strings.infoLabel}
-                      </p>
-                      <ul className="flex flex-col gap-2">
-                        {info.map((todo) => (
-                          <ChecklistItemRow
-                            key={todo.id}
-                            todo={todo}
-                            check={null}
-                            color={color}
-                            tenantSlug={tenantSlug}
-                            currentUserId={currentUserId}
-                            strings={checklistStrings}
-                          />
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {/* The task's own tick, last: the checklist is the work, this
-                  is the statement that the work is finished. */}
               <ul className="mt-3 border-t border-gray-100 pt-3">
                 <ChecklistItemRow
                   todo={{

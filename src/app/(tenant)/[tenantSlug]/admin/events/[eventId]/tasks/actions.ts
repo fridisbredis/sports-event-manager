@@ -10,25 +10,16 @@ import { translateDbError } from '@/lib/actions/db-error-message'
 import { translateActionError as tError } from '@/lib/actions/action-error'
 import { adminEventRoutePattern } from '@/lib/events/paths'
 import { WORK_AREA_COLORS } from '@/lib/theme/work-area-colors'
-import type { Json } from '@/types/database'
-import type { ChecklistItemType } from '@/types/app'
 import { wallClockToIso } from '@/lib/tasks/time'
 
 // N72. Every write goes through an RPC (migration 20261127105240): save_task
-// writes the task, its checklist and its assignees in one transaction, and
-// set_task_done writes the flag together with its audit row. Delete is a plain
+// writes the task, its done flag and its assignees in one transaction, and
+// set_task_done (the list's tick) writes the flag together with its audit row. Delete is a plain
 // DELETE under tenant_admin_manage_tasks, like deleting a work area.
 
 const uuidSchema = z.string().uuid()
 const wallClockSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
 const paletteNameSchema = z.enum(WORK_AREA_COLORS.map((c) => c.name) as [string, ...string[]])
-
-export interface TaskTodoInput {
-  /** Set for an item that already exists, so its tick survives the save. */
-  id?: string
-  instruction_text: string
-  item_type: ChecklistItemType
-}
 
 export interface SaveTaskInput {
   tenantId: string
@@ -43,7 +34,7 @@ export interface SaveTaskInput {
   startsAt: string | null
   /** 'YYYY-MM-DDTHH:mm' wall clock. */
   deadline: string
-  todos: TaskTodoInput[]
+  done: boolean
   assigneeIds: string[]
 }
 
@@ -76,14 +67,6 @@ async function authorize(
     return { error: await tError('actionErrors.notAuthorized') }
 
   return { supabase, tenantId: parsed.data }
-}
-
-// Trim, drop blanks, keep order: position comes from array order in the RPC.
-function normaliseTodos(todos: TaskTodoInput[]): TaskTodoInput[] {
-  return todos
-    .map((t) => ({ ...t, instruction_text: t.instruction_text.trim() }))
-    .filter((t) => t.instruction_text.length > 0)
-    .map((t) => (t.id ? t : { instruction_text: t.instruction_text, item_type: t.item_type }))
 }
 
 export async function saveTask(input: SaveTaskInput): Promise<SaveTaskResult> {
@@ -122,7 +105,7 @@ export async function saveTask(input: SaveTaskInput): Promise<SaveTaskResult> {
     p_color: color.success ? color.data : null,
     p_starts_at: startsAt,
     p_deadline: deadline,
-    p_todos: normaliseTodos(input.todos) as unknown as Json,
+    p_done: input.done,
     p_assignee_ids: [...new Set(input.assigneeIds)],
   } as never)
 

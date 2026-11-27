@@ -177,9 +177,10 @@ export async function toggleChecklistItem(
 // ---------------------------------------------------------------------------
 // N72: an assigned official's own tasks
 // ---------------------------------------------------------------------------
-// Both writes go through SECURITY DEFINER RPCs (migration 20261127105240) that
-// check the caller is a confirmed assignee of the task, write the flag and the
-// task_events trail row in one transaction, and record who ticked it. This
+// The tick goes through the SECURITY DEFINER set_task_done (migration
+// 20261127105240), which checks the caller is a confirmed assignee of the
+// task, writes the flag and the task_events trail row in one transaction, and
+// records who ticked it. This
 // action only fails fast on a caller who cannot see the tenant's official
 // surfaces at all — the RPC is the tighter check, as RLS is for the shift
 // checklist above.
@@ -192,11 +193,11 @@ const taskToggleSchema = z.object({
 
 export type ToggleMyTaskInput = z.input<typeof taskToggleSchema>
 
-async function runTaskToggle(
-  label: string,
-  input: ToggleMyTaskInput,
-  rpc: 'set_task_done' | 'set_task_todo_checked'
+/** Ticks or unticks one of the caller's tasks as done. */
+export async function toggleMyTaskDone(
+  input: ToggleMyTaskInput
 ): Promise<ToggleChecklistItemResult> {
+  const label = 'toggleMyTaskDone'
   const parsed = taskToggleSchema.safeParse(input)
   if (!parsed.success) {
     logger.warn(`${label}: invalid input`, { issues: parsed.error.issues })
@@ -210,19 +211,16 @@ async function runTaskToggle(
   if (!tenant) return { error: await tError('actionErrors.notAuthorized') }
 
   const supabase = await createSupabaseServerClient()
-  const { error } =
-    rpc === 'set_task_done'
-      ? await supabase.rpc('set_task_done', {
-          p_task_id: parsed.data.id,
-          p_done: parsed.data.checked,
-        })
-      : await supabase.rpc('set_task_todo_checked', {
-          p_todo_id: parsed.data.id,
-          p_checked: parsed.data.checked,
-        })
+  const { error } = await supabase.rpc('set_task_done', {
+    p_task_id: parsed.data.id,
+    p_done: parsed.data.checked,
+  })
 
   if (error) {
-    logger.error(`${label}: ${rpc} failed`, error, { tenantId: tenant.id, id: parsed.data.id })
+    logger.error(`${label}: set_task_done failed`, error, {
+      tenantId: tenant.id,
+      id: parsed.data.id,
+    })
     return { error: 'checklist.saveFailed' }
   }
 
@@ -230,18 +228,4 @@ async function runTaskToggle(
   // tick on their next navigation.
   revalidatePath(officialEventRoutePattern('schedule'), 'page')
   return {}
-}
-
-/** Ticks or unticks one of the caller's tasks as done. */
-export async function toggleMyTaskDone(
-  input: ToggleMyTaskInput
-): Promise<ToggleChecklistItemResult> {
-  return runTaskToggle('toggleMyTaskDone', input, 'set_task_done')
-}
-
-/** Ticks or unticks a checklist item on one of the caller's tasks. */
-export async function toggleMyTaskTodo(
-  input: ToggleMyTaskInput
-): Promise<ToggleChecklistItemResult> {
-  return runTaskToggle('toggleMyTaskTodo', input, 'set_task_todo_checked')
 }
