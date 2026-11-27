@@ -17,6 +17,7 @@ import {
 } from '@/lib/auth/tenant-admins'
 import { grantSystemAdminRole, revokeSystemAdminRole } from '@/lib/auth/system-admins'
 import { smsSenderIdSchema } from '@/lib/sms/sender'
+import { FEEDBACK_STATUSES, type FeedbackStatus } from '@/types/app'
 
 const setTenantActiveSchema = z.object({
   tenantId: z.string().uuid(),
@@ -488,5 +489,45 @@ export async function updateOwnSystemAdminName(name: string): Promise<{ error?: 
   }
 
   revalidatePath('/admin/system-admins')
+  return {}
+}
+
+const updateFeedbackStatusSchema = z.object({
+  feedbackId: z.string().uuid(),
+  status: z.enum(FEEDBACK_STATUSES),
+})
+
+// N71: move a feedback row to another status. The RPC checks
+// is_system_admin() itself and writes only status and updated_at; this checks
+// first anyway (defense in depth), so a refusal is a clean message rather than
+// a raw Postgres error. Not audit-logged: audit_events is per tenant and
+// records changes to access and data, and a triage status is neither.
+export async function updateFeedbackStatus(
+  feedbackId: string,
+  status: FeedbackStatus
+): Promise<{ error?: string }> {
+  const check = await assertSystemAdmin()
+  if (!check.ok) return { error: check.error }
+  const { supabase } = check
+
+  const parsed = updateFeedbackStatusSchema.safeParse({ feedbackId, status })
+  if (!parsed.success) return { error: await tError('actionErrors.invalidRequest') }
+
+  // Reads back { id, status } — see the return-shape note on
+  // update_feedback_status in migration 20261127094110.
+  const { data, error } = await supabase.rpc('update_feedback_status', {
+    p_feedback_id: parsed.data.feedbackId,
+    p_status: parsed.data.status,
+  })
+
+  const result = data as { id?: string; status?: string } | null
+  if (error || result?.status !== parsed.data.status) {
+    if (error) logger.error('updateFeedbackStatus failed', error, { feedbackId })
+    return { error: await tError('actionErrors.updateFeedbackStatusFailed') }
+  }
+
+  revalidatePath('/admin/feedback')
+  // The sidebar's New badge is counted in the /admin layout.
+  revalidatePath('/admin', 'layout')
   return {}
 }

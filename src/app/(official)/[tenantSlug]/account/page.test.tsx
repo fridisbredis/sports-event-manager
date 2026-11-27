@@ -190,6 +190,7 @@ describe('OfficialAccountPage', () => {
       avatarUrl: undefined,
       vapidPublicKey: null,
       iceContact: null,
+      feedbackHref: '/viadal/feedback',
     })
   })
 

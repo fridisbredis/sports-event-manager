@@ -14,6 +14,7 @@ import {
   ClipboardList,
   CalendarClock,
   MessageSquare,
+  MessageSquareText,
   Smartphone,
   UserCircle,
   LogOut,
@@ -99,8 +100,18 @@ export function SidebarNav({
     const href = `/${tenantSlug}/${segment}`
     return pathname === href || pathname.startsWith(href + '/')
   }
+  const onFeedback = isUnder('admin/feedback')
   const supportActive =
-    (showAccount && isUnder('admin/account')) || (!!eventId && isUnder(`${eventBase}/help`))
+    (showAccount && isUnder('admin/account')) ||
+    (!!eventId && isUnder(`${eventBase}/help`)) ||
+    onFeedback
+  // N71: Feedback is tenant-level (like Account), so the event and the page
+  // the admin came from ride along in the query — a bug report then says
+  // where it happened. Left off when already on the page: the current page
+  // would only overwrite the original origin with the feedback page itself.
+  const feedbackSearch = onFeedback
+    ? ''
+    : `?${new URLSearchParams({ from: pathname, ...(eventId ? { event: eventId } : {}) })}`
   // Opens itself when the page is one of its items, so the highlighted link
   // is never hidden. Adjusted during render rather than in an effect (React's
   // "storing information from previous renders" pattern): the sidebar lives
@@ -162,12 +173,15 @@ export function SidebarNav({
       exact = false,
       badge,
       locked = false,
+      search = '',
     }: {
       isCollapsed?: boolean
       onNavigate?: () => void
       exact?: boolean
       badge?: string
       locked?: boolean
+      /** A query string (with its "?") for the link only; the active match ignores it. */
+      search?: string
     } = {}
   ) => {
     const href = `/${tenantSlug}/${segment}`
@@ -199,7 +213,7 @@ export function SidebarNav({
     return (
       <Link
         key={segment}
-        href={href}
+        href={`${href}${search}`}
         title={isCollapsed ? label : undefined}
         aria-current={isActive ? 'page' : undefined}
         // Closes the drawer on tap. Not left to a route-change effect: tapping
@@ -328,6 +342,12 @@ export function SidebarNav({
           {/* B22: its own page, not the dashboard with ?guide=1 — so it shows
               only the guide and always opens, also from the dashboard. */}
           {eventId && navLink(`${eventBase}/help`, t('navigation.helpGuide'), CircleHelp, opts)}
+          {/* N71: next to Help and guide. Shown with or without an event —
+              an admin with no event yet may well have a question. */}
+          {navLink('admin/feedback', t('navigation.feedback'), MessageSquareText, {
+            ...opts,
+            search: feedbackSearch,
+          })}
           {/* The official surface for this same tenant. Shown to every admin,
               not gated on showAccount: access there comes from the admin role
               (see resolveOfficialSurfaceAccess), while an officials row only

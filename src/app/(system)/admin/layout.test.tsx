@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import SystemAdminLayout from './layout'
 import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import { SidebarNav } from './_components/sidebar-nav'
+import { countNewFeedback } from '@/lib/feedback/triage'
 
 // B19: the system admin menu's "Your tenants" section. Which tenants qualify is
 // decided (and tested) in getOwnTenantSurfaces; this checks what the layout
@@ -25,6 +26,14 @@ vi.mock('@/components/language-select', () => ({
 
 vi.mock('./_components/sidebar-nav', () => ({
   SidebarNav: vi.fn(() => null),
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(async () => ({})),
+}))
+
+vi.mock('@/lib/feedback/triage', () => ({
+  countNewFeedback: vi.fn(async () => 0),
 }))
 
 function allByType(node: unknown, target: unknown, out: { props: Record<string, unknown> }[] = []) {
@@ -63,5 +72,15 @@ describe('SystemAdminLayout', () => {
         { name: 'Viadal', href: '/viadal/admin', officialOnly: false },
       ])
     }
+  })
+
+  // N71: the New badge on the Feedback item, in both the rail and the drawer.
+  it('hands the menu the number of new feedback rows', async () => {
+    vi.mocked(getOwnTenantSurfaces).mockResolvedValue([])
+    vi.mocked(countNewFeedback).mockResolvedValue(3)
+
+    const navs = allByType(await SystemAdminLayout({ children: null }), SidebarNav)
+    expect(navs).toHaveLength(2)
+    for (const nav of navs) expect(nav.props.newFeedbackCount).toBe(3)
   })
 })

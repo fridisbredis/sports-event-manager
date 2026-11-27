@@ -30,6 +30,7 @@ event_distances                restore
 event_info_sections            restore
 event_stages                   restore
 events                         restore
+feedback                       keep-live   # messages already sent to us (N71); a rollback would drop newer reports and system-admin triage, and orphan their images
 official_events                restore
 official_unavailability        restore
 officials                      restore
