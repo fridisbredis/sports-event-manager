@@ -1621,6 +1621,14 @@ export type Database = {
           row_tenant_id: string
         }[]
       }
+      list_gdpr_feedback_cleanup: {
+        Args: never
+        Returns: {
+          feedback_id: string
+          feedback_tenant_id: string
+          image_path: string | null
+        }[]
+      }
       mark_official_event_seen: {
         Args: { p_event_id: string }
         Returns: undefined
