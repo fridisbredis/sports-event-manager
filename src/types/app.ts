@@ -98,6 +98,18 @@ export type StageType = 'race' | 'non_race'
 // deriving from it.
 export const ASSIGNMENT_STATUSES = ['assigned', 'available', 'on_break', 'blocked'] as const
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number]
+// N71 feedback — match the CHECK constraints in migration 20261127094110.
+// Const tuples (same reason as ASSIGNMENT_STATUSES): the zod schema, the type
+// picker and the system admin's three columns all iterate the same list.
+export const FEEDBACK_TYPES = ['question', 'bug', 'feature'] as const
+export type FeedbackType = (typeof FEEDBACK_TYPES)[number]
+export const FEEDBACK_STATUSES = ['new', 'in_progress', 'done', 'declined'] as const
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number]
+export type Feedback = Omit<DbTables['feedback']['Row'], 'type' | 'status' | 'user_role'> & {
+  type: FeedbackType
+  status: FeedbackStatus
+  user_role: TenantRole
+}
 export type AnnouncementChannel = 'officials' | 'participants'
 export type OfficialInviteStatus = 'invited' | 'confirmed' | 'removed'
 export type SmsQueueStatus = 'pending' | 'sending' | 'sent' | 'failed'

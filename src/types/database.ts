@@ -592,6 +592,69 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          body: string
+          created_at: string
+          event_id: string | null
+          id: string
+          image_path: string | null
+          page_path: string
+          status: string
+          tenant_id: string
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+          user_role: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          image_path?: string | null
+          page_path: string
+          status?: string
+          tenant_id: string
+          title: string
+          type: string
+          updated_at?: string
+          user_id: string
+          user_role: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          image_path?: string | null
+          page_path?: string
+          status?: string
+          tenant_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+          user_role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'feedback_event_id_fkey'
+            columns: ['event_id']
+            isOneToOne: false
+            referencedRelation: 'events'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'feedback_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       official_events: {
         Row: {
           created_at: string
@@ -1355,12 +1418,34 @@ export type Database = {
     Functions: {
       anonymize_inactive_users: { Args: never; Returns: undefined }
       archive_lock_event_of: { Args: { p_row: Json }; Returns: string }
+      can_delete_feedback_object: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      can_insert_feedback: {
+        Args: {
+          p_event_id: string
+          p_id: string
+          p_image_path: string
+          p_tenant_id: string
+          p_user_role: string
+        }
+        Returns: boolean
+      }
       can_read_event: {
         Args: { p_event_id: string; p_tenant_id: string }
         Returns: boolean
       }
+      can_read_feedback_object: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
       can_read_ice_contact: { Args: { p_user_id: string }; Returns: boolean }
       can_write_avatar_object: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      can_write_feedback_object: {
         Args: { object_name: string }
         Returns: boolean
       }
@@ -1637,6 +1722,10 @@ export type Database = {
       sync_participant_role: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: undefined
+      }
+      update_feedback_status: {
+        Args: { p_feedback_id: string; p_status: string }
+        Returns: Json
       }
       update_workstation: {
         Args: {
