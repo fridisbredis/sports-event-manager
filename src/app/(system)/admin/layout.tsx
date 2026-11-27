@@ -5,6 +5,8 @@ import { getOwnTenantSurfaces } from '@/lib/auth/tenant'
 import { LanguageSelect } from '@/components/language-select'
 import { toOwnTenantLinks } from '@/lib/navigation/own-tenant-links'
 import { SidebarNav } from './_components/sidebar-nav'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { countNewFeedback } from '@/lib/feedback/triage'
 
 interface Props {
   children: React.ReactNode
@@ -25,12 +27,17 @@ export default async function SystemAdminLayout({ children }: Props) {
   // so fallbackNS has no 'common' bundle to reach from the 'admin' one.
   const tCommon = await getServerTranslation(language, 'common')
 
+  // N71: the number on the Feedback item. The status action revalidates this
+  // layout, so the badge follows a status change at once.
+  const newFeedbackCount = await countNewFeedback(await createSupabaseServerClient())
+
   const labels = {
     tenants: t('systemAdmin.tenants'),
     systemAdmins: t('systemAdmin.systemAdmins'),
     systemStatus: t('systemAdmin.systemStatus'),
     backups: t('systemAdmin.backups'),
     feedback: t('systemAdmin.feedback'),
+    feedbackNew: t('systemAdmin.feedbackNew', { count: newFeedbackCount ?? 0 }),
     privacyPolicy: t('systemAdmin.privacyPolicy'),
     privacyPolicyNewTab: tCommon('privacyPage.opensInNewTab'),
     logOut: t('systemAdmin.logOut'),
@@ -58,7 +65,7 @@ export default async function SystemAdminLayout({ children }: Props) {
           <span className="section-label">{t('systemAdmin.sidebarLabel')}</span>
           <ShieldCheck className="size-4 shrink-0 text-ink-faint" strokeWidth={2} />
         </div>
-        <SidebarNav labels={labels} ownTenants={ownTenants} />
+        <SidebarNav labels={labels} ownTenants={ownTenants} newFeedbackCount={newFeedbackCount} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         {/* The language control sits here rather than in the sidebar so it
@@ -73,7 +80,11 @@ export default async function SystemAdminLayout({ children }: Props) {
               this layout already has a bar to put the control in, so nothing
               needs to float over the page. */}
           <div className="md:hidden">
-            <SidebarNav labels={labels} ownTenants={ownTenants} />
+            <SidebarNav
+              labels={labels}
+              ownTenants={ownTenants}
+              newFeedbackCount={newFeedbackCount}
+            />
           </div>
           <LanguageSelect current={language} />
         </div>

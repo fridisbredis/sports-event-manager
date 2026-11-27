@@ -695,6 +695,8 @@
     "systemStatus": "Systemstatus",
     "backups": "Säkerhetskopior",
     "feedback": "Feedback",
+    "feedbackNew_one": "{{count}} ny",
+    "feedbackNew_other": "{{count}} nya",
     "createTenant": "Skapa kund",
     "noTenantsYet": "Inga kunder än",
     "noTenantsHint": "Skapa en kund för att komma igång.",

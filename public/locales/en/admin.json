@@ -695,6 +695,8 @@
     "systemStatus": "System status",
     "backups": "Backups",
     "feedback": "Feedback",
+    "feedbackNew_one": "{{count}} new",
+    "feedbackNew_other": "{{count}} new",
     "createTenant": "Create tenant",
     "noTenantsYet": "No tenants yet",
     "noTenantsHint": "Create a tenant to get started.",

@@ -527,5 +527,7 @@ export async function updateFeedbackStatus(
   }
 
   revalidatePath('/admin/feedback')
+  // The sidebar's New badge is counted in the /admin layout.
+  revalidatePath('/admin', 'layout')
   return {}
 }

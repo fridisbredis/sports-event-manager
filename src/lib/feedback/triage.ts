@@ -133,3 +133,23 @@ export async function loadFeedbackTriage(
 
   return { items, failed: false, truncated }
 }
+
+/**
+ * How many feedback rows still have status 'new' — the badge on the system
+ * admin sidebar's Feedback item. Through the caller's RLS client: for a system
+ * admin that is every tenant's rows. (Anyone else who reaches the /admin
+ * layout gets a 404 from every page under it, and RLS would only count their
+ * own rows anyway.) null on a failed read, so the badge is left off rather
+ * than showing a wrong 0.
+ */
+export async function countNewFeedback(supabase: SupabaseClient<Database>): Promise<number | null> {
+  const { count, error } = await supabase
+    .from('feedback')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'new')
+  if (error) {
+    logQueryError(error, { op: 'countNewFeedback', table: 'feedback', kind: 'select' })
+    return null
+  }
+  return count ?? 0
+}

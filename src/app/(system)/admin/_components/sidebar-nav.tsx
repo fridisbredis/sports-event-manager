@@ -25,6 +25,8 @@ interface Labels {
   backups: string
   /** N71: every tenant's feedback, by type. */
   feedback: string
+  /** N71: the badge's screen-reader text, already translated with its count. */
+  feedbackNew: string
   logOut: string
   privacyPolicy: string
   privacyPolicyNewTab: string
@@ -40,6 +42,8 @@ interface Labels {
 interface Props {
   labels: Labels
   ownTenants: OwnTenantLink[]
+  /** N71: feedback rows with status new; null when the count could not be read. */
+  newFeedbackCount?: number | null
 }
 
 // The system-admin sidebar deliberately does NOT use the tenant theme tint the
@@ -50,7 +54,7 @@ interface Props {
 const ACTIVE_ITEM = 'bg-status-neutral-bg font-semibold text-ink shadow-[inset_3px_0_0_#111827]'
 const IDLE_ITEM = 'text-ink-soft hover:bg-gray-50 hover:text-ink'
 
-export function SidebarNav({ labels, ownTenants }: Props) {
+export function SidebarNav({ labels, ownTenants, newFeedbackCount = null }: Props) {
   const pathname = usePathname()
   // Drawer state for the phone menu. The rail is hidden below md, so without
   // this there is no navigation at all on a phone — the same gap the tenant
@@ -145,6 +149,15 @@ export function SidebarNav({ labels, ownTenants }: Props) {
           <span className="truncate" title={labels.feedback}>
             {labels.feedback}
           </span>
+          {/* N71: how many are still New. Graphite like the active item —
+              no tenant colour exists on this surface. Hidden at 0: a badge
+              that is always there stops being noticed. */}
+          {!!newFeedbackCount && (
+            <span className="ml-auto rounded-full bg-ink px-2 py-0.5 text-xs font-semibold tabular-nums text-white">
+              <span aria-hidden>{newFeedbackCount}</span>
+              <span className="sr-only">{labels.feedbackNew}</span>
+            </span>
+          )}
         </Link>
         {/* B19: the tenants where this person holds a role of their own. A
             section of the nav rather than a strip above the page: it stays out
