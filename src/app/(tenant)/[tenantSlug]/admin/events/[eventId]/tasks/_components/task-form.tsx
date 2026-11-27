@@ -301,25 +301,13 @@ export default function TaskForm({
             value={color}
             takenBy={takenByStage[stageId] ?? []}
             onChange={edit(setColor)}
+            hint={t('tasks.colorHint')}
           />
 
           <section>
             <h2 className="section-label mb-1">{t('tasks.timeLabel')}</h2>
             <p className="mb-4 text-[13px] text-gray-400">{t('tasks.timeHint')}</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <DatePicker
-                label={t('tasks.deadlineLabel')}
-                granularity="minute"
-                hourCycle={24}
-                isRequired
-                value={parseWallClock(deadline)}
-                onChange={(value) => {
-                  edit(setDeadline)(toWallClock(value))
-                  setErrors((prev) => ({ ...prev, deadline: undefined, startsAt: undefined }))
-                }}
-                isInvalid={!!errors.deadline}
-                errorMessage={errors.deadline}
-              />
               <div>
                 <DatePicker
                   label={t('tasks.startLabel')}
@@ -339,6 +327,19 @@ export default function TaskForm({
                   </LinkButton>
                 )}
               </div>
+              <DatePicker
+                label={t('tasks.deadlineLabel')}
+                granularity="minute"
+                hourCycle={24}
+                isRequired
+                value={parseWallClock(deadline)}
+                onChange={(value) => {
+                  edit(setDeadline)(toWallClock(value))
+                  setErrors((prev) => ({ ...prev, deadline: undefined, startsAt: undefined }))
+                }}
+                isInvalid={!!errors.deadline}
+                errorMessage={errors.deadline}
+              />
             </div>
           </section>
 

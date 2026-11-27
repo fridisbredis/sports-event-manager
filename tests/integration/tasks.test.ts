@@ -284,6 +284,13 @@ describe('tasks (N72)', () => {
         .eq('task_id', notMine)
       expect(hidden).toEqual([])
 
+      // The co-assignee sees both tasks they are on.
+      const { data: colleagueTasks } = await colleagueClient
+        .from('tasks')
+        .select('id')
+        .in('id', [mine, notMine])
+      expect((colleagueTasks ?? []).map((t) => t.id).sort()).toEqual([mine, notMine].sort())
+
       const { data: outsiderTasks } = await outsiderClient
         .from('tasks')
         .select('id')

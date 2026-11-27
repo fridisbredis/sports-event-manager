@@ -158,8 +158,10 @@ function StageContent({
           <TableHeader>
             <TableColumn>{t('tasks.nameLabel')}</TableColumn>
             <TableColumn>{t('tasks.colWhen')}</TableColumn>
-            <TableColumn>{t('tasks.colAssignees')}</TableColumn>
-            <TableColumn>{t('tasks.colChecklist')}</TableColumn>
+            {/* Admin screens are web-first; on a phone the table keeps name,
+                deadline and the tick, and the detail page has the rest. */}
+            <TableColumn className="hidden md:table-cell">{t('tasks.colAssignees')}</TableColumn>
+            <TableColumn className="hidden md:table-cell">{t('tasks.colChecklist')}</TableColumn>
             <TableColumn align="end">{t('tasks.colDone')}</TableColumn>
           </TableHeader>
           <TableBody>
@@ -192,17 +194,17 @@ function StageContent({
                         <Chip
                           size="sm"
                           variant="flat"
-                          className="bg-status-danger-bg font-medium text-status-danger-text"
+                          className="bg-status-pending-bg font-medium text-status-pending-text"
                         >
                           {t('tasks.overdue')}
                         </Chip>
                       )}
                     </span>
                   </TableCell>
-                  <TableCell className="text-[15px] text-ink-soft">
+                  <TableCell className="hidden text-[15px] text-ink-soft md:table-cell">
                     {task.assigneeNames.length > 0 ? task.assigneeNames.join(', ') : '—'}
                   </TableCell>
-                  <TableCell className="text-[15px] text-ink-soft">
+                  <TableCell className="hidden text-[15px] text-ink-soft md:table-cell">
                     {task.checklistTotal > 0
                       ? t('tasks.checklistProgress', {
                           done: task.checklistDone,

@@ -25,9 +25,11 @@ interface Props {
    */
   takenBy: ColorTakenBy[]
   onChange: (color: string) => void
+  /** Replaces the hint, whose default talks about the schedule (N72 tasks). */
+  hint?: string
 }
 
-export function ColorPicker({ value, takenBy, onChange }: Props) {
+export function ColorPicker({ value, takenBy, onChange, hint }: Props) {
   const { t } = useTranslation('admin')
   const paletteId = useId()
 
@@ -98,7 +100,7 @@ export function ColorPicker({ value, takenBy, onChange }: Props) {
   return (
     <section>
       <h2 className="section-label mb-1">{t('workstations.colorLabel')}</h2>
-      <p className="mb-4 text-[13px] text-gray-400">{t('workstations.colorHint')}</p>
+      <p className="mb-4 text-[13px] text-gray-400">{hint ?? t('workstations.colorHint')}</p>
 
       {/* The folded state: the current choice as a bare swatch, no ring — the
           heavy "selected" ring only means something next to its siblings, and

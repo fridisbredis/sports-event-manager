@@ -357,7 +357,8 @@
     "deadlineRequired": "Deadline krävs",
     "startAfterDeadline": "Starten måste ligga före deadline.",
     "genericSaveError": "Kunde inte spara uppgiften. Försök igen.",
-    "genericDeleteError": "Kunde inte ta bort uppgiften. Försök igen."
+    "genericDeleteError": "Kunde inte ta bort uppgiften. Försök igen.",
+    "colorHint": "Används för att skilja uppgiften från andra i listorna."
   },
   "officials": {
     "title": "Funktionärslista",

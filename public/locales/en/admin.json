@@ -357,7 +357,8 @@
     "deadlineRequired": "Deadline is required",
     "startAfterDeadline": "The start must be before the deadline.",
     "genericSaveError": "Could not save the task. Please try again.",
-    "genericDeleteError": "Could not delete the task. Please try again."
+    "genericDeleteError": "Could not delete the task. Please try again.",
+    "colorHint": "Used to tell this task apart in the lists."
   },
   "officials": {
     "title": "Officials Roster",
